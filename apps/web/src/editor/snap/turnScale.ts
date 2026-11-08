@@ -12,7 +12,7 @@ import { localToWorld } from "../../domain/pivot"
 import { priorityOf, type SnapConfig, type SnapTarget } from "../../domain/snapConfig"
 import { axesOf, type MarkRole, type SnapItem, type SnapMark } from "../../domain/snapFrame"
 import { gridAxes } from "../../domain/snapGrid"
-import { glyphMark, shiftedMarks, sideOf } from "../../domain/snapRelation"
+import { cornersOf as boxCorners, glyphMark, itemBoxMark, shiftedMarks, sideOf } from "../../domain/snapRelation"
 import {
   alignedTurns,
   type Body,
@@ -116,6 +116,13 @@ const bodyOf = (item: SnapItem): Body => {
 
 const faceMark = ({ corners }: Pick<MeshFace, "corners">, role: MarkRole): SnapMark => ({ kind: "face", role, corners })
 
+/** The boxes of the items that lead a turn, turned by `turn` as the stop leaves them. */
+const turnedBoxes = (own: ReadonlyArray<SnapItem>, turn: (point: Vec3) => Vec3): ReadonlyArray<SnapMark> =>
+  own.map((item) => {
+    const box = itemBoxMark(item, "source")
+    return box.kind === "box" ? { ...box, corners: box.corners.map(turn) } : box
+  })
+
 /** A line through `at` along the unit `direction`, `half` cm each way. */
 const lineMark = (at: Vec3, direction: Vec3, half: number, role: MarkRole): SnapMark => ({
   kind: "line",
@@ -182,6 +189,8 @@ export const allTurnStopsOf = (
         relation: "onFace",
         label: `Touching ${item.name}`,
         marks: [
+          itemBoxMark(item, "target"),
+          ...turnedBoxes(own, turnedAbout(pivot, axis, contact.angle)),
           faceMark(contact.face, "target"),
           { kind: "dot", role: "source", at: contact.at },
           glyphMark("onFace", contact.at)
@@ -202,6 +211,8 @@ export const allTurnStopsOf = (
             relation: "flush",
             label: `Flush with ${item.name}`,
             marks: [
+              itemBoxMark(item, "target"),
+              ...turnedBoxes(own, turn),
               faceMark(other, "target"),
               faceMark({ corners: face.corners.map(turn) }, "source"),
               glyphMark("flush", other.centre)
@@ -309,8 +320,16 @@ export const scaleStopsOf = (
   box: Box,
   items: ReadonlyArray<SnapItem>
 ): ReadonlyArray<ScaleStop> => {
-  // the scaled face, which a stop carries from where it reaches now to the stop
+  // the scaled face, which a stop carries from where it reaches now to the stop, and the box it stretches
   const scaled = sideOf(box, axis, "source")
+  const far = spanOf(box, axis)[1]
+  const stretched = (by: number): SnapMark => ({
+    kind: "box",
+    role: "source",
+    corners: boxCorners(box).map((corner) =>
+      vecDot(corner, axis) >= far - 1e-3 ? vecAdd(corner, vecScale(axis, by)) : corner
+    )
+  })
   const reach = reachAlong(box, pivotPoint, axis)
   return items.filter((item) => inWayOf(box, item.box, axis)).flatMap((item) =>
     (item.faces() ?? boundsFacesOf(item)).flatMap((face): ReadonlyArray<ScaleStop> => {
@@ -321,6 +340,8 @@ export const scaleStopsOf = (
         label: `Face of ${item.name}`,
         relation: "flush",
         marks: [
+          itemBoxMark(item, "target"),
+          stretched(at - reach),
           { kind: "face", role: "target", corners: face.corners },
           ...shiftedMarks([scaled], vecScale(axis, at - reach)),
           glyphMark("flush", face.centre)

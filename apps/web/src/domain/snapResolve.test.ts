@@ -4,9 +4,9 @@ import type { Vec3 } from "./coords"
 import type { Box } from "./itemBounds"
 import { defaultSnapConfig, type SnapConfig, type SnapTarget, withPreset, withTargetMoved } from "./snapConfig"
 import type { BasePoint, SnapFrame, SnapHit, SnapItem, TrackedPoint } from "./snapFrame"
-import { shownMarks } from "./snapRelation"
+import { cornersOf, shownMarks } from "./snapRelation"
 import { moveOf, resolveDrag, resolveSnap } from "./snapResolve"
-import { meshHits } from "./snapTargets"
+import { meshHits, nearEndsOf } from "./snapTargets"
 import { selectionBases } from "./snapTools"
 import { IDENTITY_QUAT, ORIGIN, vecDot, vecSub } from "./ueMath"
 
@@ -134,6 +134,20 @@ describe("resolveSnap", () => {
       assert.isUndefined(pick(pulled(ends, 0.5), 308))
       assert.deepStrictEqual(pick(ends, 308)?.landing, end.position)
     })
+  })
+
+  it("finds the ends of other items near the selection's on screen, whatever their depth or the way they face", () => {
+    const own = { ...pivotBase, end: endAlongX("own", 0, 0, 1) }
+    const ends = [endAlongX("a", 0, 60, 1), endAlongX("a", 1, 150, -1), {
+      ...endAlongX("b", 0, 0, -1),
+      position: { x: 0, y: 40, z: -900 }
+    }]
+    const items = [
+      cubeAt("a", { x: 100, y: 0, z: 0 }, { ends: ends.slice(0, 2) }),
+      cubeAt("b", { x: 0, y: 40, z: -900 }, { ends: ends.slice(2) })
+    ]
+    const near = nearEndsOf(frameOf({ x: 10, y: 0, z: 0 }, { bases: [own, pivotBase], items }), 60)
+    assert.deepStrictEqual(near.map(({ ref }) => `${ref.item} ${ref.end}`).toSorted(), ["a 0", "b 0"])
   })
 
   it("doesn't turn a piece round to join an end its trailing end goes past", () => {
@@ -560,7 +574,8 @@ describe("the Mesh target under a move's constraint", () => {
       assert.deepStrictEqual(hit === undefined ? undefined : moveOf(hit).offset, { x: 350, y: 250, z: 0 })
       assert.strictEqual(hit?.label, "Face of Track Large and Face of Curve Large")
       assert.deepStrictEqual(hit?.held, { shape: "point", at: hit?.landing ?? ORIGIN })
-      assert.deepStrictEqual(hit?.marks.map(({ kind }) => kind), ["face", "face"])
+      // each item's box with its face that stopped the move
+      assert.deepStrictEqual(hit?.marks.map(({ kind }) => kind), ["box", "face", "box", "face"])
       assert.deepStrictEqual(hit?.parts?.map(({ item }) => item), ["a", "b"])
       const otherWay = dragThrough([[340, 240], [340, 252], [352, 252]], [track, curve]).at(-1)
       assert.deepStrictEqual(otherWay?.landing, hit?.landing)
@@ -584,7 +599,11 @@ describe("the Mesh target under a move's constraint", () => {
       assert.strictEqual(middle?.label, "Face and Middle of Track Large")
       const corner = dragThrough([[340, 40], [352, 40], [352, 52]], [named("a", "Track Large", box)]).at(-1)
       assert.strictEqual(corner?.label, "Face of Track Large")
-      assert.lengthOf(corner?.marks ?? [], 2)
+      // two faces of one box, which is drawn once
+      const drawn = corner === undefined
+        ? []
+        : shownMarks(corner).filter((mark) => "role" in mark && mark.role === "target")
+      assert.deepStrictEqual(drawn.map(({ kind }) => kind), ["box", "face", "face"])
     })
 
     it("lands on both planes when a face stands a few degrees off the axis", () => {
@@ -881,6 +900,11 @@ describe("what a hit shows: the kind of snap, the part of the selection that lan
     const surfaceAt = () => ({ point: { x: 300, y: 300, z: 20 }, normal: X, item: "a", corners: [] })
     const config = on(defaultSnapConfig, "mesh")
     assert.strictEqual(resolveSnap(frameOf({ x: 300, y: 300, z: 0 }, { config, surfaceAt }))?.relation, "onFace")
+    // the box of the item the face is on (its corners out of range here), and the selection's where it lands
+    const items = [cubeAt("a", { x: 3000, y: 3000, z: 0 })]
+    const onFace = resolveSnap(frameOf({ x: 300, y: 300, z: 0 }, { config, surfaceAt, items }))
+    assert.deepStrictEqual(roles(onFace, "target").map(({ kind }) => kind), ["box", "face"])
+    assert.deepStrictEqual(roles(onFace, "source").map(({ kind }) => kind), ["box", "dot"])
     const mesh = { ...config.targets.mesh, rotateToFace: "align" as const }
     const square = { ...config, targets: { ...config.targets, mesh } }
     assert.strictEqual(
@@ -895,15 +919,26 @@ describe("what a hit shows: the kind of snap, the part of the selection that lan
     return [cubeAt("a", at, { mesh: () => meshOfBox(boxAt(at)) })]
   }
 
-  it("draws both faces of a flush stop, the selection's on the target's plane", () => {
+  it("draws both boxes of a flush stop with their faces tinted, the selection's on the target's plane", () => {
     const config = on(defaultSnapConfig, "mesh")
     const items = meshedAt(300)
     const bases = selectionBases(config, { pivot: ORIGIN, box: boxAt(ORIGIN), ends: [] }, line)
     const hit = resolveSnap(frameOf({ x: 197, y: 0, z: 0 }, { config, items, bases, constraint: line }))
     assert.strictEqual(hit?.relation, "flush")
-    const [target] = roles(hit, "target")
-    const [source] = roles(hit, "source")
+    const [targetBox, target] = roles(hit, "target")
+    const [sourceBox, source] = roles(hit, "source")
+    assert.deepStrictEqual(targetBox, {
+      kind: "box",
+      role: "target",
+      corners: cornersOf(boxAt({ x: 300, y: 0, z: 0 }))
+    })
     assert.isTrue(target?.kind === "face" && target.corners.every(({ x }) => x === 250))
+    // the selection's box where the stop puts it: its far face on the neighbour's near one
+    assert.deepStrictEqual(sourceBox, {
+      kind: "box",
+      role: "source",
+      corners: cornersOf(boxAt({ x: 200, y: 0, z: 0 }))
+    })
     assert.isTrue(source?.kind === "face" && source.corners.every(({ x }) => x === 250))
     assert.deepInclude(glyphOf(hit), { relation: "flush" })
   })
@@ -917,17 +952,14 @@ describe("what a hit shows: the kind of snap, the part of the selection that lan
     assert.deepStrictEqual(hit?.marks.map(({ kind }) => kind), ["guide", "dot"])
   })
 
-  it("draws both ends of a join and the way on out of the target's", () => {
+  it("draws both ends of a join, and nothing more than its glyph", () => {
     const config = on(defaultSnapConfig, "connectors")
     const other = endAlongX("a", 0, 300, -1)
     const own = { ...pivotBase, start: { x: 50, y: 0, z: 0 }, end: endAlongX("own", 0, 50, 1) }
     const items = [cubeAt("a", { x: 350, y: 0, z: 0 }, { ends: [other] })]
     const hit = resolveSnap(frameOf({ x: 246, y: 0, z: 0 }, { config, items, bases: [own] }))
     assert.strictEqual(hit?.relation, "join")
-    assert.deepStrictEqual(hit?.marks, [
-      { kind: "ring", role: "target", at: other.position },
-      { kind: "arrow", at: other.position, direction: other.forward }
-    ])
+    assert.deepStrictEqual(hit?.marks, [{ kind: "ring", role: "target", at: other.position }])
     assert.deepStrictEqual(roles(hit, "source"), [{ kind: "ring", role: "source", at: other.position }])
   })
 

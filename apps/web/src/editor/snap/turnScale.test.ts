@@ -5,6 +5,7 @@ import { identityTransform } from "../../domain/factory"
 import type { MeshFace } from "../../domain/meshElements"
 import { defaultSnapConfig } from "../../domain/snapConfig"
 import type { SnapItem } from "../../domain/snapFrame"
+import { cornersOf } from "../../domain/snapRelation"
 import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
 import { boxAt, cubeAt, endAlongX, loadPieces, meshOfBox } from "../../test/snapFixtures"
 import { sceneRegistry } from "../sceneRegistry"
@@ -116,12 +117,21 @@ describe("what a turn and a scale stop on", () => {
     assert.deepStrictEqual(stopsAlongX(cubeAt("a", { x: -100, y: 0, z: 0 })), [-150, -50])
   })
 
-  it("draws a stop's target, the selection's side where the turn puts it, and the glyph, tagged with its target", () => {
+  it("draws both boxes, a stop's target, the selection's side where the turn puts it, and the glyph", () => {
     const stops = turnStopsOf(defaultSnapConfig, turnOf(ORIGIN), [cubeAt("a", { x: 110, y: 0, z: 0 })], 10)
     const touch = stops.find((stop) => stop.kind === "touch" && stop.angle > 0)
     assert.strictEqual(touch?.from, "mesh")
     assert.strictEqual(touch?.relation, "onFace")
-    const [target, source, glyph] = touch?.marks ?? []
+    const [targetBox, ownBox, target, source, glyph] = touch?.marks ?? []
+    assert.deepStrictEqual(targetBox, {
+      kind: "box",
+      role: "target",
+      corners: cornersOf(boxAt({ x: 110, y: 0, z: 0 }))
+    })
+    // the selection's box turned as far as the touch: a corner of it is on the neighbour's near face
+    assert.isTrue(ownBox?.kind === "box" && ownBox.role === "source")
+    const reach = ownBox?.kind === "box" ? Math.max(...ownBox.corners.map(({ x }) => x)) : 0
+    assert.closeTo(reach, 60, 1e-6)
     assert.isTrue(target?.kind === "face" && target.role === "target")
     assert.isTrue(source?.kind === "dot" && source.role === "source")
     assert.deepInclude(glyph, { kind: "glyph", relation: "onFace" })
@@ -140,7 +150,11 @@ describe("what a turn and a scale stop on", () => {
     const stops = scaleStopsOf(alongX, ORIGIN, selection.box, [cubeAt("a", { x: 200, y: 0, z: 0 })])
     const near = stops.find((stop) => stop.at === 150)
     assert.strictEqual(near?.relation, "flush")
-    const [target, scaled, glyph] = near?.marks ?? []
+    const [targetBox, stretched, target, scaled, glyph] = near?.marks ?? []
+    assert.deepInclude(targetBox, { kind: "box", role: "target" })
+    // the selection's box stretched to the stop, its near side where it was
+    const xs = stretched?.kind === "box" ? stretched.corners.map(({ x }) => x) : []
+    assert.deepStrictEqual([Math.min(...xs), Math.max(...xs)], [selection.box.min.x, 150])
     assert.isTrue(target?.kind === "face" && target.role === "target")
     assert.isTrue(scaled?.kind === "face" && scaled.role === "source" && scaled.corners.every(({ x }) => x === 150))
     assert.deepInclude(glyph, { kind: "glyph", relation: "flush" })

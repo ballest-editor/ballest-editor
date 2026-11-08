@@ -28,7 +28,7 @@ import {
   type SnapRelation
 } from "./snapFrame"
 import { gridAxes } from "./snapGrid"
-import { sourceOf } from "./snapRelation"
+import { boxMark, itemBoxMark, sourceOf } from "./snapRelation"
 import {
   quatBetween,
   quatFromAxisAngle,
@@ -140,15 +140,21 @@ const faceTurn = (frame: SnapFrame, normal: Vec3): Quat4 | undefined => {
   return quatFromAxisAngle(Z_AXIS, angle)
 }
 
-/** A landing on a face, off it by the Mesh target's offset. */
+/** The selection's box and its own part that lands, for what lands on a neighbour's face: both sides read as boxes. */
+const boxedSource = (frame: SnapFrame, base: BasePoint): ReadonlyArray<SnapMark> => {
+  const source = sourceOf(frame.box, base)
+  return source.some(({ kind }) => kind === "box") ? source : [boxMark(frame.box, "source"), ...source]
+}
+
+/** A landing on a face of the item `key`, off it by the Mesh target's offset, with the item's box about the face. */
 const faceHit = (
   frame: SnapFrame,
   base: BasePoint,
   point: Vec3,
   normal: Vec3,
   corners: ReadonlyArray<Vec3>,
-  label: string,
-  item: string
+  key: string,
+  item = frame.items.find((one) => one.key === key)
 ): SnapHit => {
   const landing = vecAdd(point, vecScale(normal, frame.config.targets.mesh.offset))
   const rotation = faceTurn(frame, normal)
@@ -160,12 +166,12 @@ const faceHit = (
     distance: 0,
     base,
     landing,
-    label,
+    label: `Face of ${item?.name ?? "a piece"}`,
     relation: square ? "perpendicular" : "onFace",
-    marks: [{ kind: "face", role: "target", corners }],
-    source: sourceOf(frame.box, base),
+    marks: [...(item === undefined ? [] : [itemBoxMark(item, "target")]), { kind: "face", role: "target", corners }],
+    source: boxedSource(frame, base),
     held: { shape: "plane", origin: landing, normal },
-    item,
+    item: key,
     ...(rotation !== undefined && { rotation })
   }
 }
@@ -292,30 +298,18 @@ const faceHits = (
 ): ReadonlyArray<SnapHit> => {
   const { elements } = frame.config.targets.mesh
   const surface = elements.faces ? frame.surfaceAt?.(reference) : undefined
-  const name = (key: string) => frame.items.find((item) => item.key === key)?.name ?? "a piece"
   const ray = frame.view.rayAt(reference)
   return [
     ...(surface === undefined
       ? []
-      : [{
-        ...faceHit(
-          frame,
-          base,
-          surface.point,
-          surface.normal,
-          surface.corners,
-          `Face of ${name(surface.item)}`,
-          surface.item
-        ),
-        frontmost: true
-      }]),
+      : [{ ...faceHit(frame, base, surface.point, surface.normal, surface.corners, surface.item), frontmost: true }]),
     ...(elements.boundsFaces
       ? near.flatMap((item) => {
         const box = item.mesh() === undefined ? boundsOf(item) : undefined
         const under = box === undefined ? undefined : boundsFaceUnder(box.faces, ray)
         return under === undefined
           ? []
-          : [faceHit(frame, base, under.point, under.face.normal, under.face.corners, `Face of ${item.name}`, item.key)]
+          : [faceHit(frame, base, under.point, under.face.normal, under.face.corners, item.key, item)]
       })
       : [])
   ]
@@ -403,7 +397,7 @@ const stationsOf = (frame: SnapFrame, item: SnapItem) => {
     along,
     label: `Face of ${item.name}`,
     relation: "flush",
-    marks: [{ kind: "face", role: "target", corners }],
+    marks: [itemBoxMark(item, "target"), { kind: "face", role: "target", corners }],
     rotation: faceTurn(frame, normal)
   }))
   // a face's centre is a point to land on under a plane handle; under a line it would be one more middle
@@ -447,7 +441,7 @@ const stationHit = (
     label,
     relation,
     marks,
-    source: sourceOf(frame.box, base),
+    source: relation === "flush" ? boxedSource(frame, base) : sourceOf(frame.box, base),
     held: { shape: "plane", origin, normal },
     item: item.key,
     frontmost: true,
@@ -546,6 +540,20 @@ const meetingOf = (frame: SnapFrame, own: WorldEnd, other: WorldEnd) => {
   }
 }
 
+/**
+ * The ends of other items within `range` on screen of one of the selection's ends where the move has them, depth left
+ * out and whichever way they face: what the overlay rings as Connectors' to be had.
+ */
+export const nearEndsOf = (frame: SnapFrame, range: number): ReadonlyArray<WorldEnd> => {
+  const references = measuredBases(frame).flatMap(({ base, reference }) => base.end === undefined ? [] : [reference])
+  return itemsNear(frame, references, range).flatMap((item) =>
+    item.ends.filter((end) => {
+      const shown = frame.view.project(end.position)
+      return shown !== undefined && references.some((reference) => pixelDistance(shown, reference) <= range)
+    })
+  )
+}
+
 export const connectorHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
   const range = rangeOf(frame.config, "connectors")
   const measured = measuredBases(frame).filter(({ base }) => base.end !== undefined)
@@ -560,10 +568,7 @@ export const connectorHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
         if (own === undefined || vecDot(own.forward, other.forward) > 0) return []
         const meeting = meetingOf(frame, own, other)
         if (meeting === undefined) return []
-        const marks: ReadonlyArray<SnapMark> = [
-          { kind: "ring", role: "target", at: other.position },
-          { kind: "arrow", at: other.position, direction: other.forward }
-        ]
+        const marks: ReadonlyArray<SnapMark> = [{ kind: "ring", role: "target", at: other.position }]
         const spot: Spot = { at: other.position, label: `End of ${item.name}`, relation: "join", marks, item: item.key }
         return pointHit(frame, "connectors", one, spot, range).map((hit): SnapHit => ({
           ...hit,

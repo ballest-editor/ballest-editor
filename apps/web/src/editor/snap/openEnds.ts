@@ -1,8 +1,9 @@
-/** The open ends the snap overlay rings (docs/SNAPPING.md § What a drag looks like), where the pieces show. */
+/** The open ends the snap overlay rings (docs/SNAPPING.md § Connectors), where the pieces show. */
 import type { CatalogIndex } from "../../domain/Catalog"
 import { endsOf, openEndsOf, type WorldEnd } from "../../domain/connectors"
 import { editTransform } from "../../domain/editTransform"
 import type { SnapConfig } from "../../domain/snapConfig"
+import type { MarkRole } from "../../domain/snapFrame"
 import type { Doc } from "../../domain/structure"
 import type { EditorState } from "../store"
 
@@ -30,18 +31,26 @@ const shownEnds = (
   return [...docEnds.filter(({ ref }) => !preview.has(ref.item)), ...moved]
 }
 
+/** An open end to ring, and whose it is: the selection's in a drag, or another item's. */
+export type RingedEnd = WorldEnd & { readonly role: MarkRole }
+
 /**
  * The open ends to ring, as the pieces show: every one, none, or on hover the hovered item's and, in a drag, those of what
- * it carries, the ends about to join. The end a drag will join is the target's mark, not one of these.
+ * it carries and those near them it could join. What a drag carries is the source's, the rest the target's. A drag that
+ * Connectors isn't snapping rings none. The end a drag will join is the target's mark, not one of these.
  */
 export const ringedEnds = (
-  s: Pick<EditorState, "catalogIndex" | "doc" | "preview" | "hoveredItem">,
+  s: Pick<EditorState, "catalogIndex" | "doc" | "preview" | "hoveredItem" | "dragSnap">,
   show: ShowOpenEnds,
   docEnds: ReadonlyArray<WorldEnd> = endsInDoc(s.doc, s.catalogIndex)
-): ReadonlyArray<WorldEnd> => {
-  if (show === "never") return []
+): ReadonlyArray<RingedEnd> => {
+  const { dragSnap, hoveredItem, preview } = s
+  if (show === "never" || dragSnap?.targets.includes("connectors") === false) return []
   const open = openEndsOf(shownEnds(s, docEnds))
-  if (show === "always") return open
-  const { hoveredItem, preview } = s
-  return open.filter(({ ref }) => ref.item === hoveredItem || preview?.has(ref.item) === true)
+  const near = (end: WorldEnd) =>
+    dragSnap?.nearEnds.some(({ end: index, item }) => item === end.ref.item && index === end.ref.end) === true
+  const shown = show === "always"
+    ? open
+    : open.filter((end) => end.ref.item === hoveredItem || preview?.has(end.ref.item) === true || near(end))
+  return shown.map((end) => ({ ...end, role: preview?.has(end.ref.item) === true ? "source" : "target" }))
 }

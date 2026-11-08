@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import type { SnapMark } from "../../domain/snapFrame"
+import { cornersOf } from "../../domain/snapRelation"
 import { ORIGIN } from "../../domain/ueMath"
 import { isLine, isMesh } from "../threeGuards"
 import { GLYPHS, glyphSegments, RELATION_NAMES, SNAP_COLORS } from "./snapGlyphs"
@@ -37,10 +38,28 @@ describe("the snap overlay's marks", () => {
     }
   })
 
-  it("ticks both ends of an edge, tints a face and outlines it, and leaves an outline-only face untinted", () => {
+  it("ticks both ends of an edge, and tints a face and outlines it", () => {
     assert.lengthOf(drawn({ kind: "line", role: "target", from: ORIGIN, to: X }).colours, 3)
     assert.lengthOf(drawn({ kind: "face", role: "target", corners: square }).colours, 2)
-    assert.lengthOf(drawn({ kind: "face", role: "target", corners: square, outline: true }).colours, 1)
+  })
+
+  it("draws a side's box as its twelve edges in grey, plain in front of the scene and faint through it", () => {
+    const corners = cornersOf({ min: ORIGIN, max: { x: 100, y: 100, z: 100 } })
+    for (const role of ["source", "target"] as const) {
+      const { colours, layer } = drawn({ kind: "box", role, corners })
+      assert.deepStrictEqual(colours, [SNAP_COLORS.box, SNAP_COLORS.box])
+      const lines: Array<THREE.Line> = []
+      layer.traverse((object) => {
+        if (isLine(object)) lines.push(object)
+      })
+      assert.deepStrictEqual(lines.map(({ geometry }) => geometry.getAttribute("position").count), [24, 24])
+      const looks = lines.flatMap(({ material }) =>
+        material instanceof THREE.LineBasicMaterial ? [{ depth: material.depthTest, opacity: material.opacity }] : []
+      )
+      const through = looks.find(({ depth }) => !depth)?.opacity ?? 1
+      const shown = looks.find(({ depth }) => depth)?.opacity ?? 0
+      assert.isBelow(through, shown)
+    }
   })
 
   it("draws a glyph on a badge, sharing its strokes between marks and keeping them past a reset", () => {

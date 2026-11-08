@@ -13,8 +13,9 @@ export const SNAP_COLORS = {
   source: "#c79bff",
   /** The base, while nothing is in range. */
   base: "#ffffff",
+  /** A side's whole box, about the faces of it that snapped. */
+  box: "#b4bac2",
   guide: "#ff5fa8",
-  open: "#ff9f43",
   construction: "#6aa6ff",
   measurement: "#ffe08a"
 } as const

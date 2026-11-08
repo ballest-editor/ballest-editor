@@ -10,7 +10,15 @@ import type { GroupDelta } from "../../domain/groupTransform"
 import type { Box } from "../../domain/itemBounds"
 import type { Keybinds } from "../../domain/Keybinds"
 import type { EndRef } from "../../domain/MapSidecar"
-import { kindsFor, narrowedTo, type SnapConfig, type SnapKind } from "../../domain/snapConfig"
+import {
+  kindsFor,
+  narrowedTo,
+  priorityOf,
+  rangeOf,
+  type SnapConfig,
+  type SnapKind,
+  type SnapTarget
+} from "../../domain/snapConfig"
 import {
   type Constraint,
   freeOffset,
@@ -26,10 +34,12 @@ import { gridAxes } from "../../domain/snapGrid"
 import { shownMarks } from "../../domain/snapRelation"
 import { baseNearPointer, moveOf, resolveDrag, resolveSnap } from "../../domain/snapResolve"
 import type { SnappedAs, TurnStop } from "../../domain/snapRotate"
+import { nearEndsOf } from "../../domain/snapTargets"
 import { selectionBases } from "../../domain/snapTools"
 import { annotationsOf } from "../../domain/structure"
 import type { PaneCamera } from "../paneCameras"
 import {
+  type DragSnap,
   type EditorState,
   type FlipOffer,
   snapConfigOf,
@@ -87,6 +97,19 @@ const lockConstraint = (config: SnapConfig, { axis, plane }: MoveLock): Constrai
 }
 
 const plural = (n: number) => n === 1 ? "1 item" : `${n} items`
+
+/** How far round the selection's ends, as a share of Connectors' range, the overlay rings the ends it could join. */
+const NEAR_ENDS_SHARE = 6
+
+/** What a frame snaps to, for the overlay: its targets, and with Connectors among them the ends near the selection's. */
+const dragSnapOf = (frame: SnapFrame, snapping: boolean): DragSnap => {
+  const targets = snapping ? priorityOf(frame.config) : []
+  const reach = rangeOf(frame.config, "connectors") * NEAR_ENDS_SHARE
+  return {
+    targets,
+    nearEnds: targets.includes("connectors") ? nearEndsOf(frame, reach).map(({ ref }) => ref) : []
+  }
+}
 
 const lowered = (label: string) => label.slice(0, 1).toLowerCase() + label.slice(1)
 
@@ -193,6 +216,7 @@ export class MoveSession {
     this.lastHit = hit
     const base = snapping ? baseNearPointer(frame) : undefined
     publish(hit, base === undefined ? undefined : freePoint(frame, base))
+    setDragSnap(dragSnapOf(frame, snapping))
     return { delta: hit === undefined ? this.moveBy(frame.offset) : this.landingOn(hit), hit }
   }
 
@@ -291,11 +315,27 @@ export const flipOfferOf = (hit: SnapHit | undefined, keys: ReadonlyArray<string
   return meeting?.flipFits === true ? { keys, axis: "y", own: meeting.own, other: meeting.other } : null
 }
 
+/** Sets what the drag snaps to, when it changed. */
+const setDragSnap = (next: DragSnap | null): void => {
+  const s = useEditor.getState()
+  const now = s.dragSnap
+  const sameRefs = (a: DragSnap["nearEnds"], b: DragSnap["nearEnds"]) =>
+    a.length === b.length && a.every((ref, i) => {
+      const other = b[i]
+      return other !== undefined && ref.item === other.item && ref.end === other.end
+    })
+  const same = now === next || (now !== null && next !== null &&
+    now.targets.length === next.targets.length && now.targets.every((target, i) => target === next.targets[i]) &&
+    sameRefs(now.nearEnds, next.nearEnds))
+  if (!same) s.setDragSnap(next)
+}
+
 /** Hides what a drag showed, its keys in the status bar among it, when it ends. */
 export const endSnapDisplay = (): void => {
   snapMarks.clear()
   useEditor.getState().setSnapFeedback(null)
   useEditor.getState().setDragKeys(null)
+  setDragSnap(null)
 }
 
 /** Which of `keybinds`' drag keys are down, of the codes `pressed`. */
@@ -305,8 +345,9 @@ export const dragKeysOf = (keybinds: Keybinds, pressed: ReadonlySet<string>): Dr
   only: heldKindsOf(keybinds, pressed)
 })
 
-/** Shown for a rotate or scale snap, as a move's are. */
-export const showSnap = ({ label, marks = [], relation }: SnappedAs): void => {
+/** Shown for a rotate or scale snap, as a move's are, with the `targets` the turn or scale stops on. */
+export const showSnap = ({ label, marks = [], relation }: SnappedAs, targets: ReadonlyArray<SnapTarget>): void => {
   snapMarks.set(marks, undefined)
   setFeedback(label === undefined ? null : { label, base: "Pivot", ...(relation !== undefined && { relation }) })
+  setDragSnap({ targets, nearEnds: [] })
 }
