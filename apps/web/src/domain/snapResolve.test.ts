@@ -4,6 +4,7 @@ import type { Vec3 } from "./coords"
 import type { Box } from "./itemBounds"
 import { defaultSnapConfig, type SnapConfig, type SnapTarget, withPreset, withTargetMoved } from "./snapConfig"
 import type { BasePoint, SnapFrame, SnapHit, SnapItem, TrackedPoint } from "./snapFrame"
+import { shownMarks } from "./snapRelation"
 import { moveOf, resolveDrag, resolveSnap } from "./snapResolve"
 import { meshHits } from "./snapTargets"
 import { selectionBases } from "./snapTools"
@@ -42,6 +43,12 @@ const wall = (name: string, x: number) => ({
 })
 
 const pivotBase: BasePoint = { start: ORIGIN, label: "Pivot" }
+
+/** Two acquired points, whose lines along X and Y cross at (500, 700). */
+const twoTracked: ReadonlyArray<TrackedPoint> = [
+  { at: { x: 500, y: 0, z: 0 }, label: "Corner of Kicker" },
+  { at: { x: 0, y: 700, z: 0 }, label: "Corner of Curve" }
+]
 
 /** A base that stops on faces across X, as a selection's near or far face does. */
 const faceBase: BasePoint = { ...pivotBase, stop: { kind: "face", axis: { x: 1, y: 0, z: 0 } } }
@@ -215,7 +222,9 @@ describe("resolveSnap", () => {
       base: pivotBase,
       landing: edge[0],
       label: "Edge of Cube",
+      relation: "onEdge" as const,
       marks: [],
+      source: [],
       held: { shape: "segment" as const, from: edge[0], to: edge[1] }
     }
     const hit = resolveSnap(frameOf({ x: 600, y: 300, z: 0 }), held)
@@ -225,10 +234,7 @@ describe("resolveSnap", () => {
 
   it("snaps to a tracking line through an acquired point, and to where two cross", () => {
     const config = on(defaultSnapConfig, "tracking")
-    const tracked: ReadonlyArray<TrackedPoint> = [
-      { at: { x: 500, y: 0, z: 0 }, label: "Corner of Kicker" },
-      { at: { x: 0, y: 700, z: 0 }, label: "Corner of Curve" }
-    ]
+    const tracked = twoTracked
     const line = resolveSnap(frameOf({ x: 503, y: 300, z: 0 }, { config, tracked }))
     assert.strictEqual(line?.rank, 1)
     assert.closeTo(line?.landing.x ?? 0, 500, 1e-6)
@@ -796,5 +802,113 @@ describe("a body drag in an orthographic pane", () => {
     assert.deepStrictEqual(resolveSnap(frameOf(atVertex, { config, items, bases: [own] }))?.landing, high)
     const surfaceAt = facing({ x: 0, y: 0, z: 1 })
     assert.deepStrictEqual(resolveSnap(frameOf(atVertex, { config, surfaceAt, bases: [own] }))?.landing, high)
+  })
+})
+
+describe("what a hit shows: the kind of snap, the part of the selection that landed, and what it landed on", () => {
+  const X = { x: 1, y: 0, z: 0 }
+  const line = { kind: "line", direction: X } as const
+  /** The hit's marks of one role, by kind. */
+  const roles = (hit: SnapHit | undefined, role: "source" | "target") =>
+    (hit === undefined ? [] : shownMarks(hit)).flatMap((mark) => "role" in mark && mark.role === role ? [mark] : [])
+  const glyphOf = (hit: SnapHit | undefined) => (hit === undefined ? [] : shownMarks(hit)).at(-1)
+
+  it("puts the grid's glyph and the base at the landing", () => {
+    const hit = resolveSnap(frameOf({ x: 137, y: 42, z: 0 }))
+    assert.strictEqual(hit?.relation, "grid")
+    assert.deepStrictEqual(roles(hit, "source"), [{ kind: "dot", role: "source", at: { x: 140, y: 40, z: 0 } }])
+    assert.deepStrictEqual(glyphOf(hit), { kind: "glyph", relation: "grid", at: { x: 140, y: 40, z: 0 } })
+  })
+
+  it("names a corner coincident, a middle of an edge a midpoint, and an edge's point on it", () => {
+    const items = [cubeAt("a", { x: 200, y: 0, z: 0 })]
+    const corner = resolveSnap(frameOf({ x: 146, y: 46, z: 0 }, { config: on(defaultSnapConfig, "mesh"), items }))
+    assert.strictEqual(corner?.relation, "coincident")
+    assert.deepStrictEqual(roles(corner, "target"), [{ kind: "dot", role: "target", at: { x: 150, y: 50, z: 50 } }])
+    assert.deepStrictEqual(roles(corner, "source"), [{ kind: "dot", role: "source", at: { x: 150, y: 50, z: 50 } }])
+    const meshed = [cubeAt("a", { x: 200, y: 0, z: 0 }, { mesh: () => meshOfBox(boxAt({ x: 200, y: 0, z: 0 })) })]
+    const config = on(defaultSnapConfig, "mesh")
+    assert.strictEqual(resolveSnap(frameOf({ x: 152, y: 2, z: 0 }, { config, items: meshed }))?.relation, "midpoint")
+    const edge = resolveSnap(frameOf({ x: 152, y: 30, z: 0 }, { config, items: meshed }))
+    assert.strictEqual(edge?.relation, "onEdge")
+    assert.deepInclude(roles(edge, "target")[0], { kind: "line", role: "target" })
+  })
+
+  it("names a face on it, and perpendicular when Rotate to face stands the selection square on it", () => {
+    const surfaceAt = () => ({ point: { x: 300, y: 300, z: 20 }, normal: X, item: "a", corners: [] })
+    const config = on(defaultSnapConfig, "mesh")
+    assert.strictEqual(resolveSnap(frameOf({ x: 300, y: 300, z: 0 }, { config, surfaceAt }))?.relation, "onFace")
+    const mesh = { ...config.targets.mesh, rotateToFace: "align" as const }
+    const square = { ...config, targets: { ...config.targets, mesh } }
+    assert.strictEqual(
+      resolveSnap(frameOf({ x: 300, y: 300, z: 0 }, { config: square, surfaceAt }))?.relation,
+      "perpendicular"
+    )
+  })
+
+  /** A meshed cube whose faces across X are at 250 and 350. */
+  const meshedAt = (x: number) => {
+    const at = { x, y: 0, z: 0 }
+    return [cubeAt("a", at, { mesh: () => meshOfBox(boxAt(at)) })]
+  }
+
+  it("draws both faces of a flush stop, the selection's on the target's plane", () => {
+    const config = on(defaultSnapConfig, "mesh")
+    const items = meshedAt(300)
+    const bases = selectionBases(config, { pivot: ORIGIN, box: boxAt(ORIGIN), ends: [] }, line)
+    const hit = resolveSnap(frameOf({ x: 197, y: 0, z: 0 }, { config, items, bases, constraint: line }))
+    assert.strictEqual(hit?.relation, "flush")
+    const [target] = roles(hit, "target")
+    const [source] = roles(hit, "source")
+    assert.isTrue(target?.kind === "face" && target.corners.every(({ x }) => x === 250))
+    assert.isTrue(source?.kind === "face" && source.corners.every(({ x }) => x === 250))
+    assert.deepInclude(glyphOf(hit), { relation: "flush" })
+  })
+
+  it("names the middle between two faces a midpoint, with its guide", () => {
+    const config = on(defaultSnapConfig, "mesh")
+    const items = meshedAt(300)
+    const centre: BasePoint = { ...pivotBase, stop: { kind: "centre" } }
+    const hit = resolveSnap(frameOf({ x: 297, y: 0, z: 0 }, { config, items, bases: [centre], constraint: line }))
+    assert.strictEqual(hit?.relation, "midpoint")
+    assert.deepStrictEqual(hit?.marks.map(({ kind }) => kind), ["guide", "dot"])
+  })
+
+  it("draws both ends of a join and the way on out of the target's", () => {
+    const config = on(defaultSnapConfig, "connectors")
+    const other = endAlongX("a", 0, 300, -1)
+    const own = { ...pivotBase, start: { x: 50, y: 0, z: 0 }, end: endAlongX("own", 0, 50, 1) }
+    const items = [cubeAt("a", { x: 350, y: 0, z: 0 }, { ends: [other] })]
+    const hit = resolveSnap(frameOf({ x: 246, y: 0, z: 0 }, { config, items, bases: [own] }))
+    assert.strictEqual(hit?.relation, "join")
+    assert.deepStrictEqual(hit?.marks, [
+      { kind: "ring", role: "target", at: other.position },
+      { kind: "arrow", at: other.position, direction: other.forward }
+    ])
+    assert.deepStrictEqual(roles(hit, "source"), [{ kind: "ring", role: "source", at: other.position }])
+  })
+
+  it("names a tracking line in line and where two cross an intersection", () => {
+    const config = on(defaultSnapConfig, "tracking")
+    const tracked = twoTracked
+    assert.strictEqual(resolveSnap(frameOf({ x: 503, y: 300, z: 0 }, { config, tracked }))?.relation, "inLine")
+    assert.strictEqual(resolveSnap(frameOf({ x: 504, y: 696, z: 0 }, { config, tracked }))?.relation, "intersection")
+  })
+
+  it("names a construction plane on a face, an axis on an edge, and a measurement's end coincident", () => {
+    const config = on(defaultSnapConfig, "construction")
+    const plane = resolveSnap(frameOf({ x: 5, y: 33, z: 0 }, { config, construction: [wall("Landing", 0)] }))
+    assert.strictEqual(plane?.relation, "onFace")
+    assert.deepInclude(plane?.marks[0], { kind: "face", role: "target" })
+    const spine = { kind: "axis" as const, id: "a", name: "Spine", origin: ORIGIN, direction: X, extent: 1000 }
+    assert.strictEqual(
+      resolveSnap(frameOf({ x: 300, y: 3, z: 0 }, { config, construction: [spine] }))?.relation,
+      "onEdge"
+    )
+    const measurements = [{ id: "m", a: { x: 100, y: 0, z: 0 }, b: { x: 400, y: 0, z: 0 } }]
+    assert.strictEqual(
+      resolveSnap(frameOf({ x: 396, y: 3, z: 0 }, { config, measurements }))?.relation,
+      "coincident"
+    )
   })
 })

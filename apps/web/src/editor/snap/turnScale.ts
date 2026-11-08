@@ -7,9 +7,10 @@ import type { WorldEnd } from "../../domain/connectors"
 import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
 import type { Box } from "../../domain/itemBounds"
 import { localToWorld, type PivotChoice } from "../../domain/pivot"
-import { axesOf, type SnapItem, type SnapMark } from "../../domain/snapFrame"
+import { axesOf, type SnapItem } from "../../domain/snapFrame"
+import { glyphMark, shiftedMarks, sideOf } from "../../domain/snapRelation"
 import type { FlushPair, ScaleStop } from "../../domain/snapRotate"
-import { rotateVec, vecDistance, vecDot, vecLength, vecNormalize, vecSub } from "../../domain/ueMath"
+import { rotateVec, vecDistance, vecDot, vecLength, vecNormalize, vecScale, vecSub } from "../../domain/ueMath"
 
 /** The way out of the face each pivot sits on; Default and Center aren't on one. */
 const FACE_NORMALS: Partial<Readonly<Record<PivotChoice, Vec3>>> = {
@@ -97,8 +98,11 @@ export const flushPairsOf = (
         normal: base,
         target: face.normal,
         label: `Face of ${item.name}`,
-        marks: [{ kind: "face", corners: face.corners }],
-        source: "mesh"
+        relation: "flush",
+        from: "mesh",
+        marks: [{ kind: "face", role: "target", corners: face.corners }],
+        source: [sideOf(box, base, "source")],
+        at: face.centre
       }))
     )
     : []
@@ -110,8 +114,11 @@ export const flushPairsOf = (
           normal: own.forward,
           target: other.forward,
           label: `End of ${item.name}`,
-          marks: [{ kind: "ring", at: other.position }],
-          source: "connectors"
+          relation: "join",
+          from: "connectors",
+          marks: [{ kind: "ring", role: "target", at: other.position }],
+          source: [{ kind: "ring", role: "source", at: own.position }],
+          at: other.position
         }]
       )
     )
@@ -144,18 +151,27 @@ export const scaleStopsOf = (
   pivotPoint: Vec3,
   box: Box,
   items: ReadonlyArray<SnapItem>
-): ReadonlyArray<ScaleStop> =>
-  items.filter((item) => inWayOf(box, item.box, axis)).flatMap((item) =>
-    (item.faces() ?? boundsFacesOf(item)).flatMap((face): ReadonlyArray<ScaleStop> =>
-      Math.abs(vecDot(face.normal, axis)) < 0.999
-        ? []
-        : [{
-          at: vecDot(vecSub(face.centre, pivotPoint), axis),
-          label: `Face of ${item.name}`,
-          marks: [{ kind: "face", corners: face.corners }] satisfies ReadonlyArray<SnapMark>
-        }]
-    )
+): ReadonlyArray<ScaleStop> => {
+  // the scaled face, which a stop carries from where it reaches now to the stop
+  const scaled = sideOf(box, axis, "source")
+  const reach = reachAlong(box, pivotPoint, axis)
+  return items.filter((item) => inWayOf(box, item.box, axis)).flatMap((item) =>
+    (item.faces() ?? boundsFacesOf(item)).flatMap((face): ReadonlyArray<ScaleStop> => {
+      if (Math.abs(vecDot(face.normal, axis)) < 0.999) return []
+      const at = vecDot(vecSub(face.centre, pivotPoint), axis)
+      return [{
+        at,
+        label: `Face of ${item.name}`,
+        relation: "flush",
+        marks: [
+          { kind: "face", role: "target", corners: face.corners },
+          ...shiftedMarks([scaled], vecScale(axis, at - reach)),
+          glyphMark("flush", face.centre)
+        ]
+      }]
+    })
   )
+}
 
 /** How far `box` reaches from `pivotPoint` along the unit `axis`, on the side that axis points to. */
 export const reachAlong = (box: Box, pivotPoint: Vec3, axis: Vec3): number => {

@@ -21,6 +21,7 @@ import {
   type SnapHit
 } from "./snapFrame"
 import { gridLanding, gridSpacingPixels } from "./snapGrid"
+import { sourceOf } from "./snapRelation"
 import { connectorHits, constructionHits, meshHits, stationsTogether, trackingHits } from "./snapTargets"
 import { vecAdd, vecDot, vecScale, vecSub } from "./ueMath"
 
@@ -61,7 +62,10 @@ const gridHit = (frame: SnapFrame, base: BasePoint, distance: number): SnapHit =
     base,
     landing,
     label: `Grid ${formatGridSize(frame.config.gridSize, frame.units)}`,
-    marks: [{ kind: "dot", at: landing }],
+    relation: "grid",
+    // the base on the grid is all there is to show, and the glyph says it's the grid
+    marks: [],
+    source: sourceOf(frame.box, base),
     held: { shape: "point", at: landing }
   }
 }

@@ -23,7 +23,7 @@ describe("what a turn and a scale stop on", () => {
     const curved = { ...meshOfBox(boxAt(at)), faces: meshOfBox(boxAt(at)).faces.slice(0, 2) }
     assert.lengthOf(pairsOf(curved), 2)
     assert.lengthOf(pairsOf(undefined), 6)
-    assert.deepStrictEqual([...new Set(pairsOf(undefined).map((pair) => pair.source))], ["mesh"])
+    assert.deepStrictEqual([...new Set(pairsOf(undefined).map((pair) => pair.from))], ["mesh"])
   })
 
   it("scales up to a mesh's own faces, its box standing in until it has loaded", () => {
@@ -43,6 +43,30 @@ describe("what a turn and a scale stop on", () => {
   it("reaches what the face meets off to one side of the pivot, and what's behind it", () => {
     assert.deepStrictEqual(stopsAlongX(cubeAt("a", { x: 100, y: 80, z: 0 })), [50, 150])
     assert.deepStrictEqual(stopsAlongX(cubeAt("a", { x: -100, y: 0, z: 0 })), [-150, -50])
+  })
+
+  it("pairs the selection's base face with each target face as flush, and its end with each end as a join", () => {
+    const end = { ref: { item: "a", end: 0 }, position: at, forward: alongX, up: { x: 0, y: 0, z: 1 }, profile: "T" }
+    const own = { ...end, ref: { item: "own", end: 0 }, position: { x: 50, y: 0, z: 0 } }
+    const pairs = flushPairsOf({ ...selection, ends: [own] }, [
+      cubeAt("a", at, { ends: [end] })
+    ], 100)
+    const [join, face] = pairs
+    assert.strictEqual(join?.relation, "join")
+    assert.deepStrictEqual(join?.source, [{ kind: "ring", role: "source", at: own.position }])
+    assert.strictEqual(face?.relation, "flush")
+    // the selection's face the pivot is on, out of +X
+    assert.isTrue(face?.source[0]?.kind === "face" && face.source[0].corners.every(({ x }) => x === 50))
+  })
+
+  it("draws a scale stop's target face, the scaled face on it, and the flush glyph", () => {
+    const stops = scaleStopsOf(alongX, ORIGIN, selection.box, [cubeAt("a", { x: 200, y: 0, z: 0 })])
+    const near = stops.find((stop) => stop.at === 150)
+    assert.strictEqual(near?.relation, "flush")
+    const [target, scaled, glyph] = near?.marks ?? []
+    assert.isTrue(target?.kind === "face" && target.role === "target")
+    assert.isTrue(scaled?.kind === "face" && scaled.role === "source" && scaled.corners.every(({ x }) => x === 150))
+    assert.deepInclude(glyph, { kind: "glyph", relation: "flush" })
   })
 
   it("reads a loaded item's faces from the scene, where it stands", () => {

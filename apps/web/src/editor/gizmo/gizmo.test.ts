@@ -255,7 +255,14 @@ describe("gizmo drags (game space)", () => {
     }
     const turn = turnOf(s, now)
     if (turn !== undefined) {
-      const { angle } = snappedTurn({ free: turn.angle, axis: turn.axis, step: rotationStep, flush: [], reach: 0 })
+      const { angle } = snappedTurn({
+        free: turn.angle,
+        axis: turn.axis,
+        about: s.transform.translation,
+        step: rotationStep,
+        flush: [],
+        reach: 0
+      })
       const delta = { kind: "rotate", rotation: quatFromAxisAngle(turn.axis, angle) } as const
       return applyGroupDelta(s.transform, s.transform.translation, delta)
     }

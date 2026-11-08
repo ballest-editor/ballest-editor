@@ -3,6 +3,7 @@ import { priorityOf, SNAP_TARGET_NAMES } from "../domain/snapConfig"
 import { applyFlipOffer, setFlushOptions } from "../editor/actions"
 import { snapConfigOf, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
+import { SnapGlyph } from "./SnapGlyph"
 import { SURFACE } from "./viewControlStyle"
 
 const CHIP = `pointer-events-auto flex items-center gap-2 rounded-full px-2.5 py-1 text-caption ${SURFACE}`
@@ -77,6 +78,7 @@ export function SnapLabel() {
       <PickerPrompt />
       {feedback !== null && (
         <div className={CHIP} data-snap-label>
+          {feedback.relation !== undefined && <SnapGlyph relation={feedback.relation} />}
           <span className="truncate">{feedback.label}</span>
           {feedback.warning !== undefined && <span className="text-destructive">{feedback.warning}</span>}
         </div>

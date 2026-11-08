@@ -18,15 +18,23 @@ import {
   type SnapFrame,
   type SnapHit,
   type SnapItem,
-  type SnapMark,
   type SnapView
 } from "../../domain/snapFrame"
 import { gridAxes } from "../../domain/snapGrid"
+import { shownMarks } from "../../domain/snapRelation"
 import { baseNearPointer, moveOf, resolveDrag, resolveSnap } from "../../domain/snapResolve"
+import type { SnappedAs } from "../../domain/snapRotate"
 import { selectionBases } from "../../domain/snapTools"
 import { annotationsOf } from "../../domain/structure"
 import type { PaneCamera } from "../paneCameras"
-import { type EditorState, type FlipOffer, snapConfigOf, type TransformOptions, useEditor } from "../store"
+import {
+  type EditorState,
+  type FlipOffer,
+  snapConfigOf,
+  type SnapFeedback,
+  type TransformOptions,
+  useEditor
+} from "../store"
 import { heldKindsOf } from "./dragKeys"
 import { snapMarks } from "./snapMarks"
 import { snapCasts, snapItemsOf } from "./snapScene"
@@ -221,18 +229,29 @@ export class MoveSession {
 export const previewMove = (next: ReadonlyMap<string, UeTransform>, delta: GroupDelta): void =>
   useEditor.getState().setPreview(next, delta.kind === "rigid" ? delta : undefined)
 
-/** Shows a hit: its marks in the scene, its words in the pane's corner and the status bar. */
-const publish = (hit: SnapHit | undefined, free: Vec3 | undefined) => {
+/** What the label says of `hit`, and its glyph: undefined for no snap. */
+export const feedbackOf = (hit: SnapHit | undefined, base = hit?.base.label): SnapFeedback | null => {
+  if (hit === undefined) return null
+  const warning = hit.meeting?.warning
+  return { label: hit.label, base: base ?? "", relation: hit.relation, ...(warning !== undefined && { warning }) }
+}
+
+/** Sets the label's words, when they changed. */
+export const setFeedback = (next: SnapFeedback | null): void => {
   const s = useEditor.getState()
-  snapMarks.set(hit?.marks ?? [], hit?.landing ?? free)
-  const warning = hit?.meeting?.warning
-  const next = hit === undefined
-    ? null
-    : { label: hit.label, base: hit.base.label, ...(warning !== undefined && { warning }) }
   const now = s.snapFeedback
-  if (now?.label !== next?.label || now?.base !== next?.base || now?.warning !== next?.warning) {
-    s.setSnapFeedback(next)
-  }
+  const same = now?.label === next?.label && now?.base === next?.base && now?.relation === next?.relation &&
+    now?.warning === next?.warning
+  if (!same) s.setSnapFeedback(next)
+}
+
+/**
+ * Shows a hit: both sides of it and its glyph in the scene, its words in the pane's corner and the status bar. With
+ * nothing to land on, the base is drawn where it stands.
+ */
+const publish = (hit: SnapHit | undefined, free: Vec3 | undefined) => {
+  snapMarks.set(hit === undefined ? [] : shownMarks(hit), hit === undefined ? free : undefined)
+  setFeedback(feedbackOf(hit))
 }
 
 /** What a move that ended on `hit` leaves in the chip: the mirrored twin, when that's what would fit. */
@@ -256,10 +275,7 @@ export const dragKeysOf = (keybinds: Keybinds, pressed: ReadonlySet<string>): Dr
 })
 
 /** Shown for a rotate or scale snap, as a move's are. */
-export const showSnap = (label: string | undefined, marks: ReadonlyArray<SnapMark> = []): void => {
-  const s = useEditor.getState()
+export const showSnap = ({ label, marks = [], relation }: SnappedAs): void => {
   snapMarks.set(marks, undefined)
-  if (s.snapFeedback?.label !== label) {
-    s.setSnapFeedback(label === undefined ? null : { label, base: "Pivot" })
-  }
+  setFeedback(label === undefined ? null : { label, base: "Pivot", ...(relation !== undefined && { relation }) })
 }

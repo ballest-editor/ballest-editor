@@ -255,7 +255,7 @@ const showPieceDrop = (
 ) => {
   const { pane, point, px } = dropTarget(piece, canvas, e)
   const s = useEditor.getState()
-  showDrop(s, snappedDrop(s, piece, pane, px, point, e.ctrlKey))
+  showDrop(snappedDrop(s, piece, pane, px, point, e.ctrlKey))
 }
 
 /**

@@ -81,7 +81,7 @@ import type { RecoveredTab } from "../domain/recovery"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import type { SnapConfig, SnapTransform } from "../domain/snapConfig"
-import type { TrackedPoint } from "../domain/snapFrame"
+import type { SnapRelation, TrackedPoint } from "../domain/snapFrame"
 import { type FaceMeeting, mirroredPoint, type MirrorPlane } from "../domain/snapTools"
 import {
   annotationsOf,
@@ -239,6 +239,8 @@ export interface SnapFeedback {
   readonly label: string
   /** The base in use, in the same words. */
   readonly base: string
+  /** The kind of snap, whose glyph comes before the words. */
+  readonly relation?: SnapRelation
   /** A chip beside the label, when the ends' profiles differ. */
   readonly warning?: string
 }
