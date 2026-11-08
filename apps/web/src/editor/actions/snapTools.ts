@@ -4,6 +4,7 @@
  */
 import { Effect } from "effect"
 import { endsOf, meetingTurn } from "../../domain/connectors"
+import type { SpotId } from "../../domain/connectorSpots"
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
 import { applyGroupDelta, type RigidDelta } from "../../domain/groupTransform"
@@ -41,6 +42,7 @@ import { annotationsOf, freshKey } from "../../domain/structure"
 import { ORIGIN, rotateVec, vecSub } from "../../domain/ueMath"
 import { applyDelta, applyUnitOffsets, carriedKeys, type SelectionUnits, type Unit } from "../../domain/units"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
+import { snapMarks } from "../snap/snapMarks"
 import {
   editedKeys,
   type EditorState,
@@ -352,7 +354,7 @@ const endOf = (s: EditorState, { end, item: key }: EndRef, item?: Item) => {
   const placed = s.doc.map.items[index]
   return of === undefined || placed === undefined
     ? undefined
-    : endsOf(key, of, editTransform(placed), s.catalogIndex)[end]
+    : endsOf(key, of, editTransform(placed), s.catalogIndex, s.doc.structure.items.get(key)?.connectAt)[end]
 }
 
 /**
@@ -453,3 +455,21 @@ export const startAxisFromPoints = () =>
         onPick: (b) => addConstruction(axisFromPoints(a.point, b.point, freshKey(), nextName("Axis")))
       })
   })
+
+/**
+ * Rings, in the source's colour, where end `end` of the item `key` would connect at `spot`, as the snap overlay rings a
+ * landing end: what the Inspector's Connects at shows while one of its spots is hovered. Null takes the ring away.
+ */
+export const showConnectSpot = (key: string, end: number, spot: SpotId | null) => {
+  if (spot === null) {
+    snapMarks.clear()
+    return
+  }
+  const s = useEditor.getState()
+  const item = s.doc.map.items[s.doc.ids.indexOf(key)]
+  const transform = shownTransform(s, key)
+  const at = item === undefined || transform === undefined
+    ? undefined
+    : endsOf(key, item, transform, s.catalogIndex, { [String(end)]: spot })[end]?.position
+  snapMarks.set(at === undefined ? [] : [{ kind: "ring", role: "source", at }], undefined)
+}

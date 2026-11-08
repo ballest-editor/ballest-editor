@@ -31,6 +31,15 @@ describe("the open ends the overlay rings", () => {
     assertVec(second ?? assert.fail("no end"), { x: -250, y: 0, z: 50 }, "second end")
   })
 
+  it("are at the spot an end connects at, in the document and in hand", () => {
+    const { a } = twoSlabs()
+    useEditor.getState().setConnectAt(a, 0, "bottomRight")
+    useEditor.setState({ preview: null })
+    assertVec(positionsOf(ringed("always"), a)[0] ?? assert.fail("no end"), { x: 250, y: 250, z: -50 }, "in the doc")
+    moved(a, identityTransform({ x: 0, y: 500, z: 0 }))
+    assertVec(positionsOf(ringed("always"), a)[0] ?? assert.fail("no end"), { x: 250, y: 750, z: -50 }, "in hand")
+  })
+
   it("follow a move in hand", () => {
     const { a } = twoSlabs()
     moved(a, identityTransform({ x: 0, y: 500, z: 0 }))

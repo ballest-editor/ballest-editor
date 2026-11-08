@@ -81,6 +81,7 @@ export function SnapLabel() {
           {feedback.relation !== undefined && <SnapGlyph relation={feedback.relation} />}
           <span className="truncate">{feedback.label}</span>
           {feedback.warning !== undefined && <span className="text-destructive">{feedback.warning}</span>}
+          {feedback.hint !== undefined && <span className="shrink-0 text-fg-tertiary">{feedback.hint}</span>}
         </div>
       )}
       {flipOffer !== null && (

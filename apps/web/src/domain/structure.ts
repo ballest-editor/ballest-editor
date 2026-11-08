@@ -4,14 +4,17 @@
  * undefined, so the store leaves no undo step for it. An item's key is its entry in the store's `ids`.
  */
 import type { CatalogIndex } from "./Catalog"
+import type { ConnectAt, SpotId } from "./connectorSpots"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
 import type { Annotations, GroupNode, GroupPivot, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
 import { pieceLabelOf } from "./pieceName"
 
-/** What an item has beyond the game's data. An item with neither has no entry. */
+/** What an item has beyond the game's data. An item with none of it has no entry. */
 export interface ItemMeta {
   readonly name?: string
   readonly tags?: ReadonlyArray<string>
+  /** Where its ends connect, when not where they were measured (docs/SNAPPING.md § Connectors). */
+  readonly connectAt?: ConnectAt
 }
 
 export interface Structure {
@@ -128,7 +131,7 @@ export const withoutKeys = (structure: Structure, keys: ReadonlySet<string>): St
 
 const withMeta = (structure: Structure, key: string, meta: ItemMeta): Structure => {
   const items = new Map(structure.items)
-  if (meta.name === undefined && meta.tags === undefined) items.delete(key)
+  if (meta.name === undefined && meta.tags === undefined && meta.connectAt === undefined) items.delete(key)
   else items.set(key, meta)
   return { ...structure, items }
 }
@@ -137,12 +140,28 @@ const withMeta = (structure: Structure, key: string, meta: ItemMeta): Structure 
 export const withItemName = (structure: Structure, key: string, name: string | null): Structure | undefined => {
   if (findNode(structure.tree, key)?.node.kind !== "item") return undefined
   const trimmed = name?.trim() ?? ""
-  const { name: current, tags } = structure.items.get(key) ?? {}
+  const { name: current, ...rest } = structure.items.get(key) ?? {}
   if (trimmed === (current ?? "")) return undefined
-  return withMeta(structure, key, {
-    ...(trimmed.length > 0 && { name: trimmed }),
-    ...(tags !== undefined && { tags })
-  })
+  return withMeta(structure, key, { ...(trimmed.length > 0 && { name: trimmed }), ...rest })
+}
+
+/**
+ * Where end `end` of the item `key` connects: the spot `spot`, or the measured point for undefined. Which spots the end
+ * has is the catalog's, so the caller offers only those.
+ */
+export const withConnectAt = (
+  structure: Structure,
+  key: string,
+  end: number,
+  spot: SpotId | undefined
+): Structure | undefined => {
+  if (findNode(structure.tree, key)?.node.kind !== "item") return undefined
+  const { connectAt = {}, ...rest } = structure.items.get(key) ?? {}
+  const slot = String(end)
+  if (connectAt[slot] === spot) return undefined
+  const { [slot]: _gone, ...others } = connectAt
+  const next = spot === undefined ? others : { ...others, [slot]: spot }
+  return withMeta(structure, key, { ...rest, ...(Object.keys(next).length > 0 && { connectAt: next }) })
 }
 
 const withGroupNode = (structure: Structure, id: string, change: (group: GroupNode) => GroupNode): Structure => ({
@@ -227,12 +246,9 @@ export const withTags = (structure: Structure, target: string, tags: ReadonlyArr
     if (sameStrings(clean, node.tags)) return undefined
     return withGroupNode(structure, target, (group) => ({ ...group, tags: clean }))
   }
-  const { name, tags: current = [] } = structure.items.get(target) ?? {}
+  const { tags: current = [], ...rest } = structure.items.get(target) ?? {}
   if (sameStrings(clean, current)) return undefined
-  return withMeta(structure, target, {
-    ...(name !== undefined && { name }),
-    ...(clean.length > 0 && { tags: clean })
-  })
+  return withMeta(structure, target, { ...rest, ...(clean.length > 0 && { tags: clean }) })
 }
 
 /** What a group is called until the user names it. Its ordinal tells it from the others (`groupNames`). */

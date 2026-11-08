@@ -115,7 +115,7 @@ const snapItemsWhere = (
       box,
       transform,
       bounds: pivotBoundsOf(item, s.catalogIndex),
-      ends: endsOf(key, item, transform, s.catalogIndex),
+      ends: endsOf(key, item, transform, s.catalogIndex, s.doc.structure.items.get(key)?.connectAt),
       mesh: () => {
         mesh ??= worldMeshOf(key, sharpAngle)
         return mesh

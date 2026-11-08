@@ -69,6 +69,8 @@ Parameters:
 - **Show open ends**: Never, On hover, Always. An open end is one no other end meets. On hover shows the hovered item's, and in a drag those of what the drag carries, the ends about to join; Always shows every open end in the map, which is the "where does the track still need a piece" view. Default On hover. A drag's ends are drawn where the drag has them, through a move, a turn, a scale or a mirror.
 - **Flip to fit**: when the piece's mirrored twin would fit the target end and the piece itself wouldn't (a left-handed bevel against a right-handed end), the editor offers the flip in the chip, one click. This uses the game's Flip X and Flip Y ([FORMAT.md](FORMAT.md) § Mirroring), so it round-trips.
 
+**Where on an end** a piece connects is the item's choice, end by end, from a fixed set of spots on the end's cap (`domain/connectorSpots.ts`), named as seen looking out of the end with its up up (the game's +Y to the right of its +X). A rectangle or a polygon has nine: its box's four corners, the middles of its four sides and its centre ("Top left", "Top", "Centre", "Bottom right"…), the box's corners even where a polygon's own don't reach them. A circle or a ring has five: the points of its outer rim straight up, down and to either side, and its centre. Until one is chosen an end connects where it was measured, which is one of its spots: a track's Top, a tube's Centre. The chosen spot moves the end's point and nothing else, its directions stay, so a join, a turn's end stops, a drop, the open-end rings and the snap's marks all use it, and two ends meet at their chosen spots as at their measured ones. Facing each other, one end's left is the other's right, so a piece's Top left lands on a neighbour's Top right with their caps overlapping, and on its Top left a whole width aside. A mirrored item keeps the names as seen. The Inspector's Connects at section sets it for one selected item: a row per end, a grid of its spots with the one in use pressed, the spot ringed in the viewport in the source's colour while its button is hovered. A change is one undo step ("Connect Track S at top left") and takes apart the item's joints it leaves. During a drag the join's label names the spot the end is joining by and points to the Inspector; a hold key would be wrong for a choice that stays with the item.
+
 An end that has met another end is closed, and the pair is remembered in the sidecar as a joint. A joint is what Show open ends counts, what a later "select the whole track" can walk, and what a lint check can read (a track with an open end that isn't a start or a goal).
 
 #### Mesh
@@ -287,7 +289,7 @@ Connectors need, per piece, the ends: position and the two directions in the pie
 - Profiles are named for the families in the catalog's display names (Track, Bevel_F, Bevel_H, Bevel_C, Bevel_T, Round, Pipe Q, Tube F, Tube H and the rest in [qa/connectors.md](qa/connectors.md) § What is covered) and the family a piece belongs to is part of its connector record, not derived from its name at run time. A cap that differs in area, size or the height of its running surface is a profile of its own, so a half tube's end doesn't fit a full tube's.
 - A piece with no connector data has no ends: Connectors do nothing for it and Mesh and Bounds carry it. That is what every piece is until measured, so the feature grows piece family by piece family and nothing waits on all of it.
 - An end is anchored on the running surface, not the middle of its cap: pieces that join level have caps centred at different heights. A section ridden through, a full tube or a pipe, is anchored on its middle ([qa/connectors.md](qa/connectors.md) § What an end is).
-- Each end carries its cap's shape (a rectangle, polygon, circle or ring, and its size), for choosing other places on it to join.
+- Each end carries its cap's shape (a rectangle, polygon, circle or ring, and its size), which its spots are placed on (§ Connectors).
 - A lopsided cross-section has a hand, the side its top leans to looking out of the end. Two ends fit when their hands differ, and Flip to fit offers the mirrored twin when they don't.
 - Mirroring an item (Flip X, Flip Y) mirrors its ends with its geometry, as it does its bounds ([FORMAT.md](FORMAT.md) § Mirroring).
 
@@ -299,6 +301,7 @@ All of this is the editor's, none of it the game's, so it goes in the map's side
 - The grid's origin and rotation.
 - Construction planes and axes, named.
 - Joints: pairs of item ends that met. They are recorded when a connector snap commits and dropped when either item moves away or is deleted, here or in a save from the in-game editor.
+- Where each item's ends connect, when not at the measured point: `connectAt` on the item's entry, a spot by end index (`{"0": "topLeft"}`), absent for an end at its default (§ Connectors). A joint names the end by its index whichever spot it is at.
 - Measurements.
 - Acquired tracking points are not saved; they are a drag's working set.
 

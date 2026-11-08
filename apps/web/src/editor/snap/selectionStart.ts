@@ -49,7 +49,9 @@ export const selectionSnapStart = (
   })
   return {
     box: placedBoxOf(placed, catalogIndex) ?? NOTHING,
-    ends: placed.flatMap(({ item, key, transform }) => endsOf(key, item, transform, catalogIndex))
+    ends: placed.flatMap(({ item, key, transform }) =>
+      endsOf(key, item, transform, catalogIndex, doc.structure.items.get(key)?.connectAt)
+    )
   }
 }
 

@@ -9,6 +9,7 @@ import { catalogWithEnds, grouped, loadPieces } from "../../test/snapFixtures"
 import { sceneRegistry } from "../sceneRegistry"
 import { useEditor } from "../store"
 import { bodyDrags, dragTargetOf, selectionSnapStart } from "./selectionStart"
+import { snapItemsOf } from "./snapScene"
 
 const s = () => useEditor.getState()
 
@@ -58,6 +59,18 @@ describe("what a drag acts on", () => {
     inScene([a])
     s().select([a, b])
     assert.deepStrictEqual([...target().transforms.keys()], [a])
+  })
+})
+
+describe("the ends a drag carries and comes up to", () => {
+  it("stand at the spots their items connect at", () => {
+    const [a = "", b = ""] = load([0, 1000])
+    s().setConnectAt(a, 0, "topRight")
+    s().setConnectAt(b, 1, "centre")
+    const start = selectionSnapStart(s(), new Map([[a, identityTransform({ x: 0, y: 0, z: 0 })]]), [a])
+    assert.deepStrictEqual(start.ends[0]?.position, { x: 250, y: 250, z: 50 })
+    const [other] = snapItemsOf(s(), new Set([a]), 30)
+    assert.deepStrictEqual(other?.ends[1]?.position, { x: 750, y: 0, z: 0 })
   })
 })
 

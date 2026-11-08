@@ -248,10 +248,11 @@ export const loadStructure = (
   const keys = byIndex ?? keysByFingerprint(map, entries)
   const matched = new Set(keys.flatMap((key) => key ?? []))
   const ids = keys.map((key) => key ?? freshKey())
-  const items = new Map(entries.flatMap(([key, { name, tags }]) => {
+  const items = new Map(entries.flatMap(([key, { connectAt, name, tags }]) => {
     const meta: ItemMeta = {
       ...(name !== undefined && { name }),
-      ...(tags !== undefined && tags.length > 0 && { tags })
+      ...(tags !== undefined && tags.length > 0 && { tags }),
+      ...(connectAt !== undefined && Object.keys(connectAt).length > 0 && { connectAt })
     }
     return matched.has(key) && Object.keys(meta).length > 0 ? [[key, meta] as const] : []
   }))
@@ -278,7 +279,10 @@ const withStandingJoints = (
 ): Structure => {
   const annotations = annotationsOf(structure)
   if (catalog === null || annotations.joints.length === 0) return structure
-  const ends = map.items.flatMap((item, index) => endsOf(ids[index] ?? "", item, editTransform(item), catalog))
+  const ends = map.items.flatMap((item, index) => {
+    const key = ids[index] ?? ""
+    return endsOf(key, item, editTransform(item), catalog, structure.items.get(key)?.connectAt)
+  })
   return withAnnotations(structure, {
     ...annotations,
     joints: jointsAfterMove(annotations.joints, ends, new Set(), false)

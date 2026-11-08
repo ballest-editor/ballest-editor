@@ -4,6 +4,7 @@
  * it. Everything in game space.
  */
 import type { CatalogIndex, Connector } from "./Catalog"
+import { type ConnectAt, spotPosition } from "./connectorSpots"
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import type { Item } from "./MapFile"
 import type { EndRef } from "./MapSidecar"
@@ -41,11 +42,26 @@ const FACING = -0.999
 const connectorsOf = (item: Item, index: CatalogIndex | null): ReadonlyArray<Connector> =>
   index?.pieceByClass.get(item.actorToSpawn)?.connectors ?? []
 
-/** An end's point and directions after an item's mirroring: the same flip as its geometry. */
-const mirrored = (connector: Connector, flip: readonly [number, number, number] | undefined) => {
+/**
+ * An end's point and directions after an item's mirroring, the same flip as its geometry, with its point moved to the
+ * spot `spot` names. The spot is placed after the flip, so its left stays the left looking out of the end.
+ */
+const mirrored = (
+  connector: Connector,
+  flip: readonly [number, number, number] | undefined,
+  spot: ConnectAt[string] | undefined
+) => {
   const [fx, fy, fz] = flip ?? [1, 1, 1]
-  const by = ([x, y, z]: Connector["position"]) => ({ x: x * fx, y: y * fy, z: z * fz })
-  return { position: by(connector.position), forward: by(connector.forward), up: by(connector.up) }
+  const by = ([x, y, z]: Connector["position"]): Connector["position"] => [x * fx, y * fy, z * fz]
+  const { cap } = connector
+  const flipped = {
+    position: by(connector.position),
+    forward: by(connector.forward),
+    up: by(connector.up),
+    ...(cap !== undefined && { cap: cap.centre === undefined ? cap : { ...cap, centre: by(cap.centre) } })
+  }
+  const vec = ([x, y, z]: Connector["position"]): Vec3 => ({ x, y, z })
+  return { position: vec(spotPosition(flipped, spot)), forward: vec(flipped.forward), up: vec(flipped.up) }
 }
 
 /** What flipping does to a lopsided end: one mirror swaps its sides, two put them back. */
@@ -64,18 +80,19 @@ const worldDirection = (transform: UeTransform, direction: Vec3): Vec3 => {
   )
 }
 
-/** The ends of `item` (of stable key `key`) under `transform`. */
+/** The ends of `item` (of stable key `key`) under `transform`, each at the spot `connectAt` chooses for it, if any. */
 export const endsOf = (
   key: string,
   item: Item,
   transform: UeTransform,
-  index: CatalogIndex | null
+  index: CatalogIndex | null,
+  connectAt?: ConnectAt
 ): ReadonlyArray<WorldEnd> => {
   const connectors = connectorsOf(item, index)
   if (connectors.length === 0) return []
   const flip = mirrorScaleOf(item, index)
   return connectors.map((connector, end) => {
-    const { forward, position, up } = mirrored(connector, flip)
+    const { forward, position, up } = mirrored(connector, flip, connectAt?.[String(end)])
     const hand = handAfter(connector.hand, flip)
     return {
       ref: { item: key, end },

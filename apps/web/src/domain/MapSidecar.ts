@@ -4,12 +4,16 @@
  */
 import { FileHash, PrefabName, PrefabTier } from "@ballest/contracts"
 import { Schema } from "effect"
+import { SPOT_IDS } from "./connectorSpots"
 import { SnapConfig } from "./snapConfig"
 
 /** An item's stable key or a group's id: random and URL-safe. The two share one space, so a tree node has one id. */
 const NodeId = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/))
 
 export const Tags = Schema.Array(Schema.String)
+
+/** Where an item's ends connect, by end index, for those not at their measured point (docs/SNAPPING.md § Connectors). */
+const ConnectAt = Schema.Record(Schema.String.check(Schema.isPattern(/^\d{1,3}$/)), Schema.Literals(SPOT_IDS))
 
 export class SidecarItem extends Schema.Opaque<SidecarItem>()(
   Schema.Struct({
@@ -18,7 +22,8 @@ export class SidecarItem extends Schema.Opaque<SidecarItem>()(
     /** Finds the item again in a `.balledit` that changed (`fingerprintOf`). */
     fingerprint: Schema.String,
     name: Schema.optionalKey(Schema.String),
-    tags: Schema.optionalKey(Tags)
+    tags: Schema.optionalKey(Tags),
+    connectAt: Schema.optionalKey(ConnectAt)
   })
 ) {}
 

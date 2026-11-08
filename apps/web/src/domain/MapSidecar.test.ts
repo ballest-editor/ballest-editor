@@ -10,7 +10,7 @@ const sidecar = {
   items: {
     "k-1": { index: 0, fingerprint: "BP_Prim_Cube|0,0,0|0,0,0,1|1,1,1" },
     k_2: { index: 1, fingerprint: "BP_Prim_Cube|1,0,0|0,0,0,1|1,1,1", name: "Left ramp", tags: ["start", "hard"] },
-    k3: { index: 2, fingerprint: "BP_Prim_Cube|2,0,0|0,0,0,1|1,1,1" }
+    k3: { index: 2, fingerprint: "BP_Prim_Cube|2,0,0|0,0,0,1|1,1,1", connectAt: { "0": "topLeft", "1": "centre" } }
   },
   tree: [
     { kind: "item", key: "k-1" },
@@ -28,7 +28,16 @@ const sidecar = {
 }
 
 describe("MapSidecar", () => {
-  it("round-trips nested groups, names and tags", () => {
+  it("refuses a connection spot it doesn't know, and drops one not keyed by an end", () => {
+    const decoded = (connectAt: unknown) =>
+      Schema.decodeUnknownOption(MapSidecar)({ ...sidecar, items: { k3: { index: 2, fingerprint: "x", connectAt } } })
+        .pipe(Option.map(({ items }) => items["k3"]?.connectAt))
+    assert.deepStrictEqual(decoded({ "2": "bottomRight" }), Option.some({ "2": "bottomRight" }))
+    assert.isTrue(Option.isNone(decoded({ "0": "middle" })))
+    assert.deepStrictEqual(decoded({ front: "top" }), Option.some({}))
+  })
+
+  it("round-trips nested groups, names, tags and connection spots", () => {
     const text = JSON.stringify(sidecar)
     const decoded = Schema.decodeSync(Codec)(text)
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(decoded)), sidecar)

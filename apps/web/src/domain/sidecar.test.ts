@@ -5,7 +5,7 @@ import { catalogWithEnds } from "../test/snapFixtures"
 import { indexCatalog } from "./Catalog"
 import { defaultEditorState, identityTransform, itemFromPiece, newMapFile, playerStartItem } from "./factory"
 import { type Item, MapFile } from "./MapFile"
-import type { MapSidecar } from "./MapSidecar"
+import { MapSidecar } from "./MapSidecar"
 import { fingerprintOf, loadGameStructure, loadStructure, sidecarOf, structureOfMap } from "./sidecar"
 import { defaultSnapConfig } from "./snapConfig"
 import {
@@ -14,6 +14,7 @@ import {
   treeKeys,
   withAnnotations,
   withChain,
+  withConnectAt,
   withGroup,
   withGroupPivot,
   withItemName,
@@ -46,6 +47,7 @@ const authored = () => {
   next = withItemName(next, k1, "Named")!
   next = withTags(next, k2, ["tagged"])!
   next = withTags(next, "g1", ["a tag"])!
+  next = withConnectAt(next, k3, 0, "bottomLeft")!
   return { map, ids, keys: { k0, k1, k2, k3, k4 }, structure: next, sidecar: sidecarOf(map, ids, next, HASH) }
 }
 
@@ -76,6 +78,16 @@ describe("loadStructure", () => {
     assert.deepStrictEqual(loaded.structure.items, structure.items)
     assert.strictEqual(loaded.unmatched, 0)
     assert.isFalse(loaded.rematched)
+  })
+
+  it("reads back where an item's ends connect, through the sidecar's file", () => {
+    const { keys, map, sidecar } = authored()
+    const Codec = Schema.fromJsonString(MapSidecar)
+    const file = Schema.decodeSync(Codec)(Schema.encodeSync(Codec)(sidecar))
+    assert.deepStrictEqual(file.items[keys.k3]?.connectAt, { "0": "bottomLeft" })
+    assert.deepStrictEqual(loadStructure(map, HASH, file).structure.items.get(keys.k3), {
+      connectAt: { "0": "bottomLeft" }
+    })
   })
 
   it("makes keys and a flat tree without a sidecar, with the file's groups", () => {
@@ -109,6 +121,7 @@ describe("loadStructure", () => {
 
     assert.deepStrictEqual(loaded.structure.items.get(keys.k1), { name: "Named" })
     assert.deepStrictEqual(loaded.structure.items.get(keys.k2), { tags: ["tagged"] })
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k3), { connectAt: { "0": "bottomLeft" } })
     const groups = loaded.structure.tree.flatMap((node) => node.kind === "group" ? [node] : [])
     assert.deepStrictEqual(groups.map((g) => [g.name, g.tags, treeKeys(g.children)]), [
       ["Inner", ["a tag"], [keys.k1, keys.k2]],

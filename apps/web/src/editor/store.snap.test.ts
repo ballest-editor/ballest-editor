@@ -110,6 +110,31 @@ describe("joints on commit", () => {
   })
 })
 
+describe("where an end connects", () => {
+  it("moves the end to the chosen spot as one named step, taking apart a joint it leaves", () => {
+    const { b } = load()
+    join(b)
+    useEditor.getState().setConnectAt(b, 1, "topLeft")
+    const s = useEditor.getState()
+    assert.deepStrictEqual(s.doc.structure.items.get(b)?.connectAt, { "1": "topLeft" })
+    assert.lengthOf(annotationsOf(s.doc.structure).joints, 0)
+    assert.match(s.past.at(-1)?.description ?? "", /^Connect .+ at top left$/)
+    useEditor.getState().undo()
+    assert.isUndefined(useEditor.getState().doc.structure.items.get(b)?.connectAt)
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).joints, 1)
+  })
+
+  it("keeps no choice for the spot an end connects at already, and makes no step for it", () => {
+    const { b } = load()
+    useEditor.getState().setConnectAt(b, 1, "topLeft")
+    useEditor.getState().setConnectAt(b, 1, "top")
+    assert.isUndefined(useEditor.getState().doc.structure.items.get(b))
+    const steps = useEditor.getState().past.length
+    useEditor.getState().setConnectAt(b, 1, "top")
+    assert.lengthOf(useEditor.getState().past, steps)
+  })
+})
+
 describe("undo descriptions", () => {
   it("say what the step did, both ways", () => {
     const { b } = load()

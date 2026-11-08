@@ -13,10 +13,22 @@ import { cornersOf } from "../domain/snapRelation"
 import type { PaneCamera } from "../editor/paneCameras"
 import { useEditor } from "../editor/store"
 
-/** A slab's two ends along X, as Track S's. */
+/** A slab's two ends along X, as Track S's: each on the top middle of a 500 by 100 cap. */
 export const TRACK_ENDS = [
-  { position: [250, 0, 50], forward: [1, 0, 0], up: [0, 0, 1], profile: "Track" },
-  { position: [-250, 0, 50], forward: [-1, 0, 0], up: [0, 0, 1], profile: "Track" }
+  {
+    position: [250, 0, 50],
+    forward: [1, 0, 0],
+    up: [0, 0, 1],
+    profile: "Track",
+    cap: { shape: "rect", width: 500, height: 100, centre: [250, 0, 0] }
+  },
+  {
+    position: [-250, 0, 50],
+    forward: [-1, 0, 0],
+    up: [0, 0, 1],
+    profile: "Track",
+    cap: { shape: "rect", width: 500, height: 100, centre: [-250, 0, 0] }
+  }
 ]
 
 /** The bundled catalog with `connectors` on its first piece. */

@@ -13,7 +13,7 @@ import { assertVec } from "../../test/vec"
 import { PaneCamera } from "../paneCameras"
 import { selectionPivot, shownTransform, useEditor } from "../store"
 import { type DragKeyEvent, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
-import { dragKeysOf, endSnapDisplay, MoveSession, type MoveStart, previewMove } from "./moveSession"
+import { dragKeysOf, endSnapDisplay, joinHintOf, MoveSession, type MoveStart, previewMove } from "./moveSession"
 import { anchorUnder } from "./pickTarget"
 import { selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
@@ -199,6 +199,17 @@ describe("MoveSession", () => {
     moving(a).pointAt(137, 42)
     assert.strictEqual(useEditor.getState().snapFeedback, null)
     assert.isDefined(snapMarks.get().base)
+  })
+
+  it("hints on a join which spot of its end it is by, and that the Inspector changes it", () => {
+    const [a = ""] = load(null)
+    assert.strictEqual(joinHintOf(useEditor.getState(), { item: a, end: 0 }), "By its top · Inspector › Connects at")
+    useEditor.getState().setConnectAt(a, 0, "bottomRight")
+    assert.strictEqual(
+      joinHintOf(useEditor.getState(), { item: a, end: 0 }),
+      "By its bottom right · Inspector › Connects at"
+    )
+    assert.isUndefined(joinHintOf(useEditor.getState(), { item: "new", end: 0 }))
   })
 
   it("clears what it showed when the move ends", () => {

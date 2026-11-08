@@ -4,10 +4,12 @@
  * The same session measures a turn's and a scale's targets, for the Rotate and Scale rows of Affect.
  */
 import type { WorldEnd } from "../../domain/connectors"
+import { defaultSpotOf, SPOT_NAMES } from "../../domain/connectorSpots"
 import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
 import type { GroupDelta } from "../../domain/groupTransform"
 import type { Box } from "../../domain/itemBounds"
 import type { Keybinds } from "../../domain/Keybinds"
+import type { EndRef } from "../../domain/MapSidecar"
 import { kindsFor, narrowedTo, type SnapConfig, type SnapKind } from "../../domain/snapConfig"
 import {
   type Constraint,
@@ -235,11 +237,34 @@ export const turnCommitOptions = (stop: TurnStop | undefined, count: number): Tr
 export const previewMove = (next: ReadonlyMap<string, UeTransform>, delta: GroupDelta): void =>
   useEditor.getState().setPreview(next, delta.kind === "rigid" ? delta : undefined)
 
+/**
+ * Which spot of its end a joining item meets by, and where that is chosen: the label's hint on a join. A hold key would
+ * be wrong for it, as the choice stays with the item, so the Inspector is the one place to change it.
+ */
+export const joinHintOf = (
+  s: Pick<EditorState, "doc" | "catalogIndex">,
+  { end, item: key }: EndRef
+): string | undefined => {
+  const item = s.doc.map.items[s.doc.ids.indexOf(key)]
+  const connector = item === undefined ? undefined : s.catalogIndex?.pieceByClass.get(item.actorToSpawn)
+    ?.connectors?.[end]
+  if (connector?.cap === undefined) return undefined
+  const spot = s.doc.structure.items.get(key)?.connectAt?.[String(end)] ?? defaultSpotOf(connector)
+  return spot === undefined ? undefined : `By its ${SPOT_NAMES[spot].toLowerCase()} · Inspector › Connects at`
+}
+
 /** What the label says of `hit`, and its glyph: undefined for no snap. */
 export const feedbackOf = (hit: SnapHit | undefined, base = hit?.base.label): SnapFeedback | null => {
   if (hit === undefined) return null
   const warning = hit.meeting?.warning
-  return { label: hit.label, base: base ?? "", relation: hit.relation, ...(warning !== undefined && { warning }) }
+  const hint = hit.meeting === undefined ? undefined : joinHintOf(useEditor.getState(), hit.meeting.own)
+  return {
+    label: hit.label,
+    base: base ?? "",
+    relation: hit.relation,
+    ...(warning !== undefined && { warning }),
+    ...(hint !== undefined && { hint })
+  }
 }
 
 /** Sets the label's words, when they changed. */
@@ -247,7 +272,7 @@ export const setFeedback = (next: SnapFeedback | null): void => {
   const s = useEditor.getState()
   const now = s.snapFeedback
   const same = now?.label === next?.label && now?.base === next?.base && now?.relation === next?.relation &&
-    now?.warning === next?.warning
+    now?.warning === next?.warning && now?.hint === next?.hint
   if (!same) s.setSnapFeedback(next)
 }
 

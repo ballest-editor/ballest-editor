@@ -17,6 +17,7 @@ import { useShallow } from "zustand/react/shallow"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
 import { endsOf } from "../domain/connectors"
 import type { WorldEnd } from "../domain/connectors"
+import { defaultSpotOf, SPOT_NAMES, type SpotId } from "../domain/connectorSpots"
 import type { Quat4, UeTransform, Vec3 } from "../domain/coords"
 import { type Creator, creatorOf, type FoundCreator } from "../domain/creator"
 import {
@@ -98,6 +99,7 @@ import {
   treeKeys,
   withAnnotations,
   withChain,
+  withConnectAt,
   withGroup,
   withGroupName,
   withGroupPivot,
@@ -243,6 +245,8 @@ export interface SnapFeedback {
   readonly relation?: SnapRelation
   /** A chip beside the label, when the ends' profiles differ. */
   readonly warning?: string
+  /** Quieter words after it: on a join, which spot of the end it is by and where to change that. */
+  readonly hint?: string
 }
 
 /** What a tool built on the targets is asking for, while the target picker is up. */
@@ -756,6 +760,11 @@ export interface EditorState extends TabState {
   readonly renameItem: (key: string, name: string | null) => void
   readonly renameGroup: (id: string, name: string) => void
   readonly setTags: (target: string, tags: ReadonlyArray<string>) => void
+  /**
+   * Where end `end` of the item `key` connects (docs/SNAPPING.md § Connectors), one undo step that names it; the spot
+   * it connects at by default leaves no choice. Its joints that no longer meet go.
+   */
+  readonly setConnectAt: (key: string, end: number, spot: SpotId) => void
   /** `withGroup` as one undo step; answers the group's id, or undefined when none of `keys` is in the tree. */
   readonly groupItems: (keys: ReadonlyArray<string>, name?: string) => string | undefined
   /** Groups what's selected as one undo step, whole groups staying whole inside the new one. */
@@ -963,7 +972,9 @@ const withJointsAfter = (
   if (!connected && annotations.joints.length === 0) return doc
   const ends = doc.map.items.flatMap((item, index) => {
     const key = doc.ids[index]
-    return key === undefined ? [] : endsOf(key, item, editTransform(item), catalog)
+    return key === undefined
+      ? []
+      : endsOf(key, item, editTransform(item), catalog, doc.structure.items.get(key)?.connectAt)
   })
   const joints = jointsAfterMove(annotations.joints, ends, moved, connected)
   return joints.length === annotations.joints.length && joints.every((joint, i) => joint === annotations.joints[i])
@@ -1519,6 +1530,22 @@ export const useEditor = create<EditorState>()((set, get) => {
     renameItem: (key, name) => commitStructure(withItemName(get().doc.structure, key, name)),
     renameGroup: (id, name) => commitStructure(withGroupName(get().doc.structure, id, name)),
     setTags: (target, tags) => commitStructure(withTags(get().doc.structure, target, tags)),
+    setConnectAt: (key, end, spot) => {
+      const s = get()
+      const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
+      const connector = item === undefined ? undefined : s.catalogIndex?.pieceByClass.get(item.actorToSpawn)
+        ?.connectors?.[end]
+      if (connector === undefined) return
+      const structure = withConnectAt(s.doc.structure, key, end, spot === defaultSpotOf(connector) ? undefined : spot)
+      if (structure === undefined) return
+      const name = nodeNamesOf(s).get(key)?.name ?? "a piece"
+      commit(
+        withJointsAfter({ ...s.doc, structure }, new Set([key]), false, s.catalogIndex),
+        {},
+        undefined,
+        `Connect ${name} at ${SPOT_NAMES[spot].toLowerCase()}`
+      )
+    },
     groupItems: (keys, name) => {
       const id = freshKey()
       const next = withGroup(get().doc.structure, keys, id, name)

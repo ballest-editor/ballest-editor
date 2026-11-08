@@ -12,7 +12,9 @@ type ShowOpenEnds = SnapConfig["targets"]["connectors"]["showOpenEnds"]
 export const endsInDoc = (doc: Doc, index: CatalogIndex | null): ReadonlyArray<WorldEnd> =>
   doc.map.items.flatMap((item, i) => {
     const key = doc.ids[i]
-    return key === undefined ? [] : endsOf(key, item, editTransform(item), index)
+    return key === undefined
+      ? []
+      : endsOf(key, item, editTransform(item), index, doc.structure.items.get(key)?.connectAt)
   })
 
 /** `docEnds` with those of the items in a drag's preview where the preview has them. */
@@ -23,7 +25,7 @@ const shownEnds = (
   if (preview === null || preview.size === 0) return docEnds
   const moved = [...preview].flatMap(([key, transform]) => {
     const item = doc.map.items[doc.ids.indexOf(key)]
-    return item === undefined ? [] : endsOf(key, item, transform, catalogIndex)
+    return item === undefined ? [] : endsOf(key, item, transform, catalogIndex, doc.structure.items.get(key)?.connectAt)
   })
   return [...docEnds.filter(({ ref }) => !preview.has(ref.item)), ...moved]
 }

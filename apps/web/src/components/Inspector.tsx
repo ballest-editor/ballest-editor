@@ -54,6 +54,7 @@ import {
 } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
+import { ConnectsAtSection } from "./ConnectsAtSection"
 import { Disclosure } from "./Disclosure"
 import { Fact, Facts } from "./Facts"
 import { FlipSection } from "./FlipSection"
@@ -637,6 +638,7 @@ function ItemEditor({ items, ids, transforms, placed, transform }: {
             <FlipSection items={placed} />
           </TransformSection>
           <PivotSection />
+          {items.length === 1 && ids[0] !== undefined && <ConnectsAtSection itemKey={ids[0]} />}
         </>
       )}
       <Section>
