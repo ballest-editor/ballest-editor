@@ -1,7 +1,7 @@
 import { ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
-import { useState } from "react"
+import { type ComponentProps, useState } from "react"
 import type { Item } from "../domain/MapFile"
 import { lookupMaterial } from "../domain/Materials"
 import {
@@ -11,12 +11,15 @@ import {
   cssColor,
   finishLabelOf,
   materialLabelOf,
+  NOT_PAINTED,
   offPanelSlotsOf,
+  type PaintChoice,
   type PaintColor,
   type PaintFinish,
   paintGroups,
   paintTargets,
   shownFinishOf,
+  SURFACE_LOCKED,
   swatchColor
 } from "../domain/Paint"
 import { pieceNameOf } from "../domain/structure"
@@ -54,16 +57,18 @@ const slotsOf = (
 const materialAt = (item: Item, { component, slot }: SlotTarget): string | undefined =>
   item.meshComponents[component]?.materials.find((m) => m.materialIndex === slot)?.material
 
-function Swatch(
-  { finish, color, active, onPick }: {
-    readonly finish: PaintFinish
-    readonly color: PaintColor
+/** What a swatch takes beside its own props: anything a button does, as the viewport's `noFocus`. */
+type SwatchProps = Omit<ComponentProps<"button">, "color" | "onClick">
+
+/** A round swatch to pick: a CSS colour, or null for none (a checkerboard). */
+export function SwatchButton(
+  { label, color, active, onPick, className, ...props }: SwatchProps & {
+    readonly label: string
+    readonly color: string | null
     readonly active: boolean
     readonly onPick: () => void
   }
 ) {
-  const table = useEditor((s) => s.materialTable)
-  const label = `${finishLabelOf(finish)} ${colorLabelOf(color)}`
   return (
     <button
       type="button"
@@ -72,11 +77,60 @@ function Swatch(
       aria-pressed={active}
       onClick={onPick}
       className={cn(
-        "size-5 rounded-full ring-1 ring-foreground/35 transition-shadow focus-ring hover:ring-2 hover:ring-foreground/60",
-        active && "ring-2 ring-primary ring-offset-1 ring-offset-card hover:ring-primary"
+        "size-5 shrink-0 rounded-full ring-1 ring-foreground/35 transition-shadow focus-ring hover:ring-2 hover:ring-foreground/60",
+        color === null && "bg-[repeating-conic-gradient(var(--muted)_0_25%,var(--background)_0_50%)] bg-size-[8px_8px]",
+        active && "ring-2 ring-primary ring-offset-1 ring-offset-card hover:ring-primary",
+        className
       )}
-      style={{ background: cssColor(swatchColor(lookupMaterial(table, color.material), color.displayColor)) }}
+      style={color === null ? undefined : { background: color }}
+      {...props}
     />
+  )
+}
+
+/** A picker colour's swatch, as the game shows it. */
+function Swatch(
+  { finish, color, ...props }: SwatchProps & {
+    readonly finish: PaintFinish
+    readonly color: PaintColor
+    readonly active: boolean
+    readonly onPick: () => void
+  }
+) {
+  const table = useEditor((s) => s.materialTable)
+  return (
+    <SwatchButton
+      label={`${finishLabelOf(finish)} ${colorLabelOf(color)}`}
+      color={cssColor(swatchColor(lookupMaterial(table, color.material), color.displayColor))}
+      {...props}
+    />
+  )
+}
+
+/** A finish's colours as swatches to pick, with `choice` ringed when it is one of them. */
+export function FinishSwatches(
+  { finish, choice, onPick, label, className, swatchProps }: {
+    readonly finish: PaintFinish
+    readonly choice: PaintChoice | undefined
+    readonly onPick: (color: PaintColor) => void
+    readonly label: string
+    readonly className: string
+    readonly swatchProps?: SwatchProps
+  }
+) {
+  return (
+    <div className={cn("flex flex-wrap", className)} role="group" aria-label={label}>
+      {finish.colors.map((color) => (
+        <Swatch
+          key={color.color}
+          finish={finish}
+          color={color}
+          active={choice?.finish === finish && choice.color === color}
+          onPick={() => onPick(color)}
+          {...swatchProps}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -166,17 +220,13 @@ function SlotPaintRow(
         </Select>
       </div>
       {finish !== undefined && (
-        <div className="flex flex-wrap gap-2" role="group" aria-label={`${slotName} color`}>
-          {finish.colors.map((color) => (
-            <Swatch
-              key={color.color}
-              finish={finish}
-              color={color}
-              active={choice?.finish === finish && choice.color === color}
-              onPick={() => apply(color.material)}
-            />
-          ))}
-        </div>
+        <FinishSwatches
+          finish={finish}
+          choice={choice}
+          onPick={(color) => apply(color.material)}
+          label={`${slotName} color`}
+          className="gap-2"
+        />
       )}
     </div>
   )
@@ -224,8 +274,8 @@ export function PaintSection({ selected }: { readonly selected: ReadonlyArray<Se
   const loaded = useEditor((s) => s.paint.length > 0)
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const { items, surfaceLocked } = paintTargets(selected, catalogIndex)
-  if (surfaceLocked) return <Note>Paint is locked while a surface is set.</Note>
-  if (items.length === 0) return <Note>The game doesn't paint this piece.</Note>
+  if (surfaceLocked) return <Note>{SURFACE_LOCKED}</Note>
+  if (items.length === 0) return <Note>{NOT_PAINTED}</Note>
   if (!items.some(({ item }) => item.meshComponents.some((m) => m.materials.length > 0))) {
     return <Note>No material slots.</Note>
   }

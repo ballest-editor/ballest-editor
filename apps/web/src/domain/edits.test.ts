@@ -12,7 +12,7 @@ import {
   setTransforms,
   validateItem
 } from "./edits"
-import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
+import { defaultEditorState, identityTransform, meshComponentFor, newMapFile, playerStartItem } from "./factory"
 import type { EditorGroup, MapFile } from "./MapFile"
 
 const withItems = (n: number): MapFile => {
@@ -105,6 +105,29 @@ describe("edits", () => {
       { index: 0, component: 0, slot: 0, material: glossy },
       { index: 1, component: 3, slot: 0, material: glossy }
     ])))
+  })
+
+  it("adds the Main mesh component to an item that has none, when the edit brings it", () => {
+    const glossy = "/Game/X/MI_Env_Glossy_Blue.MI_Env_Glossy_Blue"
+    const base = withItems(1)
+    const bare = { ...base, items: [{ ...base.items[0]!, meshComponents: [] }] }
+    const creates = meshComponentFor("/Game/X/SM_Box.SM_Box", ["/Game/X/M_A.M_A", "/Game/X/M_B.M_B"])
+    // without it there is no component to paint
+    assert.isTrue(Option.isNone(setSlotMaterials(bare, [{ index: 0, component: 0, slot: 1, material: glossy }])))
+    const next = Option.getOrThrow(
+      setSlotMaterials(bare, [
+        { index: 0, component: 0, slot: 1, material: glossy, creates },
+        { index: 0, component: 0, slot: 0, material: glossy, creates }
+      ])
+    )
+    const [mesh, ...rest] = next.items[0]!.meshComponents
+    assert.deepStrictEqual(rest, [])
+    assert.strictEqual(mesh!.meshAssetPath, "/Game/X/SM_Box.SM_Box")
+    assert.deepStrictEqual(mesh!.materialAssetPaths, [glossy, glossy])
+    // only one past the last component: never a gap
+    assert.isTrue(
+      Option.isNone(setSlotMaterials(bare, [{ index: 0, component: 1, slot: 0, material: glossy, creates }]))
+    )
   })
 
   it("copies items with their pivots and pastes them into another map", () => {

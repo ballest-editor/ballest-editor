@@ -164,6 +164,15 @@ The Display popover is the one home of Show grid, Show sky, Show water and Map l
 - Every pane draws when its pixels are gone or in the wrong place: a resize, a moved divider, a changed layout, projection or Show switch, another tab. Dragging a divider on a large map is therefore the slow case.
 - `scene.updateMatrixWorld` runs once a frame, not once a pane, and skips the items: an item's objects work out their matrices when they change (`FixedGroup` in `ItemObject.tsx`). An object that updates its own matrix forces everything under it to update too, so the scene and the items' root keep theirs fixed as well. Code that moves an item outside React has to call `updateMatrix`, as the gizmo does.
 
+### Paint tool
+
+The tool bar's fifth tool, right of Scale (`paintMode`, B), paints with what its palette holds: the palette sits over the tool bar while the tool is on, with the game's finishes and colours, as the Inspector's Paint has them, and the four surfaces. The tool has no gizmo, and its clicks don't select.
+
+- **Hover.** The slot under the pointer is outlined in its own colour, the primitives of that one slot only; with `paintWholePiece`'s modifier held (Shift) the whole piece is. A surface always covers the whole piece. Where the game takes no paint the outline is red, the cursor says no, and the status bar says why in place of the tool's hint.
+- **Stroke.** A press paints its target, and a drag paints each slot or piece it enters once, in the pane it started in. The stroke is one undo step, and one that changed nothing is none (`beginPaintStroke`, `endPaintStroke`).
+- **Eyedropper.** `pickPaint` (Alt+click) takes the slot's material, or the piece's surface when it has one, as the palette's, and paints nothing. Alt+drag still orbits.
+- **Rules** (`editor/paintTarget.ts`, [FORMAT.md § Materials](FORMAT.md#materials-the-in-game-paint-panel)). A piece on a surface takes no paint, only another surface, and a piece whose class hides the surface property takes no surface. A piece the game's panel locks takes paint on its off-panel slots alone. Extra meshes never take paint. An item with no mesh components draws its class's Main mesh, and painting it saves that component with every slot at its default, as a fresh piece has it, except for the classes the game only loads without components, which take none. A slot is never painted at or past its mesh's slot count, and a slot the component didn't list yet comes with its defaults for the unlisted slots below it. A mirrored item paints as its source mesh, slot for slot.
+
 ### Menus
 
 `components/menuModel.ts` is the menus as data: each row's label, where it sits, what it runs, why it's off and its shortcut. `components/MenuBar.tsx` draws that and holds no rows of its own, Help's search lists it, and `MenuBar.test.ts` opens every menu and holds what's drawn to the model. Every item calls the entry point its keybind or button uses. A disabled item says why in a tooltip. Shortcuts everywhere are `components/KeyChip.tsx`, one caption chip per chord.
@@ -301,7 +310,7 @@ Save edits a map open in a tab, active or not, in that tab's document (one undo 
 
 The status bar runs along the bottom. The project is the window's title, centred in the top bar, with the document tab's dot while a tab has unsaved edits, and it stays the title with no tab open. The OS window's title says the same, `<project> – Ballest Editor` with `•` in front for the dot (`windowTitleOf`), and a browser, which has no project, shows the open map. The start screen has no project, so its title is just Ballest Editor. The top bar's right end has Play.
 
-- On the left: the selection, then what a check for updates is doing, and the entered group. The selection reads as the name of a lone item or whole group, with its ordinal when the name is shared, or as counts: "2 items", "2 groups" for whole groups alone, and "3 items · 1 group" when items sit beside them, each nested set of groups counted once (`selectionSummaryOf`).
+- On the left: the selection, the paint tool's hint while it is on ([§ Paint tool](#paint-tool)), then what a check for updates is doing, and the entered group. The selection reads as the name of a lone item or whole group, with its ordinal when the name is shared, or as counts: "2 items", "2 groups" for whole groups alone, and "3 items · 1 group" when items sit beside them, each nested set of groups counted once (`selectionSummaryOf`).
 - In the middle: the open map's sync status, as a coloured chip, or nothing with no tab open. Its popover's title is the status, then the link state when that adds something (which side changed, or what stands behind Unsaved), the last export's time, Reveal, Export and Play. A map with no file has the Unsaved chip, and the popover says "Not saved in the project yet" and has Save.
 - On the right: when the map was last exported, next to the chip, then the update pill and the notification bell at the end.
 

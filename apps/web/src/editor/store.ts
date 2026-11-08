@@ -105,7 +105,7 @@ import {
   withTags
 } from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
-import type { Surfaces } from "../domain/surface"
+import { SURFACE_PROPERTY, surfaceOf, type Surfaces } from "../domain/surface"
 import { sameVec, vecAdd, vecSub } from "../domain/ueMath"
 import { type MapValidation, validateMap } from "../domain/validateMap"
 import {
@@ -151,6 +151,7 @@ import {
   withCarriedPoints
 } from "../domain/units"
 import type { GizmoSpace } from "./gizmo/handles"
+import type { Brush } from "./paintTarget"
 
 export type { Doc } from "../domain/structure"
 /** The game folder types, for components (which reach services only through editor/). */
@@ -203,7 +204,7 @@ export interface Snapshot {
 /** A material slot edit on the item with this id (see `SlotMaterial`). */
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
-export type Tool = "select" | "translate" | "rotate" | "scale"
+export type Tool = "select" | "translate" | "rotate" | "scale" | "paint"
 export const settingsCategories = ["general", "editor", "camera", "keybinds", "appearance", "game"] as const
 export type SettingsCategory = (typeof settingsCategories)[number]
 
@@ -476,6 +477,10 @@ export interface EditorState extends TabState {
   /** The kinds "Don't show again" muted: `notify` drops them. */
   readonly mutedNotificationKinds: ReadonlySet<string>
   readonly tool: Tool
+  /** What the paint tool paints with; null for the picker's first colour (`currentBrush`). */
+  readonly brush: Brush | null
+  /** Why the paint tool won't paint what the pointer is over, for the status bar; null when it would, or isn't over one. */
+  readonly paintBlockedReason: string | null
   /** Whether the gizmo follows the selected item's axes or the world's. */
   readonly gizmoSpace: GizmoSpace
   /** What a selection pivots about: one point for all (the game's rule), or each unit its own (`domain/units.ts`). */
@@ -609,6 +614,18 @@ export interface EditorState extends TabState {
    */
   readonly paintSlots: (edits: ReadonlyArray<SlotPaint>) => boolean
   /**
+   * Sets the surface (`SurfaceAssignment`) of the items `ids` as one undo step (none when nothing changes); false (with
+   * a notice, and nothing changed) when an item no longer exists or the value doesn't fit.
+   */
+  readonly paintSurface: (ids: ReadonlyArray<string>, value: number) => boolean
+  /**
+   * Starts a paint stroke: until it ends, `paintSlots` and `paintSurface` change the document without undo steps of
+   * their own. False when a stroke or an Alt+drag duplicate is already under way, or no tab is open.
+   */
+  readonly beginPaintStroke: () => boolean
+  /** Ends a paint stroke: everything it painted is one undo step, and a stroke that changed nothing leaves none. */
+  readonly endPaintStroke: () => void
+  /**
    * Sets properties on every selected item as one undo step (a colour's three channels are
    * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
    */
@@ -689,6 +706,8 @@ export interface EditorState extends TabState {
   readonly setGroupCollapsed: (groupId: string, collapsed: boolean) => void
   readonly expandGroups: (groupIds: ReadonlyArray<string>) => void
   readonly setTool: (tool: Tool) => void
+  readonly setBrush: (brush: Brush) => void
+  readonly setPaintBlockedReason: (reason: string | null) => void
   readonly toggleGizmoSpace: () => void
   readonly togglePivotMode: () => void
   /** Opens `dialog` in place of the open one (and its payload). */
@@ -872,6 +891,15 @@ export const useEditor = create<EditorState>()((set, get) => {
   /** Where an Alt+drag duplicate started, while one is in progress. */
   let duplicateDragBase: DocState | null = null
 
+  /** Where a paint stroke started, while one is in progress. */
+  let paintStrokeBase: DocState | null = null
+
+  /** A duplicate drag or a paint stroke holds its document change back from history until it ends. */
+  const strokeUnderway = () => duplicateDragBase !== null || paintStrokeBase !== null
+
+  /** A paint edit: its own undo step, or part of the stroke under way. */
+  const commitPaint = (doc: Doc) => (paintStrokeBase === null ? commit(doc) : set({ doc }))
+
   /** Swaps in a history snapshot; its selection is restored for the items that still exist. */
   const restore = (s: EditorState, snapshot: Snapshot) => {
     const doc = snapshot.selectionOnly ? s.doc : snapshot.doc
@@ -950,6 +978,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     toasts: [],
     mutedNotificationKinds: new Set(),
     tool: "translate",
+    brush: null,
+    paintBlockedReason: null,
     gizmoSpace: "world",
     pivotMode: "together",
     dialog: null,
@@ -990,7 +1020,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         return
       }
       set((s) => {
-        if (into === "addedTab" && (interacting(s) || duplicateDragBase !== null)) return s
+        if (into === "addedTab" && (interacting(s) || strokeUnderway())) return s
         const shown = { ...tab, ...leftBehind, mapShownRequest: s.mapShownRequest + 1 }
         if (noTabOpen(s)) return { ...shown, tabIds: [s.tabId] }
         if (into === "newTab" ? isBlankTab(s) : into !== "addedTab") return shown
@@ -1007,7 +1037,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     activateTab: (tabId) =>
       set((s) => {
         const next = s.parkedTabs.get(tabId)
-        if (next === undefined || interacting(s) || duplicateDragBase !== null) return s
+        if (next === undefined || interacting(s) || strokeUnderway()) return s
         const parkedTabs = new Map(s.parkedTabs).set(s.tabId, activeTabOf(s))
         parkedTabs.delete(tabId)
         return { ...next, ...leftBehind, tabId, parkedTabs }
@@ -1035,7 +1065,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (index < 0) return
       if (tabIds.length === 1) {
         set((s) =>
-          inNamedProject(s) && !interacting(s) && duplicateDragBase === null
+          inNamedProject(s) && !interacting(s) && !strokeUnderway()
             ? { ...noTabState(), ...leftBehind, tabIds: [], tabId: freshTabId() }
             : s
         )
@@ -1163,8 +1193,39 @@ export const useEditor = create<EditorState>()((set, get) => {
         get().notify("error", "Those items no longer have that material slot.")
         return false
       }
-      if (next.value !== doc.map) commit({ ...doc, map: next.value })
+      if (next.value !== doc.map) commitPaint({ ...doc, map: next.value })
       return true
+    },
+
+    paintSurface: (ids, value) => {
+      const { doc, notify } = get()
+      const indices = ids.map((id) => doc.ids.indexOf(id))
+      const property = { list: "intProperties", name: SURFACE_PROPERTY, type: "Integer" } as const
+      const next = indices.includes(-1) ? Option.none() : setProperties(doc.map, indices, [{ property, value }])
+      if (Option.isNone(next)) {
+        notify("error", "Those items can't take that surface.")
+        return false
+      }
+      const unchanged = indices.every((i) => {
+        const item = doc.map.items[i]
+        return item !== undefined && surfaceOf(item) === value
+      })
+      if (!unchanged) commitPaint({ ...doc, map: next.value })
+      return true
+    },
+
+    beginPaintStroke: () => {
+      const s = get()
+      if (strokeUnderway() || noTabOpen(s)) return false
+      paintStrokeBase = { doc: s.doc, selectedIds: s.selectedIds }
+      return true
+    },
+
+    endPaintStroke: () => {
+      const before = paintStrokeBase
+      paintStrokeBase = null
+      const { doc } = get()
+      if (before !== null && doc !== before.doc) commit(doc, {}, before)
     },
 
     setSelectionProperties: (changes) => {
@@ -1242,7 +1303,7 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     beginDuplicateDrag: () => {
       const s = get()
-      if (duplicateDragBase !== null) return undefined
+      if (strokeUnderway()) return undefined
       const next = withClip(s, clipOf(s.doc, copyableIndices(s)))
       if (next === undefined) return undefined
       duplicateDragBase = { doc: s.doc, selectedIds: s.selectedIds }
@@ -1339,7 +1400,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     undo: () =>
       set((s) => {
         const prev = s.past.at(-1)
-        if (prev === undefined || interacting(s)) return s
+        if (prev === undefined || interacting(s) || strokeUnderway()) return s
         const { current, ...next } = restore(s, prev)
         return { ...next, past: s.past.slice(0, -1), future: [current, ...s.future] }
       }),
@@ -1347,7 +1408,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     redo: () =>
       set((s) => {
         const following = s.future[0]
-        if (following === undefined || interacting(s)) return s
+        if (following === undefined || interacting(s) || strokeUnderway()) return s
         const { current, ...next } = restore(s, following)
         return { ...next, past: [...s.past, current].slice(-HISTORY_LIMIT), future: s.future.slice(1) }
       }),
@@ -1405,7 +1466,10 @@ export const useEditor = create<EditorState>()((set, get) => {
         const open = new Set(groupIds)
         return { collapsedGroups: new Set([...s.collapsedGroups].filter((id) => !open.has(id))) }
       }),
-    setTool: (tool) => set({ tool }),
+    setTool: (tool) => set(tool === "paint" ? { tool } : { tool, paintBlockedReason: null }),
+    setBrush: (brush) => set({ brush }),
+    setPaintBlockedReason: (paintBlockedReason) =>
+      set((s) => (s.paintBlockedReason === paintBlockedReason ? s : { paintBlockedReason })),
     toggleGizmoSpace: () =>
       set((s) => (s.tool === "scale" ? s : { gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     togglePivotMode: () => set((s) => ({ pivotMode: s.pivotMode === "together" ? "each" : "together" })),
@@ -1682,6 +1746,13 @@ const sameItemTransform = (before: MapFile, after: MapFile, index: number): bool
     qa.x === qb.x && qa.y === qb.y && qa.z === qb.z && qa.w === qb.w
 }
 
+/** What the paint tool paints with: the one picked, else the picker's first colour; undefined until the picker loads. */
+export const currentBrush = (s: Pick<EditorState, "brush" | "paint">): Brush | undefined => {
+  if (s.brush !== null) return s.brush
+  const material = s.paint[0]?.colors[0]?.material
+  return material === undefined ? undefined : { _tag: "Material", material }
+}
+
 /** A drag or scrub is showing values that aren't committed yet; undo and redo wait for it. */
 const interacting = (s: EditorState) => s.preview !== null || s.lightingPreview !== null
 
@@ -1713,7 +1784,7 @@ const keyIndicesOf = (ids: ReadonlyArray<string>): ReadonlyMap<string, number> =
 }
 
 /** An item's place in `ids`; -1 for a key that isn't there. */
-const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
+export const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
 
 /** The box around the items at `keys` where they show, which is ahead of the document during a continuous edit. */
 export const groupBoxOf = (

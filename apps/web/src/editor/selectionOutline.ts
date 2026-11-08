@@ -144,12 +144,28 @@ const silhouetteMaterial = (color: string): THREE.LineBasicMaterial => {
 const outlineMaterial = silhouetteMaterial(OUTLINE_COLORS.dark.selected)
 const activeOutlineMaterial = silhouetteMaterial(OUTLINE_COLORS.dark.active)
 
+/**
+ * The paint tool's hover: what a click would paint, apart from the selection's amber, and red where the game takes no
+ * paint (the status bar says why).
+ */
+export const PAINT_HOVER_COLORS = {
+  dark: { paint: "#5ce1ff", blocked: "#ff5a5f" },
+  light: { paint: "#0a6f94", blocked: "#c0182a" }
+} as const
+const paintHoverMaterial = silhouetteMaterial(PAINT_HOVER_COLORS.dark.paint)
+const blockedHoverMaterial = silhouetteMaterial(PAINT_HOVER_COLORS.dark.blocked)
+
 /** Recolours every outline for the theme. */
 export const setOutlineTheme = (dark: boolean): void => {
   const colors = dark ? OUTLINE_COLORS.dark : OUTLINE_COLORS.light
   outlineMaterial.color.set(colors.selected)
   activeOutlineMaterial.color.set(colors.active)
+  const hover = dark ? PAINT_HOVER_COLORS.dark : PAINT_HOVER_COLORS.light
+  paintHoverMaterial.color.set(hover.paint)
+  blockedHoverMaterial.color.set(hover.blocked)
 }
+
+const everyMesh = () => true
 
 const inverse = new THREE.Matrix4()
 
@@ -163,12 +179,20 @@ export class SelectionOutline extends THREE.Group {
    * caller keeps it fresh. `active` picks the active item's colour.
    */
   update(item: THREE.Object3D, active = false): void {
+    this.draw(item, active ? activeOutlineMaterial : outlineMaterial, everyMesh)
+  }
+
+  /** The paint tool's hover: the outline of the meshes under `item` that `shows` picks, blocked or not. */
+  updatePaintHover(item: THREE.Object3D, shows: (mesh: THREE.Mesh) => boolean, blocked: boolean): void {
+    this.draw(item, blocked ? blockedHoverMaterial : paintHoverMaterial, shows)
+  }
+
+  private draw(item: THREE.Object3D, material: THREE.LineBasicMaterial, shows: (mesh: THREE.Mesh) => boolean): void {
     item.updateMatrixWorld(true)
     inverse.copy(item.matrixWorld).invert()
-    const material = active ? activeOutlineMaterial : outlineMaterial
     let count = 0
     item.traverse((object) => {
-      if (!isMesh(object)) return
+      if (!isMesh(object) || !shows(object)) return
       const lines = outlineOf(object.geometry)
       let line = this.lines[count]
       if (line === undefined) {

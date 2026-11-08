@@ -18,7 +18,7 @@ import * as THREE from "three"
 import type { CatalogPiece } from "../domain/Catalog"
 import { threeToUeVector, toTuple3, ueToThreeVector } from "../domain/coords"
 import { counted, groupBoxTargets } from "../domain/groupSelection"
-import { isBound, mouseChordOf } from "../domain/Keybinds"
+import { holdsModifiersOf, isBound, type ModifierState, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
@@ -31,6 +31,7 @@ import { GroupBox } from "./groupBox"
 import { ItemObject } from "./ItemObject"
 import { advanceGameTime } from "./materials"
 import { OrthoGrid } from "./OrthoGrid"
+import { paintSpotOf, type PaintTarget, paintTargetOf, pickedBrushOf, showsTarget } from "./paintTarget"
 import { floorGridOnly, panePointer } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
 import { draggedPiece, isPieceDrag } from "./pieceDrag"
@@ -42,7 +43,16 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { groupBoxOf, noTabOpen, type SelectMode, shownPivotDots, useEditor, useOpenPrefab } from "./store"
+import {
+  currentBrush,
+  groupBoxOf,
+  indexOfKey,
+  noTabOpen,
+  type SelectMode,
+  shownPivotDots,
+  useEditor,
+  useOpenPrefab
+} from "./store"
 import { useDarkTheme } from "./theme"
 import { isMesh } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
@@ -131,9 +141,10 @@ function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
  * plain click. Null when the chord drives the camera instead (Alt+LMB orbit).
  */
 const selectModeOf = (e: MouseEvent): SelectMode | null => {
-  if (e.button !== 0) return null
+  const { keybinds, tool } = useEditor.getState()
+  // the paint tool's clicks paint (PaintTool)
+  if (e.button !== 0 || tool === "paint") return null
   const chord = mouseChordOf(e)
-  const { keybinds } = useEditor.getState()
   if (isBound(keybinds, "toggleSelection", chord)) return "toggle"
   if (isBound(keybinds, "addToSelection", chord)) return "add"
   return sceneRegistry.isNavigationChord(chord) ? null : "replace"
@@ -142,7 +153,7 @@ const selectModeOf = (e: MouseEvent): SelectMode | null => {
 /**
  * Left-click selection, with the add/toggle modifiers, via a manual raycast on click only
  * (cheap for maps with thousands of items). A click reaches the store's click level; a plain
- * double-click on the same spot enters a group.
+ * double-click on the same spot enters a group. Not with the paint tool, whose clicks paint.
  */
 function ClickSelect() {
   const gl = useThree((s) => s.gl)
@@ -185,6 +196,192 @@ function ClickSelect() {
     el.addEventListener("dblclick", onDoubleClick, { signal })
     return () => listening.abort()
   }, [gl])
+  return null
+}
+
+const NO_MODIFIERS: ModifierState = { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false }
+
+/**
+ * The paint tool (editor/paintTarget.ts). The pointer's target is outlined (red where the game takes no paint, and the
+ * status bar says why); a press on it starts a stroke that paints every target the pointer then enters once, one undo
+ * step in all; the pick binding takes the paint under the pointer instead. A raycast at most once a frame, and only
+ * after the pointer, a modifier or the document changed.
+ */
+function PaintTool() {
+  const gl = useThree((s) => s.gl)
+  const active = useEditor((s) => s.tool === "paint")
+  const outline = useMemo(() => new SelectionOutline(), [])
+  const onFrame = useRef<(() => void) | null>(null)
+  useFrame(() => onFrame.current?.())
+  useEffect(() => () => void outline.removeFromParent(), [outline])
+  useEffect(() => {
+    if (!active) return
+    const el = gl.domElement
+    const raycaster = new THREE.Raycaster()
+    let pointer: { readonly clientX: number; readonly clientY: number } | null = null
+    let modifiers = NO_MODIFIERS
+    /** Whether what's under the pointer may have changed since the last raycast. */
+    let stale = false
+    let stroke: { readonly slot: number; readonly whole: boolean; readonly painted: Set<string> } | null = null
+    let pick: { readonly x: number; readonly y: number; readonly slot: number; travel: number } | null = null
+    let hover: PaintTarget | undefined
+
+    const spotAt = (at: { readonly clientX: number; readonly clientY: number }, slot?: number) => {
+      const { ndc, pane } = panePointer(el, at, slot)
+      raycaster.setFromCamera(ndc, pane.camera)
+      const root = sceneRegistry.itemsRoot
+      return paintSpotOf(root === null ? [] : raycaster.intersectObject(root, true))
+    }
+    const itemOf = (id: string) => {
+      const { doc } = useEditor.getState()
+      return doc.map.items[indexOfKey(doc.ids, id)]
+    }
+    const targetAt = (at: { readonly clientX: number; readonly clientY: number }): PaintTarget | undefined => {
+      const spot = spotAt(at, stroke?.slot)
+      const item = spot === undefined ? undefined : itemOf(spot.itemId)
+      const s = useEditor.getState()
+      const brush = currentBrush(s)
+      if (spot === undefined || item === undefined || brush === undefined) return undefined
+      const whole = stroke?.whole ?? holdsModifiersOf(s.keybinds, "paintWholePiece", modifiers)
+      return paintTargetOf(spot, item, s.catalogIndex, brush, whole)
+    }
+    const show = (target: PaintTarget | undefined) => {
+      hover = target
+      const reason = target?.effect._tag === "Blocked" ? target.effect.reason : null
+      el.style.cursor = reason === null ? "crosshair" : "not-allowed"
+      useEditor.getState().setPaintBlockedReason(reason)
+    }
+    const paint = (target: PaintTarget | undefined) => {
+      if (stroke === null || target === undefined || stroke.painted.has(target.key)) return
+      const { effect, spot } = target
+      if (effect._tag === "Blocked") return
+      stroke.painted.add(target.key)
+      const s = useEditor.getState()
+      if (effect._tag === "Surface") s.paintSurface([spot.itemId], effect.value)
+      else s.paintSlots(effect.edits.map((edit) => ({ id: spot.itemId, ...edit })))
+    }
+    const endStroke = () => {
+      if (stroke === null) return
+      stroke = null
+      useEditor.getState().endPaintStroke()
+      stale = true
+    }
+
+    // The pane's camera: a wheel zoom or a fly key moves what's under a still pointer.
+    let seenCamera: THREE.Camera | null = null
+    const seenView = new THREE.Matrix4()
+    const seenProjection = new THREE.Matrix4()
+    const cameraMoved = (at: { readonly clientX: number; readonly clientY: number }): boolean => {
+      const { camera } = panePointer(el, at, stroke?.slot).pane
+      if (
+        camera === seenCamera && seenView.equals(camera.matrixWorld) && seenProjection.equals(camera.projectionMatrix)
+      ) return false
+      seenCamera = camera
+      seenView.copy(camera.matrixWorld)
+      seenProjection.copy(camera.projectionMatrix)
+      return true
+    }
+
+    onFrame.current = () => {
+      if (pointer !== null && cameraMoved(pointer)) stale = true
+      if (stale && pointer !== null && !sceneRegistry.lookDragActive()) {
+        stale = false
+        const target = targetAt(pointer)
+        show(target)
+        paint(target)
+      }
+      const object = hover === undefined ? undefined : sceneRegistry.objects.get(hover.spot.itemId)
+      if (hover === undefined || object === undefined) {
+        outline.removeFromParent()
+        return
+      }
+      if (outline.parent !== object) object.add(outline)
+      outline.updatePaintHover(object, showsTarget(hover), hover.effect._tag === "Blocked")
+    }
+
+    const onDown = (e: PointerEvent) => {
+      modifiers = e
+      pointer = { clientX: e.clientX, clientY: e.clientY }
+      if (e.button !== 0 || stroke !== null) return
+      const s = useEditor.getState()
+      const chord = mouseChordOf(e)
+      const { slot } = panePointer(el, e)
+      if (isBound(s.keybinds, "pickPaint", chord)) {
+        // a drag on it still orbits (FlyCamera), so it picks on release, if the pointer stayed put
+        pick = { x: e.clientX, y: e.clientY, slot, travel: 0 }
+        return
+      }
+      const whole = isBound(s.keybinds, "paintWholePiece", chord)
+      if (!whole && (chord !== "Mouse0" || sceneRegistry.isNavigationChord(chord))) return
+      if (!s.beginPaintStroke()) return
+      stroke = { slot, whole, painted: new Set() }
+      el.setPointerCapture(e.pointerId)
+      const target = targetAt(e)
+      show(target)
+      paint(target)
+    }
+    const onMove = (e: PointerEvent) => {
+      modifiers = e
+      pointer = { clientX: e.clientX, clientY: e.clientY }
+      // a locked pointer stays where it is: its movement says how far it went
+      if (pick !== null) pick.travel += Math.abs(e.movementX) + Math.abs(e.movementY)
+      stale = true
+    }
+    const onUp = (e: PointerEvent) => {
+      if (e.button !== 0) return
+      const picked = pick
+      pick = null
+      if (
+        picked !== null &&
+        Math.max(picked.travel, Math.hypot(e.clientX - picked.x, e.clientY - picked.y)) <= CLICK_SLOP_PX
+      ) {
+        const spot = spotAt(e, picked.slot)
+        const item = spot === undefined ? undefined : itemOf(spot.itemId)
+        const s = useEditor.getState()
+        const brush = spot === undefined || item === undefined ? undefined : pickedBrushOf(spot, item, s.catalogIndex)
+        if (brush !== undefined) s.setBrush(brush)
+        stale = true
+      }
+      // the release spot, before the frame that would have painted it
+      if (stroke !== null && stale) paint(targetAt(e))
+      endStroke()
+    }
+    const onLeave = () => {
+      if (stroke !== null) return // captured: it goes on outside the canvas
+      pointer = null
+      show(undefined)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      modifiers = e
+      stale = true
+    }
+
+    const listening = new AbortController()
+    const { signal } = listening
+    el.addEventListener("pointerdown", onDown, { signal })
+    el.addEventListener("pointermove", onMove, { signal })
+    el.addEventListener("pointerup", onUp, { signal })
+    el.addEventListener("pointercancel", endStroke, { signal })
+    el.addEventListener("pointerleave", onLeave, { signal })
+    window.addEventListener("keydown", onKey, { signal })
+    window.addEventListener("keyup", onKey, { signal })
+    window.addEventListener("blur", endStroke, { signal })
+    // a paint, an undo or a new brush can change what a click there does
+    const unsubscribe = useEditor.subscribe((s, prev) => {
+      if (s.doc !== prev.doc || s.brush !== prev.brush || s.paint !== prev.paint || s.keybinds !== prev.keybinds) {
+        stale = true
+      }
+    })
+    return () => {
+      listening.abort()
+      unsubscribe()
+      endStroke()
+      onFrame.current = null
+      outline.removeFromParent()
+      el.style.cursor = ""
+      useEditor.getState().setPaintBlockedReason(null)
+    }
+  }, [gl, active, outline])
   return null
 }
 
@@ -512,6 +709,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <PivotDots />
         <GizmoController />
         <ClickSelect />
+        <PaintTool />
         <FlyCamera />
         <PaneRenderer />
         {!revealed && <InitialMeshes onSettled={reveal} />}

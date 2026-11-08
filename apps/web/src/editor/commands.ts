@@ -43,7 +43,7 @@ const enterSelectedGroup = () => {
 
 /**
  * The command for each one-shot action. Held keys and mouse drags aren't here (FlyCamera
- * runs them), nor are selection clicks (the viewport does).
+ * runs them), nor are selection or paint clicks (the viewport does).
  */
 export const actionCommands = {
   undo: () => useEditor.getState().undo(),
@@ -64,6 +64,7 @@ export const actionCommands = {
   translateMode: () => useEditor.getState().setTool("translate"),
   rotateMode: () => useEditor.getState().setTool("rotate"),
   scaleMode: () => useEditor.getState().setTool("scale"),
+  paintMode: () => useEditor.getState().setTool("paint"),
   toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
   togglePivotMode: () => useEditor.getState().togglePivotMode(),
   speedFaster: () => useEditor.getState().changeSpeed(1),

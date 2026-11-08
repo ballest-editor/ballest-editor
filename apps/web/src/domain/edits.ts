@@ -124,6 +124,11 @@ export interface SlotMaterial {
   readonly slot: number
   /** Class-qualified, as map files store it; a bare object path is qualified. */
   readonly material: string
+  /**
+   * The component to add when `component` is one past the item's last: an item with none draws its class's Main mesh,
+   * and painting it saves that mesh (`mainMeshComponentOf`).
+   */
+  readonly creates?: MeshComponent | undefined
 }
 
 /** A mesh component with `slot` set to `material`, and `materialAssetPaths` kept in step (as the game writes it). */
@@ -139,15 +144,16 @@ const withSlotMaterial = (mesh: MeshComponent, slot: number, material: string): 
 
 /**
  * Sets material slots on several items at once, all or nothing: None when an item or mesh
- * component doesn't exist. Slots that already hold the material are left alone, and the same
+ * component doesn't exist (and the edit creates none). Slots that already hold the material are left alone, and the same
  * map comes back when nothing changed.
  */
 export const setSlotMaterials = (map: MapFile, edits: ReadonlyArray<SlotMaterial>): Option.Option<MapFile> => {
   const items = map.items.slice()
   let changed = false
-  for (const { index, component, slot, material } of edits) {
+  for (const { index, component, slot, material, creates } of edits) {
     const item = items[index]
-    const mesh = item?.meshComponents[component]
+    const mesh = item?.meshComponents[component] ??
+      (component === item?.meshComponents.length ? creates : undefined)
     if (item === undefined || mesh === undefined || !Number.isInteger(slot) || slot < 0) return Option.none()
     const qualified = qualifyMaterialPath(material)
     if (mesh.materials.find((m) => m.materialIndex === slot)?.material === qualified) continue
