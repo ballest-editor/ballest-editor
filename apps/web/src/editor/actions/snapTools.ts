@@ -89,7 +89,7 @@ export const pickGridSize = (gridSize: number) => {
   applySnap({ ...config, gridSize, targets: { ...config.targets, grid: { ...config.targets.grid, enabled: true } } })
 }
 
-/** Turns several targets on or off together, as the snap menu's Alignment and tracking row does. */
+/** Turns several targets on or off together, as the snap menu's Guides row does. */
 export const setSnapTargets = (targets: ReadonlyArray<SnapTarget>, enabled: boolean) => {
   const config = snapConfigOf(useEditor.getState())
   const turned = Object.fromEntries(targets.map((target) => [target, { ...config.targets[target], enabled }]))

@@ -27,7 +27,7 @@ Blender's snapping is laid out this way and it is why its many snap types read a
 
 ### Snap base
 
-Which point of the selection is matched to a target. One choice at a time, shown in the Snap popover.
+Which point of the selection is matched to a target. One choice at a time, shown in the snap menu's Advanced.
 
 | Base    | The point                                                                                                                                                                                   |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -43,7 +43,7 @@ Under a handle or a lock the pivot and the selection's stations land too, whatev
 
 ### Snap targets
 
-Where the base can land. Each target is a row in the Snap popover with its own toggle, its own parameters, and a place in the priority list (§ Priority). A target that is off contributes nothing.
+Where the base can land. Each target is a row in the snap menu's Advanced with its own toggle, its own parameters, and a place in the priority list (§ Priority). A target that is off contributes nothing.
 
 #### Grid
 
@@ -129,7 +129,7 @@ The limits are the point. Only items in the active pane's view count, only the h
 
 ### Priority
 
-More than one target is often to be had. The Snap popover lists the enabled targets in order, and the user drags rows to reorder them. Of the targets a drag has reached and hasn't left (§ What a drag looks like), the first in the list wins, and the rest are ignored for that frame. Being in range isn't enough: a target higher in the list takes over from the current one only once the drag reaches it. Holding Shift keeps the target that is current (§ Modifiers).
+More than one target is often to be had. The snap menu's Advanced lists the targets in order, and the user drags rows to reorder them. Of the targets a drag has reached and hasn't left (§ What a drag looks like), the first in the list wins, and the rest are ignored for that frame. Being in range isn't enough: a target higher in the list takes over from the current one only once the drag reaches it. Holding Shift keeps the target that is current (§ Modifiers).
 
 The Grid can't be moved out of range the way a target can: a 10 cm grid zoomed out has a line under every pixel. So it claims a frame only while its lines stand at least twice the range apart on screen and one is in range. Otherwise it gives way to what is below it, and whatever the list's order, it is what a move falls back on when nothing else is near. Without this, Grid first would shut out every other target.
 
@@ -148,10 +148,10 @@ Within one target the nearest candidate wins, measured in screen pixels in the a
 
 ### Affect
 
-Which transforms snapping applies to. Move is always on. Rotate and Scale are toggles, as the rotation pill is. All three sit under snapping as a whole, the magnet in the top bar (§ The Snap popover): with it off nothing snaps, whatever each toggle says, and Ctrl turns it over (§ Modifiers).
+Which transforms snapping applies to. Move is always on. Rotate and Scale are toggles, as the angle pill is. All three sit under snapping as a whole, the magnet in the view bar (§ The snap menu): with it off nothing snaps, whatever each toggle says, and Ctrl turns it over (§ Modifiers).
 
 - **Move**: the base lands on a target.
-- **Rotate**: a turn with Snap on stops where the selection meets something, whatever the Rotate toggle says; Rotate is the step, which the turn takes between stops. With Snap off nothing snaps, a turn included, as the magnet gates every transform (§ The Snap popover). Ctrl inverts Snap for the drag, and a held key (§ Modifiers) keeps the stops to one target, or with T the step alone. The stops, from the targets that are on:
+- **Rotate**: a turn with Snap on stops where the selection meets something, whatever the Rotate toggle says; Rotate is the step, which the turn takes between stops. With Snap off nothing snaps, a turn included, as the magnet gates every transform (§ The snap menu). Ctrl inverts Snap for the drag, and a held key (§ Modifiers) keeps the stops to one target, or with T the step alone. The stops, from the targets that are on:
   - **Touching** (Mesh): where the selection first touches a neighbour it reaches, each way round. A corner or edge middle of the selection's mesh, or of its bounds until the mesh has loaded, comes onto one of the neighbour's flat faces, or one of the neighbour's onto one of the selection's, within 1 cm. A neighbour it already touches at the start, where the turn takes it in, is met at once, so that way has no touch.
   - **Flush** (Mesh): where a face of the selection comes into the plane of a face of a neighbour, within 1 cm, facing it or facing the same way: a door swung shut on a wall, or a side brought level with the side beside it.
   - **Aligned** (Alignment): where one of the selection's axes comes along one of a neighbour's. "Aligned with Track L on X and Y" names the axes that meet their own, and "Square to Track L" is one laid along another.
@@ -232,7 +232,7 @@ A body drag in an orthographic pane keeps its depth, as a rise along the view wo
 
 G, J, M and L narrow snapping to their kind for as long as they are held, and let go of it when they come up. The kind keeps its parameters, its range and its place in the priority list, and holding two keys keeps both kinds. Under a target's key a turn or a scale takes no step, and T held with it brings the step back. One of these held with snapping off turns it on for that kind, as Ctrl does, and Ctrl held with it turns it off again. Shift still holds the current target whatever it is. A key that means nothing to the drag (G in a turn, T in a move) does nothing. Nothing else hears them while the drag lasts, so one rebound onto a fly key doesn't also fly. They count from the press on a handle or the selection's body, and a key held before the press doesn't.
 
-From that press to the release, the middle of the status bar lists the keys the drag can take, Blender style, each as a key chip and a word: `Control` invert, `Shift` hold, `X` `Y` `Z` lock, `G` grid, `J` connectors, `M` mesh, `L` align for a move; `Control` invert, `J` connectors, `M` mesh, `T` step for a turn; `Control` invert, `M` mesh, `T` step for a scale. A held key or the axis locked takes the pressed wash (`components/DragKeyHints.tsx`). They take the sync chip's place, which has nothing to say until the drag lets go, and the right end keeps saying what snapped (§ The Snap popover).
+From that press to the release, the middle of the status bar lists the keys the drag can take, Blender style, each as a key chip and a word: `Control` invert, `Shift` hold, `X` `Y` `Z` lock, `G` grid, `J` ends, `M` pieces, `L` guides for a move; `Control` invert, `J` ends, `M` pieces, `T` step for a turn; `Control` invert, `M` pieces, `T` step for a scale, in the snap menu's words for the targets. A held key or the axis locked is filled with the accent (`components/DragKeyHints.tsx`). They show once the press has lasted 150 ms, or at once when a key goes down, so a click on a selected piece doesn't flash them. They take the sync chip's place, which has nothing to say until the drag lets go, and the right end keeps saying what snapped (§ The snap menu).
 
 The fly keys and the camera's own modifiers are unchanged ([DESKTOP.md](DESKTOP.md) § View panes); these apply only once a drag has begun, so flying and snapping don't contend.
 
@@ -240,34 +240,33 @@ The fly keys and the camera's own modifiers are unchanged ([DESKTOP.md](DESKTOP.
 
 Dragging a piece out of the palette lands by the same targets and priority as a drag, with the base at the piece's Bottom pivot (or its first end, with Connectors on). Nothing is moving yet, so there is nothing to stop: what's within the threshold of the pointer takes the drop, and a new Track S dropped near a Curve L's end joins it, and a lamp dropped on a wall sits on the wall with Rotate to face deciding which way it faces. With nothing in range the piece lands as today, at the placement distance on the grid height.
 
-## The Snap popover
+## The snap menu
 
-Snapping has three places, from quickest to fullest: the magnet and its menu in the top bar, the pills in the viewport, and the Snap popover.
+Snapping has one place: the magnet in the view bar, the pill in the viewport's top right, between World/Local and the grid pill. Its icon turns snapping as a whole on and off, N by default (`snapToggle`), and is pressed while snapping is on; its chevron opens the snap menu. Beside it the grid pill and the angle pill keep the quick forms: each icon turns its kind on and off, and each value picks its step. With the magnet off nothing snaps, and the pills and the menu's rows stay working but dimmed, to say they wait on it. Ctrl inverts the magnet for one drag (§ Modifiers). The View menu's Snap section has Snapping alone, with its key; the Panes and Display pills hold nothing of snapping's.
 
-**The magnet** sits in the top bar after the menus, as snapping is a way of editing, and the bar's right end is for what goes to the game (a browser doesn't show it, which would leave the magnet alone at the far edge). It turns snapping as a whole on and off, N by default (`snapToggle`), and is pressed while snapping is on. Grid, Rotation, Scale and each target keep their own toggles under it. With the magnet off nothing snaps, and the controls under it stay working but dimmed, to say they wait on it. Ctrl inverts the magnet for one drag (§ Modifiers).
+The menu names the targets in the user's words: **Ends** is Connectors, **Pieces** is Mesh, **Planes** is Construction, and **Guides** is Alignment and Tracking together. These pages and the code keep the targets' own names.
 
-**The snap menu** is the chevron beside the magnet, a popover of rows top to bottom:
+The plain screen, top to bottom (`components/SnapMagnet.tsx`):
 
 - **Snapping**: the magnet's switch.
-- **Grid**, **Rotation**, **Scale**: each a step, typed or picked from the list, and a switch. Picking a step turns that one on.
-- **Connectors**, **Mesh**, **Alignment and tracking**: the targets' switches, Alignment and Tracking as one.
-- **Priority**: Grid first or Pieces first, as a segmented control; neither is pressed for an order of the user's own.
-- **Connector pull**: a slider of five stops, from Grid and mesh to Connectors (§ Connectors, § Priority).
-- **Defaults…** opens Settings › Editor at Snapping, and **Snap settings…** the Snap popover.
+- **Grid**, **Angle** (a turn's step), **Scale**: each a step, typed or picked from the list, and a switch. Picking a step turns that one on.
+- **Snaps to**: Ends, Pieces and Guides, each a switch. Planes joins them once the map has a construction plane or axis.
+- **Prefer**: Grid or Pieces. It sets the priority to Grid first or Pieces first (§ Priority) and Connectors' Pull back to ×1, so the order alone decides. Any other order or pull presses neither and says Custom.
+- **Snap distance**: the threshold, in px (default 12), the one distance every target shares: how close the pointer has to get, and how far past a target it goes before the selection is free.
 
-**The pills** keep the short form in the viewport's top right: the Grid pill, whose icon turns the Grid target on and off and whose value picks the grid step; the rotation pill, the same for a turn's step; and a chevron that opens the Snap popover. Both pills dim while the magnet is off. The View menu's Snap section has the same switches as the snap menu, with the magnet's key on Snapping, then the presets, the grid step, and Open snap settings.
+**Advanced** is a disclosure under them, closed until opened (`components/SnapAdvanced.tsx`):
 
-**The Snap popover** is everything, top to bottom:
+- **Snap from**: the base (Pivot, Closest, Centre), and **Drag body** (To join, Always, Never; § What a drag looks like).
+- **Order**: the priority list. Each row is a handle to drag it by, the target's name, a one-line summary of its parameters ("10 cm, world origin"; "Warn, show on hover, pull ×2"), a chevron that opens its parameters, and its switch. Here Guides is two rows, Line-up guides (Alignment) and Point guides (Tracking).
+- **Points remembered**: how many tracking points are acquired, and Clear.
 
-- **Base**: Pivot, Closest, Centre, as a segmented control, and Drag body (To join, Always, Never; § What a drag looks like) under it.
-- **Affect**: Move (always on, shown for the row to read), Rotation and Scale, each a step and a switch.
-- **Targets**: the priority list, with the two presets as a segmented control beside the title. Each row is a handle to drag it by, the target's name, a one-line summary of its parameters ("10 cm, world origin"; "Warn, show on hover, pull ×2"), a disclosure that opens the parameters, and its switch.
-- **Tracking points**: how many are acquired, and Clear.
-- **Threshold**, the one slider every target shares: how far past a target the pointer goes before the selection is free.
+At the bottom, **Save as defaults** makes all of this map's settings, a custom priority among them, what new maps start on (§ Settings), and **Reset to defaults** gives the map those back. Both are off while the map's settings are the defaults.
 
-The three are built from one set of rows (`components/SnapParameters.tsx`), as are Settings › Editor › Snapping's: a 28px row with its label at the left and its control at the right, which drops under the label when the two can't share the width. A switch is a `Switch`, a choice of a few words a `ToggleGroup`, a step a `StepField`, a number a field of the same width, so their edges line up down a list, and a cluster of actions (the grid's origin, the construction planes) is buttons of the same height. Blocks sit 8px apart and their rows flush. A target's parameters open the same way in the popover and in Settings, under a chevron that turns down, indented under its title.
+Every row has one sentence of help behind an (i) beside its label, the same `InfoHint` the inspector uses, with an example where one helps: "The ends of tracks, tubes and ramps join end to end. Example: a Curve's end joins a Track's end with no step."
 
-The status bar's right end shows the current base and the first target asked while a drag is in progress, in the same words as the pane's label.
+The rows are one set (`components/SnapParameters.tsx`): a 28px row with its label and help at the left and its control at the right, which drops under the label when the two can't share the width. A switch is a `Switch`, a choice of a few words a `ToggleGroup`, a step a `StepField`, a number a field of the same width, so their edges line up down a list, and a cluster of actions (the grid's origin, the construction planes) is buttons of the same height. Blocks sit 8px apart and their rows flush.
+
+The status bar's right end says what snapped while a drag is in progress, its glyph and the pane's label, and nothing else.
 
 ## Tools built on the targets
 
@@ -309,7 +308,7 @@ Export writes none of it, and the game never sees it.
 
 ## Settings
 
-Settings › Editor has a Snapping section for what a new map starts on: snapping as a whole on or off (the magnet), the base, Drag body, the preset (Grid first or Pieces first), the steps and whether a turn and a scale snap, the threshold in pixels (default 12), and each target's toggle and parameters, with the same controls as the Snap popover behind each target's Parameters. The grid's origin and rotation are numbers there, as there is no selection to take them from. Use this map's makes all of a map's settings, a custom priority among them, what a new map starts on. A map's own settings, once changed, live in its sidecar and override these.
+What a new map starts on is kept in the editor's settings, and set from a map: the snap menu's Save as defaults makes all of the open map's snap settings the defaults, and Reset to defaults gives a map them back (§ The snap menu). Settings has no Snapping section. A map's own settings, once changed, live in its sidecar and override the defaults.
 
 Keybinds for the modifiers (§ Modifiers) sit with the other editor keybinds and can be rebound, since the game's own keybinds take some keys.
 
