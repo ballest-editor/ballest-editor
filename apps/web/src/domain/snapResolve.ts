@@ -22,7 +22,16 @@ import {
 } from "./snapFrame"
 import { gridLanding, gridSpacingPixels } from "./snapGrid"
 import { sourceOf } from "./snapRelation"
-import { connectorHits, constructionHits, meshHits, stationsTogether, trackingHits } from "./snapTargets"
+import {
+  connectorHits,
+  constructionHits,
+  crossing,
+  isStop,
+  meshHits,
+  stationsTogether,
+  stopsTogether,
+  trackingHits
+} from "./snapTargets"
 import { vecAdd, vecDot, vecScale, vecSub } from "./ueMath"
 
 /** How many of the nearest points are asked whether something hides them. */
@@ -150,14 +159,37 @@ const stillHeld = (frame: SnapFrame, held: SnapHit): SnapHit => {
   return underConstraint(frame, { ...held, landing, distance: 0 })
 }
 
+/** The targets that stop a plane move along one of its axes: Mesh's stations and Alignment. */
+const AXIS_STOPS: ReadonlySet<SnapTarget> = new Set(["mesh", "alignment"])
+
+/**
+ * `hit` on a plane handle or lock, with a stop across the other axis from another target when it has one axis only:
+ * a face across X from Mesh and a centre lined up across Y by Alignment land together where their planes cross, as two
+ * of one target's do. The nearest such stop goes with it.
+ */
+const withOtherAxis = (frame: SnapFrame, hit: SnapHit, takes: Takes): SnapHit => {
+  const { constraint } = frame
+  if (constraint.kind !== "plane" || !isStop(hit) || hit.parts !== undefined || !AXIS_STOPS.has(hit.target)) {
+    return hit
+  }
+  const across = askedOrder(frame.config)
+    .filter((target) => target !== hit.target && AXIS_STOPS.has(target))
+    .flatMap((target) => hitsOf(frame, target, takes))
+    .flatMap((one) => one.parts ?? [one])
+    .filter(isStop)
+    .filter((one) => crossing(hit, one) && inReach(frame, one))
+    .toSorted((a, b) => a.distance - b.distance)[0]
+  return across === undefined ? hit : stopsTogether(constraint.normal, hit, across)
+}
+
 /**
  * The first target asked (`askedOrder`: the list, with a hard-pulling Connectors ahead of Grid and Mesh) with something
- * `takes` lets through; else the grid, if it's on.
+ * `takes` lets through, with what holds the other axis of a plane move; else the grid, if it's on.
  */
 const firstHit = (frame: SnapFrame, takes: Takes): SnapHit | undefined => {
   for (const target of askedOrder(frame.config)) {
     const best = bestOf(frame, hitsOf(frame, target, takes))
-    if (best !== undefined) return underConstraint(frame, best)
+    if (best !== undefined) return underConstraint(frame, withOtherAxis(frame, best, takes))
   }
   if (!frame.config.targets.grid.enabled) return undefined
   const base = baseNearPointer(frame)

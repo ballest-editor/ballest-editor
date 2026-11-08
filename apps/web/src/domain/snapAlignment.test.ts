@@ -4,6 +4,7 @@ import type { Vec3 } from "./coords"
 import { alignmentHit } from "./snapAlignment"
 import { defaultSnapConfig } from "./snapConfig"
 import type { SnapFrame, SnapItem, SnapView } from "./snapFrame"
+import { cornersOf } from "./snapRelation"
 import { IDENTITY_QUAT, ORIGIN, vecAdd, vecScale } from "./ueMath"
 
 const view = (orthographic: boolean, inView: SnapView["inView"] = () => true) => topView(1, { orthographic, inView })
@@ -17,6 +18,9 @@ const Z = { x: 0, y: 0, z: 1 }
 /** A free drag on the ground: both of its axes are searched. */
 const onGround = { constraint: { kind: "plane", normal: Z } } as const
 
+/** A 100 cm pillar 10 m tall: its size is what makes a neighbour 9 m off near enough to line up with. */
+const pillar = { min: { x: -50, y: -50, z: -500 }, max: { x: 50, y: 50, z: 500 } }
+
 const frame = (offset: Vec3, items: ReadonlyArray<SnapItem>, extra: Partial<SnapFrame> = {}): SnapFrame => ({
   config: defaultSnapConfig,
   view: view(true),
@@ -26,7 +30,7 @@ const frame = (offset: Vec3, items: ReadonlyArray<SnapItem>, extra: Partial<Snap
   offset,
   slip: { x: 0, y: 0 },
   bases: [{ start: ORIGIN, label: "Pivot" }],
-  box: boxAt(ORIGIN),
+  box: pillar,
   rotation: IDENTITY_QUAT,
   units: "cm",
   tracked: [],
@@ -135,10 +139,10 @@ describe("alignmentHit", () => {
     assert.closeTo(hit?.landing.x ?? 0, 400, 1e-6)
   })
 
-  it("draws the sides that lined up and a guide between them in the plane they share, not between the middles", () => {
+  it("draws both boxes with the sides that lined up, and a guide between them in the plane they share", () => {
     const [hit] = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [item("a", { x: 300, y: 900, z: 0 })]))
     assert.strictEqual(hit?.relation, "aligned")
-    const [guide, target] = hit?.marks ?? []
+    const [guide, box, target] = hit?.marks ?? []
     // the selection's near side, at 350 once it has landed, on the neighbour's far side
     assert.deepStrictEqual(guide, {
       kind: "guide",
@@ -146,15 +150,33 @@ describe("alignmentHit", () => {
       to: { x: 350, y: 900, z: 0 },
       text: "800 cm"
     })
-    assert.isTrue(target?.kind === "face" && target.outline === true && target.corners.every(({ x }) => x === 350))
-    const [source] = hit?.source ?? []
+    assert.deepStrictEqual(box, { kind: "box", role: "target", corners: cornersOf(boxAt({ x: 300, y: 900, z: 0 })) })
+    assert.isTrue(target?.kind === "face" && target.role === "target" && target.corners.every(({ x }) => x === 350))
+    const [ownBox, source] = hit?.source ?? []
+    assert.deepStrictEqual(ownBox, { kind: "box", role: "source", corners: cornersOf(pillar) })
     assert.isTrue(source?.kind === "face" && source.role === "source" && source.corners.every(({ x }) => x === -50))
   })
 
-  it("draws a centre that lined up as the two centres", () => {
+  it("draws a whole side of the box, however little of the piece is on it", () => {
+    // Curve H 90's box: a tube rising from along X to straight up, which only meets its far side at the top
+    const curve = { min: { x: 0, y: -150, z: -150 }, max: { x: 711.6, y: 150, z: 561.6 } }
+    const [hit] = alignmentHit(frame({ x: 4, y: 0, z: 0 }, [item("a", { x: 661.6, y: 600, z: 0 })], { box: curve }))
+    assert.strictEqual(hit?.label, "Far side level with Cube a on X")
+    const side = hit?.source.find((mark) => mark.kind === "face")
+    assert.isTrue(side?.kind === "face" && side.corners.every(({ x }) => x === 711.6))
+    const spans = (axis: "y" | "z") => side?.kind === "face" ? side.corners.map((corner) => corner[axis]) : []
+    assert.deepStrictEqual([Math.min(...spans("y")), Math.max(...spans("y"))], [-150, 150])
+    assert.deepStrictEqual([Math.min(...spans("z")), Math.max(...spans("z"))], [-150, 561.6])
+  })
+
+  it("draws a centre that lined up as the two centres, in their boxes", () => {
     const [hit] = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [item("a", { x: 400, y: 900, z: 0 })]))
-    assert.deepStrictEqual(hit?.marks[1], { kind: "dot", role: "target", at: { x: 400, y: 900, z: 0 } })
-    assert.deepStrictEqual(hit?.source, [{ kind: "dot", role: "source", at: ORIGIN }])
+    assert.deepStrictEqual(hit?.marks[2], { kind: "dot", role: "target", at: { x: 400, y: 900, z: 0 } })
+    assert.deepStrictEqual(hit?.source, [{ kind: "box", role: "source", corners: cornersOf(pillar) }, {
+      kind: "dot",
+      role: "source",
+      at: ORIGIN
+    }])
   })
 
   it("only searches the handle's axes", () => {
@@ -176,9 +198,36 @@ describe("alignmentHit", () => {
     assert.lengthOf(alignmentHit(frame({ x: 396, y: 0, z: 0 }, close, { view: view(false) })), 1)
   })
 
+  it("only lines up with a neighbour no further off than the selection's own size, in any pane", () => {
+    const cube = { box: boxAt(ORIGIN) }
+    const at = (y: number, extra: Partial<SnapFrame> = {}) =>
+      alignmentHit(frame({ x: 396, y: 0, z: 0 }, [item("a", { x: 400, y, z: 0 })], { ...cube, ...extra }))
+    // the cube's diagonal is 173 cm: 120 cm between them is near, 800 cm isn't
+    assert.lengthOf(at(220), 1)
+    assert.lengthOf(at(900), 0)
+    // in perspective a piece far behind can show right beside the selection, and it still isn't near
+    const behind = view(false, () => true)
+    assert.lengthOf(at(900, { view: { ...behind, project: ({ x, y }) => ({ x, y: y / 100 }) } }), 0)
+  })
+
+  it("lets a small piece reach as far as the range at its depth", () => {
+    const small = { box: boxAt(ORIGIN, 1), view: topView(10, { orthographic: true }) }
+    const [hit] = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [item("a", { x: 400, y: 100, z: 0 })], small))
+    assert.strictEqual(hit?.label, "Center level with Cube a on X")
+  })
+
+  it("lines up with the nearer of two neighbours that line up as well as each other", () => {
+    const items = [item("far", { x: 400, y: 900, z: 0 }), item("near", { x: 400, y: 300, z: 0 })]
+    const [hit] = alignmentHit(frame({ x: 396, y: 0, z: 0 }, items))
+    assert.strictEqual(hit?.label, "Center level with Cube near on X")
+  })
+
   it("matches the gap between two neighbours and draws both gaps, in orthographic panes", () => {
     const items = [item("a", { x: 0, y: 500, z: 0 }), item("b", { x: 300, y: 500, z: 0 })]
-    const row = { constraint: { kind: "line", direction: X } as const, box: boxAt({ x: 0, y: 500, z: 0 }) }
+    const row = {
+      constraint: { kind: "line", direction: X } as const,
+      box: { min: { x: -50, y: 450, z: -500 }, max: { x: 50, y: 550, z: 500 } }
+    }
     const [hit] = alignmentHit(frame({ x: 596, y: 0, z: 0 }, items, row))
     assert.closeTo(hit?.landing.x ?? 0, 600, 1e-6)
     assert.strictEqual(hit?.label, "Same gap as Cube b to Cube a, 200 cm")
@@ -190,7 +239,7 @@ describe("alignmentHit", () => {
       50,
       250
     ]])
-    assert.deepInclude(hit?.source[0], { kind: "face", role: "source", outline: true })
+    assert.deepInclude(hit?.source[1], { kind: "face", role: "source" })
     assert.lengthOf(alignmentHit(frame({ x: 596, y: 0, z: 0 }, items, { ...row, view: view(false) })), 0)
   })
 })

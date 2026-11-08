@@ -95,23 +95,17 @@ export type MarkRole = "source" | "target"
 
 /**
  * How a snap shows while it is current, each in its own way (docs/SNAPPING.md § Snap indications). A point, edge,
- * face or end is the source's or the target's; a guide, a tracking line and the arrow are the relation between them.
+ * face, box or end is the source's or the target's; a guide and a tracking line are the relation between them.
  */
 export type SnapMark =
   | { readonly kind: "dot"; readonly role: MarkRole; readonly at: Vec3 }
   | { readonly kind: "line"; readonly role: MarkRole; readonly from: Vec3; readonly to: Vec3 }
-  | {
-    readonly kind: "face"
-    readonly role: MarkRole
-    readonly corners: ReadonlyArray<Vec3>
-    /** Only its outline: a side an alignment lines up, which a tint would cover whole. */
-    readonly outline?: boolean
-  }
+  | { readonly kind: "face"; readonly role: MarkRole; readonly corners: ReadonlyArray<Vec3> }
+  /** A side's whole bounds, for where the faces that snapped are: its eight corners in `cornersOf`'s order. */
+  | { readonly kind: "box"; readonly role: MarkRole; readonly corners: ReadonlyArray<Vec3> }
   | { readonly kind: "ring"; readonly role: MarkRole; readonly at: Vec3 }
   | { readonly kind: "guide"; readonly from: Vec3; readonly to: Vec3; readonly text?: string }
   | { readonly kind: "tracking"; readonly from: Vec3; readonly to: Vec3; readonly axis: "x" | "y" | "z" | "view" }
-  /** A join's way on, out of the end the selection meets. */
-  | { readonly kind: "arrow"; readonly at: Vec3; readonly direction: Vec3 }
   | { readonly kind: "glyph"; readonly relation: SnapRelation; readonly at: Vec3 }
 
 /** A connector snap: the two ends, and what the profiles say. */

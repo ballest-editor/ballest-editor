@@ -1,7 +1,8 @@
 /**
  * The Alignment target (docs/SNAPPING.md § Alignment): what 2D tools do, limited so it stays quiet in a map of thousands.
- * Only items the pane shows count, only the axes the move has are searched, and guides run between the two items that
- * matched. In perspective a neighbour must also stand within the threshold on screen.
+ * Only near neighbours count: items the pane shows, no further from the selection than its own size, and in perspective
+ * within the threshold on screen. Only the axes the move has are searched, and guides run between the two items that
+ * matched.
  */
 import type { Vec3 } from "./coords"
 import { type Box, boxCentreOf } from "./itemBounds"
@@ -17,8 +18,8 @@ import {
   type SnapMark,
   type SnapRelation
 } from "./snapFrame"
-import { cornersOf, ontoPlane, sideOf } from "./snapRelation"
-import { vecAdd, vecDot, vecLength, vecLerp, vecScale, vecSub } from "./ueMath"
+import { boxMark, cornersOf, ontoPlane, sideOf } from "./snapRelation"
+import { vecAdd, vecDistance, vecDot, vecLength, vecLerp, vecScale, vecSub } from "./ueMath"
 
 /** A box's reach along `axis`: its near and far face planes and its centre. */
 interface Span {
@@ -57,6 +58,12 @@ const showNear = (frame: SnapFrame, a: Box, b: Box, range: number): boolean => {
   return Math.hypot(gapX, gapY) <= range
 }
 
+/**
+ * How far a neighbour can stand from the selection and still count, in cm: the selection's own size, its box's diagonal,
+ * or the range at the selection's depth when that is more, so a small piece still finds what its pixels reach.
+ */
+const reachOf = (box: Box, cmRange: number): number => Math.max(vecDistance(box.min, box.max), cmRange)
+
 const FEATURES = ["min", "centre", "max"] as const
 
 type Feature = (typeof FEATURES)[number]
@@ -76,6 +83,8 @@ const levelWords = (mine: Feature, their: Feature, name: string): string =>
 interface Match {
   /** What to add along the axis, in cm. */
   readonly by: number
+  /** How far the selection stands from the neighbour it lines up with, once it has: the nearer is meant. */
+  readonly apart: number
   readonly relation: SnapRelation
   readonly marks: ReadonlyArray<SnapMark>
   /** The selection's side or centre that lined up, at the drag's start. */
@@ -86,21 +95,25 @@ interface Match {
   readonly level?: { readonly key: string; readonly feature: Feature; readonly their: Feature }
 }
 
-/** Closer than this, in cm, two matches are the same distance away: what's left is rounding, and differs by the frame. */
-const TIE = 1e-6
-
-/** The nearest first. Boxes of one size line up on all three features at once, and it's the centres that say so. */
-const nearerFirst = (a: Match, b: Match): number => {
-  const nearer = Math.abs(a.by) - Math.abs(b.by)
-  if (Math.abs(nearer) > TIE) return nearer
-  return Number(b.level?.feature === "centre") - Number(a.level?.feature === "centre")
+/**
+ * The nearest move first, a pixel counting as no difference, then the nearer neighbour: a piece far off that happens to
+ * line up as well is the less likely meant. Boxes of one size line up on all three features at once, and it's the centres
+ * that say so.
+ */
+const nearerFirst = (cmPerPixel: number) => (a: Match, b: Match): number => {
+  const pixels = (cm: number) => Math.round(cm / cmPerPixel)
+  const centre = (match: Match) => Number(match.level?.feature !== "centre")
+  return pixels(Math.abs(a.by)) - pixels(Math.abs(b.by)) || pixels(a.apart) - pixels(b.apart) ||
+    centre(a) - centre(b) || Math.abs(a.by) - Math.abs(b.by)
 }
 
-/** A box's side or centre along `axis`, as a mark: a side's outline, as a tint would cover a long piece whole. */
-const featureMark = (box: Box, axis: Vec3, feature: Feature, role: MarkRole): SnapMark =>
+/** A box's side or centre along `axis`, as marks: the box, and the side tinted in it or its centre. */
+const featureMarks = (box: Box, axis: Vec3, feature: Feature, role: MarkRole): ReadonlyArray<SnapMark> => [
+  boxMark(box, role),
   feature === "centre"
     ? { kind: "dot", role, at: boxCentreOf(box) }
-    : sideOf(box, feature === "min" ? vecScale(axis, -1) : axis, role, true)
+    : sideOf(box, feature === "min" ? vecScale(axis, -1) : axis, role)
+]
 
 /** The point of a box's feature on the plane it lines up on: its centre, carried along `axis` onto that plane. */
 const featurePoint = (box: Box, axis: Vec3, at: number): Vec3 => ontoPlane(boxCentreOf(box), axis, at)
@@ -126,20 +139,18 @@ const planeMatches = (axis: Vec3, start: Box, moved: Box, neighbours: ReadonlyAr
         if (Math.abs(by) > cmRange) return []
         const landed = movedBox(moved, vecScale(axis, by))
         const level = theirs[their]
+        const apart = separation(landed, item.box)
         return [{
           by,
+          apart,
           relation: "aligned",
           words: levelWords(mine, their, item.name),
           level: { key: item.key, feature: mine, their },
           marks: [
-            guideBetween(
-              featurePoint(landed, axis, level),
-              featurePoint(item.box, axis, level),
-              separation(landed, item.box)
-            ),
-            featureMark(item.box, axis, their, "target")
+            guideBetween(featurePoint(landed, axis, level), featurePoint(item.box, axis, level), apart),
+            ...featureMarks(item.box, axis, their, "target")
           ],
-          source: [featureMark(start, axis, mine, "source")]
+          source: featureMarks(start, axis, mine, "source")
         }]
       })
     )
@@ -152,8 +163,18 @@ const dimension = (a: Box, b: Box, axis: Vec3, from: number, to: number, gap: nu
   return guideBetween(ontoPlane(middle, axis, from), ontoPlane(middle, axis, to), gap)
 }
 
-/** Gaps along `axis` the selection can match: the one between two neighbours, carried on past the last of them. */
-const gapMatches = (axis: Vec3, start: Box, moved: Box, neighbours: ReadonlyArray<SnapItem>, cmRange: number) => {
+/**
+ * Gaps along `axis` the selection can match: the one between two neighbours, carried on past the last of them. The one
+ * the selection comes up to must be near (`near`), and the one beyond it only in view.
+ */
+const gapMatches = (
+  axis: Vec3,
+  start: Box,
+  moved: Box,
+  neighbours: ReadonlyArray<SnapItem>,
+  cmRange: number,
+  near: (item: SnapItem) => boolean
+) => {
   const own = spanOf(moved, axis)
   const inLine = [...neighbours]
     .map((item) => ({ item, span: spanOf(item.box, axis) }))
@@ -169,23 +190,25 @@ const gapMatches = (axis: Vec3, start: Box, moved: Box, neighbours: ReadonlyArra
     const reference = dimension(first.box, second.box, axis, a.max, b.min, gap)
     // after the second, the selection's near side faces the second's far side; before the first, the other way about
     const sides = [
-      { by: after, near: second, far: first, facing: -1, at: b.max },
-      { by: before, near: first, far: second, facing: 1, at: a.min }
+      { by: after, next: second, far: first, facing: -1, at: b.max },
+      { by: before, next: first, far: second, facing: 1, at: a.min }
     ]
-    return sides.flatMap(({ at, by, facing, far, near }): ReadonlyArray<Match> => {
-      if (Math.abs(by) > cmRange) return []
+    return sides.flatMap(({ at, by, facing, far, next: beside }): ReadonlyArray<Match> => {
+      if (Math.abs(by) > cmRange || !near(beside)) return []
       const landed = movedBox(moved, vecScale(axis, by))
       const towards = vecScale(axis, facing)
       return [{
         by,
+        apart: separation(landed, beside.box),
         relation: "gap",
-        words: `Same gap as ${near.name} to ${far.name}, ${Math.round(gap)} cm`,
+        words: `Same gap as ${beside.name} to ${far.name}, ${Math.round(gap)} cm`,
         marks: [
-          dimension(landed, near.box, axis, at, at - facing * gap, gap),
+          dimension(landed, beside.box, axis, at, at - facing * gap, gap),
           reference,
-          sideOf(near.box, vecScale(towards, -1), "target", true)
+          boxMark(beside.box, "target"),
+          sideOf(beside.box, vecScale(towards, -1), "target")
         ],
-        source: [sideOf(start, towards, "source", true)]
+        source: [boxMark(start, "source"), sideOf(start, towards, "source")]
       }]
     })
   })
@@ -271,17 +294,20 @@ export const alignmentHit = (
   if (base === undefined) return []
   const range = rangeOf(frame.config, "alignment")
   const free = freePoint(frame, base)
-  const cmRange = range * frame.view.cmPerPixelAt(free)
+  const cmPerPixel = frame.view.cmPerPixelAt(free)
+  const cmRange = range * cmPerPixel
   const moved = movedBox(frame.box, frame.offset)
-  const neighbours = frame.items.filter(({ box }) =>
-    frame.view.inView(box) && (frame.view.orthographic || showNear(frame, moved, box, range))
-  )
+  const inView = frame.items.filter(({ box }) => frame.view.inView(box))
+  const reach = reachOf(frame.box, cmRange)
+  const near = (item: SnapItem) =>
+    separation(moved, item.box) <= reach && (frame.view.orthographic || showNear(frame, moved, item.box, range))
+  const neighbours = inView.filter(near)
   if (neighbours.length === 0) return []
   const hits = axesOf(frame.constraint).flatMap((axis): ReadonlyArray<AxisHit> => {
     const found = [
       ...planeMatches(axis, frame.box, moved, neighbours, cmRange),
-      ...(gapsOn(frame) ? gapMatches(axis, frame.box, moved, neighbours, cmRange) : [])
-    ].sort(nearerFirst)
+      ...(gapsOn(frame) ? gapMatches(axis, frame.box, moved, inView, cmRange, near) : [])
+    ].sort(nearerFirst(cmPerPixel))
     const best = found[0]
     return best === undefined ? [] : [{ hit: axisHit(frame, base, axis, best), match: best, axis: axisName(axis) }]
   })

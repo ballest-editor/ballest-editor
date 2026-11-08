@@ -396,7 +396,7 @@ export function GizmoController() {
         })
         session.from = turn.angle
         session.on = turned.on
-        showSnap(turned.on ?? {})
+        showSnap(turned.on ?? {}, snap.targets)
         const rotation = quatFromAxisAngle(turn.axis, turned.angle)
         const frame = localFrameOf(active.start)
         return (frame === undefined
@@ -415,7 +415,7 @@ export function GizmoController() {
           : undefined,
         stops: active.stops
       })
-      showSnap(scaled)
+      showSnap(scaled, snap.targets)
       return { ...scale, kind: "scale", factor: scaled.factor } satisfies GroupDelta
     }
 

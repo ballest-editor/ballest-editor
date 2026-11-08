@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
-import { boxAt } from "../test/snapFixtures"
+import { boxAt, cubeAt } from "../test/snapFixtures"
 import type { SnapHit } from "./snapFrame"
-import { shownMarks, sideOf, sourceOf } from "./snapRelation"
+import { boxMark, cornersOf, itemBoxMark, shownMarks, sideOf, sourceOf } from "./snapRelation"
 import { ORIGIN, quatFromAxisAngle } from "./ueMath"
 
 const X = { x: 1, y: 0, z: 0 }
@@ -29,9 +29,18 @@ describe("sideOf", () => {
       at: { x: 50, y: 50, z: 50 }
     })
   })
+})
 
-  it("keeps to an outline when asked", () => {
-    assert.deepInclude(sideOf(boxAt(ORIGIN), Z, "source", true), { kind: "face", outline: true })
+describe("itemBoxMark", () => {
+  it("is an item's own bounds where they are known, turned with it, and its world box where they aren't", () => {
+    const turned = cubeAt("a", ORIGIN, {
+      transform: { ...cubeAt("a", ORIGIN).transform, rotation: quatFromAxisAngle(Z, Math.PI / 4) }
+    })
+    const mark = itemBoxMark(turned, "target")
+    const xs = mark.kind === "box" ? mark.corners.map(({ x }) => x) : []
+    // a 100 cm cube turned 45°: its corners reach out along X by half its diagonal
+    assert.closeTo(Math.max(...xs), 50 * Math.SQRT2, 1e-9)
+    assert.deepStrictEqual(itemBoxMark({ ...turned, bounds: undefined }, "target"), boxMark(turned.box, "target"))
   })
 })
 
@@ -45,7 +54,8 @@ describe("sourceOf", () => {
       { kind: "dot", role: "source", at: ORIGIN }
     ])
     const near = sourceOf(box, { start: { x: -50, y: 0, z: 0 }, label: "Near face", stop: { kind: "face", axis: X } })
-    assert.isTrue(near.every((mark) => mark.kind === "face" && mark.corners.every(({ x }) => x === -50)))
+    assert.deepStrictEqual(near[0], { kind: "box", role: "source", corners: cornersOf(box) })
+    assert.isTrue(near[1]?.kind === "face" && near[1].corners.every(({ x }) => x === -50))
   })
 })
 
@@ -76,6 +86,12 @@ describe("shownMarks", () => {
     const to = turned?.kind === "line" ? turned.to : ORIGIN
     assert.closeTo(to.x, 200, 1e-9)
     assert.closeTo(to.y, 0, 1e-9)
+  })
+
+  it("draws a box once, however many parts of a landing bring it", () => {
+    const box = boxMark(boxAt({ x: 300, y: 0, z: 0 }), "target")
+    const twice = shownMarks({ ...hit, marks: [box, box], source: [] })
+    assert.deepStrictEqual(twice.map(({ kind }) => kind), ["box", "glyph"])
   })
 
   it("leaves the source out of a pick, which has no selection", () => {
