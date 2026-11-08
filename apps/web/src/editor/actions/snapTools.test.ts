@@ -3,6 +3,7 @@ import { indexCatalog } from "../../domain/Catalog"
 import { editTransform } from "../../domain/editTransform"
 import { MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "../../domain/mirror"
 import { defaultSettings } from "../../domain/Settings"
+import { SNAP_PRESETS, withTargetMoved } from "../../domain/snapConfig"
 import { annotationsOf, findGroup } from "../../domain/structure"
 import { catalogWithEnds, endAlongX, grouped, loadPieces } from "../../test/snapFixtures"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
@@ -16,9 +17,14 @@ import {
   gridYawToSelection,
   mirrorSelection,
   pickGridSize,
+  preferSnap,
+  resetSnapToDefaults,
+  saveSnapDefaults,
   selectConnected,
   setFlushOptions,
   setSnapTargets,
+  snapIsDefault,
+  snapPreferenceOf,
   startAxisFromPoints,
   startFlush,
   startGridOriginPick,
@@ -28,6 +34,7 @@ import {
   updateSnap,
   updateSnapTarget
 } from "./snapTools"
+import { saveSettings } from "./startup"
 
 const load = (xs: ReadonlyArray<number>) => loadPieces(xs.map((x) => ({ x, y: 0, z: 0 })))
 
@@ -93,6 +100,37 @@ describe("snap settings", () => {
     assert.strictEqual(config().targets.tracking.keep, defaultSettings.snapping.targets.tracking.keep)
     setSnapTargets(["alignment", "tracking"], true)
     assert.isTrue(config().targets.alignment.enabled && config().targets.tracking.enabled)
+  })
+
+  it("prefers the grid or pieces with the order and an even pull, and calls anything else custom", () => {
+    const config = () => snapConfigOf(useEditor.getState())
+    assert.strictEqual(snapPreferenceOf(config()), "grid")
+    updateSnapTarget("connectors", { weight: 4 })
+    assert.isNull(snapPreferenceOf(config()), "a strong pull isn't either")
+    preferSnap("pieces")
+    assert.deepStrictEqual(config().order, SNAP_PRESETS.piecesFirst)
+    assert.strictEqual(config().targets.connectors.weight, 1)
+    assert.strictEqual(snapPreferenceOf(config()), "pieces")
+    updateSnap({ order: withTargetMoved(config(), "grid", 2).order })
+    assert.isNull(snapPreferenceOf(config()), "an order of the user's own")
+    preferSnap("grid")
+    assert.deepStrictEqual(config().order, SNAP_PRESETS.gridFirst)
+  })
+
+  it("saves the tab's settings as what new maps start on, and resets the tab to them", () => {
+    const s = () => useEditor.getState()
+    assert.isTrue(snapIsDefault(s()))
+    updateSnap({ gridSize: 37, threshold: 20 })
+    assert.isFalse(snapIsDefault(s()))
+    void saveSnapDefaults()
+    assert.strictEqual(s().settings.snapping.gridSize, 37)
+    assert.isTrue(snapIsDefault(s()))
+    updateSnapTarget("mesh", { offset: 5 })
+    resetSnapToDefaults()
+    assert.strictEqual(snapConfigOf(s()).targets.mesh.offset, defaultSettings.snapping.targets.mesh.offset)
+    assert.strictEqual(snapConfigOf(s()).gridSize, 37, "back to the saved defaults")
+    assert.isTrue(snapIsDefault(s()))
+    void saveSettings(defaultSettings)
   })
 })
 

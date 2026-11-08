@@ -2,7 +2,7 @@
  * Snapping's settings and the tools built on the targets (docs/SNAPPING.md § Tools built on the targets). A tool asks the
  * one target picker for its points and faces, and does its work here as one undo step.
  */
-import { Effect } from "effect"
+import { Effect, Equal } from "effect"
 import { endsOf, meetingTurn } from "../../domain/connectors"
 import type { SpotId } from "../../domain/connectorSpots"
 import type { UeTransform, Vec3 } from "../../domain/coords"
@@ -15,7 +15,7 @@ import type { Item } from "../../domain/MapFile"
 import { prefabSnapKeyOf } from "../../domain/MapPrefs"
 import type { Construction, EndRef } from "../../domain/MapSidecar"
 import { withMirrorMesh } from "../../domain/mirror"
-import type { SnapConfig, SnapTarget } from "../../domain/snapConfig"
+import { isPreset, SNAP_PRESETS, type SnapConfig, type SnapPreset, type SnapTarget } from "../../domain/snapConfig"
 import {
   alignOffsets,
   angleBetweenFaces,
@@ -56,6 +56,7 @@ import {
   useEditor
 } from "../store"
 import { run } from "./run"
+import { saveSettings } from "./startup"
 
 /** Gives the open tab `config`: a map's are saved with it, a definition's go in the editor's own prefs. */
 const applySnap = (config: SnapConfig) => {
@@ -94,6 +95,39 @@ export const setSnapTargets = (targets: ReadonlyArray<SnapTarget>, enabled: bool
   const turned = Object.fromEntries(targets.map((target) => [target, { ...config.targets[target], enabled }]))
   applySnap({ ...config, targets: { ...config.targets, ...turned } })
 }
+
+/** The snap menu's Prefer: which wins when both are near, the grid or pieces and their ends. */
+export type SnapPreference = "grid" | "pieces"
+
+const PREFERENCE_PRESETS: Readonly<Record<SnapPreference, SnapPreset>> = { grid: "gridFirst", pieces: "piecesFirst" }
+
+/** Which Prefer `config` is: a preset's order with the ends' pull even. Null for anything else, a custom priority. */
+export const snapPreferenceOf = (config: SnapConfig): SnapPreference | null => {
+  if (config.targets.connectors.weight !== 1) return null
+  return isPreset(config, "gridFirst") ? "grid" : isPreset(config, "piecesFirst") ? "pieces" : null
+}
+
+/** Sets Prefer: the preset's order, and the ends' pull back to even, so the order alone decides. */
+export const preferSnap = (preference: SnapPreference) => {
+  const config = snapConfigOf(useEditor.getState())
+  applySnap({
+    ...config,
+    order: SNAP_PRESETS[PREFERENCE_PRESETS[preference]],
+    targets: { ...config.targets, connectors: { ...config.targets.connectors, weight: 1 } }
+  })
+}
+
+/** Whether the tab's snap settings are what new maps start on. */
+export const snapIsDefault = (s: EditorState): boolean => Equal.equals(snapConfigOf(s), s.settings.snapping)
+
+/** Makes the tab's snap settings, all of them, what new maps start on (docs/SNAPPING.md § Settings). */
+export const saveSnapDefaults = () => {
+  const s = useEditor.getState()
+  return saveSettings({ ...s.settings, snapping: snapConfigOf(s) })
+}
+
+/** Gives the tab the snap settings new maps start on. */
+export const resetSnapToDefaults = () => applySnap(useEditor.getState().settings.snapping)
 
 /** The items a tool that moves "B" moves: the selection if the pick is on it, else the item picked. */
 const movingKeys = (s: EditorState, item: string | undefined): ReadonlyArray<string> =>

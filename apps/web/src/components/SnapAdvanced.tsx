@@ -6,21 +6,9 @@ import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ReactNode, useState } from "react"
 import {
-  formatGridSize,
-  formatRotationStep,
-  formatScaleStep,
-  GRID_SIZES,
-  ROTATION_STEPS,
-  SCALE_STEPS
-} from "../domain/snap"
-import {
   BODY_DRAG_NAMES,
-  isPreset,
   rowsOf,
-  SNAP_PRESETS,
-  SNAP_TARGET_NAMES,
   type SnapConfig,
-  type SnapPreset,
   type SnapTarget,
   targetSummary,
   withTargetMoved
@@ -43,40 +31,43 @@ import {
   updateSnapTarget
 } from "../editor/actions"
 import { snapConfigOf, useEditor } from "../editor/store"
+import { InfoHint } from "./InfoHint"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
-import {
-  DISCLOSURE_BODY,
-  DisclosureChevron,
-  Row,
-  RowValue,
-  Segmented,
-  SliderField,
-  StepField,
-  StepRow,
-  SwitchRow,
-  ValueParameters
-} from "./SnapParameters"
+import { DISCLOSURE_BODY, DisclosureChevron, Row, Segmented, SwitchRow, ValueParameters } from "./SnapParameters"
 
 const BASE_NAMES = { pivot: "Pivot", closest: "Closest", centre: "Centre" } as const
 
-export const PRESET_NAMES: Readonly<Record<SnapPreset, string>> = {
-  gridFirst: "Grid first",
-  piecesFirst: "Pieces first"
-}
-
-/** The preset the order is, or null for an order of the user's own. */
-export const presetOf = (config: SnapConfig): SnapPreset | null =>
-  isPreset(config, "gridFirst") ? "gridFirst" : isPreset(config, "piecesFirst") ? "piecesFirst" : null
-
-/** A block of the popover: its title, then its rows. Blocks sit 8px apart, rows flush, as 28px rows give the rhythm. */
-function Block({ title, children }: { readonly title: ReactNode; readonly children: ReactNode }) {
-  return (
-    <div className="flex flex-col">
-      <div className="flex min-h-7 items-center justify-between gap-2">{title}</div>
-      {children}
-    </div>
-  )
+/**
+ * The targets as the snap menu names them (docs/SNAPPING.md § The snap menu): Ends, Pieces and Guides are the plain
+ * screen's switches, and Guides is two targets there, line-up guides to nearby pieces and guides from remembered points.
+ */
+export const TARGET_WORDS: Readonly<Record<SnapTarget, { readonly label: string; readonly help: string }>> = {
+  grid: {
+    label: "Grid",
+    help: "Lines a set distance apart, from the grid's origin and turned with it."
+  },
+  connectors: {
+    label: "Ends",
+    help:
+      "The ends of tracks, tubes and ramps join end to end. Example: a Curve's end joins a Track's end with no step."
+  },
+  mesh: {
+    label: "Pieces",
+    help: "The corners, edges and faces of other pieces. Example: a lamp dropped on a wall sits on the wall."
+  },
+  construction: {
+    label: "Planes",
+    help: "Planes and lines you add yourself, to build along. Example: a plane at 45° to lay a ramp's pieces on."
+  },
+  tracking: {
+    label: "Point guides",
+    help: "Guides from points the pointer rested on. Example: rest on a corner, then move along the guide out of it."
+  },
+  alignment: {
+    label: "Line-up guides",
+    help: "Lines up with pieces nearby, and draws a guide while it does. Example: a kicker set level with a landing."
+  }
 }
 
 /** Buttons that act, as one cluster at a row's right: the same height as every other control. */
@@ -85,30 +76,22 @@ function Actions({ children }: { readonly children: ReactNode }) {
 }
 
 function GridParameters({ config }: { readonly config: SnapConfig }) {
-  const units = useEditor((s) => s.settings.general.units)
   const { origin, yaw } = config.targets.grid
   const hasSelection = useEditor((s) => s.selectedIds.length > 0)
   const atWorld = origin.x === 0 && origin.y === 0 && origin.z === 0
   return (
     <>
-      <Row label="Step">
-        <StepField
-          label="Grid step"
-          value={config.gridSize}
-          options={GRID_SIZES}
-          format={(size) => formatGridSize(size, units)}
-          unit="cm"
-          onChange={(gridSize) => updateSnap({ gridSize })}
-        />
-      </Row>
-      <Row label="Origin">
+      <Row
+        label="Origin"
+        help="Where the grid's lines count from: the world's centre, a point you pick, or the selection."
+      >
         <Actions>
           <Button variant="outline" disabled={atWorld} onClick={gridOriginToWorld}>World</Button>
           <Button variant="outline" onClick={startGridOriginPick}>Pick…</Button>
           <Button variant="outline" disabled={!hasSelection} onClick={gridOriginToSelection}>Selection</Button>
         </Actions>
       </Row>
-      <Row label="Rotation">
+      <Row label="Rotation" help="Turns the grid, to build square to a piece that isn't square to the world.">
         <span className="pr-1 text-fg-secondary tabular-nums">{Math.round(yaw * 10) / 10}°</span>
         <Actions>
           <Button variant="outline" disabled={yaw === 0} onClick={gridYawReset}>Reset</Button>
@@ -143,6 +126,7 @@ function ConstructionEntry({ one }: { readonly one: ReturnType<typeof annotation
         <>
           <SwitchRow
             label="Grid on this plane"
+            help="Draws the grid on this plane and snaps to it there."
             checked={one.grid}
             onChange={(on) => setConstructionGrid(one.id, on)}
           />
@@ -165,20 +149,20 @@ function ConstructionParameters() {
   const construction = useEditor((s) => annotationsOf(s.doc.structure).construction)
   return (
     <>
-      <Row label="Plane from">
+      <Row label="Plane from" help="Adds a plane on a face you click, or through three points you click.">
         <Actions>
           <Button variant="outline" onClick={startPlaneFromFace}>Face…</Button>
           <Button variant="outline" onClick={startPlaneFromPoints}>3 points…</Button>
         </Actions>
       </Row>
-      <Row label="World plane">
+      <Row label="World plane" help="Adds one of the world's planes through the grid's origin.">
         <Actions>
           {WORLD_PLANES.map((plane) => (
             <Button key={plane} variant="outline" onClick={() => addWorldPlane(plane)}>{plane.toUpperCase()}</Button>
           ))}
         </Actions>
       </Row>
-      <Row label="Axis from">
+      <Row label="Axis from" help="Adds a line along a world axis, or through two points you click.">
         <Actions>
           {WORLD_AXES.map((axis) => (
             <Button key={axis} variant="outline" onClick={() => addWorldAxis(axis)}>{axis.toUpperCase()}</Button>
@@ -202,11 +186,11 @@ function Parameters({ config, target }: { readonly config: SnapConfig; readonly 
     case "construction":
       return <ConstructionParameters />
     default:
-      return <ValueParameters config={config} target={target} update={updateSnapTarget} />
+      return <ValueParameters config={config} target={target} />
   }
 }
 
-/** One row of the priority list: a handle, a toggle, the name, what it's set to, and its parameters behind a disclosure. */
+/** One row of the priority list: a handle, the name, what it's set to, its help, its switch, and its parameters. */
 function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
   readonly config: SnapConfig
   readonly target: SnapTarget
@@ -218,6 +202,7 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
   const units = useEditor((s) => s.settings.general.units)
   const constructions = useEditor((s) => annotationsOf(s.doc.structure).construction.length)
   const summary = targetSummary(config, target, units, { construction: constructions })
+  const { label, help } = TARGET_WORDS[target]
   return (
     <Collapsible
       data-snap-target={target}
@@ -232,7 +217,7 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
         <span
           draggable
           role="button"
-          aria-label={`Drag ${SNAP_TARGET_NAMES[target]} to change its priority`}
+          aria-label={`Drag ${label} to change its place`}
           className="flex w-5 shrink-0 cursor-grab justify-center text-fg-tertiary"
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = "move"
@@ -242,12 +227,13 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
           <IconGripVertical className="size-4" />
         </span>
         <CollapsibleTrigger className="group/disclosure flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-control px-1 text-left focus-ring hover:bg-hover">
-          <span className="shrink-0 text-body-strong">{SNAP_TARGET_NAMES[target]}</span>
+          <span className="shrink-0 text-body-strong">{label}</span>
           <span className="min-w-0 flex-1 truncate text-caption text-fg-tertiary">{summary}</span>
           <DisclosureChevron />
         </CollapsibleTrigger>
+        <InfoHint>{help}</InfoHint>
         <Switch
-          aria-label={SNAP_TARGET_NAMES[target]}
+          aria-label={label}
           checked={config.targets[target].enabled}
           onCheckedChange={(enabled) => updateSnapTarget(target, { enabled })}
         />
@@ -259,29 +245,33 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
   )
 }
 
-/** The Snap popover's body (docs/SNAPPING.md § The Snap popover): base, affect, the priority list, tracking, threshold. */
-export function SnapPopoverContent() {
+/**
+ * The snap menu's Advanced (docs/SNAPPING.md § The snap menu): which point snaps, when a drag on the body moves, the
+ * priority list with each target's parameters, and the remembered points.
+ */
+export function SnapAdvanced() {
   const config = useEditor(snapConfigOf)
   const tracked = useEditor((s) => s.tracked.length)
   const clearTracked = useEditor((s) => s.clearTracked)
   const [dragged, setDragged] = useState<SnapTarget | null>(null)
-  const rows = rowsOf(config)
   return (
-    // The padding is the scroller's own, so a switch's wider hit area stays inside it and the scrollbar sits at the edge.
-    <div
-      className="flex max-h-[min(70vh,calc(var(--available-height)-0.5rem))] flex-col gap-2 overflow-x-hidden overflow-y-auto px-3 py-2 [scrollbar-color:color-mix(in_oklch,var(--foreground)_25%,transparent)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin]"
-      data-snap-popover
-    >
-      <Block title={<SectionTitle>Base</SectionTitle>}>
-        <Row label="Snap from">
+    <div className="flex flex-col gap-2" data-snap-advanced>
+      <div className="flex flex-col">
+        <Row
+          label="Snap from"
+          help="Which point of what you drag lands on the target: its pivot, its point nearest the target, or its centre."
+        >
           <Segmented
-            label="Snap base"
+            label="Snap from"
             value={config.base}
             items={BASE_NAMES}
             onChange={(base) => updateSnap({ base })}
           />
         </Row>
-        <Row label="Drag body">
+        <Row
+          label="Drag body"
+          help="When dragging the piece itself, not the gizmo, moves it: only to join ends, always, or never."
+        >
           <Segmented
             label="Drag by the body"
             value={config.bodyDrag}
@@ -289,90 +279,36 @@ export function SnapPopoverContent() {
             onChange={(bodyDrag) => updateSnap({ bodyDrag })}
           />
         </Row>
-      </Block>
-      <Block title={<SectionTitle>Affect</SectionTitle>}>
-        <Row label="Move">
-          <Switch aria-label="Snap move" checked disabled />
-        </Row>
-        <StepRow
-          label="Rotation"
-          step={{
-            label: "Rotation step",
-            value: config.rotationStep,
-            options: ROTATION_STEPS,
-            format: formatRotationStep,
-            unit: "°",
-            onChange: (rotationStep) => updateSnap({ rotationStep })
-          }}
-          enabled={config.rotationEnabled}
-          onEnabled={(rotationEnabled) => updateSnap({ rotationEnabled })}
-        />
-        <StepRow
-          label="Scale"
-          step={{
-            label: "Scale step",
-            value: config.scaleStep,
-            options: SCALE_STEPS,
-            format: formatScaleStep,
-            unit: "%",
-            onChange: (scaleStep) => updateSnap({ scaleStep })
-          }}
-          enabled={config.scaleEnabled}
-          onEnabled={(scaleEnabled) => updateSnap({ scaleEnabled })}
-        />
-      </Block>
-      <Block
-        title={
-          <>
-            <SectionTitle>Targets</SectionTitle>
-            <Segmented
-              label="Priority"
-              value={presetOf(config)}
-              items={PRESET_NAMES}
-              onChange={(preset) => updateSnap({ order: SNAP_PRESETS[preset] })}
-            />
-          </>
-        }
-      >
-        <div className="flex flex-col pt-1">
-          {rows.map((target, index) => (
-            <TargetRow
-              key={target}
-              config={config}
-              target={target}
-              index={index}
-              dragging={dragged === target}
-              onDragStart={() => setDragged(target)}
-              onDropAt={(at) => {
-                if (dragged !== null) updateSnap({ order: withTargetMoved(config, dragged, at).order })
-                setDragged(null)
-              }}
-            />
-          ))}
+      </div>
+      <div className="flex flex-col">
+        <div className="flex min-h-7 items-center gap-1">
+          <SectionTitle>Order</SectionTitle>
+          <InfoHint>
+            When two are near at once, the higher one wins. Drag a row by its handle to move it; Prefer sets the two
+            usual orders.
+          </InfoHint>
         </div>
-      </Block>
-      <Block title={<SectionTitle>Tracking points</SectionTitle>}>
-        <Row label={`${tracked} acquired`}>
-          <Button variant="outline" disabled={tracked === 0} onClick={clearTracked}>Clear</Button>
-        </Row>
-      </Block>
-      <Block
-        title={
-          <>
-            <SectionTitle>Threshold</SectionTitle>
-            <RowValue>{config.threshold} px</RowValue>
-          </>
-        }
+        {rowsOf(config).map((target, index) => (
+          <TargetRow
+            key={target}
+            config={config}
+            target={target}
+            index={index}
+            dragging={dragged === target}
+            onDragStart={() => setDragged(target)}
+            onDropAt={(at) => {
+              if (dragged !== null) updateSnap({ order: withTargetMoved(config, dragged, at).order })
+              setDragged(null)
+            }}
+          />
+        ))}
+      </div>
+      <Row
+        label={`${tracked} ${tracked === 1 ? "point" : "points"} remembered`}
+        help="The points Point guides draw from. They last until cleared, or Escape with no drag."
       >
-        <SliderField
-          label="Snap threshold"
-          min={2}
-          max={40}
-          step={1}
-          value={config.threshold}
-          onChange={(threshold) => updateSnap({ threshold })}
-        />
-      </Block>
+        <Button variant="outline" disabled={tracked === 0} onClick={clearTracked}>Clear</Button>
+      </Row>
     </div>
   )
 }

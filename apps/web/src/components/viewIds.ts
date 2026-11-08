@@ -3,8 +3,8 @@ import { dialogIds, settingsCategories } from "../editor/store"
 import { dockPanels } from "./dock/panels"
 import { MENU_TITLES } from "./menuModel"
 
-/** The popovers with rows of their own: the viewport's Display and Snap, and the top bar's snap menu. */
-const POPOVERS = ["display", "snap", "snapMenu"] as const
+/** The popovers with rows of their own: the view bar's Display and the snap menu, with its Advanced open. */
+const POPOVERS = ["display", "snap", "snapAdvanced"] as const
 
 /**
  * Every view the app has, read from the registries that make them: what the app driver's coverage is measured against

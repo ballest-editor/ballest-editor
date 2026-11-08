@@ -42,7 +42,7 @@ import { ColorSetting } from "./ColorSetting"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
 import { SizeToggle } from "./SizeToggle"
-import { SnapPopoverContent } from "./SnapPopover"
+import { SnapMagnet } from "./SnapMagnet"
 import { ToolBar } from "./ToolBar"
 import { CONTROL_WORD, GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
@@ -51,7 +51,7 @@ import { ViewTip, ViewTipBoundary } from "./ViewTip"
 /**
  * Everything floating over the viewport: its panes' frames, the tool bar (bottom) and, in the viewport's top right like
  * the game's, over every pane since they all share them, two pills: how the view divides into panes and what it displays,
- * then the gizmo's axes with grid and rotation snapping, under the top bar's magnet. They sit in the top right pane's corner (`ViewPanes`): as that
+ * then the gizmo's pivot and axes with snapping: the magnet and its menu, and the grid and angle steps. They sit in the top right pane's corner (`ViewPanes`): as that
  * pane narrows they go to icons, and only then does the second pill drop under the first, clear of the pane's label.
  * Pointer-only, so keybinds stay with the viewport.
  */
@@ -73,6 +73,8 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
             <span aria-hidden className={GROUP_DIVIDER} />
             <AxesToggle disabled={disabled} />
             <span aria-hidden className={GROUP_DIVIDER} />
+            <SnapMagnet disabled={disabled} />
+            <span aria-hidden className={GROUP_DIVIDER} />
             <SnapGroup
               icon={<IconGrid4x4 />}
               label="Snap to grid"
@@ -89,19 +91,17 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
             <span aria-hidden className={GROUP_DIVIDER} />
             <SnapGroup
               icon={<IconAngle />}
-              label="Snap rotation"
+              label="Snap angle"
               enabled={rotationEnabled}
               snapping={enabled}
               onToggle={(pressed) => updateSnap({ rotationEnabled: pressed })}
               value={rotationStep}
               options={ROTATION_STEPS}
               onPick={(step) => updateSnap({ rotationEnabled: true, rotationStep: step })}
-              valueLabel="Rotation step"
+              valueLabel="Angle step"
               format={formatRotationStep}
               disabled={disabled}
             />
-            <span aria-hidden className={GROUP_DIVIDER} />
-            <SnapSettingsControl disabled={disabled} />
           </div>
         </div>
       </ViewPanes>
@@ -367,38 +367,9 @@ function DisplayControl({ disabled }: { readonly disabled: boolean }) {
   )
 }
 
-/** The chevron that opens the Snap popover; View › Snap › Open snap settings and the snap menu open it too. */
-function SnapSettingsControl({ disabled }: { readonly disabled: boolean }) {
-  const open = useEditor((s) => s.snapPopoverOpen)
-  const setOpen = useEditor((s) => s.setSnapPopoverOpen)
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <ViewTip
-        label="Snap settings"
-        render={
-          <PopoverTrigger
-            disabled={disabled}
-            render={<button type="button" aria-label="Snap settings" className={SEGMENT} {...noFocus} />}
-          />
-        }
-      >
-        <IconChevronDown className="size-3" />
-      </ViewTip>
-      <PopoverContent
-        align="end"
-        initialFocus={false}
-        finalFocus={false}
-        className="w-[22rem] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden p-0"
-      >
-        <SnapPopoverContent />
-      </PopoverContent>
-    </Popover>
-  )
-}
-
 /**
  * One kind of gizmo snapping: the icon turns it on and off, the value next to it picks the step and turns it on. Both
- * stay working while snapping as a whole (the top bar's magnet) is off, and are dimmed to say they wait on it.
+ * stay working while snapping as a whole (the magnet beside them) is off, and are dimmed to say they wait on it.
  */
 function SnapGroup<V extends number>(props: {
   readonly icon: ReactNode

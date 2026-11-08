@@ -19,7 +19,7 @@ const hintsOf = (shown: DragKeysShown | null): ReadonlyArray<string> => {
   return [...html.matchAll(/data-drag-key="[^"]+" data-active="(true|false)">(.*?)<\/span><\/span>/g)].map(
     ([, active, inner = ""]) => {
       const keys = [...inner.matchAll(/<kbd[^>]*class="([^"]*)"[^>]*>(.*?)<\/kbd>/g)].map(([, cls = "", text]) =>
-        cls.includes("bg-primary/12") ? `${text}*` : text
+        cls.includes("bg-primary ") ? `${text}*` : text
       )
       const word = inner.slice(inner.lastIndexOf(">") + 1)
       return `${keys.join(" ")} ${word}${active === "true" ? "*" : ""}`
@@ -38,9 +38,9 @@ describe("the status bar's drag keys", () => {
       "Shift hold",
       "X Y Z lock",
       "G grid",
-      "J connectors",
-      "M mesh",
-      "L align"
+      "J ends",
+      "M pieces",
+      "L guides"
     ])
   })
 
@@ -48,14 +48,14 @@ describe("the status bar's drag keys", () => {
     assert.deepStrictEqual(hintsOf({ transform: "turn", pressed: [], lock: undefined }), [
       "Control invert",
       "G grid",
-      "J connectors",
-      "M mesh",
-      "L align",
+      "J ends",
+      "M pieces",
+      "L guides",
       "T step"
     ])
     assert.deepStrictEqual(hintsOf({ transform: "scale", pressed: [], lock: undefined }), [
       "Control invert",
-      "M mesh",
+      "M pieces",
       "T step"
     ])
   })
@@ -63,7 +63,7 @@ describe("the status bar's drag keys", () => {
   it("lights what is held and the axis locked", () => {
     assert.deepStrictEqual(
       hintsOf({ transform: "move", pressed: ["ControlLeft", "KeyG"], lock: { axis: "y", plane: true } }),
-      ["Control* invert*", "Shift hold", "X Y* Z lock*", "G* grid*", "J connectors", "M mesh", "L align"]
+      ["Control* invert*", "Shift hold", "X Y* Z lock*", "G* grid*", "J ends", "M pieces", "L guides"]
     )
   })
 })

@@ -11,15 +11,6 @@ import { ORIGIN } from "./ueMath"
 export const SNAP_TARGETS = ["grid", "connectors", "mesh", "construction", "tracking", "alignment"] as const
 export type SnapTarget = (typeof SNAP_TARGETS)[number]
 
-export const SNAP_TARGET_NAMES: Readonly<Record<SnapTarget, string>> = {
-  grid: "Grid",
-  connectors: "Connectors",
-  mesh: "Mesh",
-  construction: "Construction",
-  tracking: "Tracking",
-  alignment: "Alignment"
-}
-
 export const SNAP_BASES = ["pivot", "closest", "centre"] as const
 
 /** When a press on the selection's body drags it: to join ends (with Connectors on and ends to join), always, or never. */

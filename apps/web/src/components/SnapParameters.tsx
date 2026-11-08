@@ -12,14 +12,17 @@ import {
   formatWeight,
   MESH_ELEMENT_NAMES,
   MESH_ELEMENTS,
+  type MeshElement,
   type SnapConfig,
   type SnapTarget
 } from "../domain/snapConfig"
+import { updateSnapTarget } from "../editor/actions"
+import { InfoHint } from "./InfoHint"
 import { NumberField } from "./NumberField"
 
 /**
- * The rows every snap control is made of, in the snap menu, the Snap popover and Settings › Snapping alike: a 28px row,
- * its label at the left and its control at the right, which drops under the label when the two can't share the width.
+ * The rows the snap menu is made of (docs/SNAPPING.md § The snap menu): a 28px row, its label and its one sentence of
+ * help at the left and its control at the right, which drops under the label when the two can't share the width.
  * Fields are one width (`FIELD`), so their edges line up down a list.
  */
 const FIELD = "w-28"
@@ -27,35 +30,52 @@ const FIELD = "w-28"
 /** What a disclosure opens: its rows, indented under the title. */
 export const DISCLOSURE_BODY = "flex flex-col py-1 pl-6"
 
-export function Row({ label, dimmed = false, strong = false, children }: {
+/** A row's label and, when it has one, its help behind an (i): one plain sentence and an example. */
+export function RowLabel({ label, help, dimmed = false, strong = false }: {
   readonly label: string
-  /** Snapping as a whole is off: the row still works, and says it has no effect yet. */
-  readonly dimmed?: boolean
-  /** A row that names a thing, a target, rather than a parameter of one. */
-  readonly strong?: boolean
-  readonly children: ReactNode
+  readonly help?: string | undefined
+  readonly dimmed?: boolean | undefined
+  readonly strong?: boolean | undefined
 }) {
   return (
-    <div className="flex min-h-7 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+    <span className="flex min-w-0 items-center gap-1">
       <span
         className={cn("min-w-0 truncate", strong ? "text-body-strong" : "text-body", dimmed && "text-fg-tertiary")}
       >
         {label}
       </span>
+      {help !== undefined && <InfoHint>{help}</InfoHint>}
+    </span>
+  )
+}
+
+export function Row({ label, help, dimmed, strong, children }: {
+  readonly label: string
+  readonly help?: string | undefined
+  /** Snapping as a whole is off: the row still works, and says it has no effect yet. */
+  readonly dimmed?: boolean | undefined
+  /** A row that names a thing, a target, rather than a parameter of one. */
+  readonly strong?: boolean | undefined
+  readonly children: ReactNode
+}) {
+  return (
+    <div className="flex min-h-7 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <RowLabel label={label} help={help} dimmed={dimmed} strong={strong} />
       <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">{children}</div>
     </div>
   )
 }
 
-export function SwitchRow({ label, checked, onChange, dimmed, strong }: {
+export function SwitchRow({ label, help, checked, onChange, dimmed, strong }: {
   readonly label: string
+  readonly help?: string | undefined
   readonly checked: boolean
   readonly onChange: (on: boolean) => void
-  readonly dimmed?: boolean
-  readonly strong?: boolean
+  readonly dimmed?: boolean | undefined
+  readonly strong?: boolean | undefined
 }) {
   return (
-    <Row label={label} {...(dimmed !== undefined && { dimmed })} {...(strong !== undefined && { strong })}>
+    <Row label={label} help={help} dimmed={dimmed} strong={strong}>
       <Switch aria-label={label} checked={checked} onCheckedChange={onChange} />
     </Row>
   )
@@ -83,14 +103,15 @@ export function Segmented<V extends string>({ label, value, items, onChange }: {
   )
 }
 
-function ChoiceRow<V extends string>(props: {
+export function ChoiceRow<V extends string>({ help, ...props }: {
   readonly label: string
+  readonly help: string
   readonly value: V
   readonly items: Readonly<Record<V, string>>
   readonly onChange: (value: V) => void
 }) {
   return (
-    <Row label={props.label}>
+    <Row label={props.label} help={help}>
       <Segmented {...props} />
     </Row>
   )
@@ -109,7 +130,7 @@ export interface StepProps {
 }
 
 /** A step chosen from a list, or typed: one field's width, the list's chevron inside it. */
-export function StepField({ label, value, options, format, unit, onChange }: StepProps) {
+function StepField({ label, value, options, format, unit, onChange }: StepProps) {
   const items = Object.fromEntries(options.map((option) => [option, format(option)]))
   return (
     <div className={cn("flex items-center gap-1", FIELD)}>
@@ -137,23 +158,25 @@ export function StepField({ label, value, options, format, unit, onChange }: Ste
 }
 
 /** A kind of snapping with a step: the step, then the switch that turns it on. */
-export function StepRow({ label, step, enabled, onEnabled, dimmed }: {
+export function StepRow({ label, help, step, enabled, onEnabled, dimmed }: {
   readonly label: string
+  readonly help: string
   readonly step: StepProps
   readonly enabled: boolean
   readonly onEnabled: (on: boolean) => void
-  readonly dimmed?: boolean
+  readonly dimmed?: boolean | undefined
 }) {
   return (
-    <Row label={label} {...(dimmed !== undefined && { dimmed })}>
+    <Row label={label} help={help} dimmed={dimmed}>
       <StepField {...step} />
       <Switch aria-label={`Snap ${label.toLowerCase()}`} checked={enabled} onCheckedChange={onEnabled} />
     </Row>
   )
 }
 
-function NumberRow({ label, value, unit, min, digits = 1, onChange, children }: {
+function NumberRow({ label, help, value, unit, min, digits = 1, onChange, children }: {
   readonly label: string
+  readonly help: string
   readonly value: number
   readonly unit: string
   readonly min?: number
@@ -163,7 +186,7 @@ function NumberRow({ label, value, unit, min, digits = 1, onChange, children }: 
   readonly children?: ReactNode
 }) {
   return (
-    <Row label={label}>
+    <Row label={label} help={help}>
       {children}
       <div className={FIELD}>
         <NumberField
@@ -225,20 +248,19 @@ const stopOf = (weight: number) => {
   )
 }
 
-/** How hard connector ends pull against Grid and Mesh (docs/SNAPPING.md § Priority), in five stops. */
-export function PullSlider({ weight, onChange, dimmed }: {
-  readonly weight: number
-  readonly onChange: (weight: number) => void
-  readonly dimmed?: boolean
-}) {
+/** How hard ends pull against the grid and pieces (docs/SNAPPING.md § Priority), in five stops. */
+function PullSlider({ weight, onChange }: { readonly weight: number; readonly onChange: (weight: number) => void }) {
   return (
     <div className="flex flex-col">
-      <Row label="Connector pull" {...(dimmed !== undefined && { dimmed })}>
+      <Row
+        label="Pull"
+        help="How strongly ends win over the grid and pieces. Example: at ×4 an end joins even with a grid line under the pointer."
+      >
         <RowValue>{formatWeight(weight)}</RowValue>
       </Row>
       <SliderField
-        label="Connector pull"
-        ends={["Grid and mesh", "Connectors"]}
+        label="Pull"
+        ends={["Grid and pieces", "Ends"]}
         min={0}
         max={CONNECTOR_WEIGHTS.length - 1}
         step={1}
@@ -249,21 +271,14 @@ export function PullSlider({ weight, onChange, dimmed }: {
   )
 }
 
-/** Sets part of a target: on the map in the Snap popover, on what new maps start on in Settings. */
-export type UpdateTarget = <T extends SnapTarget>(target: T, patch: Partial<SnapConfig["targets"][T]>) => void
-
-interface TargetProps {
-  readonly config: SnapConfig
-  readonly update: UpdateTarget
-}
-
-function ConnectorParameters({ config, update: updateTarget }: TargetProps) {
+function ConnectorParameters({ config }: { readonly config: SnapConfig }) {
   const { flipToFit, matchRotation, profiles, range, showOpenEnds, weight } = config.targets.connectors
-  const update = (patch: Partial<SnapConfig["targets"]["connectors"]>) => updateTarget("connectors", patch)
+  const update = (patch: Partial<SnapConfig["targets"]["connectors"]>) => updateSnapTarget("connectors", patch)
   return (
     <>
       <NumberRow
         label="Range"
+        help="How close an end has to get to join, when it should differ from Snap distance."
         value={range ?? config.threshold}
         digits={0}
         unit="px"
@@ -273,8 +288,8 @@ function ConnectorParameters({ config, update: updateTarget }: TargetProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Use the shared threshold"
-          title="Use the shared threshold"
+          aria-label="Use Snap distance"
+          title="Use Snap distance"
           disabled={range === null}
           onClick={() => update({ range: null })}
         >
@@ -282,39 +297,65 @@ function ConnectorParameters({ config, update: updateTarget }: TargetProps) {
         </Button>
       </NumberRow>
       <PullSlider weight={weight} onChange={(next) => update({ weight: next })} />
-      <SwitchRow label="Match rotation" checked={matchRotation} onChange={(on) => update({ matchRotation: on })} />
+      <SwitchRow
+        label="Match rotation"
+        help="Turns the piece so its end faces the other end. Example: a Track dropped crooked on a Curve's end comes round straight."
+        checked={matchRotation}
+        onChange={(on) => update({ matchRotation: on })}
+      />
       <ChoiceRow
         label="Profiles"
+        help="Whether ends of different shapes join: never (Strict), with a warning, or always (Any). Example: a half tube's end on a full tube's."
         value={profiles}
         items={{ strict: "Strict", warn: "Warn", any: "Any" }}
         onChange={(next) => update({ profiles: next })}
       />
       <ChoiceRow
         label="Open ends"
+        help="When to mark the ends that have nothing joined to them yet."
         value={showOpenEnds}
         items={{ never: "Never", hover: "Hover", always: "Always" }}
         onChange={(next) => update({ showOpenEnds: next })}
       />
-      <SwitchRow label="Flip to fit" checked={flipToFit} onChange={(on) => update({ flipToFit: on })} />
+      <SwitchRow
+        label="Flip to fit"
+        help="Offers the piece's mirror image when that one would fit where this one doesn't."
+        checked={flipToFit}
+        onChange={(on) => update({ flipToFit: on })}
+      />
     </>
   )
 }
 
-function MeshParameters({ config, update: updateTarget }: TargetProps) {
+/** What each of a piece's points, edges and faces is, in a sentence: the bounds are the box around the piece. */
+const ELEMENT_HELP: Readonly<Record<MeshElement, string>> = {
+  boundsCorners: "The corners of the box around a piece.",
+  boundsFaceCentres: "The middle of each side of the box around a piece.",
+  boundsFaces: "Anywhere on the sides of the box around a piece.",
+  vertices: "The corners of a piece's own shape.",
+  sharpEdges: "Along the edges where a piece's surface folds sharply.",
+  edgeMidpoints: "The middle of each sharp edge.",
+  faceCentres: "The middle of each flat face.",
+  faces: "Anywhere on a piece's surface."
+}
+
+function MeshParameters({ config }: { readonly config: SnapConfig }) {
   const { elements, occlusion, offset, rotateToFace, sharpAngle } = config.targets.mesh
-  const update = (patch: Partial<SnapConfig["targets"]["mesh"]>) => updateTarget("mesh", patch)
+  const update = (patch: Partial<SnapConfig["targets"]["mesh"]>) => updateSnapTarget("mesh", patch)
   return (
     <>
       {MESH_ELEMENTS.map((element) => (
         <SwitchRow
           key={element}
           label={MESH_ELEMENT_NAMES[element]}
+          help={ELEMENT_HELP[element]}
           checked={elements[element]}
           onChange={(on) => update({ elements: { ...elements, [element]: on } })}
         />
       ))}
       <NumberRow
         label="Sharp edge angle"
+        help="How sharply a surface has to fold for the fold to count as an edge. Example: at 30° a box's edges count and a curve's don't."
         value={sharpAngle}
         unit="°"
         min={0}
@@ -322,28 +363,37 @@ function MeshParameters({ config, update: updateTarget }: TargetProps) {
       />
       <ChoiceRow
         label="Occlusion"
+        help="Whether parts of pieces hidden behind others can be snapped to (Through) or only what you can see (In front)."
         value={occlusion}
         items={{ front: "In front", through: "Through" }}
         onChange={(next) => update({ occlusion: next })}
       />
       <ChoiceRow
         label="Rotate to face"
+        help="What a piece does when it lands on a face: keeps its turn, stands upright on it, or turns square to it. Example: a lamp on a wall, Upright."
         value={rotateToFace}
         items={{ keep: "Keep", upright: "Upright", align: "Align" }}
         onChange={(next) => update({ rotateToFace: next })}
       />
-      <NumberRow label="Offset" value={offset} unit="cm" onChange={(next) => update({ offset: next })} />
+      <NumberRow
+        label="Offset"
+        help="Lands this far off the face, for things that float. Example: a light 20 cm off a wall."
+        value={offset}
+        unit="cm"
+        onChange={(next) => update({ offset: next })}
+      />
     </>
   )
 }
 
-function TrackingParameters({ config, update: updateTarget }: TargetProps) {
+function TrackingParameters({ config }: { readonly config: SnapConfig }) {
   const { acquire, hoverMs, keep } = config.targets.tracking
-  const update = (patch: Partial<SnapConfig["targets"]["tracking"]>) => updateTarget("tracking", patch)
+  const update = (patch: Partial<SnapConfig["targets"]["tracking"]>) => updateSnapTarget("tracking", patch)
   return (
     <>
       <NumberRow
         label="Points kept"
+        help="How many points a drag remembers to draw guides from."
         value={keep}
         digits={0}
         unit=""
@@ -352,6 +402,7 @@ function TrackingParameters({ config, update: updateTarget }: TargetProps) {
       />
       <NumberRow
         label="Hover time"
+        help="How long the pointer rests on a point before it is remembered."
         value={hoverMs}
         digits={0}
         unit="ms"
@@ -360,6 +411,7 @@ function TrackingParameters({ config, update: updateTarget }: TargetProps) {
       />
       <ChoiceRow
         label="Acquire"
+        help="Whether resting on a point remembers it, or only resting on it with Shift held."
         value={acquire}
         items={{ auto: "Automatically", shift: "With Shift" }}
         onChange={(next) => update({ acquire: next })}
@@ -368,54 +420,32 @@ function TrackingParameters({ config, update: updateTarget }: TargetProps) {
   )
 }
 
-/** A grid's place as numbers: a map also has the pickers, but what new maps start on has no selection to take it from. */
-function GridValues({ config, update }: TargetProps) {
-  const { origin, yaw } = config.targets.grid
-  return (
-    <>
-      {(["x", "y", "z"] as const).map((axis) => (
-        <NumberRow
-          key={axis}
-          label={`Origin ${axis.toUpperCase()}`}
-          value={origin[axis]}
-          unit="cm"
-          onChange={(next) => update("grid", { origin: { ...origin, [axis]: next } })}
-        />
-      ))}
-      <NumberRow label="Rotation" value={yaw} unit="°" onChange={(next) => update("grid", { yaw: next })} />
-    </>
-  )
-}
-
-/** A target's parameters that are plain values, whoever they're being set for. */
-export function ValueParameters({ target, ...props }: TargetProps & { readonly target: SnapTarget }) {
+/** A target's parameters that are plain values. */
+export function ValueParameters({ config, target }: { readonly config: SnapConfig; readonly target: SnapTarget }) {
   switch (target) {
-    case "grid":
-      return <GridValues {...props} />
     case "connectors":
-      return <ConnectorParameters {...props} />
+      return <ConnectorParameters config={config} />
     case "mesh":
-      return <MeshParameters {...props} />
+      return <MeshParameters config={config} />
     case "tracking":
-      return <TrackingParameters {...props} />
+      return <TrackingParameters config={config} />
     case "alignment":
       return (
         <ChoiceRow
           label="Gap guides"
-          value={props.config.targets.alignment.gapGuides}
+          help="When to show a guide where the gaps either side come out equal: in orthographic panes, always, or never."
+          value={config.targets.alignment.gapGuides}
           items={{ ortho: "In ortho", always: "Always", never: "Never" }}
-          onChange={(gapGuides) => props.update("alignment", { gapGuides })}
+          onChange={(gapGuides) => updateSnapTarget("alignment", { gapGuides })}
         />
       )
+    case "grid":
     case "construction":
       return null
   }
 }
 
-/**
- * The chevron of a disclosure that opens a block of parameters, the same in the Snap popover and Settings: its trigger
- * is `group/disclosure`, and it turns down while the block shows.
- */
+/** The chevron of a disclosure that opens a block of parameters: its trigger is `group/disclosure`, and it turns down while the block shows. */
 export const DisclosureChevron = () => (
   <IconChevronRight className="size-4 shrink-0 text-fg-tertiary transition-transform group-data-[panel-open]/disclosure:rotate-90" />
 )

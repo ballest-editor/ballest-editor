@@ -620,8 +620,6 @@ export interface EditorState extends TabState {
   readonly snapFeedback: SnapFeedback | null
   /** The keys the drag under way can take; null with no drag. */
   readonly dragKeys: DragKeysShown | null
-  /** Whether the Snap popover is open. */
-  readonly snapPopoverOpen: boolean
   /** The target picker's request, while a tool waits on a pick. */
   readonly picker: PickerRequest | null
   /** The offer the last connector snap left in its chip. */
@@ -855,7 +853,6 @@ export interface EditorState extends TabState {
   readonly clearTracked: () => void
   readonly setSnapFeedback: (feedback: SnapFeedback | null) => void
   readonly setDragKeys: (keys: DragKeysShown | null) => void
-  readonly setSnapPopoverOpen: (open: boolean) => void
   readonly setPicker: (picker: PickerRequest | null) => void
   readonly setFlipOffer: (offer: FlipOffer | null) => void
   readonly setHoveredItem: (key: string | null) => void
@@ -1196,7 +1193,6 @@ export const useEditor = create<EditorState>()((set, get) => {
     tracked: [],
     snapFeedback: null,
     dragKeys: null,
-    snapPopoverOpen: false,
     picker: null,
     flipOffer: null,
     hoveredItem: null,
@@ -1777,7 +1773,6 @@ export const useEditor = create<EditorState>()((set, get) => {
     clearTracked: () => set({ tracked: [] }),
     setSnapFeedback: (snapFeedback) => set({ snapFeedback }),
     setDragKeys: (dragKeys) => set({ dragKeys }),
-    setSnapPopoverOpen: (snapPopoverOpen) => set({ snapPopoverOpen }),
     setPicker: (picker) => set({ picker }),
     setFlipOffer: (flipOffer) => set({ flipOffer }),
     setHoveredItem: (hoveredItem) => set({ hoveredItem }),

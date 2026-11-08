@@ -9,7 +9,6 @@ import { exportProblemOf, projectTitleOf, projectUnsavedOf, useEditor } from "..
 import { KeyChip } from "./KeyChip"
 import { Logo } from "./Logo"
 import { MenuBar } from "./MenuBar"
-import { SnapControl } from "./SnapMenu"
 
 /** Out of the title bar's drag region: a drag region takes the pointer, so a tooltip inside one never shows. */
 const NO_DRAG = "[-webkit-app-region:no-drag]"
@@ -143,8 +142,6 @@ export function TopBar() {
         Ballest Editor
       </span>
       <MenuBar />
-      <span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border" />
-      <SnapControl />
       <ProjectTitle />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {catalog?.warning !== undefined && <Badge variant="warn" title={catalog.warning}>Fixture catalog</Badge>}

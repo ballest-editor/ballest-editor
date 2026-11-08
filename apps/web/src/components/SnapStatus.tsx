@@ -1,7 +1,6 @@
 import { Button } from "@workspace/ui/components/button"
-import { askedOrder, SNAP_TARGET_NAMES } from "../domain/snapConfig"
 import { applyFlipOffer, setFlushOptions } from "../editor/actions"
-import { snapConfigOf, useEditor } from "../editor/store"
+import { useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 import { SnapGlyph } from "./SnapGlyph"
 import { SURFACE } from "./viewControlStyle"
@@ -95,15 +94,14 @@ export function SnapLabel() {
   )
 }
 
-/** The status bar's right end while a drag is in progress: the base and what it is on, in the pane's words. */
+/** The status bar's right end while a drag is in progress: what snapped, in the pane's words, and nothing more. */
 export function SnapStatus() {
   const feedback = useEditor((s) => s.snapFeedback)
-  const first = useEditor((s) => askedOrder(snapConfigOf(s))[0])
   if (feedback === null) return null
   return (
-    <span className="min-w-0 truncate text-fg-secondary" data-snap-status>
-      {feedback.base} · {first === undefined ? "" : `${SNAP_TARGET_NAMES[first]} first · `}
-      {feedback.label}
+    <span className="flex min-w-0 items-center gap-1.5 text-fg-secondary" data-snap-status>
+      {feedback.relation !== undefined && <SnapGlyph relation={feedback.relation} />}
+      <span className="truncate">{feedback.label}</span>
     </span>
   )
 }

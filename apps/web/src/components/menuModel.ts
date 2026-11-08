@@ -7,8 +7,7 @@ import { selectedNodes } from "../domain/groupSelection"
 import type { KeybindAction } from "../domain/Keybinds"
 import { PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { termsOf } from "../domain/outline"
-import { formatGridSize, GRID_SIZES } from "../domain/snap"
-import { isPreset, SNAP_PRESETS, type SnapConfig, type SnapTarget } from "../domain/snapConfig"
+import type { SnapConfig } from "../domain/snapConfig"
 import { WORLD_PLANES } from "../domain/snapTools"
 import { annotationsOf } from "../domain/structure"
 import { updateCheckBlockedBy } from "../domain/updates"
@@ -34,20 +33,17 @@ import {
   openExternalLink,
   openInGame,
   openRecentInNewWindow,
-  pickGridSize,
   quitApp,
   reimportMap,
   selectConnected,
   selectionPrefabProblem,
-  setSnapTargets,
   startFlush,
   startGridOriginPick,
   startMeasure,
   startMirror,
   startSavePrefab,
   switchProject,
-  toggleSnapping,
-  updateSnap
+  toggleSnapping
 } from "../editor/actions"
 import { actionCommands, type CommandAction, lookAlong } from "../editor/commands"
 import {
@@ -305,32 +301,6 @@ const paneMenus = ({ layout, projection }: MenuState): ReadonlyArray<MenuChoice>
   ]
 }
 
-/** What View › Snap turns on and off under Snapping, each read under it (docs/SNAPPING.md § The Snap popover). */
-const snapToggles = (snapping: SnapConfig): ReadonlyArray<MenuCheck> => {
-  const target = (label: string, targets: ReadonlyArray<SnapTarget>): MenuCheck => {
-    const checked = targets.every((one) => snapping.targets[one].enabled)
-    return { kind: "check", label, checked, run: () => setSnapTargets(targets, !checked) }
-  }
-  return [
-    target("Grid", ["grid"]),
-    {
-      kind: "check",
-      label: "Rotation",
-      checked: snapping.rotationEnabled,
-      run: () => updateSnap({ rotationEnabled: !snapping.rotationEnabled })
-    },
-    {
-      kind: "check",
-      label: "Scale",
-      checked: snapping.scaleEnabled,
-      run: () => updateSnap({ scaleEnabled: !snapping.scaleEnabled })
-    },
-    target("Connectors", ["connectors"]),
-    target("Mesh", ["mesh"]),
-    target("Alignment and tracking", ["alignment", "tracking"])
-  ]
-}
-
 const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
   {
     kind: "section",
@@ -367,34 +337,7 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
         checked: state.snapping.enabled,
         run: toggleSnapping,
         shortcut: "snapToggle"
-      },
-      ...snapToggles(state.snapping),
-      {
-        kind: "choice",
-        title: "Priority",
-        options: [
-          {
-            label: "Grid first",
-            checked: isPreset(state.snapping, "gridFirst"),
-            run: () => updateSnap({ order: SNAP_PRESETS.gridFirst })
-          },
-          {
-            label: "Pieces first",
-            checked: isPreset(state.snapping, "piecesFirst"),
-            run: () => updateSnap({ order: SNAP_PRESETS.piecesFirst })
-          }
-        ]
-      },
-      {
-        kind: "choice",
-        title: "Grid size",
-        options: GRID_SIZES.map((gridSize) => ({
-          label: formatGridSize(gridSize, state.units),
-          checked: gridSize === state.snapping.gridSize,
-          run: () => pickGridSize(gridSize)
-        }))
-      },
-      item("Open snap settings", () => useEditor.getState().setSnapPopoverOpen(true))
+      }
     ]
   }
 ]
