@@ -241,13 +241,13 @@ describe("a palette drop", () => {
   beforeEach(() => setUp())
   afterEach(tearDown)
 
-  it.each([["snapping on", false], ["snapping inverted off", true]])(
+  it.each([["snapping on", false], ["snapping held off", true]])(
     "lets go of the acquired points, %s",
-    (_, invert) => {
+    (_, off) => {
       const piece = catalogWithEnds().pieces[0] ?? assert.fail("the bundled catalog is empty")
       const pane = lookDown(paneCameraAt(0))
       act(() =>
-        landDrop(piece, pane, { x: CENTRE + 600, y: CENTRE }, { x: 0, y: 600, z: 0 }, invert, () => {
+        landDrop(piece, pane, { x: CENTRE + 600, y: CENTRE }, { x: 0, y: 600, z: 0 }, off, () => {
           useEditor.getState().placePiece(piece, identityTransform({ x: 0, y: 600, z: 0 }))
         })
       )

@@ -99,7 +99,7 @@ describe("keybind table", () => {
     }
     const shared = [...seen].filter(([, actions]) => actions.length > 1)
     // Ctrl is snapping's only once a drag has begun, and flying's otherwise
-    expect(shared).toEqual([["ControlLeft", ["snapInvert", "moveDown"]], ["KeyW", ["translateMode", "moveForward"]]])
+    expect(shared).toEqual([["ControlLeft", ["snapOff", "moveDown"]], ["KeyW", ["translateMode", "moveForward"]]])
     expect(isOneShotChord(defaultKeybinds, "KeyW")).toBe(true)
     expect(isOneShotChord(defaultKeybinds, "KeyS")).toBe(false)
     expect(actionsFor(defaultKeybinds, "KeyC")).toEqual(["toggleGizmoSpace"])
@@ -123,6 +123,14 @@ describe("keybind table", () => {
     expect(merged.saveMapAs).toEqual(["Ctrl+Shift+KeyE"])
     expect(merged.saveMap).toEqual(["Ctrl+KeyS"])
     expect(mergeKeybinds({ importMap: ["Ctrl+KeyI"], openMap: ["Ctrl+KeyP"] }).openMap).toEqual(["Ctrl+KeyP"])
+  })
+
+  it("keeps the binding saved for invert snapping as snapping off, and drops the grid and step keys", () => {
+    const merged = mergeKeybinds({ snapInvert: ["AltLeft"], snapOnlyGrid: ["KeyQ"], snapOnlyStep: ["KeyT"] })
+    expect(merged.snapOff).toEqual(["AltLeft"])
+    expect(merged).not.toHaveProperty("snapOnlyGrid")
+    expect(merged).not.toHaveProperty("snapOnlyStep")
+    expect(merged).not.toHaveProperty("snapInvert")
   })
 
   it("formats bindings for display", () => {
@@ -276,17 +284,15 @@ describe("conflictingBindings", () => {
   })
 
   it("marks two of a drag's keys sharing a chord", () => {
-    expect(newConflicts({ ...defaultKeybinds, snapOnlyMesh: ["KeyG"] })).toEqual(["KeyG"])
+    expect(newConflicts({ ...defaultKeybinds, snapOnlyMesh: ["KeyJ"] })).toEqual(["KeyJ"])
   })
 
   it("gives the keys that narrow snapping chords nothing else is bound to", () => {
     const narrowing = keybindActions.filter((action) => action.startsWith("snapOnly"))
     expect(narrowing).toEqual([
-      "snapOnlyGrid",
       "snapOnlyConnectors",
       "snapOnlyMesh",
-      "snapOnlyAlignment",
-      "snapOnlyStep"
+      "snapOnlyAlignment"
     ])
     expect(conflictingBindings(defaultKeybinds).size).toBe(0)
     for (const action of narrowing) {

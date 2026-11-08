@@ -6,7 +6,7 @@ import { defaultKeybinds } from "../../domain/Keybinds"
 import { defaultSnapConfig, type SnapConfig, type SnapKind } from "../../domain/snapConfig"
 import type { Ray } from "../../domain/snapFrame"
 import { findGroup } from "../../domain/structure"
-import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
+import { ORIGIN, rotatorToQuat, vecAdd, vecScale, vecSub } from "../../domain/ueMath"
 import { applyDelta } from "../../domain/units"
 import { grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { assertVec } from "../../test/vec"
@@ -18,7 +18,7 @@ import { anchorUnder } from "./pickTarget"
 import { selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
 import { snapItemsOf } from "./snapScene"
-import { snapViewOf } from "./snapView"
+import { snapViewOf, toThree } from "./snapView"
 
 const yawTo = (yaw: number) => rotatorToQuat({ roll: 0, pitch: 0, yaw })
 
@@ -68,7 +68,7 @@ const onlyGrid = (over: Partial<SnapConfig> = {}): SnapConfig => ({
   ...over
 })
 
-const up = { invert: false, hold: false }
+const up = { off: false, hold: false }
 
 /** Only the corners of other items' bounds, with the grid on or off. */
 const onlyCorners = (grid: boolean): SnapConfig => {
@@ -110,16 +110,14 @@ const offsetOf = (delta: GroupDelta | undefined) => delta?.kind === "translate" 
 describe("MoveSession", () => {
   beforeEach(() => endSnapDisplay())
 
-  it("moves free with snapping off, and lands with Ctrl inverting it", () => {
+  it("moves free with snapping off, and Ctrl doesn't turn it on", () => {
     const [a = ""] = load({ ...onlyGrid(), enabled: false })
     const { rayAt, session } = moving(a)
     const { px, ray } = rayAt(137, 42)
     const free = session.update(ray, px, up)
     assert.isUndefined(free.hit)
     assert.strictEqual(free.delta?.kind, "translate")
-    const inverted = session.update(ray, px, { invert: true, hold: false })
-    assert.strictEqual(inverted.hit?.target, "grid")
-    assert.deepStrictEqual(inverted.hit?.landing, { x: 140, y: 40, z: 0 })
+    assert.isUndefined(session.update(ray, px, { off: true, hold: false }).hit)
   })
 
   it("goes free under Ctrl with snapping on", () => {
@@ -127,16 +125,16 @@ describe("MoveSession", () => {
     const { rayAt, session } = moving(a)
     const { px, ray } = rayAt(137, 42)
     assert.isDefined(session.update(ray, px, up).hit)
-    assert.isUndefined(session.update(ray, px, { invert: true, hold: false }).hit)
+    assert.isUndefined(session.update(ray, px, { off: true, hold: false }).hit)
   })
 
   it("keeps a held target under Ctrl, and lets go when Shift does", () => {
     const [a = ""] = load(onlyGrid())
     const { rayAt, session } = moving(a)
     const near = rayAt(137, 42)
-    const held = session.update(near.ray, near.px, { invert: false, hold: true })
+    const held = session.update(near.ray, near.px, { off: false, hold: true })
     const far = rayAt(600, 600)
-    const still = session.update(far.ray, far.px, { invert: true, hold: true })
+    const still = session.update(far.ray, far.px, { off: true, hold: true })
     assert.deepStrictEqual(still.hit?.landing, held.hit?.landing)
     assert.deepStrictEqual(session.update(far.ray, far.px, up).hit?.landing, { x: 600, y: 600, z: 0 })
   })
@@ -160,7 +158,7 @@ describe("MoveSession", () => {
     const { px, ray } = rayAt(137, 42)
     const landed = session.update(ray, px, up)
     assert.deepStrictEqual(landed.delta, { kind: "translate", offset: { x: 140, y: 40, z: 0 }, frame: axes })
-    const free = session.update(ray, px, { invert: true, hold: false })
+    const free = session.update(ray, px, { off: true, hold: false })
     assert.isTrue(free.delta?.kind === "translate" && free.delta.frame === axes)
   })
 
@@ -359,31 +357,23 @@ describe("MoveSession snap-and-go", () => {
     assert.closeTo(reached.hit?.landing.x ?? 0, corner.x, 1e-6)
   })
 
-  it("lands on nothing but the grid while its key is held, and on the target again once it's let go", () => {
-    const { corner, pointPast, rayAt, session } = towardsCorner(onlyCorners(true))
-    const pointWith = (by: number, only: ReadonlyArray<SnapKind>, invert = false) =>
-      session.update(rayAt(corner.x + by, corner.y).ray, rayAt(corner.x + by, corner.y).px, { ...up, invert, only })
-    pointWith(-20, ["grid"])
-    assert.strictEqual(pointWith(1, ["grid"]).hit?.target, "grid")
-    pointWith(-3, ["grid"])
-    assert.strictEqual(pointPast(2).hit?.target, "mesh")
+  it("lands on nothing but the mesh while its key is held, the grid off with the rest", () => {
+    const { corner, rayAt, session } = towardsCorner(onlyCorners(true))
+    const pointWith = (by: number, only: ReadonlyArray<SnapKind>, off = false) =>
+      session.update(rayAt(corner.x + by, corner.y).ray, rayAt(corner.x + by, corner.y).px, { ...up, off, only })
     pointWith(-20, ["mesh"])
     assert.isUndefined(pointWith(-7.3, ["mesh"]).hit, "the grid is off under the mesh's key")
-    assert.isUndefined(pointWith(-7.3, ["grid"], true).hit, "Ctrl still inverts what the key narrowed to")
+    assert.strictEqual(pointWith(1, ["mesh"]).hit?.target, "mesh")
+    assert.isUndefined(pointWith(1, ["mesh"], true).hit, "Ctrl turns off what the key narrowed to")
   })
 
-  it("snaps to the kind held with snapping off, as Ctrl would, and Ctrl turns that off again", () => {
+  it("snaps to the kind held with snapping off, and Ctrl turns that off again", () => {
     const { corner, rayAt, session } = towardsCorner({ ...onlyCorners(true), enabled: false })
-    const at = rayAt(corner.x - 7.3, corner.y)
-    assert.isUndefined(session.update(at.ray, at.px, up).hit)
-    assert.strictEqual(session.update(at.ray, at.px, { ...up, only: ["grid"] }).hit?.target, "grid")
-    assert.isUndefined(session.update(at.ray, at.px, { invert: true, hold: false, only: ["grid"] }).hit)
-  })
-
-  it("ignores the step's key, which means nothing to a move", () => {
-    const { corner, rayAt, session } = towardsCorner(onlyCorners(true))
-    const at = rayAt(corner.x - 7.3, corner.y)
-    assert.strictEqual(session.update(at.ray, at.px, { ...up, only: ["step"] }).hit?.target, "grid")
+    const pointWith = (by: number, keys: Partial<typeof up> & { readonly only?: ReadonlyArray<SnapKind> }) =>
+      session.update(rayAt(corner.x + by, corner.y).ray, rayAt(corner.x + by, corner.y).px, { ...up, ...keys })
+    assert.isUndefined(pointWith(-20, {}).hit)
+    assert.strictEqual(pointWith(1, { only: ["mesh"] }).hit?.target, "mesh")
+    assert.isUndefined(pointWith(1, { off: true, only: ["mesh"] }).hit)
   })
 
   it("keeps a target Shift holds past its range, and lets go past the range when Shift does", () => {
@@ -391,9 +381,9 @@ describe("MoveSession snap-and-go", () => {
     pointPast(-3)
     pointPast(2)
     const far = rayAt(corner.x + 60, corner.y)
-    const held = session.update(far.ray, far.px, { invert: false, hold: true })
+    const held = session.update(far.ray, far.px, { off: false, hold: true })
     assert.closeTo(held.hit?.landing.x ?? 0, corner.x, 1e-6)
-    const under = session.update(far.ray, far.px, { invert: true, hold: true })
+    const under = session.update(far.ray, far.px, { off: true, hold: true })
     assert.closeTo(under.hit?.landing.x ?? 0, corner.x, 1e-6)
     assert.isUndefined(session.update(far.ray, far.px, up).hit)
   })
@@ -402,7 +392,7 @@ describe("MoveSession snap-and-go", () => {
     const { rayAt, corner, session, pointPast } = towardsCorner(onlyCorners(false))
     pointPast(-20)
     const near = rayAt(corner.x - 6, corner.y)
-    assert.isUndefined(session.update(near.ray, near.px, { invert: false, hold: true }).hit)
+    assert.isUndefined(session.update(near.ray, near.px, { off: false, hold: true }).hit)
   })
 
   it("goes free under Ctrl on a target, and stays free when Ctrl lets go inside its range", () => {
@@ -410,7 +400,7 @@ describe("MoveSession snap-and-go", () => {
     pointPast(-3)
     pointPast(2)
     const inside = rayAt(corner.x + 6, corner.y)
-    assert.isUndefined(session.update(inside.ray, inside.px, { invert: true, hold: false }).hit)
+    assert.isUndefined(session.update(inside.ray, inside.px, { off: true, hold: false }).hit)
     assert.isUndefined(session.update(inside.ray, inside.px, up).hit)
   })
 
@@ -444,6 +434,109 @@ describe("MoveSession snap-and-go", () => {
     assert.deepStrictEqual(session.commitOptions(1), {})
     pointPast(2)
     assert.include(session.commitOptions(1).description ?? "", "Move 1 item to corner of ")
+  })
+})
+
+describe("a move with only J held", () => {
+  const joining = { ...up, only: ["connectors"] as ReadonlyArray<SnapKind> }
+
+  /** `a` at the origin, moved by its body with the grid on, and `b` whose -X end is at (350, 300, 50). */
+  const joinDrag = () => {
+    const [a = ""] = loadPieces([ORIGIN, { x: 600, y: 300, z: 0 }])
+    useEditor.getState().setTabSnap(onlyGrid())
+    const s = useEditor.getState()
+    const transform = shownTransform(s, a) ?? identityTransform()
+    const { ends } = selectionSnapStart(s, new Map([[a, transform]]), [a])
+    return moving(a, ORIGIN, undefined, { ends })
+  }
+  const landedAt = (delta: GroupDelta | undefined) =>
+    delta?.kind === "rigid" ? landedPoint({ x: 250, y: 0, z: 50 }, delta) : undefined
+
+  it("stays where it started while no end meets one, whatever the grid says", () => {
+    const { rayAt, session } = joinDrag()
+    const at = rayAt(137, 42)
+    const result = session.update(at.ray, at.px, joining)
+    assert.isUndefined(result.hit)
+    assertVec(offsetOf(result.delta) ?? { x: 1, y: 1, z: 1 }, ORIGIN, "where it started")
+  })
+
+  it("jumps to the join as soon as an end meets one on screen, from three times the range", () => {
+    const { rayAt, session } = joinDrag()
+    // a's +X end, 250 cm out, shows 30 px short of b's -X end: past the range alone, within three times it
+    const near = rayAt(70, 300)
+    const joined = session.update(near.ray, near.px, joining)
+    assert.strictEqual(joined.hit?.relation, "join")
+    assertVec(landedAt(joined.delta) ?? ORIGIN, { x: 350, y: 300, z: 50 }, "a's end on b's")
+    const far = rayAt(55, 300)
+    const back = session.update(far.ray, far.px, joining)
+    assert.isUndefined(back.hit, "45 px off is out of reach")
+    assertVec(offsetOf(back.delta) ?? { x: 1, y: 1, z: 1 }, ORIGIN, "back where it started, not at the pointer")
+  })
+
+  it("follows the pointer again once J comes up", () => {
+    const { rayAt, session } = joinDrag()
+    const at = rayAt(137, 42)
+    session.update(at.ray, at.px, joining)
+    assert.strictEqual(session.update(at.ray, at.px, up).hit?.target, "grid")
+  })
+})
+
+describe("a body drag in perspective", () => {
+  /** A 1000 px pane looking down at an angle on the ground between the origin and `towards`. */
+  const angled = (towards: Vec3) => {
+    const pane = new PaneCamera()
+    pane.width = 1000
+    pane.height = 1000
+    const camera = pane.perspective
+    camera.aspect = 1
+    camera.position.copy(toThree({ x: towards.x / 2 - 3000, y: towards.y / 2 - 1500, z: 2500 }))
+    camera.lookAt(toThree({ x: towards.x / 2, y: towards.y / 2, z: 0 }))
+    camera.updateProjectionMatrix()
+    camera.updateMatrixWorld(true)
+    return pane
+  }
+
+  it("measures an end where it shows, so one shown on another's end joins it however far the move has come", () => {
+    const target = { x: 2350, y: 1800, z: 50 }
+    const [a = ""] = loadPieces([ORIGIN, { x: 2600, y: 1800, z: 0 }])
+    const { connectors, grid } = onlyGrid().targets
+    useEditor.getState().setTabSnap({
+      ...onlyGrid(),
+      targets: {
+        ...onlyGrid().targets,
+        connectors: { ...connectors, enabled: true },
+        grid: { ...grid, enabled: false }
+      }
+    })
+    const s = useEditor.getState()
+    const { ends } = selectionSnapStart(s, new Map([[a, shownTransform(s, a) ?? identityTransform()]]), [a])
+    const pane = angled(target)
+    const view = snapViewOf(pane)
+    // pressed on the body 200 cm from the pivot, and moved so a's +X end shows on b's -X end
+    const grabbed = { x: -200, y: 150, z: 0 }
+    const pointerAt = (offset: Vec3) => {
+      const px = view.project(vecAdd(grabbed, offset)) ?? { x: 0, y: 0 }
+      return { ray: view.rayAt(px), px }
+    }
+    const start = pointerAt(ORIGIN)
+    const session = new MoveSession({
+      pane,
+      keys: new Set([a]),
+      pivot: ORIGIN,
+      box: { min: { x: -250, y: -250, z: 0 }, max: { x: 250, y: 250, z: 100 } },
+      ends,
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      constraint: { kind: "surface", normal: { x: 0, y: 0, z: 1 } },
+      ray: start.ray,
+      px: start.px
+    })
+    const meet = vecSub(target, { x: 250, y: 0, z: 50 })
+    const short = pointerAt(vecScale(meet, 0.98))
+    session.update(short.ray, short.px, up)
+    const there = pointerAt(meet)
+    const hit = session.update(there.ray, there.px, up).hit
+    assert.strictEqual(hit?.relation, "join")
+    assertVec(hit?.landing ?? ORIGIN, target, "on b's end")
   })
 })
 
@@ -525,28 +618,28 @@ describe("drag keys", () => {
 
   it("counts a modifier pressed before the drag, and forgets one released away from it", () => {
     const state = seedDragKeys({ ctrlKey: true, shiftKey: false })
-    assert.isTrue(dragKeysOf(defaultKeybinds, state.pressed).invert)
+    assert.isTrue(dragKeysOf(defaultKeybinds, state.pressed).off)
     syncDragKeys(state, { ctrlKey: false, shiftKey: true })
-    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed), { invert: false, hold: true, only: [] })
+    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed), { off: false, hold: true, only: [] })
   })
 
-  it("narrows while a kind's key is held, Ctrl still inverting, and lets go when the key comes up", () => {
+  it("narrows while a kind's key is held, Ctrl with it, and lets go when the key comes up", () => {
     const state = seedDragKeys({ ctrlKey: false, shiftKey: false })
     let stopped = false
     const stop = () => {
       stopped = true
     }
-    assert.isTrue(handleDragKey(state, undefined, key("KeyG", { stopImmediatePropagation: stop }), defaultKeybinds))
+    assert.isTrue(handleDragKey(state, undefined, key("KeyJ", { stopImmediatePropagation: stop }), defaultKeybinds))
     assert.isTrue(stopped, "nothing else hears the key mid-drag")
-    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed).only, ["grid"])
+    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed).only, ["connectors"])
     handleDragKey(state, undefined, key("KeyM"), defaultKeybinds)
     syncDragKeys(state, { ctrlKey: true, shiftKey: false })
     assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed), {
-      invert: true,
+      off: true,
       hold: false,
-      only: ["grid", "mesh"]
+      only: ["connectors", "mesh"]
     })
-    releaseDragKey(state, "KeyG")
+    releaseDragKey(state, "KeyJ")
     releaseDragKey(state, "KeyM")
     assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed).only, [])
   })
@@ -575,6 +668,8 @@ describe("drag keys", () => {
   it("leaves a key that isn't the drag's, and a turn takes no lock", () => {
     const state = seedDragKeys({ ctrlKey: false, shiftKey: false })
     assert.isFalse(handleDragKey(state, undefined, key("KeyX"), defaultKeybinds))
+    assert.isFalse(handleDragKey(state, undefined, key("KeyG"), defaultKeybinds), "the grid has no key")
+    assert.isFalse(handleDragKey(state, undefined, key("KeyT"), defaultKeybinds), "nor the step")
     const [a = ""] = load(onlyGrid())
     assert.isFalse(handleDragKey(state, moving(a).session, key("KeyK"), defaultKeybinds))
   })

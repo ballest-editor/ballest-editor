@@ -10,11 +10,12 @@ import type { GroupDelta } from "../../domain/groupTransform"
 import type { Box } from "../../domain/itemBounds"
 import type { Keybinds } from "../../domain/Keybinds"
 import type { EndRef } from "../../domain/MapSidecar"
-import { kindsFor, narrowedTo, type SnapConfig, type SnapKind } from "../../domain/snapConfig"
+import { joinsOnly, kindsFor, narrowedTo, type SnapConfig, type SnapKind, withJoinReach } from "../../domain/snapConfig"
 import {
   type Constraint,
   freeOffset,
   freePoint,
+  pointOn,
   type Ray,
   type ScreenPoint,
   type SnapFrame,
@@ -28,6 +29,7 @@ import { baseNearPointer, moveOf, resolveDrag, resolveSnap } from "../../domain/
 import type { SnappedAs, TurnStop } from "../../domain/snapRotate"
 import { selectionBases } from "../../domain/snapTools"
 import { annotationsOf } from "../../domain/structure"
+import { ORIGIN, vecAdd } from "../../domain/ueMath"
 import type { PaneCamera } from "../paneCameras"
 import {
   type EditorState,
@@ -44,8 +46,8 @@ import { snapViewOf } from "./snapView"
 
 /** The keys that change a drag while it is held, by what they do. */
 export interface DragKeys {
-  /** Inverts snapping. */
-  readonly invert: boolean
+  /** Turns snapping off while held. */
+  readonly off: boolean
   /** Holds the current target. */
   readonly hold: boolean
   /** The kinds snapping is narrowed to while their keys are held; none narrows nothing. */
@@ -100,8 +102,6 @@ export class MoveSession {
   private readonly view: SnapView
   private readonly items: ReadonlyArray<SnapItem>
   private readonly casts: ReturnType<typeof snapCasts>
-  /** Where the pointer sat off the pivot at the start, in pixels. */
-  private readonly grab: ScreenPoint
   private readonly config: SnapConfig
   private lastOffset: Vec3 = { x: 0, y: 0, z: 0 }
   /** A lock changed what the pointer means: the next sample starts a path of its own. */
@@ -118,8 +118,6 @@ export class MoveSession {
     this.view = snapViewOf(start.pane)
     this.items = snapItemsOf(s, start.keys, this.config.targets.mesh.sharpAngle)
     this.casts = snapCasts(this.items, start.pane, this.view)
-    const shown = this.view.project(start.pivot) ?? start.px
-    this.grab = { x: start.px.x - shown.x, y: start.px.y - shown.y }
   }
 
   /** The constraint under the lock, if one is set. */
@@ -141,14 +139,11 @@ export class MoveSession {
     const { constraint, start } = this
     const offset = freeOffset(constraint, start.pivot, start.ray, ray) ?? this.lastOffset
     this.lastOffset = offset
-    const moved = this.view.project({
-      x: start.pivot.x + offset.x,
-      y: start.pivot.y + offset.y,
-      z: start.pivot.z + offset.z
-    })
-    const slip = moved === undefined
-      ? { x: 0, y: 0 }
-      : { x: px.x - moved.x - this.grab.x, y: px.y - moved.y - this.grab.y }
+    // What the pointer took hold of goes with the move, so it stays under the pointer on a plane, and a line leaves the
+    // pointer off it by as much as it is off the line. Measured in pixels of the pivot, a grab would drift in perspective.
+    const held = pointOn(constraint, start.pivot, start.ray)
+    const moved = held === undefined ? undefined : this.view.project(vecAdd(held, offset))
+    const slip = moved === undefined ? { x: 0, y: 0 } : { x: px.x - moved.x, y: px.y - moved.y }
     const s = useEditor.getState()
     const { construction, measurements } = annotationsOf(s.doc.structure)
     const stepAxes = this.lock === undefined ? start.stepAxes : undefined
@@ -173,27 +168,36 @@ export class MoveSession {
     }
   }
 
-  /** The delta for the pointer at `ray`, with `keys` held. */
+  /**
+   * The delta for the pointer at `ray`, with `keys` held. With J alone the move only joins (docs/SNAPPING.md § Modifiers):
+   * the selection stays where it started until one of its ends meets another on screen, from further off than the range,
+   * and goes back there when it leaves it.
+   */
   update(ray: Ray, px: ScreenPoint, keys: DragKeys): MoveResult {
     const before = this.lastOffset
-    const config = narrowedTo(this.config, kindsFor("move", keys.only ?? []))
+    const kinds = kindsFor("move", keys.only ?? [])
+    const joinOnly = joinsOnly(kinds)
+    const narrowed = narrowedTo(this.config, kinds)
+    const config = joinOnly ? withJoinReach(narrowed) : narrowed
     const frame = this.frame(ray, px, config)
     const from = this.pathBroken ? frame.offset : before
     this.pathBroken = false
-    const snapping = config.enabled !== keys.invert
-    // Combined with Ctrl, the held target still holds. What Shift finds current is the last sample's, as this one may
-    // have left it.
+    const snapping = config.enabled && !keys.off
+    // With Ctrl, the held target still holds. What Shift finds current is the last sample's, as this one may have left it.
     const holding = keys.hold ? this.held ?? this.lastHit : undefined
     const hit = holding !== undefined
       ? resolveSnap(frame, holding)
-      : snapping
-      ? resolveDrag(frame, { from, current: this.lastHit })
-      : undefined
+      : !snapping
+      ? undefined
+      : joinOnly
+      ? resolveSnap(frame)
+      : resolveDrag(frame, { from, current: this.lastHit })
     this.held = keys.hold ? holding ?? hit : undefined
     this.lastHit = hit
     const base = snapping ? baseNearPointer(frame) : undefined
     publish(hit, base === undefined ? undefined : freePoint(frame, base))
-    return { delta: hit === undefined ? this.moveBy(frame.offset) : this.landingOn(hit), hit }
+    const stays = snapping && joinOnly
+    return { delta: hit !== undefined ? this.landingOn(hit) : this.moveBy(stays ? ORIGIN : frame.offset), hit }
   }
 
   private landingOn(hit: SnapHit): GroupDelta {
@@ -300,7 +304,7 @@ export const endSnapDisplay = (): void => {
 
 /** Which of `keybinds`' drag keys are down, of the codes `pressed`. */
 export const dragKeysOf = (keybinds: Keybinds, pressed: ReadonlySet<string>): DragKeys => ({
-  invert: keybinds.snapInvert.some((code) => pressed.has(code)),
+  off: keybinds.snapOff.some((code) => pressed.has(code)),
   hold: keybinds.snapHold.some((code) => pressed.has(code)),
   only: heldKindsOf(keybinds, pressed)
 })

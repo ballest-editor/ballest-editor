@@ -34,36 +34,32 @@ describe("the status bar's drag keys", () => {
 
   it("offers a move every key it can take", () => {
     assert.deepStrictEqual(hintsOf({ transform: "move", pressed: [], lock: undefined }), [
-      "Control invert",
+      "Control off",
       "Shift hold",
       "X Y Z lock",
-      "G grid",
       "J connectors",
       "M mesh",
       "L align"
     ])
   })
 
-  it("offers a turn no hold or lock, and a scale only the mesh and the step", () => {
+  it("offers a turn no hold or lock, and a scale only the mesh", () => {
     assert.deepStrictEqual(hintsOf({ transform: "turn", pressed: [], lock: undefined }), [
-      "Control invert",
-      "G grid",
+      "Control off",
       "J connectors",
       "M mesh",
-      "L align",
-      "T step"
+      "L align"
     ])
     assert.deepStrictEqual(hintsOf({ transform: "scale", pressed: [], lock: undefined }), [
-      "Control invert",
-      "M mesh",
-      "T step"
+      "Control off",
+      "M mesh"
     ])
   })
 
   it("lights what is held and the axis locked", () => {
     assert.deepStrictEqual(
-      hintsOf({ transform: "move", pressed: ["ControlLeft", "KeyG"], lock: { axis: "y", plane: true } }),
-      ["Control* invert*", "Shift hold", "X Y* Z lock*", "G* grid*", "J connectors", "M mesh", "L align"]
+      hintsOf({ transform: "move", pressed: ["ControlLeft", "KeyJ"], lock: { axis: "y", plane: true } }),
+      ["Control* off*", "Shift hold", "X Y* Z lock*", "J* connectors*", "M mesh", "L align"]
     )
   })
 })

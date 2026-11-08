@@ -90,7 +90,7 @@ export const keybindSections = [
     name: "snapping",
     actions: [
       "snapToggle",
-      "snapInvert",
+      "snapOff",
       "snapHold",
       "snapLockX",
       "snapLockY",
@@ -98,11 +98,9 @@ export const keybindSections = [
       "snapPlaneX",
       "snapPlaneY",
       "snapPlaneZ",
-      "snapOnlyGrid",
       "snapOnlyConnectors",
       "snapOnlyMesh",
-      "snapOnlyAlignment",
-      "snapOnlyStep"
+      "snapOnlyAlignment"
     ]
   },
   { name: "file", actions: ["newMap", "openMap", "saveMap", "saveMapAs", "closeTab", "nextTab", "previousTab"] },
@@ -159,7 +157,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   orbit: "orbit",
   pan: "pan",
   snapToggle: "snapping on / off",
-  snapInvert: "invert snapping",
+  snapOff: "snapping off",
   snapHold: "hold target",
   snapLockX: "lock to x",
   snapLockY: "lock to y",
@@ -167,11 +165,9 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   snapPlaneX: "lock to plane across x",
   snapPlaneY: "lock to plane across y",
   snapPlaneZ: "lock to plane across z",
-  snapOnlyGrid: "grid only",
   snapOnlyConnectors: "connectors only",
   snapOnlyMesh: "mesh only",
   snapOnlyAlignment: "alignment only",
-  snapOnlyStep: "step only",
   viewTop: "top view",
   viewBottom: "bottom view",
   viewFront: "front view",
@@ -247,8 +243,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   pan: "Hold and drag to slide the camera sideways and up/down.",
   snapToggle:
     "Turn snapping as a whole on or off: the magnet in the top bar. Grid, rotation, scale and each target keep their own toggles under it. No equivalent in the in-game editor.",
-  snapInvert:
-    "Hold during a drag: snapping goes off when it is on and on when it is off. Only once a drag has begun, so Ctrl still flies down.",
+  snapOff:
+    "Hold during a drag: nothing snaps while it is held. With snapping off already it does nothing. Only once a drag has begun, so Ctrl still flies down.",
   snapHold:
     "Hold during a drag: the selection stays on the target it found, sliding along it, and nothing else takes over.",
   snapLockX: "During a drag, lock the move to the X axis (the grid's, when it is turned). Press again to unlock.",
@@ -257,16 +253,12 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   snapPlaneX: "During a drag, lock the move to the plane square to X. Press again to unlock.",
   snapPlaneY: "During a drag, lock the move to the plane square to Y. Press again to unlock.",
   snapPlaneZ: "During a drag, lock the move to the plane square to Z. Press again to unlock.",
-  snapOnlyGrid:
-    "Hold during a move: it snaps to the grid and nothing else, even with snapping off, until it is let go. Held with another of these keys, both kinds count. G for grid; outside a drag only Shift+G and Ctrl+G mean anything.",
   snapOnlyConnectors:
-    "Hold during a move or a turn: only connector ends count, even with snapping off, and a turn takes no step. J for join: C is the game's key for the gizmo's axes.",
+    "Hold during a move or a turn: only connector ends count, even with snapping off. A move stays where it started until one of its ends meets another on screen, from further off than usual, and jumps to the join. J for join: C is the game's key for the gizmo's axes.",
   snapOnlyMesh:
-    "Hold during a move, a turn or a scale: only the Mesh target counts (vertices, edges and faces, and the faces a turn or a scale stops on), even with snapping off, and a turn or a scale takes no step. M for mesh.",
+    "Hold during a move, a turn or a scale: only the Mesh target counts (vertices, edges and faces, and the faces a turn or a scale stops on), even with snapping off. M for mesh.",
   snapOnlyAlignment:
     "Hold during a move: only alignment and tracking count, even with snapping off, so a row lines up without the grid or a face taking over. L for line up: A flies the camera left.",
-  snapOnlyStep:
-    "Hold during a turn or a scale: it takes the rotation or scale step alone and stops at no face or end, even with snapping off for it. With a target's key also held, both count. T is free in the editor.",
   viewTop: "Look straight down in the active pane, orthographic. Editor only: the game has no orthographic views.",
   viewBottom: "Look straight up from under the map in the active pane, orthographic.",
   viewFront: "Look at the map from its front (the +X side, the game's forward) in the active pane, orthographic.",
@@ -310,7 +302,7 @@ export const mouseClickActions: ReadonlySet<KeybindAction> = new Set(["addToSele
 export const mouseDragActions: ReadonlySet<KeybindAction> = new Set(["look", "orbit", "pan"])
 /** Actions a drag takes once it has begun (docs/SNAPPING.md § Modifiers): nothing fires them from a key by itself. */
 export const duringDragActions: ReadonlySet<KeybindAction> = new Set([
-  "snapInvert",
+  "snapOff",
   "snapHold",
   "snapLockX",
   "snapLockY",
@@ -318,11 +310,9 @@ export const duringDragActions: ReadonlySet<KeybindAction> = new Set([
   "snapPlaneX",
   "snapPlaneY",
   "snapPlaneZ",
-  "snapOnlyGrid",
   "snapOnlyConnectors",
   "snapOnlyMesh",
-  "snapOnlyAlignment",
-  "snapOnlyStep"
+  "snapOnlyAlignment"
 ])
 /** Actions that are held down rather than fired once. */
 export const heldActions: ReadonlySet<KeybindAction> = new Set([
@@ -349,7 +339,7 @@ export type Keybinds = Readonly<Record<KeybindAction, Bindings>>
  */
 export const defaultKeybinds: Keybinds = {
   snapToggle: ["KeyN"],
-  snapInvert: ["ControlLeft", "ControlRight"],
+  snapOff: ["ControlLeft", "ControlRight"],
   snapHold: ["ShiftLeft", "ShiftRight"],
   snapLockX: ["KeyX"],
   snapLockY: ["KeyY"],
@@ -357,11 +347,9 @@ export const defaultKeybinds: Keybinds = {
   snapPlaneX: ["Shift+KeyX"],
   snapPlaneY: ["Shift+KeyY"],
   snapPlaneZ: ["Shift+KeyZ"],
-  snapOnlyGrid: ["KeyG"],
   snapOnlyConnectors: ["KeyJ"],
   snapOnlyMesh: ["KeyM"],
   snapOnlyAlignment: ["KeyL"],
-  snapOnlyStep: ["KeyT"],
   selectMode: ["KeyQ"],
   translateMode: ["KeyW"],
   rotateMode: ["KeyE"],
@@ -427,7 +415,11 @@ export const uniqueBindings = (
 ): Bindings => [...new Set(bindings.filter((b) => b.length > 0))]
 
 /** Actions saved under an older name: their bindings carry over when the new name has none saved. */
-const RENAMED_ACTIONS: Partial<Record<KeybindAction, string>> = { openMap: "importMap", saveMapAs: "exportMap" }
+const RENAMED_ACTIONS: Partial<Record<KeybindAction, string>> = {
+  openMap: "importMap",
+  saveMapAs: "exportMap",
+  snapOff: "snapInvert"
+}
 
 export const mergeKeybinds = (stored: StoredKeybinds, defaults: Keybinds = defaultKeybinds): Keybinds => {
   const out: Record<KeybindAction, Bindings> = { ...defaults }
