@@ -6,19 +6,18 @@
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo } from "react"
 import * as THREE from "three"
-import { endsOf, openEndsOf, type WorldEnd } from "../../domain/connectors"
 import type { Vec3 } from "../../domain/coords"
-import { editTransform } from "../../domain/editTransform"
 import type { Construction, Measurement } from "../../domain/MapSidecar"
 import type { SnapMark, TrackedPoint } from "../../domain/snapFrame"
 import { measurementFacts } from "../../domain/snapTools"
-import { annotationsOf, type Doc } from "../../domain/structure"
+import { annotationsOf } from "../../domain/structure"
 import { vecAdd, vecCross, vecLerp, vecScale } from "../../domain/ueMath"
 import { sceneAxisColors } from "../axisColors"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { snapConfigOf, useEditor } from "../store"
 import { useDarkTheme } from "../theme"
 import { isLine, isMesh } from "../threeGuards"
+import { endsInDoc, ringedEnds } from "./openEnds"
 import { snapMarks } from "./snapMarks"
 import { toThree } from "./snapView"
 
@@ -244,19 +243,11 @@ const drawMeasurement = (layer: MarkLayer, { a, angle, b }: Measurement) => {
   layer.label(vecLerp(a, b, 0.5), text)
 }
 
-/** Every end in the map, where the document has them. */
-const endsInDoc = (doc: Doc, index: Parameters<typeof endsOf>[3]): ReadonlyArray<WorldEnd> =>
-  doc.map.items.flatMap((item, i) => {
-    const key = doc.ids[i]
-    return key === undefined ? [] : endsOf(key, item, editTransform(item), index)
-  })
-
 /** What the overlay draws from: the identities that say it changed. */
 interface Inputs {
   readonly construction: ReadonlyArray<Construction>
   readonly measurements: ReadonlyArray<Measurement>
   readonly tracked: ReadonlyArray<TrackedPoint>
-  readonly open: ReadonlyArray<WorldEnd>
   readonly dark: boolean
 }
 
@@ -266,27 +257,34 @@ export function SnapOverlay() {
   const tracked = useEditor((s) => s.tracked)
   const showOpen = useEditor((s) => snapConfigOf(s).targets.connectors.showOpenEnds)
   const hovered = useEditor((s) => s.hoveredItem)
+  const preview = useEditor((s) => s.preview)
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   const persistent = useMemo(() => new MarkLayer(), [])
+  /** The open ends, apart: a drag moves them on every event. */
+  const rings = useMemo(() => new MarkLayer(), [])
   const transient = useMemo(() => new MarkLayer(), [])
 
-  const ends = useMemo(() => showOpen === "never" ? [] : openEndsOf(endsInDoc(doc, index)), [doc, index, showOpen])
+  const docEnds = useMemo(() => showOpen === "never" ? [] : endsInDoc(doc, index), [doc, index, showOpen])
   const open = useMemo(
-    () => showOpen === "hover" ? ends.filter(({ ref }) => ref.item === hovered) : ends,
-    [ends, hovered, showOpen]
+    () => ringedEnds({ doc, catalogIndex: index, preview, hoveredItem: hovered }, showOpen, docEnds),
+    [doc, index, preview, hovered, showOpen, docEnds]
   )
   const inputs: Inputs = useMemo(() => {
     const { construction, measurements } = annotationsOf(doc.structure)
-    return { construction, measurements, tracked, open, dark }
-  }, [doc.structure, tracked, open, dark])
+    return { construction, measurements, tracked, dark }
+  }, [doc.structure, tracked, dark])
 
   useEffect(() => {
     persistent.reset()
     for (const one of inputs.construction) drawConstruction(persistent, one)
     for (const one of inputs.measurements) drawMeasurement(persistent, one)
     for (const { at } of inputs.tracked) persistent.plus(at, COLORS.target)
-    for (const { position } of inputs.open) persistent.ring(position, COLORS.open)
   }, [persistent, inputs])
+
+  useEffect(() => {
+    rings.reset()
+    for (const { position } of open) rings.ring(position, COLORS.open)
+  }, [rings, open])
 
   const shown = useMemo(() => ({ revision: -1 }), [])
   useFrame(() => {
@@ -300,15 +298,18 @@ export function SnapOverlay() {
 
   useBeforePaneDraw((pane) => {
     persistent.fit((point) => pane.worldPerPixelAt(point), pane.camera)
+    rings.fit((point) => pane.worldPerPixelAt(point), pane.camera)
     transient.fit((point) => pane.worldPerPixelAt(point), pane.camera)
   })
   useEffect(() => () => {
     persistent.reset()
+    rings.reset()
     transient.reset()
-  }, [persistent, transient])
+  }, [persistent, rings, transient])
   return (
     <>
       <primitive object={persistent} />
+      <primitive object={rings} />
       <primitive object={transient} />
     </>
   )
