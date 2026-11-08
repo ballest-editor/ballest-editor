@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Option } from "effect"
+import { Option, Schema } from "effect"
 import {
   addItem,
   asNewDraft,
@@ -13,7 +13,7 @@ import {
   validateItem
 } from "./edits"
 import { defaultEditorState, identityTransform, meshComponentFor, newMapFile, playerStartItem } from "./factory"
-import type { EditorGroup, MapFile } from "./MapFile"
+import { type EditorGroup, MapFile } from "./MapFile"
 
 const withItems = (n: number): MapFile => {
   // item i sits at x = i
@@ -128,6 +128,87 @@ describe("edits", () => {
     assert.isTrue(
       Option.isNone(setSlotMaterials(bare, [{ index: 0, component: 1, slot: 0, material: glossy, creates }]))
     )
+  })
+
+  describe("a slot put back to its default", () => {
+    const material = (name: string) => `/Script/Engine.MaterialInstanceConstant'/Game/X/${name}.${name}'`
+    const fallback = (slot: number) => `/Game/X/M_Default${slot}.M_Default${slot}`
+    /** One item whose component lists `slots`, each painted red. */
+    const painted = (slots: ReadonlyArray<number>): MapFile => {
+      const base = withItems(1)
+      const mesh = meshComponentFor("/Game/X/SM_Box.SM_Box", [])
+      const materials = slots.map((materialIndex) => ({ material: material("MI_Red"), materialIndex }))
+      return {
+        ...base,
+        items: [{
+          ...base.items[0]!,
+          meshComponents: [{ ...mesh, materials, materialAssetPaths: materials.map(() => "/Game/X/MI_Red.MI_Red") }]
+        }]
+      }
+    }
+    const reset = (map: MapFile, slots: ReadonlyArray<number>) =>
+      Option.getOrThrow(
+        setSlotMaterials(
+          map,
+          slots.map((slot) => ({ index: 0, component: 0, slot, material: undefined, fallback: fallback(slot) }))
+        )
+      )
+    const listed = (map: MapFile) =>
+      map.items[0]!.meshComponents[0]!.materials.map((m) => [m.materialIndex, m.material] as const)
+
+    it("loses its entry, with materialAssetPaths in step", () => {
+      const next = reset(painted([0, 1, 2]), [2])
+      assert.deepStrictEqual(listed(next), [[0, material("MI_Red")], [1, material("MI_Red")]])
+      assert.deepStrictEqual(next.items[0]!.meshComponents[0]!.materialAssetPaths, [
+        "/Game/X/MI_Red.MI_Red",
+        "/Game/X/MI_Red.MI_Red"
+      ])
+      // every slot at once leaves the component listing none, which the game fills with the defaults
+      assert.deepStrictEqual(listed(reset(painted([0, 1, 2]), [0, 1, 2])), [])
+    })
+
+    it("keeps the list contiguous: below a slot that keeps its entry it gets its default written instead", () => {
+      const map = painted([0, 1, 2])
+      assert.deepStrictEqual(listed(reset(map, [1])), [
+        [0, material("MI_Red")],
+        [1, `/Script/Engine.Material'${fallback(1)}'`],
+        [2, material("MI_Red")]
+      ])
+      // in any order in one call: slot 2 goes, so slot 1 can go too, and slot 0 is under nothing
+      assert.deepStrictEqual(listed(reset(map, [1, 2])), [[0, material("MI_Red")]])
+      assert.deepStrictEqual(listed(reset(map, [0, 2])), [
+        [0, `/Script/Engine.Material'${fallback(0)}'`],
+        [1, material("MI_Red")]
+      ])
+      // without a fallback, an entry under another stays as it is
+      const kept = setSlotMaterials(map, [{ index: 0, component: 0, slot: 0, material: undefined }])
+      assert.strictEqual(Option.getOrThrow(kept), map)
+    })
+
+    it("changes nothing on a slot the item doesn't list, or a component it doesn't have yet", () => {
+      const map = painted([0])
+      assert.strictEqual(reset(map, [1, 2]), map)
+      const base = withItems(1)
+      const bare = { ...base, items: [{ ...base.items[0]!, meshComponents: [] }] }
+      const creates = meshComponentFor("/Game/X/SM_Box.SM_Box", [fallback(0)])
+      assert.strictEqual(
+        Option.getOrThrow(setSlotMaterials(bare, [{ index: 0, component: 0, slot: 0, material: undefined, creates }])),
+        bare
+      )
+    })
+
+    it("saves and loads back through the MapFile codec unchanged", () => {
+      const codec = Schema.fromJsonString(MapFile)
+      for (const next of [reset(painted([0, 1, 2]), [2]), reset(painted([0, 1, 2]), [0, 1, 2])]) {
+        const json = Schema.encodeSync(codec)(next)
+        const back = Schema.decodeSync(codec)(json)
+        assert.deepStrictEqual(listed(back), listed(next))
+        assert.deepStrictEqual(
+          back.items[0]!.meshComponents[0]!.materialAssetPaths,
+          next.items[0]!.meshComponents[0]!.materialAssetPaths
+        )
+      }
+    })
   })
 
   it("copies items with their pivots and pastes them into another map", () => {

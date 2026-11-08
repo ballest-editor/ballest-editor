@@ -202,10 +202,10 @@ function ClickSelect() {
 const NO_MODIFIERS: ModifierState = { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false }
 
 /**
- * The paint tool (editor/paintTarget.ts). The pointer's target is outlined (red where the game takes no paint, and the
- * status bar says why); a press on it starts a stroke that paints every target the pointer then enters once, one undo
- * step in all; the pick binding takes the paint under the pointer instead. A raycast at most once a frame, and only
- * after the pointer, a modifier or the document changed.
+ * The paint tool (editor/paintTarget.ts). The pointer's target is outlined and shaded (red where the game takes no
+ * paint, and the status bar says why); a press on it starts a stroke that paints every target the pointer then enters
+ * once, one undo step in all; the pick binding takes the paint under the pointer instead. A raycast at most once a
+ * frame, and only after the pointer, a modifier or the document changed.
  */
 function PaintTool() {
   const gl = useThree((s) => s.gl)

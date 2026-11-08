@@ -13,6 +13,9 @@ import {
   type PaintSpot,
   paintSpotOf,
   paintTargetOf,
+  panelSlotEditsOf,
+  panelSlotPaintOf,
+  panelSlotsOf,
   pickedBrushOf,
   showsTarget
 } from "./paintTarget"
@@ -233,6 +236,55 @@ describe("what a click with the paint tool paints", () => {
     })
   })
 
+  describe("with the default", () => {
+    const reset: Brush = { _tag: "Default" }
+    const effectOf = (item: Item, at: PaintSpot, whole = false) => target(item, at, reset, whole).effect
+    const cleared = (slot: number) => ({ component: 0, slot, material: undefined, fallback: defaultOf("Box", slot) })
+
+    it("takes the slot's entry out, with its default for setSlotMaterials to keep the list contiguous", () => {
+      assert.deepStrictEqual(effectOf(itemOf("Box"), spot("m0", 1)), { _tag: "Slots", edits: [cleared(1)] })
+      // no fills below it, unlike a colour: an unlisted slot already draws its default
+      assert.deepStrictEqual(effectOf(itemOf("Box", { listed: [0] }), spot("m0", 2)), {
+        _tag: "Slots",
+        edits: [cleared(2)]
+      })
+    })
+
+    it("clears every slot the piece takes for the whole piece", () => {
+      assert.deepStrictEqual(effectOf(itemOf("Box"), spot("m0", 0), true), {
+        _tag: "Slots",
+        edits: [0, 1, 2].map(cleared)
+      })
+      // only where the game paints at all
+      assert.deepStrictEqual(effectOf(itemOf("Glass"), spot("m0", 0), true), {
+        _tag: "Slots",
+        edits: [0, 2].map((slot) => ({ ...cleared(slot), fallback: defaultOf("Glass", slot) }))
+      })
+      assert.deepStrictEqual(effectOf(itemOf("Light"), spot("m0", 0), true), {
+        _tag: "Blocked",
+        reason: PAINT_BLOCKED.notPainted
+      })
+    })
+
+    it("has nothing to do on an item with no components, which draws its defaults already", () => {
+      const bare = itemOf("Box", { listed: null })
+      assert.deepStrictEqual(effectOf(bare, spot("main", 1)), { _tag: "Slots", edits: [] })
+      assert.deepStrictEqual(effectOf(bare, spot("main", 1), true), { _tag: "Slots", edits: [] })
+    })
+
+    it("is locked by a surface and blocked where paint is", () => {
+      assert.deepStrictEqual(effectOf(itemOf("Box", { surface: 1 }), spot("m0", 0)), {
+        _tag: "Blocked",
+        reason: PAINT_BLOCKED.surfaceLocked
+      })
+      assert.deepStrictEqual(effectOf(itemOf("Box"), spot("x0", 0)), { _tag: "Blocked", reason: PAINT_BLOCKED.extra })
+      assert.deepStrictEqual(effectOf(itemOf("Box"), spot("m0", 3)), {
+        _tag: "Blocked",
+        reason: PAINT_BLOCKED.unknownSlots
+      })
+    })
+  })
+
   it("gives a surface only to a piece the game offers one", () => {
     const ice: Brush = { _tag: "Surface", value: 2 }
     assert.deepStrictEqual(target(itemOf("Box"), spot("m0", 0), ice).effect, { _tag: "Surface", value: 2 })
@@ -247,17 +299,20 @@ describe("what a click with the paint tool paints", () => {
 })
 
 describe("the paint tool's eyedropper", () => {
-  it("picks the material drawn at the slot, the item's own or the catalog's default", () => {
+  it("picks the material the item lists for the slot, else the default", () => {
     const painted = itemOf("Box")
     const withRed = {
       ...painted,
       meshComponents: [{ ...painted.meshComponents[0]!, materials: [{ material: RED, materialIndex: 1 }] }]
     }
     assert.deepStrictEqual(pickedBrushOf(spot("m0", 1), withRed, index), red)
-    assert.deepStrictEqual(pickedBrushOf(spot("m0", 2), withRed, index), {
+    // a default the item lists is a material like any other
+    assert.deepStrictEqual(pickedBrushOf(spot("m0", 2), painted, index), {
       _tag: "Material",
       material: qualified(defaultOf("Box", 2))
     })
+    assert.deepStrictEqual(pickedBrushOf(spot("m0", 2), withRed, index), { _tag: "Default" })
+    assert.deepStrictEqual(pickedBrushOf(spot("main", 0), itemOf("Box", { listed: null }), index), { _tag: "Default" })
     assert.isUndefined(pickedBrushOf(spot("m0", 7), withRed, index))
   })
 
@@ -266,6 +321,68 @@ describe("the paint tool's eyedropper", () => {
       _tag: "Surface",
       value: 3
     })
+  })
+})
+
+describe("the Inspector's Paint rows", () => {
+  const slot = (component: number, at: number) => ({ component, slot: at })
+
+  it("list every slot of the mesh, painted or at its default, and only the off-panel ones of a locked piece", () => {
+    assert.deepStrictEqual(
+      panelSlotsOf([itemOf("Box", { listed: [0] })], index, undefined),
+      [0, 1, 2].map((s) => slot(0, s))
+    )
+    assert.deepStrictEqual(panelSlotsOf([itemOf("Glass", { listed: [] })], index, new Set([0, 2])), [
+      slot(0, 0),
+      slot(0, 2)
+    ])
+    // a mesh the catalog doesn't know: what it lists
+    const unknown = itemOf("Box", { mesh: "/Game/X/SM_Gone.SM_Gone", listed: [1] })
+    assert.deepStrictEqual(panelSlotsOf([unknown], index, undefined), [slot(0, 1)])
+    // an item with no components has no rows, as before
+    assert.deepStrictEqual(panelSlotsOf([itemOf("Box", { listed: null })], index, undefined), [])
+  })
+
+  it("show what the slot draws, and whether that's the default", () => {
+    const item = itemOf("Box", { listed: [0] })
+    assert.deepStrictEqual(panelSlotPaintOf(item, index, slot(0, 0)), {
+      material: qualified(defaultOf("Box", 0)),
+      listed: true
+    })
+    assert.deepStrictEqual(panelSlotPaintOf(item, index, slot(0, 2)), { material: defaultOf("Box", 2), listed: false })
+    // through a mirrored mesh's source
+    const mirrored = itemOf("Box", { mesh: "/Game/LevelEditor/Mirror/SM_BoxM.SM_BoxM", listed: [] })
+    assert.deepStrictEqual(panelSlotPaintOf(mirrored, index, slot(0, 1)), {
+      material: defaultOf("Box", 1),
+      listed: false
+    })
+  })
+
+  it("paint by the paint tool's rules, and a listed slot of an unknown mesh as it is", () => {
+    assert.deepStrictEqual(panelSlotEditsOf(itemOf("Box", { listed: [0] }), index, slot(0, 2), red), [
+      { component: 0, slot: 1, material: defaultOf("Box", 1) },
+      { component: 0, slot: 2, material: RED }
+    ])
+    assert.deepStrictEqual(panelSlotEditsOf(itemOf("Box"), index, slot(0, 1), { _tag: "Default" }), [
+      { component: 0, slot: 1, material: undefined, fallback: defaultOf("Box", 1) }
+    ])
+    const unknown = itemOf("Box", { mesh: "/Game/X/SM_Gone.SM_Gone", listed: [1] })
+    assert.deepStrictEqual(panelSlotEditsOf(unknown, index, slot(0, 1), red), [{
+      component: 0,
+      slot: 1,
+      material: RED
+    }])
+    assert.deepStrictEqual(panelSlotEditsOf(unknown, index, slot(0, 1), { _tag: "Default" }), [])
+    assert.deepStrictEqual(panelSlotEditsOf(unknown, index, slot(0, 0), red), [])
+    // an older map's component without a mesh path (Roundabout's) still repaints what it lists
+    const { meshAssetPath: _, ...bare } = unknown.meshComponents[0]!
+    const legacy = { ...unknown, meshComponents: [bare] }
+    assert.deepStrictEqual(panelSlotEditsOf(legacy, index, slot(0, 1), red), [{
+      component: 0,
+      slot: 1,
+      material: RED
+    }])
+    assert.deepStrictEqual(panelSlotEditsOf(legacy, index, slot(0, 0), red), [])
   })
 })
 

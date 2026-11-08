@@ -104,7 +104,10 @@ export const SnappingSettings = Schema.Struct({
 /** The Pieces panel's thumbnail sizes, as its header offers them. */
 export const piecesThumbnailSizes = ["s", "m", "l"] as const
 
-/** Changed from a panel's own header rather than the Settings dialog, but persisted with the rest. */
+/**
+ * Changed from a panel's own header (or the paint palette's toggle) rather than the Settings dialog, but persisted with
+ * the rest.
+ */
 export const PanelSettings = Schema.Struct({
   /** How the Pieces panel lays out its pieces. */
   piecesView: Schema.Literals(["list", "grid"]),
@@ -115,7 +118,9 @@ export const PanelSettings = Schema.Struct({
   /** What its Favorites lists, in the order they were starred. */
   favoritePieces: Schema.Array(Schema.String),
   /** What the Inspector's Scale row shows: a factor of the piece's own size, or its size (see domain/itemBounds). */
-  inspectorScale: Schema.Literals(["factor", "size"])
+  inspectorScale: Schema.Literals(["factor", "size"]),
+  /** How the paint tool's palette shows the picker: one finish's colours in a row, or every finish × colour. */
+  paintView: Schema.Literals(["row", "grid"])
 })
 
 /** How much bigger or smaller than medium each gizmo size draws, on screen. */
@@ -175,7 +180,8 @@ export const defaultSettings: Settings = {
     piecesThumbnailSize: "m",
     recentPieces: [],
     favoritePieces: [],
-    inspectorScale: "factor"
+    inspectorScale: "factor",
+    paintView: "row"
   },
   gizmo: { size: "m", showForGroups: true }
 }

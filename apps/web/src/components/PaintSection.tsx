@@ -24,6 +24,7 @@ import {
 } from "../domain/Paint"
 import { pieceNameOf } from "../domain/structure"
 import { paintSlots } from "../editor/actions"
+import { type Brush, type PanelSlot, panelSlotEditsOf, panelSlotPaintOf, panelSlotsOf } from "../editor/paintTarget"
 import { useEditor } from "../editor/store"
 import { HintBadge } from "./HintBadge"
 import { InfoHint } from "./InfoHint"
@@ -33,34 +34,10 @@ interface SelectedItem {
   readonly item: Item
 }
 
-/** One mesh component's material slot across a group of items. */
-interface SlotTarget {
-  readonly component: number
-  readonly slot: number
-}
-
-const slotsOf = (
-  members: ReadonlyArray<SelectedItem>,
-  only: ReadonlySet<number> | undefined
-): ReadonlyArray<SlotTarget> => {
-  const seen = new Map<string, SlotTarget>()
-  for (const { item } of members) {
-    item.meshComponents.forEach((mesh, component) => {
-      for (const { materialIndex: slot } of mesh.materials) {
-        if (only === undefined || only.has(slot)) seen.set(`${component}:${slot}`, { component, slot })
-      }
-    })
-  }
-  return [...seen.values()].sort((a, b) => a.component - b.component || a.slot - b.slot)
-}
-
-const materialAt = (item: Item, { component, slot }: SlotTarget): string | undefined =>
-  item.meshComponents[component]?.materials.find((m) => m.materialIndex === slot)?.material
-
 /** What a swatch takes beside its own props: anything a button does, as the viewport's `noFocus`. */
 type SwatchProps = Omit<ComponentProps<"button">, "color" | "onClick">
 
-/** A round swatch to pick: a CSS colour, or null for none (a checkerboard). */
+/** A round swatch to pick: a CSS colour (or any background), or null for none (a checkerboard). */
 export function SwatchButton(
   { label, color, active, onPick, className, ...props }: SwatchProps & {
     readonly label: string
@@ -86,6 +63,20 @@ export function SwatchButton(
       {...props}
     />
   )
+}
+
+/** The default's name: a slot as its piece comes, with no paint of its own. */
+export const DEFAULT_LABEL = "Default"
+
+/** The default's swatch, a CSS background: a slashed circle, apart from every colour. */
+export const DEFAULT_SWATCH =
+  "linear-gradient(135deg, transparent calc(50% - 1px), var(--fg-secondary) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)), var(--card)"
+
+/** The swatch that paints a slot back to its default. */
+export function DefaultSwatch(
+  props: SwatchProps & { readonly label: string; readonly active: boolean; readonly onPick: () => void }
+) {
+  return <SwatchButton color={DEFAULT_SWATCH} {...props} />
 }
 
 /** A picker colour's swatch, as the game shows it. */
@@ -143,12 +134,13 @@ const OFF_PANEL_HINT =
  * the default for a slot off the picker. Changing the finish keeps the colour when the new
  * finish has it (`colorForFinish`); otherwise it only shows that finish's colours until one is
  * picked. The row reads as the material: its swatch, its colour's name and its finish. The
- * asset's own name is in Details.
+ * asset's own name is in Details. A slot the items leave out draws its default, and the
+ * Default swatch, ringed then, takes the slot's paint off again (`panelSlotEditsOf`).
  */
 function SlotPaintRow(
   { members, target, numbered, offPanel }: {
     readonly members: ReadonlyArray<SelectedItem>
-    readonly target: SlotTarget
+    readonly target: PanelSlot
     /** Whether the slot says which it is, when its piece has more than one. */
     readonly numbered: boolean
     /** Whether the game's paint panel leaves this slot out. */
@@ -157,18 +149,21 @@ function SlotPaintRow(
 ) {
   const paint = useEditor((s) => s.paint)
   const table = useEditor((s) => s.materialTable)
+  const index = useEditor((s) => s.catalogIndex)
   // A finish browsed without picking a colour yet; otherwise the slot's own finish shows.
   const [browsing, setBrowsing] = useState<string | null>(null)
-  const materials = members.map(({ item }) => materialAt(item, target))
+  const drawn = members.map(({ item }) => panelSlotPaintOf(item, index, target))
+  const materials = drawn.map((d) => d.material)
   const first = materials[0]
   const current = materials.every((m) => m === first) ? first : null
   const choice = current === null ? undefined : choiceOf(paint, current)
   const finish = paint.find((f) => f.name === browsing) ?? shownFinishOf(paint, choiceOf(paint, first))
+  const atDefault = drawn.every((d) => !d.listed)
 
-  const apply = (material: string) => {
+  const apply = (brush: Exclude<Brush, { readonly _tag: "Surface" }>) => {
     setBrowsing(null)
     paintSlots(
-      members.flatMap(({ id, item }) => materialAt(item, target) === undefined ? [] : [{ id, ...target, material }])
+      members.flatMap(({ id, item }) => panelSlotEditsOf(item, index, target, brush).map((edit) => ({ id, ...edit })))
     )
   }
   const changeFinish = (name: string | null) => {
@@ -177,7 +172,7 @@ function SlotPaintRow(
     // The game goes by the first item of a mixed selection.
     const color = colorForFinish(next, choiceOf(paint, first))
     if (color === undefined) setBrowsing(next.name)
-    else apply(color.material)
+    else apply({ _tag: "Material", material: color.material })
   }
 
   // The game numbers its slots from 1.
@@ -219,15 +214,22 @@ function SlotPaintRow(
           </SelectContent>
         </Select>
       </div>
-      {finish !== undefined && (
-        <FinishSwatches
-          finish={finish}
-          choice={choice}
-          onPick={(color) => apply(color.material)}
-          label={`${slotName} color`}
-          className="gap-2"
+      <div className="flex flex-wrap items-center gap-2">
+        {finish !== undefined && (
+          <FinishSwatches
+            finish={finish}
+            choice={atDefault ? undefined : choice}
+            onPick={(color) => apply({ _tag: "Material", material: color.material })}
+            label={`${slotName} color`}
+            className="gap-2"
+          />
+        )}
+        <DefaultSwatch
+          label={`${slotName} ${DEFAULT_LABEL.toLowerCase()}`}
+          active={atDefault}
+          onPick={() => apply({ _tag: "Default" })}
         />
-      )}
+      </div>
     </div>
   )
 }
@@ -243,7 +245,7 @@ function PaintGroup(
   const first = members[0]
   if (first === undefined) return null
   const offPanel = offPanelSlotsOf(first.item, catalogIndex)
-  const slots = slotsOf(members, offPanel)
+  const slots = panelSlotsOf(members.map((m) => m.item), catalogIndex, offPanel)
   return (
     <div className="flex flex-col gap-3">
       {showName && (
@@ -276,7 +278,7 @@ export function PaintSection({ selected }: { readonly selected: ReadonlyArray<Se
   const { items, surfaceLocked } = paintTargets(selected, catalogIndex)
   if (surfaceLocked) return <Note>{SURFACE_LOCKED}</Note>
   if (items.length === 0) return <Note>{NOT_PAINTED}</Note>
-  if (!items.some(({ item }) => item.meshComponents.some((m) => m.materials.length > 0))) {
+  if (panelSlotsOf(items.map((m) => m.item), catalogIndex, undefined).length === 0) {
     return <Note>No material slots.</Note>
   }
   if (!loaded) return <Note>The game's materials aren't loaded.</Note>

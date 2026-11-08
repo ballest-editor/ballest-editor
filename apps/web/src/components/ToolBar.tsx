@@ -29,15 +29,15 @@ export const toolPanels: ReadonlyArray<Tool> = ["paint"]
 
 /**
  * Tool switcher, bottom-centre of the viewport. It belongs to no pane and floats over them all: a divider under it passes
- * behind the pill and drags from either side of it. The paint tool's palette sits above it while that tool is on.
- * Pointer-only, so keybinds stay with the viewport.
+ * behind the pill and drags from either side of it. The paint tool's palette sits above it while that tool is on, and
+ * scrolls rather than grow past the top of the viewport. Pointer-only, so keybinds stay with the viewport.
  */
 export function ToolBar({ disabled }: { readonly disabled: boolean }) {
   const tool = useEditor((s) => s.tool)
   const setTool = useEditor((s) => s.setTool)
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center justify-center gap-2">
+    <div className="pointer-events-none absolute inset-x-0 top-3 bottom-3 flex flex-col items-center justify-end gap-2">
       {tool === "paint" && !disabled && <PaintPalette />}
       <ToggleGroup
         pill="primary"
@@ -47,7 +47,7 @@ export function ToolBar({ disabled }: { readonly disabled: boolean }) {
           if (next !== undefined) setTool(next.tool) // clicking the active tool keeps it
         }}
         disabled={disabled}
-        className={cn(GROUP, "h-9")}
+        className={cn(GROUP, "h-9 shrink-0")}
       >
         {TOOLS.map(({ tool: t, label, action, icon: Icon }) => (
           <ViewTip

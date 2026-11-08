@@ -18,7 +18,7 @@ import { lightingOf } from "../domain/sunlight"
 import { surfaceOf } from "../domain/surface"
 import { defaultViewLayout } from "../domain/viewLayout"
 import type { ProjectState } from "../services/Platform"
-import { paintTargetOf } from "./paintTarget"
+import { paintTargetOf, pickedBrushOf } from "./paintTarget"
 import {
   currentBrush,
   editedAtOf,
@@ -216,6 +216,32 @@ describe("editor store", () => {
         s().doc.map.items[1]!.meshComponents[0]!.materials.map((m) => m.material),
         cube.materialSlots.map(() => material)
       )
+    })
+
+    it("puts a painted piece back to its defaults, which the eyedropper then picks, as one undo step", () => {
+      mapWithCubes(0)
+      const id = s().doc.ids[1]!
+      const at = { itemId: id, visual: "m0", slot: 0 }
+      const editsOf = (brush: Parameters<typeof paintTargetOf>[3]) => {
+        const { effect } = paintTargetOf(at, s().doc.map.items[1]!, cubeIndex, brush, true)
+        return effect._tag === "Slots" ? effect.edits.map((edit) => ({ id, ...edit })) : []
+      }
+      s().paintSlots(editsOf({ _tag: "Material", material }))
+      const steps = s().past.length
+      s().beginPaintStroke()
+      s().paintSlots(editsOf({ _tag: "Default" }))
+      s().endPaintStroke()
+      const mesh = s().doc.map.items[1]!.meshComponents[0]!
+      assert.deepStrictEqual([mesh.materials, mesh.materialAssetPaths], [[], []])
+      assert.strictEqual(s().past.length, steps + 1)
+      assert.deepStrictEqual(pickedBrushOf(at, s().doc.map.items[1]!, cubeIndex), { _tag: "Default" })
+      // already there: nothing to do
+      s().beginPaintStroke()
+      s().paintSlots(editsOf({ _tag: "Default" }))
+      s().endPaintStroke()
+      assert.strictEqual(s().past.length, steps + 1)
+      s().undo()
+      assert.strictEqual(slotOf(1), material)
     })
 
     it("sets surfaces, with or without a stroke, and one step for each", () => {
