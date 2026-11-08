@@ -201,17 +201,32 @@ Dragging a piece out of the palette lands by the same targets and priority as a 
 
 ## The Snap popover
 
-One popover in the view controls, opened by the chevron after the snap pills. Its shape, top to bottom:
+Snapping has three places, from quickest to fullest: the magnet and its menu in the top bar, the pills in the viewport, and the Snap popover.
+
+**The magnet** sits in the top bar after the menus, as snapping is a way of editing, and the bar's right end is for what goes to the game (a browser doesn't show it, which would leave the magnet alone at the far edge). It turns snapping as a whole on and off, M by default (`snapToggle`), and is pressed while snapping is on. Grid, Rotation, Scale and each target keep their own toggles under it. With the magnet off nothing snaps, and the controls under it stay working but dimmed, to say they wait on it. Ctrl inverts the magnet for one drag (§ Modifiers).
+
+**The snap menu** is the chevron beside the magnet, a popover of rows top to bottom:
+
+- **Snapping**: the magnet's switch.
+- **Grid**, **Rotation**, **Scale**: each a step, typed or picked from the list, and a switch. Picking a step turns that one on.
+- **Connectors**, **Mesh**, **Alignment and tracking**: the targets' switches, Alignment and Tracking as one.
+- **Priority**: Grid first or Pieces first, as a segmented control; neither is pressed for an order of the user's own.
+- **Connector pull**: a slider of five stops, from Grid and mesh to Connectors (§ Connectors, § Priority).
+- **Defaults…** opens Settings › Editor at Snapping, and **Snap settings…** the Snap popover.
+
+**The pills** keep the short form in the viewport's top right: the Grid pill, whose icon turns the Grid target on and off and whose value picks the grid step; the rotation pill, the same for a turn's step; and a chevron that opens the Snap popover. Both pills dim while the magnet is off. The View menu's Snap section has the same switches as the snap menu, with the magnet's key on Snapping, then the presets, the grid step, and Open snap settings.
+
+**The Snap popover** is everything, top to bottom:
 
 - **Base**: Pivot, Closest, Centre, as a segmented control.
-- **Affect**: Move (always on, shown for the row to read), Rotate, Scale, with their steps beside them.
-- **Targets**: the priority list. Each row is a toggle, the target's name, a one-line summary of its parameters ("10 cm, world origin"; "Warn, show on hover"), and a disclosure that opens the parameters. Rows drag to reorder. The two presets sit above the list.
+- **Affect**: Move (always on, shown for the row to read), Rotation and Scale, each a step and a switch.
+- **Targets**: the priority list, with the two presets as a segmented control beside the title. Each row is a handle to drag it by, the target's name, a one-line summary of its parameters ("10 cm, world origin"; "Warn, show on hover, pull ×2"), a disclosure that opens the parameters, and its switch.
 - **Tracking points**: how many are acquired, and Clear.
 - **Threshold**, the one slider every target shares: how far past a target the pointer goes before the selection is free.
 
-The pills keep a short form: with the popover closed, the view controls show Snap on or off, the grid step, and the rotation step, as they do now, and a chevron that opens the popover. The View menu's Grid section becomes Snap: the on and off toggle, the presets, the grid step, and Open snap settings.
+The three are built from one set of rows (`components/SnapParameters.tsx`), as are Settings › Editor › Snapping's: a 28px row with its label at the left and its control at the right, which drops under the label when the two can't share the width. A switch is a `Switch`, a choice of a few words a `ToggleGroup`, a step a `StepField`, a number a field of the same width, so their edges line up down a list, and a cluster of actions (the grid's origin, the construction planes) is buttons of the same height. Blocks sit 8px apart and their rows flush. A target's parameters open the same way in the popover and in Settings, under a chevron that turns down, indented under its title.
 
-The status bar's right end shows the current base and the first enabled target while a drag is in progress, in the same words as the pane's label.
+The status bar's right end shows the current base and the first target asked while a drag is in progress, in the same words as the pane's label.
 
 ## Tools built on the targets
 
@@ -251,7 +266,7 @@ Export writes none of it, and the game never sees it.
 
 ## Settings
 
-Settings › Editor has a Snapping section for what a new map starts on: snapping on or off, the base, the preset (Grid first or Pieces first), the steps and whether a turn and a scale snap, the threshold in pixels (default 12), and each target's toggle and parameters, with the same controls as the Snap popover behind each target's Parameters. The grid's origin and rotation are numbers there, as there is no selection to take them from. Use this map's makes all of a map's settings, a custom priority among them, what a new map starts on. A map's own settings, once changed, live in its sidecar and override these.
+Settings › Editor has a Snapping section for what a new map starts on: snapping as a whole on or off (the magnet), the base, the preset (Grid first or Pieces first), the steps and whether a turn and a scale snap, the threshold in pixels (default 12), and each target's toggle and parameters, with the same controls as the Snap popover behind each target's Parameters. The grid's origin and rotation are numbers there, as there is no selection to take them from. Use this map's makes all of a map's settings, a custom priority among them, what a new map starts on. A map's own settings, once changed, live in its sidecar and override these.
 
 Keybinds for the modifiers (§ Modifiers) sit with the other editor keybinds and can be rebound, since the game's own keybinds take some keys.
 

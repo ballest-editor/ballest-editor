@@ -1,6 +1,5 @@
 import {
   IconCamera,
-  IconChevronRight,
   IconDeviceGamepad2,
   IconKeyboard,
   IconPalette,
@@ -12,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
+import { cn } from "@workspace/ui/lib/utils"
 import { Equal, String as Str, Struct } from "effect"
 import { type ComponentProps, useEffect } from "react"
 import { movementLookModes } from "../domain/flyKeys"
@@ -51,7 +51,15 @@ import { CheckAgainButton, useGameLinkSettings } from "./GameLink"
 import { useKeybindCapture } from "./KeybindControl"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
-import { StepField, type UpdateTarget, ValueParameters } from "./SnapParameters"
+import {
+  DISCLOSURE_BODY,
+  DisclosureChevron,
+  Segmented,
+  StepField,
+  type UpdateTarget,
+  ValueParameters
+} from "./SnapParameters"
+import { PRESET_NAMES, presetOf } from "./SnapPopover"
 
 /** What a search finds each target's parameters by. */
 const SNAP_TARGET_KEYWORDS: Readonly<Record<SnapTarget, string>> = {
@@ -226,14 +234,14 @@ export function SettingsDialog(props: {
     {
       ...snapRow(
         "on",
-        "Snap",
+        "Snapping",
         snapping.enabled !== snapDefaults.enabled,
         () => updateSnapping({ enabled: snapDefaults.enabled })
       ),
-      description: "Whether a new map starts with snapping on.",
+      description: "Whether a new map starts with snapping as a whole on: the magnet in the top bar.",
       control: (
         <Switch
-          aria-label="Snap"
+          aria-label="Snapping"
           checked={snapping.enabled}
           onCheckedChange={(enabled) => updateSnapping({ enabled })}
         />
@@ -248,7 +256,8 @@ export function SettingsDialog(props: {
       ),
       description: "Which point of the selection lands on a target.",
       control: (
-        <Choice
+        <Segmented
+          label="Base"
           value={snapping.base}
           items={{ pivot: "Pivot", closest: "Closest", centre: "Centre" }}
           onChange={(base) => updateSnapping({ base })}
@@ -264,9 +273,10 @@ export function SettingsDialog(props: {
       ),
       description: "Which targets a new map asks first.",
       control: (
-        <Choice
-          value={isPreset(snapping, "piecesFirst") ? "piecesFirst" : "gridFirst"}
-          items={{ gridFirst: "Grid first", piecesFirst: "Pieces first" }}
+        <Segmented
+          label="Priority"
+          value={presetOf(snapping)}
+          items={PRESET_NAMES}
           onChange={(preset) => updateSnapping({ order: SNAP_PRESETS[preset] })}
         />
       )
@@ -363,11 +373,11 @@ export function SettingsDialog(props: {
       ...(target !== "construction" && {
         detail: (
           <Collapsible className="mt-1">
-            <CollapsibleTrigger className="group/more flex cursor-pointer items-center gap-1 rounded-control text-caption text-fg-secondary focus-ring">
-              <IconChevronRight className="size-3.5 transition-transform group-data-[panel-open]/more:rotate-90" />
+            <CollapsibleTrigger className="group/disclosure flex min-h-6 cursor-pointer items-center gap-1 rounded-control text-label text-fg-secondary focus-ring">
+              <DisclosureChevron />
               Parameters
             </CollapsibleTrigger>
-            <CollapsibleContent className="flex max-w-80 flex-col gap-1 py-1 pl-4">
+            <CollapsibleContent className={cn(DISCLOSURE_BODY, "max-w-80")}>
               <ValueParameters config={snapping} target={target} update={updateTarget} />
             </CollapsibleContent>
           </Collapsible>

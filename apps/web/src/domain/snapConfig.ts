@@ -54,7 +54,7 @@ export const MESH_ELEMENT_NAMES: Readonly<Record<MeshElement, string>> = {
 const Positive = Schema.Finite.check(Schema.isGreaterThan(0))
 
 /** The stops of the connectors' pull, weakest first: a quarter of their range to four times it. */
-const CONNECTOR_WEIGHTS = [0.25, 0.5, 1, 2, 4] as const
+export const CONNECTOR_WEIGHTS = [0.25, 0.5, 1, 2, 4] as const
 
 /** A pull as it reads: "×2", "×0.5". */
 export const formatWeight = (weight: number): string => `×${weight}`
