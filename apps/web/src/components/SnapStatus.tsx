@@ -1,5 +1,5 @@
 import { Button } from "@workspace/ui/components/button"
-import { priorityOf, SNAP_TARGET_NAMES } from "../domain/snapConfig"
+import { askedOrder, SNAP_TARGET_NAMES } from "../domain/snapConfig"
 import { applyFlipOffer, setFlushOptions } from "../editor/actions"
 import { snapConfigOf, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
@@ -97,7 +97,7 @@ export function SnapLabel() {
 /** The status bar's right end while a drag is in progress: the base and what it is on, in the pane's words. */
 export function SnapStatus() {
   const feedback = useEditor((s) => s.snapFeedback)
-  const first = useEditor((s) => priorityOf(snapConfigOf(s))[0])
+  const first = useEditor((s) => askedOrder(snapConfigOf(s))[0])
   if (feedback === null) return null
   return (
     <span className="min-w-0 truncate text-fg-secondary" data-snap-status>

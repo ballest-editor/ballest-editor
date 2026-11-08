@@ -23,6 +23,7 @@ import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gridColorsOf } from "../domain/Settings"
+import { snapsGrid } from "../domain/snapConfig"
 import { holdsDrop, placeAt, placePrefab } from "./actions"
 import { fadeFineLines, gridReach } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
@@ -313,7 +314,7 @@ function ViewportGrid() {
   const snapping = useEditor(snapConfigOf)
   const { origin, yaw } = snapping.targets.grid
   // what is seen is what snaps: the grid's own step while it is on, from its origin and turned with it
-  const step = snapping.enabled && snapping.targets.grid.enabled ? snapping.gridSize : FLOOR_CELL_CM
+  const step = snapsGrid(snapping) ? snapping.gridSize : FLOOR_CELL_CM
   const grid = useRef<THREE.Mesh>(null)
   useLayoutEffect(() => {
     const material = grid.current?.material

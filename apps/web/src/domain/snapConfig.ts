@@ -61,6 +61,12 @@ export const MESH_ELEMENT_NAMES: Readonly<Record<MeshElement, string>> = {
 }
 
 const Positive = Schema.Finite.check(Schema.isGreaterThan(0))
+
+/** The stops of the connectors' pull, weakest first: a quarter of their range to four times it. */
+export const CONNECTOR_WEIGHTS = [0.25, 0.5, 1, 2, 4] as const
+
+/** A pull as it reads: "×2", "×0.5". */
+export const formatWeight = (weight: number): string => `×${weight}`
 const Vector = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
 
 const GridTarget = Schema.Struct({
@@ -80,7 +86,14 @@ const ConnectorsTarget = Schema.Struct({
   profiles: Schema.Literals(["strict", "warn", "any"]),
   showOpenEnds: Schema.Literals(["never", "hover", "always"]),
   /** Offers the mirrored twin when it would fit and the piece itself wouldn't. */
-  flipToFit: Schema.Boolean
+  flipToFit: Schema.Boolean,
+  /**
+   * How hard ends pull against Grid and Mesh (docs/SNAPPING.md § Priority): their range is multiplied by it, and above 1
+   * they are asked ahead of both. Settings from before it read as 1.
+   */
+  weight: Schema.Finite.check(Schema.isBetween({ minimum: CONNECTOR_WEIGHTS[0], maximum: CONNECTOR_WEIGHTS[4] })).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(1))
+  )
 })
 
 const MeshTarget = Schema.Struct({
@@ -168,7 +181,8 @@ export const defaultSnapConfig: SnapConfig = {
       matchRotation: true,
       profiles: "warn",
       showOpenEnds: "hover",
-      flipToFit: true
+      flipToFit: true,
+      weight: 1
     },
     mesh: {
       enabled: true,
@@ -204,6 +218,31 @@ export const rowsOf = (config: SnapConfig): ReadonlyArray<SnapTarget> => wholeOr
 /** The targets that are on, in the order they are asked. */
 export const priorityOf = (config: SnapConfig): ReadonlyArray<SnapTarget> =>
   rowsOf(config).filter((target) => config.targets[target].enabled)
+
+/**
+ * The order a frame asks the targets in: the list's, except that Connectors pulling harder than even goes ahead of Grid
+ * and Mesh wherever they stand above it. The other targets keep their places.
+ */
+export const askedOrder = (config: SnapConfig): ReadonlyArray<SnapTarget> => {
+  const order = priorityOf(config)
+  const at = order.indexOf("connectors")
+  if (config.targets.connectors.weight <= 1 || at < 0) return order
+  const first = order.findIndex((target) => target === "grid" || target === "mesh")
+  if (first < 0 || first > at) return order
+  const rest = order.filter((target) => target !== "connectors")
+  return [...rest.slice(0, first), "connectors", ...rest.slice(first)]
+}
+
+/** Whether a move lands on the grid: snapping as a whole is on, and the Grid target is. */
+export const snapsGrid = (config: SnapConfig): boolean => config.enabled && config.targets.grid.enabled
+
+/** Whether a turn snaps to its step: under snapping as a whole, which Ctrl (`invert`) turns over, and its own toggle. */
+export const snapsRotation = (config: SnapConfig, invert = false): boolean =>
+  config.enabled !== invert && config.rotationEnabled
+
+/** Whether a scale snaps to its step, as `snapsRotation` does a turn. */
+export const snapsScale = (config: SnapConfig, invert = false): boolean =>
+  config.enabled !== invert && config.scaleEnabled
 
 export const withPreset = (config: SnapConfig, preset: SnapPreset): SnapConfig => ({
   ...config,
@@ -293,7 +332,7 @@ export const turnSnapOf = (
 ): { readonly step: boolean; readonly targets: ReadonlyArray<SnapTarget> } => {
   const held = kindsFor(transform, kinds)
   const narrowed = narrowedTo(config, held)
-  const on = (transform === "turn" ? narrowed.rotationEnabled : narrowed.scaleEnabled) !== invert
+  const on = narrowed.enabled !== invert && (transform === "turn" ? narrowed.rotationEnabled : narrowed.scaleEnabled)
   if (!on) return { step: false, targets: [] }
   return {
     step: held.length === 0 || held.includes("step"),
@@ -302,8 +341,11 @@ export const turnSnapOf = (
 }
 
 /** How far, in pixels, `target` keeps hold of a drag, and how near a pick has to be. */
-export const rangeOf = (config: SnapConfig, target: SnapTarget): number =>
-  target === "connectors" ? config.targets.connectors.range ?? config.threshold : config.threshold
+export const rangeOf = (config: SnapConfig, target: SnapTarget): number => {
+  if (target !== "connectors") return config.threshold
+  const { range, weight } = config.targets.connectors
+  return (range ?? config.threshold) * weight
+}
 
 const isWorldOrigin = ({ x, y, z }: Vec3) => x === 0 && y === 0 && z === 0
 
@@ -328,7 +370,11 @@ export const targetSummary = (
         ...(grid.yaw === 0 ? [] : [`${grid.yaw}°`])
       ].join(", ")
     case "connectors":
-      return `${PROFILE_WORDS[connectors.profiles]}, ${OPEN_END_WORDS[connectors.showOpenEnds]}`
+      return [
+        PROFILE_WORDS[connectors.profiles],
+        OPEN_END_WORDS[connectors.showOpenEnds],
+        ...(connectors.weight === 1 ? [] : [`pull ${formatWeight(connectors.weight)}`])
+      ].join(", ")
     case "mesh": {
       const on = MESH_ELEMENTS.filter((element) => mesh.elements[element]).length
       return `${on} of ${MESH_ELEMENTS.length} elements, ${FACE_WORDS[mesh.rotateToFace]}`

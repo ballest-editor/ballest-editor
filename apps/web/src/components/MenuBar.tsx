@@ -135,6 +135,7 @@ function Row({ node, inset }: Indent & { readonly node: MenuNode }) {
       return (
         <MenubarCheckboxItem closeOnClick checked={node.checked} onCheckedChange={() => node.run()}>
           {node.label}
+          {node.shortcut !== undefined && <Shortcut action={node.shortcut} />}
         </MenubarCheckboxItem>
       )
     case "section":

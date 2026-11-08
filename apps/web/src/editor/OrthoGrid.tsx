@@ -3,6 +3,7 @@ import * as THREE from "three"
 import { threeToUeVector } from "../domain/coords"
 import { axisOf, dot, gridLevels, MAX_GRID_LEVELS, ORTHO_AXES } from "../domain/orthoView"
 import { gridColorsOf } from "../domain/Settings"
+import { snapsGrid } from "../domain/snapConfig"
 import { gridInView } from "../domain/snapGrid"
 import { sceneAxisColors } from "./axisColors"
 import { orthographicOnly } from "./paneCameras"
@@ -126,7 +127,7 @@ export function OrthoGrid() {
     const cmPerPixel = pane.cmPerPixel / window.devicePixelRatio
     const levels = gridLevels(
       cmPerPixel,
-      snapping.enabled && snapping.targets.grid.enabled ? snapping.gridSize : undefined
+      snapsGrid(snapping) ? snapping.gridSize : undefined
     )
     uniforms.uCentre.value.set(dot(target, right), dot(target, up))
     const grid = gridInView(snapping, right, up)

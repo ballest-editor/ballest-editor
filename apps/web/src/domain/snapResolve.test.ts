@@ -53,6 +53,14 @@ const twoTracked: ReadonlyArray<TrackedPoint> = [
 /** A base that stops on faces across X, as a selection's near or far face does. */
 const faceBase: BasePoint = { ...pivotBase, stop: { kind: "face", axis: { x: 1, y: 0, z: 0 } } }
 
+/** An item with one end at x 300 facing back along X, a vertex at `vertex`, and a base that is an end facing it. */
+const endWithVertex = (vertex: Vec3) => {
+  const end = endAlongX("a", 0, 300, -1)
+  const own: BasePoint = { start: ORIGIN, label: "End", end: endAlongX("own", 0, 0, 1) }
+  const mesh = () => ({ vertices: [vertex], edges: [], faceCentres: [], faces: [] })
+  return { end, own, items: [cubeAt("a", end.position, { ends: [end], mesh, bounds: undefined })] }
+}
+
 const frameOf = (offset: Vec3, extra: Partial<SnapFrame> = {}): SnapFrame => ({
   config: on(defaultSnapConfig, "grid", "mesh"),
   view: topView(),
@@ -101,6 +109,31 @@ describe("resolveSnap", () => {
     const hit = resolveSnap(frameOf({ x: 104, y: 96, z: 0 }, { config, items }))
     assert.strictEqual(hit?.target, "grid")
     assert.deepStrictEqual(hit?.landing, { x: 100, y: 100, z: 0 })
+  })
+
+  describe("the connectors' pull", () => {
+    const { end, items, own } = endWithVertex({ x: 306, y: 0, z: 0 })
+    const pulled = (config: SnapConfig, weight: number): SnapConfig => ({
+      ...config,
+      targets: { ...config.targets, connectors: { ...config.targets.connectors, weight } }
+    })
+    const pick = (config: SnapConfig, x: number) =>
+      resolveSnap(frameOf({ x, y: 0, z: 0 }, { config, bases: [own], items }))
+
+    it("leaves a vertex above Connectors in the list to win at an even pull, and gives the end the frame above it", () => {
+      const meshFirst = withTargetMoved(on(defaultSnapConfig, "grid", "connectors", "mesh"), "mesh", 0)
+      assert.strictEqual(pick(meshFirst, 304)?.target, "mesh")
+      assert.strictEqual(pick(pulled(meshFirst, 2), 304)?.target, "connectors")
+      assert.strictEqual(pick(pulled(meshFirst, 0.5), 304)?.target, "mesh")
+    })
+
+    it("reaches an end from further off as it pulls harder, and from nearer as it pulls less", () => {
+      const ends = on(defaultSnapConfig, "connectors")
+      assert.isUndefined(pick(ends, 320))
+      assert.deepStrictEqual(pick(pulled(ends, 2), 320)?.landing, end.position)
+      assert.isUndefined(pick(pulled(ends, 0.5), 308))
+      assert.deepStrictEqual(pick(ends, 308)?.landing, end.position)
+    })
   })
 
   it("is free past every range with the grid off", () => {
@@ -669,10 +702,7 @@ describe("resolveDrag", () => {
   })
 
   it("reaches an end the path passes anywhere in its range, and a vertex only within a third", () => {
-    const end = endAlongX("a", 0, 300, -1)
-    const own: BasePoint = { start: ORIGIN, label: "End", end: endAlongX("own", 0, 0, 1) }
-    const mesh = () => ({ vertices: [end.position], edges: [], faceCentres: [], faces: [] })
-    const items = [cubeAt("a", end.position, { ends: [end], mesh, bounds: undefined })]
+    const { end, items, own } = endWithVertex({ x: 300, y: 0, z: 0 })
     const path = [280, 296, 304]
     const passing = (config: SnapConfig, y: number) => dragAlong(path, { config, bases: [own], items }, y)[2]?.landing
     assert.deepStrictEqual(passing(only("connectors"), 8), end.position)

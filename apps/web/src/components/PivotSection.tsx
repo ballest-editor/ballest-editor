@@ -8,6 +8,7 @@ import { soleGroupOf } from "../domain/groupSelection"
 import type { Axis } from "../domain/groupTransform"
 import { GROUP_PIVOT_FACES, type GroupNode, type GroupPivot } from "../domain/MapSidecar"
 import { PIVOT_CHOICES, pivotBoundsOf } from "../domain/pivot"
+import { snapsGrid } from "../domain/snapConfig"
 import { pieceNameOf, treeKeys } from "../domain/structure"
 import { vecSub } from "../domain/ueMath"
 import { editSelectionAxis, moveSelectionBy, previewSelectionAxis, setSelectionPivot } from "../editor/actions"
@@ -64,7 +65,7 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
               onScrub={(v, from) => previewSelectionAxis("translation", axis, v === null ? null : offset(v, from))}
               onScrubCommit={(v, from) => editSelectionAxis("translation", axis, offset(v, from))}
               step={units === "m" ? 0.01 : 1}
-              snap={snapping.enabled ? snapping.gridSize / perUnit : undefined}
+              snap={snapsGrid(snapping) ? snapping.gridSize / perUnit : undefined}
               digits={units === "m" ? 3 : 1}
               handleClassName={AXIS_BG_CLASSES[axis]}
               handleText={axis.toUpperCase()}
