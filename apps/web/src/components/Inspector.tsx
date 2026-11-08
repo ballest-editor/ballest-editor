@@ -5,6 +5,8 @@ import {
   IconCircleCheck,
   IconCopy,
   IconFolderOpen,
+  IconPercentage,
+  IconRuler2,
   IconSettings,
   IconTrash,
   IconUserCircle
@@ -14,15 +16,18 @@ import { Button } from "@workspace/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
+import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { Fragment, type ReactNode, useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
+import type { CatalogIndex } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { creatorChipText, mapCreatorLabel } from "../domain/creator"
 import { editTransform, isDecal } from "../domain/editTransform"
 import { mapLabelOf } from "../domain/factory"
 import { counted, exactSelectedGroup } from "../domain/groupSelection"
 import { type Axis, readField, type TransformField } from "../domain/groupTransform"
+import { extentOf, sizeAt } from "../domain/itemBounds"
 import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
@@ -37,7 +42,9 @@ import {
   previewSelectionAxis,
   revealProject,
   setSelectionField,
-  setSelectionUnitField
+  setSelectionSize,
+  setSelectionUnitField,
+  updateSettings
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import {
@@ -64,7 +71,7 @@ import { PaintSection } from "./PaintSection"
 import { PathAction, PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
 import { PrefabSettings } from "./PrefabSettings"
-import { RowClipboard } from "./RowClipboard"
+import { type ClipKey, RowClipboard } from "./RowClipboard"
 import { Section, SectionHeader, SectionTitle } from "./SectionTitle"
 import { ChainSection, GroupSection, InstanceSection, ItemTags, LabelledField } from "./StructureSection"
 
@@ -306,6 +313,8 @@ interface TransformRowSpec {
   readonly axisLabels: Readonly<Record<Axis, string>>
   readonly step: number
   readonly digits: number
+  /** Centimetres per shown unit, on a row whose scrubs land on the tool bar's grid (a location or a size). */
+  readonly grid?: number
 }
 
 const AXIS_LABELS: Readonly<Record<Axis, string>> = { x: "X", y: "Y", z: "Z" }
@@ -322,7 +331,8 @@ const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<T
     help: `The piece's origin, as the map stores it, in ${units === "m" ? "metres" : "centimetres"}, Z up`,
     axisLabels: AXIS_LABELS,
     step: units === "m" ? 0.01 : 1,
-    digits: units === "m" ? 3 : 1
+    digits: units === "m" ? 3 : 1,
+    grid: units === "m" ? 100 : 1
   }
   return [
     ...(of === "item" ? [location] : []),
@@ -359,11 +369,77 @@ const DECAL_SIZE_ROW: TransformRowSpec = {
   help: "Centimetres: height, width, depth",
   axisLabels: AXIS_LABELS,
   step: 1,
-  digits: 1
+  digits: 1,
+  grid: 1
 }
 
-const FIELD_HELP =
-  "Drag a field to change it: Shift ×10, Alt ×0.1. Type +50, -20, *2 or /2 to change what's there, =-20 to set a negative."
+/**
+ * The Scale row as a size: the piece's bounds along its own axes at its scale (domain/itemBounds), in display units. A
+ * change scales the selection as the factor row does, by the ratio it makes of the active item's size.
+ */
+const sizeRow = (units: "cm" | "m"): TransformRowSpec => ({
+  field: "scale3D",
+  label: "Size",
+  unit: units,
+  help: "The piece's size along its own axes. A change scales it",
+  axisLabels: AXIS_LABELS,
+  step: units === "m" ? 0.01 : 1,
+  digits: units === "m" ? 3 : 1,
+  grid: units === "m" ? 100 : 1
+})
+
+const SCALE_MODES = ["factor", "size"] as const
+
+/** One choice of `ScaleModeToggle`. A disabled item takes no pointer events, so the tooltip is on a wrapper. */
+function ScaleModeItem({ value, label, disabled = false, children }: {
+  readonly value: typeof SCALE_MODES[number]
+  readonly label: string
+  readonly disabled?: boolean
+  readonly children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex" />}>
+        <ToggleGroupItem
+          value={value}
+          aria-label={label}
+          disabled={disabled}
+          className="h-4 min-w-0 px-0.5 [&_svg:not([class*='size-'])]:size-3.5"
+        >
+          {children}
+        </ToggleGroupItem>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** Whether the Scale row shows a factor or a size, kept in settings; Size needs the active piece's bounds. */
+function ScaleModeToggle({ units, sizeKnown }: { readonly units: "cm" | "m"; readonly sizeKnown: boolean }) {
+  const mode = useEditor((s) => s.settings.panels.inspectorScale)
+  return (
+    <ToggleGroup
+      aria-label="Show scale as"
+      value={[sizeKnown ? mode : "factor"]}
+      onValueChange={(picked) => {
+        const next = SCALE_MODES.find((m) => picked.includes(m))
+        if (next !== undefined) void updateSettings("panels", { inspectorScale: next })
+      }}
+      className="p-px"
+    >
+      <ScaleModeItem value="factor" label="Factor">
+        <IconPercentage />
+      </ScaleModeItem>
+      <ScaleModeItem
+        value="size"
+        label={sizeKnown ? `Size in ${units}` : "This piece's size isn't known"}
+        disabled={!sizeKnown}
+      >
+        <IconRuler2 />
+      </ScaleModeItem>
+    </ToggleGroup>
+  )
+}
 
 /**
  * One editable row over the whole selection: its name and unit, its clipboard button (`RowClipboard`), then an X/Y/Z
@@ -371,7 +447,8 @@ const FIELD_HELP =
  * or a whole group's frame. A typed value takes the unit's axis there and the rest of the selection follows by the
  * same change, as a scrub does and as the game's panel does, so a selection keeps its spread; items that differ from
  * the unit are marked Mixed. A paste is the row's `onPaste`. With snapping on, a scrub lands on the grid or rotation
- * step. `perUnit` converts display units to the stored value.
+ * step. `perUnit` converts each axis's display value to the stored one (a size to its scale). `mode` is a control
+ * after the label (Scale's factor or size).
  */
 function TransformRow(props: {
   readonly row: TransformRowSpec
@@ -383,29 +460,33 @@ function TransformRow(props: {
   readonly copyValue: Vec3
   /** What a paste of three values does to the selection. */
   readonly onPaste: (value: Vec3) => void
-  readonly perUnit: number
+  readonly perUnit: Readonly<Record<Axis, number>>
+  /** The clipboard's kind of row, when it isn't the field's (a size). */
+  readonly clipKey?: ClipKey
+  readonly mode?: ReactNode
 }) {
   const snapping = useEditor((s) => s.settings.snapping)
   const { row, perUnit } = props
   const { field } = row
-  // Scrubs follow the tool bar's snapping, in display units: the grid for location, the step for rotation.
-  const snap = field === "translation"
-    ? snapping.enabled ? snapping.gridSize / perUnit : undefined
+  // Scrubs follow the tool bar's snapping, in display units: the grid for a location or a size, the step for rotation.
+  const snap = row.grid !== undefined
+    ? snapping.enabled ? snapping.gridSize / row.grid : undefined
     : field === "rotation" && snapping.rotationEnabled
     ? snapping.rotationStep
     : undefined
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex h-5 items-center justify-between gap-2">
-        <Tooltip>
-          <TooltipTrigger render={<span className="text-body text-fg-secondary" />}>
-            {row.label} <span className="text-caption text-fg-tertiary">{row.unit}</span>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="flex-col items-start">
-            <span>{row.help}</span>
-            <span>{FIELD_HELP}</span>
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger render={<span className="text-body text-fg-secondary" />}>
+              {row.label}
+              {row.unit !== "" && <span className="text-caption text-fg-tertiary">{` ${row.unit}`}</span>}
+            </TooltipTrigger>
+            <TooltipContent side="left">{row.help}</TooltipContent>
+          </Tooltip>
+          {props.mode}
+        </div>
         {props.mixed.size > 0 && (
           <Tooltip>
             <TooltipTrigger render={<span className="ml-auto text-caption text-fg-tertiary" />}>Mixed</TooltipTrigger>
@@ -416,18 +497,23 @@ function TransformRow(props: {
             </TooltipContent>
           </Tooltip>
         )}
-        <RowClipboard clipKey={field} label={row.label} value={props.copyValue} onPaste={props.onPaste} />
+        <RowClipboard
+          clipKey={props.clipKey ?? field}
+          label={row.label}
+          value={props.copyValue}
+          onPaste={props.onPaste}
+        />
       </div>
       <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
         {axes.map((axis) => {
-          const value = readField(props.unit, field)[axis] / perUnit
-          const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
+          const value = readField(props.unit, field)[axis] / perUnit[axis]
+          const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit[axis] }) as const
           return (
             <NumberField
               key={axis}
               label={row.axisLabels[axis]}
               value={value}
-              onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit })}
+              onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit[axis] })}
               onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
               onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
               step={row.step}
@@ -557,47 +643,104 @@ function ItemDetails({ item, index }: { readonly item: Item; readonly index: num
   )
 }
 
+/** The axes on which any of `values` differs from `reference`. */
+const differingAxes = (reference: Vec3, values: ReadonlyArray<Vec3>, tolerance = 1e-6): Set<Axis> =>
+  new Set(AXES.filter((axis) => values.some((v) => Math.abs(v[axis] - reference[axis]) > tolerance)))
+
 /** The axes on which any of `transforms` differs from `unit`, in the field's units. */
-const mixedAxes = (unit: UeTransform, transforms: ReadonlyArray<UeTransform>, field: TransformField): Set<Axis> => {
-  const reference = readField(unit, field)
-  const values = transforms.map((t) => readField(t, field))
-  return new Set(AXES.filter((axis) => values.some((v) => Math.abs(v[axis] - reference[axis]) > 1e-6)))
+const mixedAxes = (unit: UeTransform, transforms: ReadonlyArray<UeTransform>, field: TransformField): Set<Axis> =>
+  differingAxes(readField(unit, field), transforms.map((t) => readField(t, field)))
+
+const uniform = (n: number): Readonly<Record<Axis, number>> => ({ x: n, y: n, z: n })
+
+/** The Scale row's props as a size: `extent` is the active item's, `items` and `transforms` line up. */
+const sizeRowProps = (
+  { unit, active, extent, items, transforms, catalog, perUnit }: {
+    readonly unit: UeTransform
+    readonly active: UeTransform
+    readonly extent: Vec3
+    readonly items: ReadonlyArray<Item>
+    readonly transforms: ReadonlyArray<UeTransform>
+    readonly catalog: CatalogIndex | null
+    readonly perUnit: number
+  }
+) => {
+  const sizes = items.flatMap((item, i) => {
+    const own = extentOf(item, catalog)
+    const t = transforms[i]
+    return own === undefined || t === undefined ? [] : [sizeAt(own, t.scale3D)]
+  })
+  const sign = (axis: Axis) => (unit.scale3D[axis] < 0 ? -1 : 1)
+  return {
+    // a display value times this is the active item's scale for that size, flipped as it is
+    perUnit: {
+      x: sign("x") * perUnit / extent.x,
+      y: sign("y") * perUnit / extent.y,
+      z: sign("z") * perUnit / extent.z
+    },
+    mixed: differingAxes(sizeAt(extent, unit.scale3D), sizes, 1e-3),
+    copyValue: sizeAt(extent, active.scale3D),
+    onPaste: setSelectionSize,
+    clipKey: "size"
+  } as const
 }
 
 /**
  * The Transform section: the selection's unit, edited as one thing. For items that is the active one with the rest
  * following; for a whole group it is the frame, with the group's items as `transforms` only to mark what differs.
  */
-function TransformSection({ of, unit, transforms, active, decals = false, children }: {
+function TransformSection({ of, unit, transforms, active, items = NO_ITEMS, children }: {
   readonly of: "item" | "group"
   readonly unit: UeTransform
   readonly transforms: ReadonlyArray<UeTransform>
   /** The active item's document transform, which a copy reads; a group's copy reads the unit as shown. */
   readonly active?: UeTransform | undefined
-  /** Whether every item is a decal, whose scale is a size. */
-  readonly decals?: boolean
+  /** The selected items, in line with `transforms`, whose Scale row can show a size; none for a group. */
+  readonly items?: ReadonlyArray<Item>
   readonly children?: ReactNode
 }) {
   const units = useEditor((s) => s.settings.general.units)
+  const catalog = useEditor((s) => s.catalogIndex)
+  const scaleMode = useEditor((s) => s.settings.panels.inspectorScale)
   // Display units only; the map always stores centimetres (rotation and scale don't convert).
   const perUnit = units === "m" ? 100 : 1
+  // a decal's scale is its size already; a group's is a factor of nothing it holds
+  const decals = items.length > 0 && items.every(isDecal)
+  const activeItem = decals ? undefined : items.at(-1)
+  const extent = activeItem === undefined ? undefined : extentOf(activeItem, catalog)
   return (
     <Section>
       <SectionTitle>Transform</SectionTitle>
       <div className="flex @container flex-col gap-2">
-        {transformRows(units, of).map((row) => (
-          <TransformRow
-            key={row.field}
-            row={row.field === "scale3D" && decals ? DECAL_SIZE_ROW : row}
-            unit={unit}
-            mixed={of === "item" ? mixedAxes(unit, transforms, row.field) : EMPTY_AXES}
-            copyValue={readField(active ?? unit, row.field)}
+        {transformRows(units, of).map((row) => {
+          const props = {
+            row,
+            unit,
+            mixed: of === "item" ? mixedAxes(unit, transforms, row.field) : EMPTY_AXES,
+            copyValue: readField(active ?? unit, row.field),
             // a piece's paste sets every item; a group's takes the group there, as typing the three values would
-            onPaste={(value) =>
-              of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value)}
-            perUnit={row.field === "translation" ? perUnit : 1}
-          />
-        ))}
+            onPaste: (value: Vec3) =>
+              of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value),
+            perUnit: uniform(row.field === "translation" ? perUnit : 1)
+          }
+          if (row.field !== "scale3D") return <TransformRow key={row.field} {...props} />
+          if (decals) return <TransformRow key={row.field} {...props} row={DECAL_SIZE_ROW} />
+          if (activeItem === undefined) return <TransformRow key={row.field} {...props} />
+          const mode = <ScaleModeToggle units={units} sizeKnown={extent !== undefined} />
+          if (extent === undefined || scaleMode === "factor") {
+            // the toggle says it's a factor
+            return <TransformRow key={row.field} {...props} row={{ ...row, unit: "" }} mode={mode} />
+          }
+          return (
+            <TransformRow
+              key={row.field}
+              {...props}
+              {...sizeRowProps({ unit, active: active ?? unit, extent, items, transforms, catalog, perUnit })}
+              row={sizeRow(units)}
+              mode={mode}
+            />
+          )
+        })}
         {children}
       </div>
     </Section>
@@ -605,6 +748,7 @@ function TransformSection({ of, unit, transforms, active, decals = false, childr
 }
 
 const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
+const NO_ITEMS: ReadonlyArray<Item> = []
 const EMPTY_AXES: ReadonlySet<Axis> = new Set()
 
 /**
@@ -630,7 +774,7 @@ function ItemEditor({ items, ids, transforms, placed, transform }: {
             unit={shownActive}
             transforms={transforms}
             active={editTransform(active)}
-            decals={items.every(isDecal)}
+            items={items}
           >
             <FlipSection items={placed} />
           </TransformSection>

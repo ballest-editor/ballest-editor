@@ -8,10 +8,10 @@ import type { TransformField } from "../domain/groupTransform"
 import { useEditor } from "../editor/store"
 import { ShiftClick } from "./KeyChip"
 
-/** What a row's three values are: a transform field, or a pivot's position. Each keeps its own copy. */
-export type ClipKey = TransformField | "pivot"
+/** What a row's three values are: a transform field, a size, or a pivot's position. Each keeps its own copy. */
+export type ClipKey = TransformField | "size" | "pivot"
 
-/** Copied rows in stored units (cm, degrees, factor), shared by every selection and tab. */
+/** Copied rows in stored units (cm, degrees, factor; a size in cm), shared by every selection and tab. */
 const copiedRows = new Map<ClipKey, Vec3>()
 
 /**

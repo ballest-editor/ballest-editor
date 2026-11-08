@@ -61,3 +61,29 @@ export const boxCentreOf = ({ max, min }: Box): Vec3 => ({
   y: (min.y + max.y) / 2,
   z: (min.z + max.z) / 2
 })
+
+/**
+ * An item's local bounds' length along each of its own axes (unscaled cm): what a scale of 1 makes its size. Undefined
+ * when the bounds are unknown or flat on an axis (a raw light's), where no scale gives a size.
+ */
+export const extentOf = (item: Item, catalog: CatalogIndex | null): Vec3 | undefined => {
+  const bounds = pivotBoundsOf(item, catalog)
+  if (bounds === undefined) return undefined
+  const [x0, y0, z0] = bounds.min
+  const [x1, y1, z1] = bounds.max
+  const extent = { x: x1 - x0, y: y1 - y0, z: z1 - z0 }
+  return Math.min(extent.x, extent.y, extent.z) > 0 ? extent : undefined
+}
+
+/** The size (cm) an `extent` takes at `scale`, along the item's own axes: a flip doesn't make it negative. */
+export const sizeAt = (extent: Vec3, scale: Vec3): Vec3 => ({
+  x: extent.x * Math.abs(scale.x),
+  y: extent.y * Math.abs(scale.y),
+  z: extent.z * Math.abs(scale.z)
+})
+
+/** The scale that gives `extent` the `size` (cm), keeping each axis's flip from `scale`. */
+export const scaleForSize = (extent: Vec3, scale: Vec3, size: Vec3): Vec3 => {
+  const axis = (e: number, s: number, v: number) => (s < 0 ? -1 : 1) * v / e
+  return { x: axis(extent.x, scale.x, size.x), y: axis(extent.y, scale.y, size.y), z: axis(extent.z, scale.z, size.z) }
+}
