@@ -34,7 +34,7 @@ describe("MapSidecar", () => {
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(decoded)), sidecar)
   })
 
-  it("round-trips a group's pivot and a chain, and refuses a pivot it doesn't know", () => {
+  it("round-trips a group's pivot and a chain with its growth, and refuses a pivot or growth it doesn't know", () => {
     const decodes = (value: unknown) => Option.isSome(Schema.decodeUnknownOption(MapSidecar)(value))
     const withGroups = (...groups: ReadonlyArray<Record<string, unknown>>) => ({
       ...sidecar,
@@ -43,7 +43,8 @@ describe("MapSidecar", () => {
     const good = withGroups(
       { pivot: { choice: "Top" } },
       { pivot: { choice: "item", key: "k3" } },
-      { pivot: { choice: "point", world: { x: 1, y: -2.5, z: 3 } }, chain: true }
+      { pivot: { choice: "point", world: { x: 1, y: -2.5, z: 3 } }, chain: true },
+      { chain: true, growth: { curve: "compound", percent: -12.5 } }
     )
     const text = JSON.stringify(good)
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(Schema.decodeSync(Codec)(text))), good)
@@ -51,6 +52,8 @@ describe("MapSidecar", () => {
     assert.isFalse(decodes(withGroups({ pivot: { choice: "item" } })))
     assert.isFalse(decodes(withGroups({ pivot: { choice: "point", world: { x: 1, y: 2 } } })))
     assert.isFalse(decodes(withGroups({ chain: false })))
+    assert.isFalse(decodes(withGroups({ chain: true, growth: { curve: "steep", percent: 10 } })))
+    assert.isFalse(decodes(withGroups({ chain: true, growth: { curve: "linear" } })))
   })
 
   it("refuses a sidecar of another format version, or a key that isn't URL-safe", () => {

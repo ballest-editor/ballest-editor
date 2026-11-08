@@ -52,6 +52,18 @@ export const GroupPivot = Schema.Union([
 ])
 export type GroupPivot = typeof GroupPivot.Type
 
+/**
+ * How much more each link of a chain turns than the one before when it bends (docs/DESKTOP.md § Group pivots and
+ * chains): `linear` adds `percent` of the first link's turn per link, so the curve tightens steadily (a clothoid);
+ * `compound` multiplies by `1 + percent / 100` per link, so it tightens faster and faster. Absent, every link turns
+ * alike.
+ */
+export const ChainGrowth = Schema.Struct({
+  curve: Schema.Literals(["linear", "compound"]),
+  percent: Schema.Finite
+})
+export type ChainGrowth = typeof ChainGrowth.Type
+
 export interface ItemNode {
   readonly kind: "item"
   readonly key: string
@@ -67,6 +79,8 @@ export interface GroupNode {
   readonly pivot?: GroupPivot
   /** A chain: its children, in this order, are its links, each hanging off the one before (docs/DESKTOP.md § Chains). */
   readonly chain?: true
+  /** A chain's growth; absent on a plain group. */
+  readonly growth?: ChainGrowth
 }
 
 export type TreeNode = ItemNode | GroupNode
@@ -81,7 +95,8 @@ const TreeNode: Schema.Codec<TreeNode> = Schema.Union([
     children: Schema.Array(Schema.suspend((): Schema.Codec<TreeNode> => TreeNode)),
     prefab: Schema.optionalKey(PrefabLink),
     pivot: Schema.optionalKey(GroupPivot),
-    chain: Schema.optionalKey(Schema.Literal(true))
+    chain: Schema.optionalKey(Schema.Literal(true)),
+    growth: Schema.optionalKey(ChainGrowth)
   })
 ])
 

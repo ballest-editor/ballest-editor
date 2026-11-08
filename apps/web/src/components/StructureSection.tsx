@@ -1,18 +1,21 @@
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { Slider, sliderValue } from "@workspace/ui/components/slider"
+import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { type ReactNode, useMemo, useState } from "react"
 import type { UeTransform } from "../domain/coords"
 import { counted } from "../domain/groupSelection"
 import { formatBoxSize, placedBoxOf } from "../domain/itemBounds"
 import { itemCountOf } from "../domain/mapDiff"
 import type { Item } from "../domain/MapFile"
-import type { GroupNode, PrefabLink } from "../domain/MapSidecar"
+import type { ChainGrowth, GroupNode, PrefabLink } from "../domain/MapSidecar"
 import { isSamePrefab } from "../domain/prefab"
 import { checkInstance } from "../domain/prefabInstance"
 import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
+import { NumberField } from "./NumberField"
 import { SectionHeader, SectionTitle } from "./SectionTitle"
 import { TagInput } from "./TagInput"
 
@@ -110,9 +113,86 @@ export function GroupSection({ group, items, transforms, actions, children }: {
   )
 }
 
+const GROWTH_CURVES = ["Even", "Linear", "Compound"] as const
+type GrowthCurve = (typeof GROWTH_CURVES)[number]
+/** The slider's reach; the field takes any value, short of a compound shrink to nothing. */
+const GROWTH_RANGE = { min: -50, max: 100 }
+/** Where a growth starts when it's switched on. */
+const DEFAULT_GROWTH_PERCENT = 10
+
+const growthFor = (curve: GrowthCurve, percent: number): ChainGrowth | undefined =>
+  curve === "Even"
+    ? undefined
+    : curve === "Linear"
+    ? { curve: "linear", percent }
+    : { curve: "compound", percent: Math.max(-99, percent) }
+
+/** How much more each link of a chain turns than the one before when it bends (`ChainGrowth`). */
+function ChainGrowthField({ group }: { readonly group: GroupNode }) {
+  const setChainGrowth = useEditor((s) => s.setChainGrowth)
+  const { growth } = group
+  const curve: GrowthCurve = growth === undefined ? "Even" : growth.curve === "linear" ? "Linear" : "Compound"
+  // the slider's value while it's dragged; the chain takes it when it's let go
+  const [dragged, setDragged] = useState<number | null>(null)
+  const percent = dragged ?? growth?.percent ?? DEFAULT_GROWTH_PERCENT
+  const commit = (next: GrowthCurve, value: number) => {
+    setDragged(null)
+    setChainGrowth(group.id, growthFor(next, value))
+  }
+  return (
+    <div className="flex @container flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-body text-fg-secondary">Growth</span>
+        <InfoHint>
+          How much more each link turns than the one before when the chain bends. Linear adds a share of the first
+          link's turn at every link, so the curve tightens steadily; Compound multiplies it, so the curve winds into a
+          spiral. A negative growth opens the curve out instead.
+        </InfoHint>
+      </div>
+      <ToggleGroup
+        aria-label="Chain growth"
+        value={[curve]}
+        onValueChange={(value) => {
+          const next = GROWTH_CURVES.find((c) => value.includes(c))
+          if (next !== undefined && next !== curve) commit(next, percent)
+        }}
+        className="grid w-full grid-cols-3"
+      >
+        {GROWTH_CURVES.map((c) => <ToggleGroupItem key={c} value={c} className="min-w-0 px-1">{c}</ToggleGroupItem>)}
+      </ToggleGroup>
+      {curve !== "Even" && (
+        <div className="grid grid-cols-[minmax(0,1fr)_4.75rem] items-center gap-2">
+          <Slider
+            aria-label="Growth per link"
+            min={GROWTH_RANGE.min}
+            max={GROWTH_RANGE.max}
+            step={1}
+            // one thumb: the shared Slider draws a thumb per array entry, and a bare number as a range
+            value={[Math.min(GROWTH_RANGE.max, Math.max(GROWTH_RANGE.min, percent))]}
+            onValueChange={(v) => setDragged(sliderValue(v) ?? null)}
+            onValueCommitted={(v) => {
+              const next = sliderValue(v)
+              if (next !== undefined) commit(curve, next)
+            }}
+          />
+          <NumberField
+            label="Growth per link"
+            value={percent}
+            digits={1}
+            handle={false}
+            unit="%"
+            onCommit={(v) => commit(curve, v)}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 /**
  * A chain (docs/design/pivot-modes-and-chains.md § Chains): its links in outline order, each hanging off the one before,
- * so a turn in Each runs down them. Here: how many links, and the chain actions the Outline's menu has.
+ * so a turn in Each bends it. Here: how many links, how a bend grows down them, and the chain actions the Outline's menu
+ * has.
  */
 export function ChainSection({ group }: { readonly group: GroupNode }) {
   const setChain = useEditor((s) => s.setChain)
@@ -141,11 +221,13 @@ export function ChainSection({ group }: { readonly group: GroupNode }) {
       <div className="flex items-center justify-between gap-2">
         <SectionTitle>Chain</SectionTitle>
         <InfoHint>
-          The links hang off one another in outline order: a turn in Each runs down them, a move carries the links after
-          the moved one, and a scale stays with its link.
+          The links hang off one another in outline order: a turn in Each bends the chain, each link turning on its own
+          axes and carrying the links after it; a move carries the links after the moved one, and a scale stays with its
+          link.
         </InfoHint>
       </div>
       <p className="text-body text-fg-tertiary">{counted(links, "link")} in outline order.</p>
+      <ChainGrowthField group={group} />
       <div className="flex flex-wrap gap-1">
         <Button variant="outline" size="sm" disabled={links < 2} onClick={() => reverseChain(group.id)}>
           Reverse

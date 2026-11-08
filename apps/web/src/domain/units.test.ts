@@ -11,14 +11,15 @@ import {
   selectionAxisEdit
 } from "./groupTransform"
 import type { Box } from "./itemBounds"
-import type { GroupNode, TreeNode } from "./MapSidecar"
+import type { ChainGrowth, GroupNode, TreeNode } from "./MapSidecar"
 import { localToWorld } from "./pivot"
 import type { Structure } from "./structure"
-import { ORIGIN, quatToRotator, rotateVec, rotatorToQuat } from "./ueMath"
+import { ORIGIN, quatConjugate, quatDot, quatMul, quatToRotator, rotateVec, rotatorToQuat, vecSub } from "./ueMath"
 import {
   applyUnitEdit,
   deltaEdit,
   effectivePivotMode,
+  pathOrder,
   pivotDotsOf,
   pivotUnitOf,
   selectionUnitsOf,
@@ -234,14 +235,11 @@ describe("chains", () => {
   const chain = group("chain", links.map(item), { chain: true })
 
   it("turns each link by the angle about its own moved pivot in Each, so the turns accumulate down the chain", () => {
-    const sel = selectionUnitsOf(links, null, contextOf([chain, item("x")], new Map([...transforms, ["x", at(9000)]])))!
-    // the chain is one unit; with the loose x it is two, so Each applies
     const withX = selectionUnitsOf(
       [...links, "x"],
       null,
       contextOf([chain, item("x")], new Map([...transforms, ["x", at(9000)]]))
     )!
-    assert.strictEqual(effectivePivotMode("each", sel), "together", "a chain alone is one unit")
     const out = applyUnitEdit(withX, "each", new Map([...transforms, ["x", at(9000)]]), deltaEdit(turn(10)))
     links.forEach((key, i) => assert.closeTo(yawOf(out.get(key)!), 10 * (i + 1), 1e-6, `${key} reads ${10 * (i + 1)}`))
     // link 2 swung about link 1's pivot by 10, then turned 10 more about its own moved pivot (which doesn't move it)
@@ -257,13 +255,27 @@ describe("chains", () => {
     assert.closeTo(yawOf(out.get("x")!), 10, 1e-6)
   })
 
-  it("turns rigidly about the first link in Together, like any group", () => {
+  it("bends a chain selected whole in Each, on its own, and turns it rigidly about its first link in Together", () => {
     const sel = selectionUnitsOf(links, null, contextOf([chain], transforms))!
-    const out = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
+    assert.strictEqual(effectivePivotMode("each", sel), "each", "a chain alone bends")
+    const bent = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
+    links.forEach((key, i) => assert.closeTo(yawOf(bent.get(key)!), 10 * (i + 1), 1e-6, key))
+    const rigid = applyUnitEdit(sel, "together", transforms, deltaEdit(turn(10)))
     links.forEach((key, i) => {
-      assert.closeTo(yawOf(out.get(key)!), 10, 1e-6)
-      assertVec(out.get(key)!.translation, swung({ x: i * 1000, y: 0, z: 0 }, ORIGIN, 10), key)
+      assert.closeTo(yawOf(rigid.get(key)!), 10, 1e-6)
+      assertVec(rigid.get(key)!.translation, swung({ x: i * 1000, y: 0, z: 0 }, ORIGIN, 10), key)
     })
+    // a one-link chain is a piece, and a plain group alone is still held at Together
+    const one = group("one", [item("l1")], { chain: true })
+    assert.strictEqual(
+      effectivePivotMode("each", selectionUnitsOf(["l1"], null, contextOf([one], transforms))),
+      "together"
+    )
+    const plain = group("g", links.map(item))
+    assert.strictEqual(
+      effectivePivotMode("each", selectionUnitsOf(links, null, contextOf([plain], transforms))),
+      "together"
+    )
   })
 
   it("carries the links after a selected link inside an entered chain, and leaves those before it", () => {
@@ -299,13 +311,80 @@ describe("chains", () => {
     assert.deepStrictEqual([...scaled.keys()], ["l3"])
   })
 
-  it("accumulates through the selected links only when several are selected inside the chain", () => {
-    const sel = selectionUnitsOf(["l1", "l3"], "chain", contextOf([chain], transforms))!
+  it("bends from the first selected link to the end in Each, selected or not", () => {
+    // l3 alone is one unit, so Each needs a second: l5 selected too
+    const sel = selectionUnitsOf(["l3", "l5"], "chain", contextOf([chain], transforms))!
     const out = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
-    assert.closeTo(yawOf(out.get("l1")!), 10, 1e-6)
-    assert.closeTo(yawOf(out.get("l2")!), 10, 1e-6, "carried by 1")
-    assert.closeTo(yawOf(out.get("l3")!), 20, 1e-6, "carried by 1, then its own")
-    assert.closeTo(yawOf(out.get("l4")!), 20, 1e-6, "carried by 1 and 3")
+    assert.isUndefined(out.get("l1"))
+    assert.isUndefined(out.get("l2"))
+    for (const [key, yaw] of [["l3", 10], ["l4", 20], ["l5", 30]] as const) {
+      assert.closeTo(yawOf(out.get(key)!), yaw, 1e-6, key)
+    }
+  })
+
+  it("bends each link in its own axes as the first takes the turn, so a curve's joints all take the same turn", () => {
+    const sel = (t: ReadonlyMap<string, UeTransform>) => selectionUnitsOf(links, null, contextOf([chain], t))!
+    // an arc first, then a turn about world X: a fixed world axis would kink the arc into joints that differ
+    const arc = new Map([...transforms, ...applyUnitEdit(sel(transforms), "each", transforms, deltaEdit(turn(30)))])
+    const rolled = { kind: "rotate", rotation: rotatorToQuat({ roll: 20, pitch: 0, yaw: 0 }) } as const
+    const out = applyUnitEdit(sel(arc), "each", arc, deltaEdit(rolled))
+    const joint = (from: string, to: string) => {
+      const [a, b] = [out.get(from)!, out.get(to)!]
+      const back = quatConjugate(a.rotation)
+      return { turn: quatMul(back, b.rotation), offset: rotateVec(back, vecSub(b.translation, a.translation)) }
+    }
+    const first = joint("l1", "l2")
+    for (const [from, to] of [["l2", "l3"], ["l3", "l4"], ["l4", "l5"]] as const) {
+      const next = joint(from, to)
+      assertVec(next.offset, first.offset, `${from} to ${to}`)
+      assert.closeTo(Math.abs(quatDot(next.turn, first.turn)), 1, 1e-9, `${from} to ${to} turns the same`)
+    }
+    // the first link takes the turn as the gizmo shows it
+    const expected = quatMul(rolled.rotation, arc.get("l1")!.rotation)
+    assert.closeTo(Math.abs(quatDot(out.get("l1")!.rotation, expected)), 1, 1e-9)
+  })
+
+  it("grows each link's turn by the chain's growth: by a share of the first turn, or compounding", () => {
+    const sel = (growth: ChainGrowth) =>
+      selectionUnitsOf(links, null, contextOf([group("chain", links.map(item), { chain: true, growth })], transforms))!
+    const yaws = (growth: ChainGrowth) => {
+      const out = applyUnitEdit(sel(growth), "each", transforms, deltaEdit(turn(10)))
+      return links.map((key) => yawOf(out.get(key)!))
+    }
+    // linear 50%: the links turn 10, 15, 20, 25, 30 on their own
+    yaws({ curve: "linear", percent: 50 }).forEach((yaw, i) => assert.closeTo(yaw, [10, 25, 45, 70, 100][i]!, 1e-6))
+    // compound 100%: 10, 20, 40, 80, 160 on their own, which wraps the last one past 180
+    yaws({ curve: "compound", percent: 100 }).forEach((yaw, i) => assert.closeTo(yaw, [10, 30, 70, 150, -50][i]!, 1e-6))
+    // inside the chain it counts from the first bending link
+    const entered = selectionUnitsOf(
+      ["l4", "l5"],
+      "chain",
+      contextOf(
+        [group("chain", links.map(item), { chain: true, growth: { curve: "linear", percent: 100 } })],
+        transforms
+      )
+    )!
+    const out = applyUnitEdit(entered, "each", transforms, deltaEdit(turn(10)))
+    assert.closeTo(yawOf(out.get("l4")!), 10, 1e-6)
+    assert.closeTo(yawOf(out.get("l5")!), 30, 1e-6)
+  })
+})
+
+describe("a chain's order along its pieces", () => {
+  const xs = (...x: ReadonlyArray<number>): ReadonlyArray<Vec3> => x.map((v) => ({ x: v, y: 0, z: 0 }))
+
+  it("walks the points as they lie, whatever order they come in", () => {
+    // placed in blocks: 0-3, then 12-15, then 4-11
+    const points = xs(0, 1, 2, 3, 12, 13, 14, 15, 4, 5, 6, 7, 8, 9, 10, 11)
+    assert.deepStrictEqual(pathOrder(points).map((i) => points[i]!.x), [...Array(16).keys()])
+  })
+
+  it("starts at the root when it is an end, else at the end nearer to it", () => {
+    const points = xs(3, 0, 1, 2)
+    assert.deepStrictEqual(pathOrder(points).map((i) => points[i]!.x), [3, 2, 1, 0], "the root's end")
+    assert.deepStrictEqual(pathOrder(points, 2).map((i) => points[i]!.x), [0, 1, 2, 3])
+    assert.deepStrictEqual(pathOrder(xs(1, 0, 2, 3, 4)).map((i) => [1, 0, 2, 3, 4][i]), [0, 1, 2, 3, 4])
+    assert.deepStrictEqual(pathOrder(xs(5, 9)), [0, 1])
   })
 })
 

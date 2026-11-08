@@ -49,6 +49,7 @@ export const keybindSections = [
       "deselect",
       "enterGroup",
       "groupSelection",
+      "chainSelection",
       "ungroupSelection"
     ]
   },
@@ -122,6 +123,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   deselect: "deselect",
   enterGroup: "enter group",
   groupSelection: "group",
+  chainSelection: "group as chain",
   ungroupSelection: "ungroup",
   moveForward: "forward",
   moveBack: "reverse",
@@ -193,6 +195,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Enter the selected group, so a click selects what is inside it. Double-clicking an item of a group does the same. Editor only.",
   groupSelection:
     "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the in-game editor.",
+  chainSelection:
+    "Group the selection as a chain, in the order it was selected; one whole group selected becomes a chain itself. With the pivot setting at Each, a turn then bends it. Editor only.",
   ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the in-game editor.",
   moveForward: "Fly the camera forward while held.",
   moveBack: "Fly the camera backward while held.",
@@ -297,6 +301,7 @@ export const defaultKeybinds: Keybinds = {
   deselect: ["Escape"],
   enterGroup: ["Enter", "NumpadEnter"],
   groupSelection: ["Ctrl+KeyG"],
+  chainSelection: ["Ctrl+Shift+KeyG"],
   ungroupSelection: ["Shift+KeyG"],
   moveForward: ["KeyW"],
   moveBack: ["KeyS"],
