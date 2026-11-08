@@ -58,7 +58,7 @@ The grid as today, with #84's additions:
 
 The ends of track, ramp, tube and pipe pieces. A connector is a point on a piece, a direction it faces out of, an up direction, and a profile (the cross-section it presents: Track, Bevel_F, Bevel_C, Bevel_H, Tube H, Tube F, Pipe half, and so on). The data is per piece and measured once, like `tools/extract/panel.json` (§ Connector data).
 
-When the selection's end reaches another item's end, it lands on it, facing the opposite way, up matching up. The two pieces meet with no gap and no step.
+When the selection's end reaches another item's end, it lands on it, facing the opposite way, up matching up. The two pieces meet with no gap and no step. An end only joins what it is turned toward, within a right angle: a piece going past an end isn't turned round to meet it with its trailing end.
 
 Parameters:
 

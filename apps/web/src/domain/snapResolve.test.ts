@@ -136,6 +136,19 @@ describe("resolveSnap", () => {
     })
   })
 
+  it("doesn't turn a piece round to join an end its trailing end goes past", () => {
+    const { end, items } = endWithVertex({ x: 0, y: 700, z: 0 })
+    const ends = on(defaultSnapConfig, "connectors")
+    const trailing: BasePoint = { start: ORIGIN, label: "End", end: endAlongX("own", 0, 0, -1) }
+    const hit = resolveSnap(frameOf({ x: 304, y: 0, z: 0 }, { config: ends, bases: [trailing], items }))
+    assert.isUndefined(hit, "the ends face the same way")
+    const facing: BasePoint = { start: ORIGIN, label: "End", end: endAlongX("own", 0, 0, 1) }
+    assert.deepStrictEqual(
+      resolveSnap(frameOf({ x: 304, y: 0, z: 0 }, { config: ends, bases: [facing], items }))?.landing,
+      end.position
+    )
+  })
+
   it("is free past every range with the grid off", () => {
     const config = on(defaultSnapConfig, "mesh")
     assert.isUndefined(resolveSnap(frameOf({ x: 500, y: 500, z: 0 }, { config, items: [cubeAt("a", ORIGIN)] })))

@@ -555,8 +555,11 @@ export const connectorHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
     near.flatMap((item) =>
       item.ends.flatMap((other) => {
         const own = one.base.end
-        const meeting = own === undefined ? undefined : meetingOf(frame, own, other)
-        if (own === undefined || meeting === undefined) return []
+        // an end joins what it is turned toward, within a right angle: the trailing end of a piece going past isn't
+        // turned round to meet what the leading end just left
+        if (own === undefined || vecDot(own.forward, other.forward) > 0) return []
+        const meeting = meetingOf(frame, own, other)
+        if (meeting === undefined) return []
         const marks: ReadonlyArray<SnapMark> = [
           { kind: "ring", role: "target", at: other.position },
           { kind: "arrow", at: other.position, direction: other.forward }
