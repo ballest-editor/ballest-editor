@@ -10,12 +10,15 @@ import {
   axesOf,
   type BasePoint,
   freePoint,
+  type MarkRole,
   type SnapFrame,
   type SnapHit,
   type SnapItem,
-  type SnapMark
+  type SnapMark,
+  type SnapRelation
 } from "./snapFrame"
-import { vecAdd, vecDot, vecLength, vecScale, vecSub } from "./ueMath"
+import { cornersOf, ontoPlane, sideOf } from "./snapRelation"
+import { vecAdd, vecDot, vecLength, vecLerp, vecScale, vecSub } from "./ueMath"
 
 /** A box's reach along `axis`: its near and far face planes and its centre. */
 interface Span {
@@ -23,9 +26,6 @@ interface Span {
   readonly centre: number
   readonly max: number
 }
-
-const cornersOf = ({ max, min }: Box): ReadonlyArray<Vec3> =>
-  [min.x, max.x].flatMap((x) => [min.y, max.y].flatMap((y) => [min.z, max.z].map((z) => ({ x, y, z }))))
 
 const spanOf = (box: Box, axis: Vec3): Span => {
   const along = cornersOf(box).map((corner) => vecDot(corner, axis))
@@ -76,7 +76,10 @@ const levelWords = (mine: Feature, their: Feature, name: string): string =>
 interface Match {
   /** What to add along the axis, in cm. */
   readonly by: number
+  readonly relation: SnapRelation
   readonly marks: ReadonlyArray<SnapMark>
+  /** The selection's side or centre that lined up, at the drag's start. */
+  readonly source: ReadonlyArray<SnapMark>
   /** What it says, short of the axis a plane is on. */
   readonly words: string
   /** The item and features a plane lines up: what two axes share to read as one. A gap has none. */
@@ -93,18 +96,25 @@ const nearerFirst = (a: Match, b: Match): number => {
   return Number(b.level?.feature === "centre") - Number(a.level?.feature === "centre")
 }
 
-/** The guide between the selection and a neighbour, with the distance between the pieces on it when there is one. */
-const guideBetween = (selection: Box, neighbour: Box, apart: number): SnapMark => {
+/** A box's side or centre along `axis`, as a mark: a side's outline, as a tint would cover a long piece whole. */
+const featureMark = (box: Box, axis: Vec3, feature: Feature, role: MarkRole): SnapMark =>
+  feature === "centre"
+    ? { kind: "dot", role, at: boxCentreOf(box) }
+    : sideOf(box, feature === "min" ? vecScale(axis, -1) : axis, role, true)
+
+/** The point of a box's feature on the plane it lines up on: its centre, carried along `axis` onto that plane. */
+const featurePoint = (box: Box, axis: Vec3, at: number): Vec3 => ontoPlane(boxCentreOf(box), axis, at)
+
+/**
+ * The guide between the feature of the selection and the neighbour's it lined up with, in the plane they share, with
+ * the distance between the pieces on it when there is one.
+ */
+const guideBetween = (from: Vec3, to: Vec3, apart: number): SnapMark => {
   const cm = Math.round(apart)
-  return {
-    kind: "guide",
-    from: boxCentreOf(selection),
-    to: boxCentreOf(neighbour),
-    ...(cm > 0 && { text: `${cm} cm` })
-  }
+  return { kind: "guide", from, to, ...(cm > 0 && { text: `${cm} cm` }) }
 }
 
-const planeMatches = (axis: Vec3, moved: Box, neighbours: ReadonlyArray<SnapItem>, cmRange: number) => {
+const planeMatches = (axis: Vec3, start: Box, moved: Box, neighbours: ReadonlyArray<SnapItem>, cmRange: number) => {
   const own = spanOf(moved, axis)
   return neighbours.flatMap((item): ReadonlyArray<Match> => {
     const theirs = spanOf(item.box, axis)
@@ -115,19 +125,35 @@ const planeMatches = (axis: Vec3, moved: Box, neighbours: ReadonlyArray<SnapItem
         const by = theirs[their] - own[mine]
         if (Math.abs(by) > cmRange) return []
         const landed = movedBox(moved, vecScale(axis, by))
+        const level = theirs[their]
         return [{
           by,
+          relation: "aligned",
           words: levelWords(mine, their, item.name),
           level: { key: item.key, feature: mine, their },
-          marks: [guideBetween(landed, item.box, separation(landed, item.box))]
+          marks: [
+            guideBetween(
+              featurePoint(landed, axis, level),
+              featurePoint(item.box, axis, level),
+              separation(landed, item.box)
+            ),
+            featureMark(item.box, axis, their, "target")
+          ],
+          source: [featureMark(start, axis, mine, "source")]
         }]
       })
     )
   })
 }
 
+/** A guide along `axis` from `from` to `to` cm, as a dimension between two boxes, in line with both their centres. */
+const dimension = (a: Box, b: Box, axis: Vec3, from: number, to: number, gap: number): SnapMark => {
+  const middle = vecLerp(boxCentreOf(a), boxCentreOf(b), 0.5)
+  return guideBetween(ontoPlane(middle, axis, from), ontoPlane(middle, axis, to), gap)
+}
+
 /** Gaps along `axis` the selection can match: the one between two neighbours, carried on past the last of them. */
-const gapMatches = (axis: Vec3, moved: Box, neighbours: ReadonlyArray<SnapItem>, cmRange: number) => {
+const gapMatches = (axis: Vec3, start: Box, moved: Box, neighbours: ReadonlyArray<SnapItem>, cmRange: number) => {
   const own = spanOf(moved, axis)
   const inLine = [...neighbours]
     .map((item) => ({ item, span: spanOf(item.box, axis) }))
@@ -140,14 +166,26 @@ const gapMatches = (axis: Vec3, moved: Box, neighbours: ReadonlyArray<SnapItem>,
     if (gap <= 0) return []
     const after = b.max + gap - own.min
     const before = a.min - gap - own.max
-    return [[after, second, first], [before, first, second]].flatMap(([by, near, far]): ReadonlyArray<Match> => {
-      if (typeof by !== "number" || typeof near !== "object" || typeof far !== "object") return []
+    const reference = dimension(first.box, second.box, axis, a.max, b.min, gap)
+    // after the second, the selection's near side faces the second's far side; before the first, the other way about
+    const sides = [
+      { by: after, near: second, far: first, facing: -1, at: b.max },
+      { by: before, near: first, far: second, facing: 1, at: a.min }
+    ]
+    return sides.flatMap(({ at, by, facing, far, near }): ReadonlyArray<Match> => {
       if (Math.abs(by) > cmRange) return []
       const landed = movedBox(moved, vecScale(axis, by))
+      const towards = vecScale(axis, facing)
       return [{
         by,
+        relation: "gap",
         words: `Same gap as ${near.name} to ${far.name}, ${Math.round(gap)} cm`,
-        marks: [guideBetween(landed, near.box, gap), guideBetween(near.box, far.box, gap)]
+        marks: [
+          dimension(landed, near.box, axis, at, at - facing * gap, gap),
+          reference,
+          sideOf(near.box, vecScale(towards, -1), "target", true)
+        ],
+        source: [sideOf(start, towards, "source", true)]
       }]
     })
   })
@@ -178,7 +216,9 @@ const axisHit = (frame: SnapFrame, base: BasePoint, axis: Vec3, best: Match): Sn
     base,
     landing,
     label: labelOf(best, axisName(axis)),
+    relation: best.relation,
     marks: best.marks,
+    source: best.source,
     held: { shape: "plane", origin: landing, normal: axis }
   }
 }
@@ -216,6 +256,7 @@ const together = (frame: SnapFrame, base: BasePoint, axes: ReadonlyArray<AxisHit
     landing,
     label: jointLabel(axes),
     marks: hits.flatMap(({ marks }) => marks),
+    source: hits.flatMap(({ source }) => source),
     held: { shape: "point", at: landing },
     parts: hits
   }]
@@ -238,8 +279,8 @@ export const alignmentHit = (
   if (neighbours.length === 0) return []
   const hits = axesOf(frame.constraint).flatMap((axis): ReadonlyArray<AxisHit> => {
     const found = [
-      ...planeMatches(axis, moved, neighbours, cmRange),
-      ...(gapsOn(frame) ? gapMatches(axis, moved, neighbours, cmRange) : [])
+      ...planeMatches(axis, frame.box, moved, neighbours, cmRange),
+      ...(gapsOn(frame) ? gapMatches(axis, frame.box, moved, neighbours, cmRange) : [])
     ].sort(nearerFirst)
     const best = found[0]
     return best === undefined ? [] : [{ hit: axisHit(frame, base, axis, best), match: best, axis: axisName(axis) }]

@@ -12,6 +12,7 @@ The game's in-game editor has a 10 cm grid and rotation steps, and that is what 
 
 - **Connector data** covers the Track, Bevel_F, Bevel_H and Bevel_C families ([qa/connectors.md](qa/connectors.md)). Round, Bevel_T, the ramps, Tubes, Pipes, the player start and the goal have no ends yet, so Mesh carries them.
 - **A prefab instance's ends** aren't found (§ Open questions).
+- **A turn's base face** is drawn as the side of the selection's box, which is the piece's own face only while the piece is square to the world.
 - **A turned grid in a side view** draws the line family nearest the view, spaced as it crosses the view. The other family's lines aren't drawn there.
 
 ## The model
@@ -161,10 +162,33 @@ Snapping measures a drag on the items that take it as the gizmo shows it (`leadi
 
 ## What a drag looks like
 
-1. The user grabs the selection by a gizmo handle or by an item's body. The base point is drawn: a filled dot in the gizmo's colour. With Closest, the dot jumps between candidates as the pointer moves.
-2. On the way to a target the selection stays with the pointer, or on the grid, and nothing pulls it forward. When it gets to the target it stops there, while the pointer goes on and is never moved. Once the pointer is past the threshold the selection goes free and catches up with it (Baudisch's snap-and-go; § Getting to a target has the rule). The target is highlighted in its own way: a dot on a vertex or corner, a line along an edge, a tinted face, a dashed guide for an alignment, an axis-coloured line for tracking, a ring on a connector end.
-3. One short label in the active pane's corner says what snapped: "Corner of Track L", "End of Curve M", "Centre level with Kicker1 S on Y", "Same gap as Kicker1 S to Track L, 250 cm", "Grid 10 cm", "Plane: Landing". The label is the one place every target reports, so a user who doesn't know which target fired can read it.
+1. The user grabs the selection by a gizmo handle or by an item's body. While nothing is in range the base point is drawn as a white dot. With Closest, the dot jumps between candidates as the pointer moves.
+2. On the way to a target the selection stays with the pointer, or on the grid, and nothing pulls it forward. When it gets to the target it stops there, while the pointer goes on and is never moved. Once the pointer is past the threshold the selection goes free and catches up with it (Baudisch's snap-and-go; § Getting to a target has the rule). The snap is drawn as § Snap indications says: what landed, what it landed on, and the glyph of the kind of snap.
+3. One short label in the active pane's corner says what snapped, the same glyph before its words: "Corner of Track L", "End of Curve M", "Centre level with Kicker1 S on Y", "Same gap as Kicker1 S to Track L, 250 cm", "Grid 10 cm", "Plane: Landing". The label is the one place every target reports, so a user who doesn't know which target fired can read it.
 4. Releasing commits one undo step, as a drag does today. The snap that was current is in the step's description ("Move 3 items to end of Curve M"), so the history reads as what happened.
+
+### Snap indications
+
+Every snap draws both of its sides, each in its own colour: the **source**, the part of the selection that landed (a point, an end, or a face of its box), in violet, where the snap puts it; and the **target**, what it landed on, in amber. A point's source is a ring round the target's dot, and an end's a ring round the target's ring, so both show where they meet. A glyph says the kind of snap, white on a dark badge beside the landing (on the side away from a join's arrow), and the label shows the same glyph before its words. The kinds, their glyphs and their drawings are a closed list (`SnapRelation` in `domain/snapFrame.ts`, the glyphs in `editor/snap/snapGlyphs.ts`); a Rotate or Scale stop (§ Affect) uses the same list.
+
+| Kind          | Glyph                           | Drawn in the scene                                                                                                                                            | Example label                                                      |
+| ------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Coincident    | a dot                           | The target point, and the source's point on it                                                                                                                | "Corner of Track L", "Vertex of Kicker1 S", "End of a measurement" |
+| On edge       | a line with end ticks and a dot | The edge, a tick across each end, and the source's point on it                                                                                                | "Edge of Track L", "Axis: Spine"                                   |
+| Midpoint      | a triangle                      | The middle of an edge as a point; the middle of a piece as a guide between its two faces, a dot at its middle                                                 | "Middle of an edge of Track L", "Middle of Track L"                |
+| Centre        | a crosshair in a circle         | The centre of a face as a point                                                                                                                               | "Centre of a face of Track L"                                      |
+| On face       | a square                        | The face, tinted                                                                                                                                              | "Face of Track L", "Plane: Landing"                                |
+| Flush         | two parallel bars               | Both faces tinted, the selection's on the target's plane. A turn draws the base face where the turn leaves it, and a scale the scaled face where it stops     | "Face of Track L"                                                  |
+| Tangent       | a circle on a line              | The face, while Flush and tangent's panel is set to Tangent                                                                                                   | "Face of Track L"                                                  |
+| Perpendicular | a right angle                   | The face, when Rotate to face's Align stands the selection square on it                                                                                       | "Face of Track L"                                                  |
+| Aligned       | two slanted dashes              | The outlines of the two sides that lined up (or their centres), and a dashed guide between them in the plane they share, with the distance between the pieces | "Near side level with far side of Track L on Y"                    |
+| In line       | three dashes                    | The tracking line in its axis's colour, from the acquired point                                                                                               | "In line with Corner of Kicker"                                    |
+| Intersection  | a cross                         | The two tracking lines to where they cross, or the axis and the plane                                                                                         | "Crossing of Corner of Kicker and Corner of Curve"                 |
+| Join          | a ring and an arrow             | Both end rings, and an arrow out of the target's end, the way the track goes on                                                                               | "End of Curve M"                                                   |
+| Grid          | a grid                          | The source's point on the grid                                                                                                                                | "Grid 10 cm"                                                       |
+| Gap           | a span between two bars         | The two sides that face across the new gap, and a dimension guide along the move for it and for the gap it copies, each with its length                       | "Same gap as Kicker1 S to Track L, 250 cm"                         |
+
+The target picker draws only the target and the glyph, as a pick has no selection.
 
 ### Getting to a target
 

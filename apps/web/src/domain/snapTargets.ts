@@ -24,9 +24,11 @@ import {
   type SnapFrame,
   type SnapHit,
   type SnapItem,
-  type SnapMark
+  type SnapMark,
+  type SnapRelation
 } from "./snapFrame"
 import { gridAxes } from "./snapGrid"
+import { sourceOf } from "./snapRelation"
 import {
   quatBetween,
   quatFromAxisAngle,
@@ -93,6 +95,8 @@ const itemsNear = (frame: SnapFrame, references: ReadonlyArray<ScreenPoint>, ran
 interface Spot {
   readonly at: Vec3
   readonly label: string
+  /** A point of a piece meets the base where it is, unless it says otherwise. */
+  readonly relation?: SnapRelation
   readonly marks?: ReadonlyArray<SnapMark>
   readonly item?: string
 }
@@ -116,7 +120,9 @@ const pointHit = (
     base,
     landing: spot.at,
     label: spot.label,
-    marks: spot.marks ?? [{ kind: "dot", at: spot.at }],
+    relation: spot.relation ?? "coincident",
+    marks: spot.marks ?? [{ kind: "dot", role: "target", at: spot.at }],
+    source: sourceOf(frame.box, base),
     held: { shape: "point", at: spot.at },
     ...(spot.item !== undefined && { item: spot.item })
   }]
@@ -146,6 +152,8 @@ const faceHit = (
 ): SnapHit => {
   const landing = vecAdd(point, vecScale(normal, frame.config.targets.mesh.offset))
   const rotation = faceTurn(frame, normal)
+  // Rotate to face's Align stands the selection square on the face
+  const square = rotation !== undefined && frame.config.targets.mesh.rotateToFace === "align"
   return {
     target: "mesh",
     rank: 2,
@@ -153,7 +161,9 @@ const faceHit = (
     base,
     landing,
     label,
-    marks: [{ kind: "face", corners }],
+    relation: square ? "perpendicular" : "onFace",
+    marks: [{ kind: "face", role: "target", corners }],
+    source: sourceOf(frame.box, base),
     held: { shape: "plane", origin: landing, normal },
     item,
     ...(rotation !== undefined && { rotation })
@@ -229,16 +239,18 @@ const meshSpotsOf = (config: SnapConfig, item: SnapItem): ReadonlyArray<Spot> =>
   const of = ` of ${item.name}`
   const mesh = item.mesh()
   const box = mesh === undefined ? boundsOf(item) : undefined
-  const spots = (points: ReadonlyArray<Vec3>, label: string) =>
-    points.map((at): Spot => ({ at, label: `${label}${of}`, item: item.key }))
+  const spots = (points: ReadonlyArray<Vec3>, label: string, relation: SnapRelation) =>
+    points.map((at): Spot => ({ at, label: `${label}${of}`, relation, item: item.key }))
   return [
-    ...(elements.boundsCorners && box !== undefined ? spots(box.corners, "Corner") : []),
+    ...(elements.boundsCorners && box !== undefined ? spots(box.corners, "Corner", "coincident") : []),
     ...(elements.boundsFaceCentres && box !== undefined
-      ? spots(box.faces.map(({ centre }) => centre), "Centre of a face")
+      ? spots(box.faces.map(({ centre }) => centre), "Centre of a face", "centre")
       : []),
-    ...(elements.vertices && mesh !== undefined ? spots(mesh.vertices, "Vertex") : []),
-    ...(elements.edgeMidpoints && mesh !== undefined ? spots(runMidpoints(mesh), "Middle of an edge") : []),
-    ...(elements.faceCentres && mesh !== undefined ? spots(mesh.faceCentres, "Centre of a face") : [])
+    ...(elements.vertices && mesh !== undefined ? spots(mesh.vertices, "Vertex", "coincident") : []),
+    ...(elements.edgeMidpoints && mesh !== undefined
+      ? spots(runMidpoints(mesh), "Middle of an edge", "midpoint")
+      : []),
+    ...(elements.faceCentres && mesh !== undefined ? spots(mesh.faceCentres, "Centre of a face", "centre") : [])
   ]
 }
 
@@ -263,7 +275,9 @@ const edgeHits = (
       base: measured.base,
       landing,
       label: `Edge of ${item.name}`,
-      marks: [{ kind: "line" as const, from, to }],
+      relation: "onEdge" as const,
+      marks: [{ kind: "line" as const, role: "target" as const, from, to }],
+      source: sourceOf(frame.box, measured.base),
       held: { shape: "segment" as const, from, to },
       item: item.key
     }]
@@ -333,6 +347,7 @@ interface Station {
   /** The way the move crosses it. */
   readonly along: Vec3
   readonly label: string
+  readonly relation: SnapRelation
   readonly marks: ReadonlyArray<SnapMark>
   readonly rotation?: Quat4 | undefined
   /** It is the plane between two faces, and no face itself. */
@@ -355,12 +370,14 @@ const middlesOf = (item: SnapItem, faces: ReadonlyArray<FaceAcross>): ReadonlyAr
     const inOrder = run.faces.toSorted((a, b) => vecDot(a.centre, along) - vecDot(b.centre, along))
     const [near, far] = [inOrder[0], inOrder.at(-1)]
     if (near === undefined || far === undefined || vecDot(near.normal, far.normal) >= 0) return []
+    const origin = vecScale(vecAdd(near.centre, far.centre), 0.5)
     return [{
-      origin: vecScale(vecAdd(near.centre, far.centre), 0.5),
+      origin,
       normal: along,
       along,
       label: `Middle of ${item.name}`,
-      marks: [{ kind: "guide", from: near.centre, to: far.centre }],
+      relation: "midpoint",
+      marks: [{ kind: "guide", from: near.centre, to: far.centre }, { kind: "dot", role: "target", at: origin }],
       middle: true
     }]
   })
@@ -385,12 +402,18 @@ const stationsOf = (frame: SnapFrame, item: SnapItem) => {
     normal,
     along,
     label: `Face of ${item.name}`,
-    marks: [{ kind: "face", corners }],
+    relation: "flush",
+    marks: [{ kind: "face", role: "target", corners }],
     rotation: faceTurn(frame, normal)
   }))
   // a face's centre is a point to land on under a plane handle; under a line it would be one more middle
   const centres = points && frame.constraint.kind === "plane"
-    ? faces.map(({ centre }): Spot => ({ at: centre, label: `Centre of a face of ${item.name}`, item: item.key }))
+    ? faces.map(({ centre }): Spot => ({
+      at: centre,
+      label: `Centre of a face of ${item.name}`,
+      relation: "centre",
+      item: item.key
+    }))
     : []
   return { centres, stations: [...stations, ...middlesOf(item, across)] }
 }
@@ -406,7 +429,7 @@ const stationHit = (
   frame: SnapFrame,
   base: BasePoint,
   item: SnapItem,
-  { along, label, marks, normal, origin, rotation }: Station,
+  { along, label, marks, normal, origin, relation, rotation }: Station,
   range: number
 ): ReadonlyArray<SnapHit> => {
   const free = freePoint(frame, base)
@@ -422,7 +445,9 @@ const stationHit = (
     base,
     landing,
     label,
+    relation,
     marks,
+    source: sourceOf(frame.box, base),
     held: { shape: "plane", origin, normal },
     item: item.key,
     frontmost: true,
@@ -501,6 +526,8 @@ export const stationsTogether = (frame: SnapFrame, hits: ReadonlyArray<SnapHit>)
     landing,
     label: labelOfBoth(a, b),
     marks: [...a.marks, ...b.marks],
+    // each part's base stays on its own plane, and the move takes both
+    source: a.base === b.base ? a.source : [...a.source, ...b.source],
     held: { shape: "point", at: landing },
     parts: [a, b]
   }]
@@ -530,8 +557,11 @@ export const connectorHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
         const own = one.base.end
         const meeting = own === undefined ? undefined : meetingOf(frame, own, other)
         if (own === undefined || meeting === undefined) return []
-        const marks = [{ kind: "ring" as const, at: other.position }]
-        const spot = { at: other.position, label: `End of ${item.name}`, marks, item: item.key }
+        const marks: ReadonlyArray<SnapMark> = [
+          { kind: "ring", role: "target", at: other.position },
+          { kind: "arrow", at: other.position, direction: other.forward }
+        ]
+        const spot: Spot = { at: other.position, label: `End of ${item.name}`, relation: "join", marks, item: item.key }
         return pointHit(frame, "connectors", one, spot, range).map((hit): SnapHit => ({
           ...hit,
           meeting,
@@ -575,13 +605,15 @@ export const trackingHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
           base,
           landing,
           label: `In line with ${point.label}`,
+          relation: "inLine",
           marks: [{ kind: "tracking", from: point.at, to: landing, axis }],
+          source: sourceOf(frame.box, base),
           held: { shape: "line", origin: point.at, direction }
         }]
       })
     )
-    const seen = (at: Vec3, label: string, marks: ReadonlyArray<SnapMark>) =>
-      pointHit(frame, "tracking", one, { at, label, marks }, range)
+    const seen = (at: Vec3, label: string, relation: SnapRelation, marks: ReadonlyArray<SnapMark>) =>
+      pointHit(frame, "tracking", one, { at, label, relation, marks }, range)
     // A pair of lines crosses where each keeps its own axes' values. On a plane the third value is the plane's.
     const planeNormal = constraint.kind === "line" ? undefined : constraint.normal
     const crossings = tracked.flatMap((a, ai) =>
@@ -600,7 +632,7 @@ export const trackingHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
               vecAdd(vecScale(di, vecDot(b.at, di)), vecScale(dj, vecDot(a.at, dj))),
               vecScale(dk, third)
             )
-            return seen(at, `Crossing of ${a.label} and ${b.label}`, [
+            return seen(at, `Crossing of ${a.label} and ${b.label}`, "intersection", [
               { kind: "tracking", from: a.at, to: at, axis: AXIS_NAMES[i] ?? "x" },
               { kind: "tracking", from: b.at, to: at, axis: AXIS_NAMES[j] ?? "x" }
             ])
@@ -613,7 +645,8 @@ export const trackingHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
       const at = vecAdd(point.at, vecScale(direction, vecDot(vecSub(free, point.at), direction)))
       const shown = frame.view.project(point.at)
       if (alongTheMove(direction) || shown === undefined || pixelDistance(shown, reference) > range) return []
-      return seen(at, `In line with ${point.label}`, [{ kind: "tracking", from: point.at, to: at, axis: "view" }]).map(
+      const marks = [{ kind: "tracking" as const, from: point.at, to: at, axis: "view" as const }]
+      return seen(at, `In line with ${point.label}`, "inLine", marks).map(
         (hit) => ({ ...hit, distance: pixelDistance(shown, reference) })
       )
     })
@@ -652,7 +685,9 @@ const planeHits = (
     base,
     landing,
     label: `Plane: ${plane.name}`,
-    marks: [{ kind: "face", corners: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)] }],
+    relation: "onFace",
+    marks: [{ kind: "face", role: "target", corners: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)] }],
+    source: sourceOf(frame.box, base),
     held: { shape: "plane", origin: plane.origin, normal: plane.normal }
   }]
 }
@@ -676,7 +711,9 @@ const axisHits = (
     base,
     landing,
     label: `Axis: ${axis.name}`,
-    marks: [{ kind: "line", from: end(-1), to: end(1) }],
+    relation: "onEdge",
+    marks: [{ kind: "line", role: "target", from: end(-1), to: end(1) }],
+    source: sourceOf(frame.box, base),
     held: { shape: "line", origin: axis.origin, direction: axis.direction }
   }]
 }
@@ -700,7 +737,9 @@ export const constructionHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
       planes.flatMap((plane) => {
         const at = crossingOf(axis, plane)
         const label = `Crossing of ${axis.name} and ${plane.name}`
-        return at === undefined ? [] : pointHit(frame, "construction", one, { at, label }, range)
+        return at === undefined
+          ? []
+          : pointHit(frame, "construction", one, { at, label, relation: "intersection" }, range)
       })
     ),
     ...frame.measurements.flatMap(({ a, b }) =>

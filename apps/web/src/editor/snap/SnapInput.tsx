@@ -8,13 +8,22 @@ import * as THREE from "three"
 import type { UeTransform } from "../../domain/coords"
 import { chordOf, mouseChordOf } from "../../domain/Keybinds"
 import type { Constraint } from "../../domain/snapFrame"
+import { shownMarks } from "../../domain/snapRelation"
 import { applyDelta, leadingKeys, type PivotMode, type SelectionUnits } from "../../domain/units"
 import { transformSelection } from "../actions"
 import { type PaneCamera, panePointer } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
 import { fitTransforms, type PickerRequest, snapConfigOf, useEditor } from "../store"
 import { type DragKeyState, handleDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
-import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, previewMove } from "./moveSession"
+import {
+  dragKeysOf,
+  endSnapDisplay,
+  feedbackOf,
+  flipOfferOf,
+  MoveSession,
+  previewMove,
+  setFeedback
+} from "./moveSession"
 import { anchorUnder, hitUnder, pickedOf } from "./pickTarget"
 import { dragTargetOf, selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
@@ -196,9 +205,14 @@ export function SnapInput() {
     const showPick = (picker: PickerRequest, e: PointerEvent) => {
       const s = useEditor.getState()
       const { pane, px } = panePointer(el, e)
-      const hit = hitUnder(s, pane, px, picker.accepts)
-      snapMarks.set(hit?.marks ?? [], hit?.landing)
-      s.setSnapFeedback(hit === undefined ? null : { label: hit.label, base: "Pick" })
+      const found = hitUnder(s, pane, px, picker.accepts)
+      // a face picked for Flush and tangent shows the meeting it will make
+      const hit = found !== undefined && picker.panel === "flush" && found.held.shape === "plane"
+        ? { ...found, relation: s.flushMode }
+        : found
+      // a pick moves nothing, so it has no source: the dot is where the pointer picks
+      snapMarks.set(hit === undefined ? [] : shownMarks(hit, { source: false }), hit?.landing)
+      setFeedback(feedbackOf(hit, "Pick"))
     }
 
     const onPointerDown = (e: PointerEvent) => {

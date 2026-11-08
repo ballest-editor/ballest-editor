@@ -354,11 +354,12 @@ export function GizmoController() {
         const turned = snappedTurn({
           free: turn.angle,
           axis: turn.axis,
+          about: active.pivot,
           step: on ? config.rotationStep : undefined,
           flush: on ? active.flush : [],
           reach: config.threshold / Math.max(radius, 1)
         })
-        showSnap(turned.label, turned.marks)
+        showSnap(turned)
         const rotation = quatFromAxisAngle(turn.axis, turned.angle)
         const frame = localFrameOf(active.start)
         return (frame === undefined
@@ -378,7 +379,7 @@ export function GizmoController() {
             : undefined,
         stops: active.stops
       })
-      showSnap(scaled.label, scaled.marks)
+      showSnap(scaled)
       return { ...scale, kind: "scale", factor: scaled.factor } satisfies GroupDelta
     }
 

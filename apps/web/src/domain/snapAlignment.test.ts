@@ -135,6 +135,28 @@ describe("alignmentHit", () => {
     assert.closeTo(hit?.landing.x ?? 0, 400, 1e-6)
   })
 
+  it("draws the sides that lined up and a guide between them in the plane they share, not between the middles", () => {
+    const [hit] = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [item("a", { x: 300, y: 900, z: 0 })]))
+    assert.strictEqual(hit?.relation, "aligned")
+    const [guide, target] = hit?.marks ?? []
+    // the selection's near side, at 350 once it has landed, on the neighbour's far side
+    assert.deepStrictEqual(guide, {
+      kind: "guide",
+      from: { x: 350, y: 0, z: 0 },
+      to: { x: 350, y: 900, z: 0 },
+      text: "800 cm"
+    })
+    assert.isTrue(target?.kind === "face" && target.outline === true && target.corners.every(({ x }) => x === 350))
+    const [source] = hit?.source ?? []
+    assert.isTrue(source?.kind === "face" && source.role === "source" && source.corners.every(({ x }) => x === -50))
+  })
+
+  it("draws a centre that lined up as the two centres", () => {
+    const [hit] = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [item("a", { x: 400, y: 900, z: 0 })]))
+    assert.deepStrictEqual(hit?.marks[1], { kind: "dot", role: "target", at: { x: 400, y: 900, z: 0 } })
+    assert.deepStrictEqual(hit?.source, [{ kind: "dot", role: "source", at: ORIGIN }])
+  })
+
   it("only searches the handle's axes", () => {
     const off = frame({ x: 0, y: 396, z: 0 }, [item("a", { x: 777, y: 400, z: 0 })])
     assert.lengthOf(alignmentHit(off), 0)
@@ -160,7 +182,15 @@ describe("alignmentHit", () => {
     const [hit] = alignmentHit(frame({ x: 596, y: 0, z: 0 }, items, row))
     assert.closeTo(hit?.landing.x ?? 0, 600, 1e-6)
     assert.strictEqual(hit?.label, "Same gap as Cube b to Cube a, 200 cm")
-    assert.lengthOf(hit?.marks.filter((mark) => mark.kind === "guide") ?? [], 2)
+    assert.strictEqual(hit?.relation, "gap")
+    // each gap measured along the move between the sides that face each other: Cube b's far side to the selection's
+    // near side, and Cube a's far side to Cube b's near side
+    const guides = hit?.marks.flatMap((mark) => mark.kind === "guide" ? [[mark.from.x, mark.to.x]] : []) ?? []
+    assert.deepStrictEqual(guides.map(([from, to]) => [Math.round(from ?? 0), Math.round(to ?? 0)]), [[350, 550], [
+      50,
+      250
+    ]])
+    assert.deepInclude(hit?.source[0], { kind: "face", role: "source", outline: true })
     assert.lengthOf(alignmentHit(frame({ x: 596, y: 0, z: 0 }, items, { ...row, view: view(false) })), 0)
   })
 })

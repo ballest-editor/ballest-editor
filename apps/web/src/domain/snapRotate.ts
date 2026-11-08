@@ -5,7 +5,8 @@
  */
 import type { Vec3 } from "./coords"
 import { snapValue } from "./snap"
-import type { SnapMark } from "./snapFrame"
+import type { SnapMark, SnapRelation } from "./snapFrame"
+import { glyphMark, turnedMarks } from "./snapRelation"
 import { vecCross, vecDot, vecLength, vecScale, vecSub } from "./ueMath"
 
 /** A direction of the selection and one it can be turned to meet. */
@@ -15,14 +16,26 @@ export interface FlushPair {
   /** Out of the target. */
   readonly target: Vec3
   readonly label: string
+  readonly relation: SnapRelation
+  /** The target: a face or an end. */
   readonly marks: ReadonlyArray<SnapMark>
+  /** The base face or the end of the selection, before the turn. */
+  readonly source: ReadonlyArray<SnapMark>
+  /** Where the glyph goes: on the target. */
+  readonly at: Vec3
 }
 
-export interface SnappedTurn {
+/** A turn or scale as it snapped, for the label: what to say and the glyph to say it with. */
+export interface SnappedAs {
+  readonly label?: string
+  readonly relation?: SnapRelation
+  /** Both sides, the source where the snap puts it, and the glyph. */
+  readonly marks?: ReadonlyArray<SnapMark>
+}
+
+export interface SnappedTurn extends SnappedAs {
   /** Radians. */
   readonly angle: number
-  readonly label?: string
-  readonly marks?: ReadonlyArray<SnapMark>
 }
 
 /** How far out of the turn's plane two directions can be and still meet. */
@@ -43,9 +56,11 @@ const flushAngle = ({ normal, target }: FlushPair, axis: Vec3, free: number): nu
 
 /** Where a turn the pointer put at `free` radians lands: flush with a target in `reach`, else on the step in degrees. */
 export const snappedTurn = (
-  { axis, flush, free, reach, step }: {
+  { about, axis, flush, free, reach, step }: {
     readonly free: number
     readonly axis: Vec3
+    /** The pivot the turn is about. */
+    readonly about: Vec3
     readonly step?: number | undefined
     readonly flush: ReadonlyArray<FlushPair>
     readonly reach: number
@@ -55,7 +70,15 @@ export const snappedTurn = (
     const angle = flushAngle(pair, axis, free)
     return angle === undefined || Math.abs(angle - free) > reach ? [] : [{ angle, pair }]
   }).sort((a, b) => Math.abs(a.angle - free) - Math.abs(b.angle - free))[0]
-  if (near !== undefined) return { angle: near.angle, label: near.pair.label, marks: near.pair.marks }
+  if (near !== undefined) {
+    const { angle, pair } = near
+    return {
+      angle,
+      label: pair.label,
+      relation: pair.relation,
+      marks: [...pair.marks, ...turnedMarks(pair.source, { about, axis, angle }), glyphMark(pair.relation, pair.at)]
+    }
+  }
   return { angle: step === undefined ? free : snapValue(free * 180 / Math.PI, step) * Math.PI / 180 }
 }
 
@@ -63,14 +86,14 @@ export const snappedTurn = (
 export interface ScaleStop {
   readonly at: number
   readonly label: string
+  readonly relation: SnapRelation
+  /** The target face, the scaled face stopped on it, and the glyph. */
   readonly marks: ReadonlyArray<SnapMark>
 }
 
-export interface SnappedScale {
+export interface SnappedScale extends SnappedAs {
   /** What to multiply the scale by. */
   readonly factor: number
-  readonly label?: string
-  readonly marks?: ReadonlyArray<SnapMark>
 }
 
 /**
@@ -93,7 +116,7 @@ export const snappedScale = (
       .filter(({ at }) => Math.abs(at - now) <= face.range)
       .sort((a, b) => Math.abs(a.at - now) - Math.abs(b.at - now))[0]
     if (near !== undefined) {
-      return { factor: near.at / face.reach / from, label: near.label, marks: near.marks }
+      return { factor: near.at / face.reach / from, label: near.label, relation: near.relation, marks: near.marks }
     }
   }
   if (step === undefined) return { factor: free / from }

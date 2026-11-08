@@ -9,6 +9,7 @@ import type { Item } from "../domain/MapFile"
 import type { WorldMesh } from "../domain/meshElements"
 import { defaultSettings } from "../domain/Settings"
 import type { SnapItem, SnapView } from "../domain/snapFrame"
+import { cornersOf } from "../domain/snapRelation"
 import type { PaneCamera } from "../editor/paneCameras"
 import { useEditor } from "../editor/store"
 
@@ -104,7 +105,7 @@ export const meshOfBox = ({ max, min }: Box): WorldMesh => {
   const mid = { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 }
   const axes = ["x", "y", "z"] as const
   const at = (a: Vec3, axis: "x" | "y" | "z", value: number): Vec3 => ({ ...a, [axis]: value })
-  const corners = [min.x, max.x].flatMap((x) => [min.y, max.y].flatMap((y) => [min.z, max.z].map((z) => ({ x, y, z }))))
+  const corners = cornersOf({ max, min })
   const faces = axes.flatMap((axis, i) =>
     ([[min, -1], [max, 1]] as const).map(([side, sign]) => {
       const centre = at(mid, axis, side[axis])

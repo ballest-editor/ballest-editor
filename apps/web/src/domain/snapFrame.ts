@@ -70,14 +70,49 @@ export type HeldShape =
   | { readonly shape: "segment"; readonly from: Vec3; readonly to: Vec3 }
   | { readonly shape: "plane"; readonly origin: Vec3; readonly normal: Vec3 }
 
-/** How a target shows while it is current, each in its own way (docs/SNAPPING.md § What a drag looks like). */
+/**
+ * What kind of snap a hit is (docs/SNAPPING.md § Snap indications): each has its own glyph, drawn at the landing
+ * and before the words in the label.
+ */
+export type SnapRelation =
+  | "coincident"
+  | "onEdge"
+  | "midpoint"
+  | "centre"
+  | "onFace"
+  | "flush"
+  | "tangent"
+  | "perpendicular"
+  | "aligned"
+  | "inLine"
+  | "intersection"
+  | "join"
+  | "grid"
+  | "gap"
+
+/** Which side of a snap a mark draws: the part of the selection that landed, or what it landed on. */
+export type MarkRole = "source" | "target"
+
+/**
+ * How a snap shows while it is current, each in its own way (docs/SNAPPING.md § Snap indications). A point, edge,
+ * face or end is the source's or the target's; a guide, a tracking line and the arrow are the relation between them.
+ */
 export type SnapMark =
-  | { readonly kind: "dot"; readonly at: Vec3 }
-  | { readonly kind: "line"; readonly from: Vec3; readonly to: Vec3 }
-  | { readonly kind: "face"; readonly corners: ReadonlyArray<Vec3> }
+  | { readonly kind: "dot"; readonly role: MarkRole; readonly at: Vec3 }
+  | { readonly kind: "line"; readonly role: MarkRole; readonly from: Vec3; readonly to: Vec3 }
+  | {
+    readonly kind: "face"
+    readonly role: MarkRole
+    readonly corners: ReadonlyArray<Vec3>
+    /** Only its outline: a side an alignment lines up, which a tint would cover whole. */
+    readonly outline?: boolean
+  }
+  | { readonly kind: "ring"; readonly role: MarkRole; readonly at: Vec3 }
   | { readonly kind: "guide"; readonly from: Vec3; readonly to: Vec3; readonly text?: string }
   | { readonly kind: "tracking"; readonly from: Vec3; readonly to: Vec3; readonly axis: "x" | "y" | "z" | "view" }
-  | { readonly kind: "ring"; readonly at: Vec3 }
+  /** A join's way on, out of the end the selection meets. */
+  | { readonly kind: "arrow"; readonly at: Vec3; readonly direction: Vec3 }
+  | { readonly kind: "glyph"; readonly relation: SnapRelation; readonly at: Vec3 }
 
 /** A connector snap: the two ends, and what the profiles say. */
 export interface EndMeeting {
@@ -101,7 +136,11 @@ export interface SnapHit {
   /** The turn the selection takes about the base, when the target asks for one. */
   readonly rotation?: Quat4
   readonly label: string
+  readonly relation: SnapRelation
+  /** What it landed on, and the relation's guides, where they are. */
   readonly marks: ReadonlyArray<SnapMark>
+  /** The part of the selection that landed, where it stood at the drag's start: it goes where the hit takes the base. */
+  readonly source: ReadonlyArray<SnapMark>
   readonly held: HeldShape
   /** The item the target is on. */
   readonly item?: string

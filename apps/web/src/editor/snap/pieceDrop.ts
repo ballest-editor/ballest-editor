@@ -11,12 +11,14 @@ import { placedBoxOf } from "../../domain/itemBounds"
 import type { ItemTransform } from "../../domain/MapFile"
 import { localToWorld, pivotFor } from "../../domain/pivot"
 import type { ScreenPoint, SnapFrame, SnapHit, SnapItem } from "../../domain/snapFrame"
+import { shownMarks } from "../../domain/snapRelation"
 import { moveOf, resolveSnap } from "../../domain/snapResolve"
 import { selectionBases } from "../../domain/snapTools"
 import { annotationsOf, type Doc } from "../../domain/structure"
 import { ORIGIN, vecSub } from "../../domain/ueMath"
 import type { PaneCamera } from "../paneCameras"
 import { type EditorState, snapConfigOf, type TransformOptions } from "../store"
+import { feedbackOf, setFeedback } from "./moveSession"
 import { snapMarks } from "./snapMarks"
 import { snapCasts, snapItemsOf } from "./snapScene"
 import { snapViewOf } from "./snapView"
@@ -91,8 +93,7 @@ export const snappedDrop = (
 }
 
 /** Shows where a drop would land. */
-export const showDrop = (s: EditorState, drop: SnappedDrop | undefined): void => {
-  snapMarks.set(drop?.hit.marks ?? [], drop?.hit.landing)
-  const next = drop === undefined ? null : { label: drop.hit.label, base: drop.hit.base.label }
-  if (s.snapFeedback?.label !== next?.label) s.setSnapFeedback(next)
+export const showDrop = (drop: SnappedDrop | undefined): void => {
+  snapMarks.set(drop === undefined ? [] : shownMarks(drop.hit), undefined)
+  setFeedback(feedbackOf(drop?.hit))
 }

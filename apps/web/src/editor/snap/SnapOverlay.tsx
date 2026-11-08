@@ -1,7 +1,8 @@
 /**
- * What snapping draws in the scene (docs/SNAPPING.md § What a drag looks like): the current target and the base, and what
- * stays on the map: construction geometry, measurements, acquired tracking points and open ends. Everything draws over
- * the scene and stays one size on screen, so it reads the same in every pane.
+ * What snapping draws in the scene (docs/SNAPPING.md § Snap indications): the current snap, its source and target
+ * each in its own colour with the glyph of its kind, or the base while nothing is in range; and what stays on the map:
+ * construction geometry, measurements, acquired tracking points and open ends. Everything draws over the scene and stays
+ * one size on screen, so it reads the same in every pane.
  */
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo } from "react"
@@ -10,7 +11,7 @@ import { endsOf, openEndsOf, type WorldEnd } from "../../domain/connectors"
 import type { Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
 import type { Construction, Measurement } from "../../domain/MapSidecar"
-import type { SnapMark, TrackedPoint } from "../../domain/snapFrame"
+import type { SnapMark, SnapRelation, TrackedPoint } from "../../domain/snapFrame"
 import { measurementFacts } from "../../domain/snapTools"
 import { annotationsOf, type Doc } from "../../domain/structure"
 import { vecAdd, vecCross, vecLerp, vecScale } from "../../domain/ueMath"
@@ -19,6 +20,7 @@ import { useBeforePaneDraw } from "../PaneRenderer"
 import { snapConfigOf, useEditor } from "../store"
 import { useDarkTheme } from "../theme"
 import { isLine, isMesh } from "../threeGuards"
+import { GLYPHS, glyphSegments, roleColor, SNAP_COLORS as COLORS } from "./snapGlyphs"
 import { snapMarks } from "./snapMarks"
 import { toThree } from "./snapView"
 
@@ -28,40 +30,80 @@ const RENDER_ORDER = 960
 /** On screen, in pixels. */
 const DOT = 9
 const RING = 16
+/** A source's point rings the target's dot, and a source's end rings the target's end. */
+const SOURCE_POINT = 16
+const SOURCE_END = 25
 const PLUS = 7
 const DASH = 7
+/** An edge's end ticks, and a join's arrow. */
+const TICK = 9
+const ARROW = 44
+/** The glyph's badge, its offset up and right of the landing, and the glyph in it. */
+const BADGE = 22
+const BADGE_OFFSET = 20
+const GLYPH = 15
 const LABEL_HEIGHT = 20
 /** The label's texture pixels to a pixel on screen, to stay sharp on a high-density display. */
 const LABEL_DENSITY = 3
 
-const COLORS = {
-  target: "#ffc940",
-  base: "#ffffff",
-  guide: "#ff5fa8",
-  end: "#38d6c4",
-  open: "#ff9f43",
-  construction: "#6aa6ff",
-  measurement: "#ffe08a"
-} as const
+/** Over the target: the source, then the glyph's badge, then the glyph. */
+const ABOVE = { target: 0, source: 1, badge: 2, glyph: 3 } as const
 
 const look = { depthTest: false, depthWrite: false, transparent: true, toneMapped: false } as const
 
 const pointGeometry = (points: ReadonlyArray<Vec3>) => new THREE.BufferGeometry().setFromPoints(points.map(toThree))
 
+const flatGeometry = (points: ReadonlyArray<readonly [number, number]>) =>
+  new THREE.BufferGeometry().setFromPoints(points.map(([x, y]) => new THREE.Vector3(x, y, 0)))
+
 const dotGeometry = new THREE.CircleGeometry(0.5, 20)
 const ringGeometry = new THREE.RingGeometry(0.4, 0.5, 32)
-const plusGeometry = new THREE.BufferGeometry().setFromPoints([
-  new THREE.Vector3(-1, 0, 0),
-  new THREE.Vector3(1, 0, 0),
-  new THREE.Vector3(0, -1, 0),
-  new THREE.Vector3(0, 1, 0)
-])
+const plusGeometry = flatGeometry([[-1, 0], [1, 0], [0, -1], [0, 1]])
+/** Across the edge once turned along it. */
+const tickGeometry = flatGeometry([[0, -0.5], [0, 0.5]])
+/** Out along x from the end, starting past the rings there, with its head. */
+const arrowGeometry = flatGeometry([[0.36, 0], [1, 0], [1, 0], [0.78, 0.13], [1, 0], [0.78, -0.13]])
+
+/** A glyph's strokes in a unit box about the origin, y up: lines, and its dots filled. */
+const glyphGeometry = (relation: SnapRelation) => {
+  const unit = (x: number, y: number) => [(x - 12) / 24, (12 - y) / 24] as const
+  const segments = glyphSegments(GLYPHS[relation]).flatMap(([x1, y1, x2, y2]) => [unit(x1, y1), unit(x2, y2)])
+  const dots = GLYPHS[relation].flatMap((stroke) => {
+    if (!("dot" in stroke)) return []
+    const [cx, cy, r] = stroke.dot
+    const steps = 16
+    const rim = (i: number) =>
+      unit(cx + r * Math.cos(i / steps * Math.PI * 2), cy + r * Math.sin(i / steps * Math.PI * 2))
+    return Array.from({ length: steps }, (_, i) => [unit(cx, cy), rim(i), rim(i + 1)]).flat()
+  })
+  return { lines: flatGeometry(segments), fill: dots.length === 0 ? undefined : flatGeometry(dots) }
+}
+
+/** Every shape the marks share, which outlive the marks that use them. */
+const SHARED_SHAPES = new Set<THREE.BufferGeometry>()
+
+const glyphGeometries = new Map<SnapRelation, ReturnType<typeof glyphGeometry>>()
+
+/** A glyph's shapes, made the first time it shows. */
+const glyphShapes = (relation: SnapRelation) => {
+  const kept = glyphGeometries.get(relation)
+  if (kept !== undefined) return kept
+  const made = glyphGeometry(relation)
+  glyphGeometries.set(relation, made)
+  SHARED_SHAPES.add(made.lines)
+  if (made.fill !== undefined) SHARED_SHAPES.add(made.fill)
+  return made
+}
 
 /** An object held to a size on screen, turned to face the pane. */
 interface Sized {
   readonly object: THREE.Object3D
   /** Pixels across, or width and height. */
   readonly size: number | readonly [number, number]
+  /** A direction in the scene its x runs along on screen, as an edge's ticks and a join's arrow do. */
+  readonly along?: THREE.Vector3
+  /** A badge's contents, set off its point away from a direction in the scene, or up and right. */
+  readonly badge?: { readonly parts: ReadonlyArray<THREE.Object3D>; readonly away: THREE.Vector3 | undefined }
 }
 
 const labelTextures = new Map<string, { readonly texture: THREE.CanvasTexture; readonly width: number }>()
@@ -96,7 +138,15 @@ const labelTexture = (text: string) => {
   return entry
 }
 
-const SHARED_SHAPES: ReadonlySet<THREE.BufferGeometry> = new Set([dotGeometry, ringGeometry, plusGeometry])
+for (const shape of [dotGeometry, ringGeometry, plusGeometry, tickGeometry, arrowGeometry]) SHARED_SHAPES.add(shape)
+
+/** A direction in game space as the scene's, unit length. */
+const sceneDirection = (direction: Vec3) => toThree(direction).sub(toThree({ x: 0, y: 0, z: 0 })).normalize()
+
+const toCamera = new THREE.Quaternion()
+const onScreen = new THREE.Vector3()
+const turnOnScreen = new THREE.Quaternion()
+const SCREEN_NORMAL = new THREE.Vector3(0, 0, 1)
 
 /** Lets go of what a mark made for itself; the shared shapes stay for the next one, and so do a label's. */
 const disposeMark = (object: THREE.Object3D) => {
@@ -107,15 +157,26 @@ const disposeMark = (object: THREE.Object3D) => {
   if (!Array.isArray(material)) material.dispose()
 }
 
+/** Sets a badge's parts off its point, in pixels: opposite `away` on screen, else up and right. Needs `toCamera` set. */
+const placeBadge = (parts: ReadonlyArray<THREE.Object3D>, away: THREE.Vector3 | undefined) => {
+  let [x, y] = [BADGE_OFFSET, BADGE_OFFSET]
+  if (away !== undefined) {
+    onScreen.copy(away).applyQuaternion(toCamera)
+    const length = Math.hypot(onScreen.x, onScreen.y)
+    if (length > 1e-3) [x, y] = [-onScreen.x / length * BADGE_OFFSET * 1.4, -onScreen.y / length * BADGE_OFFSET * 1.4]
+  }
+  for (const part of parts) part.position.set(x, y, 0)
+}
+
 /** One layer of marks, rebuilt only when what it shows changes. */
-class MarkLayer extends THREE.Group {
+export class MarkLayer extends THREE.Group {
   private sized: Array<Sized> = []
   private dashed: Array<THREE.LineDashedMaterial> = []
 
-  private put<T extends THREE.Object3D>(object: T): T {
-    object.renderOrder = RENDER_ORDER
+  private put<T extends THREE.Object3D>(object: T, above = 0, into: THREE.Object3D = this): T {
+    object.renderOrder = RENDER_ORDER + above
     object.raycast = () => {}
-    this.add(object)
+    into.add(object)
     return object
   }
 
@@ -132,12 +193,13 @@ class MarkLayer extends THREE.Group {
     this.sized.push({ object: mesh, size })
   }
 
-  ring(at: Vec3, color: string): void {
+  ring(at: Vec3, color: string, size = RING, above = 0): void {
     const mesh = this.put(
-      new THREE.Mesh(ringGeometry, new THREE.MeshBasicMaterial({ ...look, color, side: THREE.DoubleSide }))
+      new THREE.Mesh(ringGeometry, new THREE.MeshBasicMaterial({ ...look, color, side: THREE.DoubleSide })),
+      above
     )
     mesh.position.copy(toThree(at))
-    this.sized.push({ object: mesh, size: RING })
+    this.sized.push({ object: mesh, size })
   }
 
   plus(at: Vec3, color: string): void {
@@ -146,8 +208,53 @@ class MarkLayer extends THREE.Group {
     this.sized.push({ object: lines, size: PLUS })
   }
 
-  line(from: Vec3, to: Vec3, color: string): void {
-    this.put(new THREE.LineSegments(pointGeometry([from, to]), new THREE.LineBasicMaterial({ ...look, color })))
+  line(from: Vec3, to: Vec3, color: string, above = 0): void {
+    this.put(new THREE.LineSegments(pointGeometry([from, to]), new THREE.LineBasicMaterial({ ...look, color })), above)
+  }
+
+  /** A short screen-sized object at `at`, its x along the scene direction `along`. */
+  private alongOnScreen(geometry: THREE.BufferGeometry, at: Vec3, along: Vec3, size: number, color: string): void {
+    const lines = this.put(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ ...look, color })), 1)
+    lines.position.copy(toThree(at))
+    this.sized.push({ object: lines, size, along: sceneDirection(along) })
+  }
+
+  /** An edge with a tick across each end, to tell it from a guide. */
+  edge(from: Vec3, to: Vec3, color: string, above = 0): void {
+    this.line(from, to, color, above)
+    const along = { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z }
+    for (const end of [from, to]) this.alongOnScreen(tickGeometry, end, along, TICK, color)
+  }
+
+  arrow(at: Vec3, direction: Vec3, color: string): void {
+    this.alongOnScreen(arrowGeometry, at, direction, ARROW, color)
+  }
+
+  /** The glyph of a snap's kind, white on a dark badge beside `at`: up and right, or on the side away from `away`. */
+  glyph(relation: SnapRelation, at: Vec3, away?: Vec3): void {
+    const shapes = glyphShapes(relation)
+    const badge = this.put(new THREE.Group())
+    badge.position.copy(toThree(at))
+    const placed = (object: THREE.Mesh | THREE.LineSegments, size: number, above: number) => {
+      this.put(object, above, badge)
+      object.scale.setScalar(size)
+      return object
+    }
+    const disc = new THREE.MeshBasicMaterial({ ...look, color: "#101218", opacity: 0.82 })
+    const ink = { ...look, color: COLORS.base }
+    const parts = [
+      placed(new THREE.Mesh(dotGeometry, disc), BADGE, ABOVE.badge),
+      placed(new THREE.LineSegments(shapes.lines, new THREE.LineBasicMaterial(ink)), GLYPH, ABOVE.glyph),
+      ...(shapes.fill === undefined
+        ? []
+        : [placed(new THREE.Mesh(shapes.fill, new THREE.MeshBasicMaterial(ink)), GLYPH, ABOVE.glyph)])
+    ]
+    // a pixel to a unit: the badge's parts are laid out in pixels
+    this.sized.push({
+      object: badge,
+      size: 1,
+      badge: { parts, away: away === undefined ? undefined : sceneDirection(away) }
+    })
   }
 
   dashedLine(from: Vec3, to: Vec3, color: string): void {
@@ -157,12 +264,17 @@ class MarkLayer extends THREE.Group {
     this.dashed.push(material)
   }
 
-  face(corners: ReadonlyArray<Vec3>, color: string, opacity = 0.28): void {
+  face(corners: ReadonlyArray<Vec3>, color: string, opacity = 0.28, above = 0): void {
     const [first] = corners
     if (first === undefined || corners.length < 3) return
     const points = corners.slice(1, -1).flatMap((corner, i) => [first, corner, corners[i + 2] ?? corner])
     const material = new THREE.MeshBasicMaterial({ ...look, color, opacity, side: THREE.DoubleSide })
-    this.put(new THREE.Mesh(pointGeometry(points), material))
+    this.put(new THREE.Mesh(pointGeometry(points), material), above)
+  }
+
+  outline(corners: ReadonlyArray<Vec3>, color: string, above = 0): void {
+    const loop = corners.flatMap((corner, i) => [corner, corners[(i + 1) % corners.length] ?? corner])
+    this.put(new THREE.LineSegments(pointGeometry(loop), new THREE.LineBasicMaterial({ ...look, color })), above)
   }
 
   label(at: Vec3, text: string): void {
@@ -174,10 +286,16 @@ class MarkLayer extends THREE.Group {
 
   /** Sizes what stays one size for a pane showing `worldPerPixel` cm to the pixel here. */
   fit(worldPerPixelAt: (point: THREE.Vector3) => number, camera: THREE.Camera): void {
-    for (const { object, size } of this.sized) {
+    toCamera.copy(camera.quaternion).invert()
+    for (const { along, badge, object, size } of this.sized) {
       const perPixel = worldPerPixelAt(object.position)
       if (typeof size === "number") {
         object.quaternion.copy(camera.quaternion)
+        if (along !== undefined) {
+          onScreen.copy(along).applyQuaternion(toCamera)
+          object.quaternion.multiply(turnOnScreen.setFromAxisAngle(SCREEN_NORMAL, Math.atan2(onScreen.y, onScreen.x)))
+        }
+        if (badge !== undefined) placeBadge(badge.parts, badge.away)
         object.scale.setScalar(perPixel * size)
       } else {
         object.scale.set(perPixel * size[0], perPixel * size[1], 1)
@@ -192,16 +310,29 @@ class MarkLayer extends THREE.Group {
   }
 }
 
-const drawMark = (layer: MarkLayer, mark: SnapMark, dark: boolean) => {
+/** One mark, in its side's colour: a source's point and end ring the target's, so both show where they meet. */
+export const drawMark = (layer: MarkLayer, mark: SnapMark, dark: boolean, away?: Vec3): void => {
   switch (mark.kind) {
     case "dot":
-      layer.dot(mark.at, COLORS.target)
+      if (mark.role === "source") layer.ring(mark.at, COLORS.source, SOURCE_POINT, ABOVE.source)
+      else layer.dot(mark.at, COLORS.target)
+      return
+    case "ring":
+      if (mark.role === "source") layer.ring(mark.at, COLORS.source, SOURCE_END, ABOVE.source)
+      else layer.ring(mark.at, COLORS.target)
       return
     case "line":
-      layer.line(mark.from, mark.to, COLORS.target)
+      layer.edge(mark.from, mark.to, roleColor(mark.role), ABOVE[mark.role])
       return
     case "face":
-      layer.face(mark.corners, COLORS.target)
+      if (mark.outline !== true) layer.face(mark.corners, roleColor(mark.role), 0.22, ABOVE[mark.role])
+      layer.outline(mark.corners, roleColor(mark.role), ABOVE[mark.role])
+      return
+    case "arrow":
+      layer.arrow(mark.at, mark.direction, COLORS.target)
+      return
+    case "glyph":
+      layer.glyph(mark.relation, mark.at, away)
       return
     case "guide":
       layer.dashedLine(mark.from, mark.to, COLORS.guide)
@@ -212,8 +343,6 @@ const drawMark = (layer: MarkLayer, mark: SnapMark, dark: boolean) => {
       layer.dashedLine(mark.from, mark.to, mark.axis === "view" ? COLORS.target : colors[mark.axis])
       return
     }
-    case "ring":
-      layer.ring(mark.at, COLORS.end)
   }
 }
 
@@ -294,7 +423,9 @@ export function SnapOverlay() {
     if (revision === shown.revision) return
     shown.revision = revision
     transient.reset()
-    for (const mark of marks) drawMark(transient, mark, dark)
+    // a glyph keeps clear of the join's arrow
+    const away = marks.find((mark) => mark.kind === "arrow")?.direction
+    for (const mark of marks) drawMark(transient, mark, dark, away)
     if (base !== undefined) transient.dot(base, COLORS.base)
   })
 
