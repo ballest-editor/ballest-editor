@@ -3,7 +3,7 @@ import type { Quat4, Vec3 } from "../../domain/coords"
 import { identityTransform } from "../../domain/factory"
 import { type GroupDelta, landedPoint } from "../../domain/groupTransform"
 import { defaultKeybinds } from "../../domain/Keybinds"
-import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
+import { defaultSnapConfig, type SnapConfig, type SnapKind } from "../../domain/snapConfig"
 import type { Ray } from "../../domain/snapFrame"
 import { findGroup } from "../../domain/structure"
 import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
@@ -12,7 +12,7 @@ import { grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { assertVec } from "../../test/vec"
 import { PaneCamera } from "../paneCameras"
 import { selectionPivot, shownTransform, useEditor } from "../store"
-import { type DragKeyEvent, handleDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
+import { type DragKeyEvent, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import { dragKeysOf, endSnapDisplay, MoveSession, type MoveStart, previewMove } from "./moveSession"
 import { anchorUnder } from "./pickTarget"
 import { selectionSnapStart } from "./selectionStart"
@@ -348,6 +348,33 @@ describe("MoveSession snap-and-go", () => {
     assert.closeTo(reached.hit?.landing.x ?? 0, corner.x, 1e-6)
   })
 
+  it("lands on nothing but the grid while its key is held, and on the target again once it's let go", () => {
+    const { corner, pointPast, rayAt, session } = towardsCorner(onlyCorners(true))
+    const pointWith = (by: number, only: ReadonlyArray<SnapKind>, invert = false) =>
+      session.update(rayAt(corner.x + by, corner.y).ray, rayAt(corner.x + by, corner.y).px, { ...up, invert, only })
+    pointWith(-20, ["grid"])
+    assert.strictEqual(pointWith(1, ["grid"]).hit?.target, "grid")
+    pointWith(-3, ["grid"])
+    assert.strictEqual(pointPast(2).hit?.target, "mesh")
+    pointWith(-20, ["mesh"])
+    assert.isUndefined(pointWith(-7.3, ["mesh"]).hit, "the grid is off under the mesh's key")
+    assert.isUndefined(pointWith(-7.3, ["grid"], true).hit, "Ctrl still inverts what the key narrowed to")
+  })
+
+  it("snaps to the kind held with snapping off, as Ctrl would, and Ctrl turns that off again", () => {
+    const { corner, rayAt, session } = towardsCorner({ ...onlyCorners(true), enabled: false })
+    const at = rayAt(corner.x - 7.3, corner.y)
+    assert.isUndefined(session.update(at.ray, at.px, up).hit)
+    assert.strictEqual(session.update(at.ray, at.px, { ...up, only: ["grid"] }).hit?.target, "grid")
+    assert.isUndefined(session.update(at.ray, at.px, { invert: true, hold: false, only: ["grid"] }).hit)
+  })
+
+  it("ignores the step's key, which means nothing to a move", () => {
+    const { corner, rayAt, session } = towardsCorner(onlyCorners(true))
+    const at = rayAt(corner.x - 7.3, corner.y)
+    assert.strictEqual(session.update(at.ray, at.px, { ...up, only: ["step"] }).hit?.target, "grid")
+  })
+
   it("keeps a target Shift holds past its range, and lets go past the range when Shift does", () => {
     const { corner, rayAt, session, pointPast } = towardsCorner(onlyCorners(false))
     pointPast(-3)
@@ -489,7 +516,37 @@ describe("drag keys", () => {
     const state = seedDragKeys({ ctrlKey: true, shiftKey: false })
     assert.isTrue(dragKeysOf(defaultKeybinds, state.pressed).invert)
     syncDragKeys(state, { ctrlKey: false, shiftKey: true })
-    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed), { invert: false, hold: true })
+    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed), { invert: false, hold: true, only: [] })
+  })
+
+  it("narrows while a kind's key is held, Ctrl still inverting, and lets go when the key comes up", () => {
+    const state = seedDragKeys({ ctrlKey: false, shiftKey: false })
+    let stopped = false
+    const stop = () => {
+      stopped = true
+    }
+    assert.isTrue(handleDragKey(state, undefined, key("KeyG", { stopImmediatePropagation: stop }), defaultKeybinds))
+    assert.isTrue(stopped, "nothing else hears the key mid-drag")
+    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed).only, ["grid"])
+    handleDragKey(state, undefined, key("KeyM"), defaultKeybinds)
+    syncDragKeys(state, { ctrlKey: true, shiftKey: false })
+    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed), {
+      invert: true,
+      hold: false,
+      only: ["grid", "mesh"]
+    })
+    releaseDragKey(state, "KeyG")
+    releaseDragKey(state, "KeyM")
+    assert.deepStrictEqual(dragKeysOf(defaultKeybinds, state.pressed).only, [])
+  })
+
+  it("holds a rebound key with its modifiers, by either hand", () => {
+    const keybinds = { ...defaultKeybinds, snapOnlyMesh: ["Shift+KeyM"] }
+    const state = seedDragKeys({ ctrlKey: false, shiftKey: false })
+    handleDragKey(state, undefined, key("KeyM"), keybinds)
+    assert.deepStrictEqual(dragKeysOf(keybinds, state.pressed).only, [])
+    syncDragKeys(state, { ctrlKey: false, shiftKey: true })
+    assert.deepStrictEqual(dragKeysOf(keybinds, state.pressed).only, ["mesh"])
   })
 
   it("takes a lock key, Shift making it the plane, and Ctrl leaving it alone", () => {
@@ -508,6 +565,6 @@ describe("drag keys", () => {
     const state = seedDragKeys({ ctrlKey: false, shiftKey: false })
     assert.isFalse(handleDragKey(state, undefined, key("KeyX"), defaultKeybinds))
     const [a = ""] = load(onlyGrid())
-    assert.isFalse(handleDragKey(state, moving(a).session, key("KeyJ"), defaultKeybinds))
+    assert.isFalse(handleDragKey(state, moving(a).session, key("KeyK"), defaultKeybinds))
   })
 })

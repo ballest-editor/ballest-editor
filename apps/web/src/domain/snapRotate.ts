@@ -16,6 +16,8 @@ export interface FlushPair {
   readonly target: Vec3
   readonly label: string
   readonly marks: ReadonlyArray<SnapMark>
+  /** The target that offers it, so a held key can leave it out. */
+  readonly source: "connectors" | "mesh"
 }
 
 export interface SnappedTurn {

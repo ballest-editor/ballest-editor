@@ -211,6 +211,85 @@ export const withTargetMoved = (config: SnapConfig, target: SnapTarget, index: n
   return { ...config, order: [...rest.slice(0, at), target, ...rest.slice(at)] }
 }
 
+/**
+ * What a held key narrows snapping to, for as long as it is held (docs/SNAPPING.md § Modifiers): one target, alignment
+ * with tracking, or a turn's and a scale's step.
+ */
+export const SNAP_KINDS = ["grid", "connectors", "mesh", "alignment", "step"] as const
+export type SnapKind = (typeof SNAP_KINDS)[number]
+
+/** What each transform can be narrowed to: a turn and a scale have no grid or alignment, a move has no step. */
+export const SNAP_KINDS_OF = {
+  move: ["grid", "connectors", "mesh", "alignment"],
+  turn: ["connectors", "mesh", "step"],
+  scale: ["mesh", "step"]
+} as const satisfies Readonly<Record<string, ReadonlyArray<SnapKind>>>
+export type SnapTransform = keyof typeof SNAP_KINDS_OF
+
+/** The targets each kind keeps on. */
+const KIND_TARGETS: Readonly<Record<SnapKind, ReadonlyArray<SnapTarget>>> = {
+  grid: ["grid"],
+  connectors: ["connectors"],
+  mesh: ["mesh"],
+  alignment: ["alignment", "tracking"],
+  step: []
+}
+
+/** Of `kinds`, those that mean something to `transform`. */
+export const kindsFor = (transform: SnapTransform, kinds: ReadonlyArray<SnapKind>): ReadonlyArray<SnapKind> =>
+  kinds.filter((kind) => (SNAP_KINDS_OF[transform] as ReadonlyArray<SnapKind>).includes(kind))
+
+/**
+ * `config` while the keys of `kinds` are held: those kinds' targets on and every other off, with their parameters and
+ * their place in the priority list as they were. Holding one turns snapping on, as Ctrl does when it is off. With no
+ * kinds it is `config` itself.
+ */
+export const narrowedTo = (config: SnapConfig, kinds: ReadonlyArray<SnapKind>): SnapConfig => {
+  if (kinds.length === 0) return config
+  const kept = new Set(kinds.flatMap((kind) => KIND_TARGETS[kind]))
+  const { alignment, connectors, construction, grid, mesh, tracking } = config.targets
+  return {
+    ...config,
+    enabled: true,
+    rotationEnabled: true,
+    scaleEnabled: true,
+    targets: {
+      grid: { ...grid, enabled: kept.has("grid") },
+      connectors: { ...connectors, enabled: kept.has("connectors") },
+      mesh: { ...mesh, enabled: kept.has("mesh") },
+      construction: { ...construction, enabled: kept.has("construction") },
+      tracking: { ...tracking, enabled: kept.has("tracking") },
+      alignment: { ...alignment, enabled: kept.has("alignment") }
+    }
+  }
+}
+
+/** The targets that can stop a turn (flush faces, ends facing) and a scale (the scaled face on another). */
+const TURN_TARGETS: Readonly<Record<"turn" | "scale", ReadonlyArray<SnapTarget>>> = {
+  turn: ["connectors", "mesh"],
+  scale: ["mesh"]
+}
+
+/**
+ * How a turn or a scale snaps under `config` with `kinds` held and Ctrl `invert`ing: whether it takes the step, and the
+ * targets that can stop it, highest priority first. A target's key leaves the step out, and the step's key keeps it in.
+ */
+export const turnSnapOf = (
+  config: SnapConfig,
+  transform: "turn" | "scale",
+  kinds: ReadonlyArray<SnapKind>,
+  invert: boolean
+): { readonly step: boolean; readonly targets: ReadonlyArray<SnapTarget> } => {
+  const held = kindsFor(transform, kinds)
+  const narrowed = narrowedTo(config, held)
+  const on = (transform === "turn" ? narrowed.rotationEnabled : narrowed.scaleEnabled) !== invert
+  if (!on) return { step: false, targets: [] }
+  return {
+    step: held.length === 0 || held.includes("step"),
+    targets: priorityOf(narrowed).filter((target) => TURN_TARGETS[transform].includes(target))
+  }
+}
+
 /** How far, in pixels, `target` keeps hold of a drag, and how near a pick has to be. */
 export const rangeOf = (config: SnapConfig, target: SnapTarget): number =>
   target === "connectors" ? config.targets.connectors.range ?? config.threshold : config.threshold

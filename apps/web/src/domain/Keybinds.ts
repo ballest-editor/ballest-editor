@@ -95,7 +95,12 @@ export const keybindSections = [
       "snapLockZ",
       "snapPlaneX",
       "snapPlaneY",
-      "snapPlaneZ"
+      "snapPlaneZ",
+      "snapOnlyGrid",
+      "snapOnlyConnectors",
+      "snapOnlyMesh",
+      "snapOnlyAlignment",
+      "snapOnlyStep"
     ]
   },
   { name: "file", actions: ["newMap", "openMap", "saveMap", "saveMapAs", "closeTab", "nextTab", "previousTab"] },
@@ -158,6 +163,11 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   snapPlaneX: "lock to plane across x",
   snapPlaneY: "lock to plane across y",
   snapPlaneZ: "lock to plane across z",
+  snapOnlyGrid: "grid only",
+  snapOnlyConnectors: "connectors only",
+  snapOnlyMesh: "mesh only",
+  snapOnlyAlignment: "alignment only",
+  snapOnlyStep: "step only",
   viewTop: "top view",
   viewBottom: "bottom view",
   viewFront: "front view",
@@ -239,6 +249,16 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   snapPlaneX: "During a drag, lock the move to the plane square to X. Press again to unlock.",
   snapPlaneY: "During a drag, lock the move to the plane square to Y. Press again to unlock.",
   snapPlaneZ: "During a drag, lock the move to the plane square to Z. Press again to unlock.",
+  snapOnlyGrid:
+    "Hold during a move: it snaps to the grid and nothing else, even with snapping off, until it is let go. Held with another of these keys, both kinds count. G for grid; outside a drag only Shift+G and Ctrl+G mean anything.",
+  snapOnlyConnectors:
+    "Hold during a move or a turn: only connector ends count, even with snapping off, and a turn takes no step. J for join: C is the game's key for the gizmo's axes.",
+  snapOnlyMesh:
+    "Hold during a move, a turn or a scale: only the Mesh target counts (vertices, edges and faces, and the faces a turn or a scale stops on), even with snapping off, and a turn or a scale takes no step. M for mesh.",
+  snapOnlyAlignment:
+    "Hold during a move: only alignment and tracking count, even with snapping off, so a row lines up without the grid or a face taking over. L for line up: A flies the camera left.",
+  snapOnlyStep:
+    "Hold during a turn or a scale: it takes the rotation or scale step alone and stops at no face or end, even with snapping off for it. With a target's key also held, both count. T is free in the editor.",
   viewTop: "Look straight down in the active pane, orthographic. Editor only: the game has no orthographic views.",
   viewBottom: "Look straight up from under the map in the active pane, orthographic.",
   viewFront: "Look at the map from its front (the +X side, the game's forward) in the active pane, orthographic.",
@@ -289,7 +309,12 @@ export const duringDragActions: ReadonlySet<KeybindAction> = new Set([
   "snapLockZ",
   "snapPlaneX",
   "snapPlaneY",
-  "snapPlaneZ"
+  "snapPlaneZ",
+  "snapOnlyGrid",
+  "snapOnlyConnectors",
+  "snapOnlyMesh",
+  "snapOnlyAlignment",
+  "snapOnlyStep"
 ])
 /** Actions that are held down rather than fired once. */
 export const heldActions: ReadonlySet<KeybindAction> = new Set([
@@ -323,6 +348,11 @@ export const defaultKeybinds: Keybinds = {
   snapPlaneX: ["Shift+KeyX"],
   snapPlaneY: ["Shift+KeyY"],
   snapPlaneZ: ["Shift+KeyZ"],
+  snapOnlyGrid: ["KeyG"],
+  snapOnlyConnectors: ["KeyJ"],
+  snapOnlyMesh: ["KeyM"],
+  snapOnlyAlignment: ["KeyL"],
+  snapOnlyStep: ["KeyT"],
   selectMode: ["KeyQ"],
   translateMode: ["KeyW"],
   rotateMode: ["KeyE"],
@@ -416,6 +446,13 @@ const MODIFIER_NAME_CODES: Readonly<Record<string, ReadonlyArray<string>>> = {
 /** Does releasing key `code` end a hold of `binding` (its key, or one of its modifiers)? */
 export const releasesBinding = (binding: string, code: string): boolean =>
   binding.split("+").some((part) => part === code || (MODIFIER_NAME_CODES[part]?.includes(code) ?? false))
+
+/** Is `binding` held, of the codes `pressed`: its key, and each of its modifiers by either hand? */
+export const bindingHeld = (binding: string, pressed: ReadonlySet<string>): boolean =>
+  binding.length > 0 &&
+  binding.split("+").every((part) =>
+    pressed.has(part) || (MODIFIER_NAME_CODES[part]?.some((code) => pressed.has(code)) ?? false)
+  )
 
 /** Is `chord` one of the action's bindings? */
 export const isBound = (keybinds: Keybinds, action: KeybindAction, chord: string): boolean =>

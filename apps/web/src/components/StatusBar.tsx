@@ -1,9 +1,20 @@
+import { useEditor } from "../editor/store"
+import { DragKeyHints } from "./DragKeyHints"
 import { EnteredGroupStatus } from "./EnteredGroupStatus"
 import { LastExportStatus, LinkStatus } from "./LinkStatus"
 import { NotificationCenter } from "./NotificationCenter"
 import { SelectionStatus } from "./SelectionStatus"
 import { SnapStatus } from "./SnapStatus"
 import { UpdatePill, UpdateStatus } from "./UpdatePill"
+
+/**
+ * The middle of the bar: the map's sync status, or during a drag the keys it can take. Nothing is saved or exported until
+ * the drag lets go, so the status has nothing to say meanwhile.
+ */
+function CentreStatus() {
+  const dragging = useEditor((s) => s.dragKeys !== null)
+  return dragging ? <DragKeyHints /> : <LinkStatus />
+}
 
 /** Along the bottom of the window (docs/PROJECTS.md § Shell): the selection, the map's sync status, updates, the bell. */
 export function StatusBar() {
@@ -15,7 +26,7 @@ export function StatusBar() {
         <EnteredGroupStatus />
       </div>
       <div className="flex min-w-0 items-center justify-center">
-        <LinkStatus />
+        <CentreStatus />
       </div>
       <div className="flex min-w-0 items-center gap-1">
         <LastExportStatus />

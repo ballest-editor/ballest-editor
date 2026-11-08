@@ -7,7 +7,6 @@ import type { WorldEnd } from "../../domain/connectors"
 import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
 import type { Box } from "../../domain/itemBounds"
 import { localToWorld, type PivotChoice } from "../../domain/pivot"
-import type { SnapConfig } from "../../domain/snapConfig"
 import { axesOf, type SnapItem, type SnapMark } from "../../domain/snapFrame"
 import type { FlushPair, ScaleStop } from "../../domain/snapRotate"
 import { rotateVec, vecDistance, vecDot, vecLength, vecNormalize, vecSub } from "../../domain/ueMath"
@@ -75,9 +74,11 @@ const touches = (a: Box, b: Box, by: number) =>
   a.min.y - by <= b.max.y && a.max.y + by >= b.min.y &&
   a.min.z - by <= b.max.z && a.max.z + by >= b.min.z
 
-/** What can stop a turn of the selection about `pivotPoint`, from the Mesh and Connectors targets that are on. */
+/**
+ * What can stop a turn of the selection about `pivotPoint`, from the Mesh and Connectors targets, on or off: a held key
+ * can turn either on, so the turn keeps to the targets on at each sample.
+ */
 export const flushPairsOf = (
-  config: SnapConfig,
   { base, box, ends, pivotPoint }: {
     /** The way out of the face the pivot is on, if it is on one. */
     readonly base: Vec3 | undefined
@@ -90,31 +91,31 @@ export const flushPairsOf = (
 ): ReadonlyArray<FlushPair> => {
   const reach = vecLength(vecSub(box.max, box.min)) / 2 + rangeCm
   const near = items.filter((item) => touches(box, item.box, reach))
-  const faces = config.targets.mesh.enabled && base !== undefined
+  const faces = base !== undefined
     ? near.flatMap((item) =>
       (item.mesh()?.faces ?? boundsFacesOf(item)).map((face): FlushPair => ({
         normal: base,
         target: face.normal,
         label: `Face of ${item.name}`,
-        marks: [{ kind: "face", corners: face.corners }]
+        marks: [{ kind: "face", corners: face.corners }],
+        source: "mesh"
       }))
     )
     : []
-  const meetings = config.targets.connectors.enabled
-    ? ends.flatMap((own) => {
-      const out = vecDistance(own.position, pivotPoint)
-      return near.flatMap((item) =>
-        item.ends.flatMap((other): ReadonlyArray<FlushPair> =>
-          Math.abs(vecDistance(other.position, pivotPoint) - out) > rangeCm ? [] : [{
-            normal: own.forward,
-            target: other.forward,
-            label: `End of ${item.name}`,
-            marks: [{ kind: "ring", at: other.position }]
-          }]
-        )
+  const meetings = ends.flatMap((own) => {
+    const out = vecDistance(own.position, pivotPoint)
+    return near.flatMap((item) =>
+      item.ends.flatMap((other): ReadonlyArray<FlushPair> =>
+        Math.abs(vecDistance(other.position, pivotPoint) - out) > rangeCm ? [] : [{
+          normal: own.forward,
+          target: other.forward,
+          label: `End of ${item.name}`,
+          marks: [{ kind: "ring", at: other.position }],
+          source: "connectors"
+        }]
       )
-    })
-    : []
+    )
+  })
   return [...meetings, ...faces]
 }
 

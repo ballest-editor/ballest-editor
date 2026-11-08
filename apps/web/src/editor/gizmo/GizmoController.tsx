@@ -6,6 +6,7 @@ import { selectedGroupIds } from "../../domain/groupSelection"
 import type { GroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { gizmoScaleOf } from "../../domain/Settings"
+import { type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
 import { type FlushPair, type ScaleStop, snappedScale, snappedTurn } from "../../domain/snapRotate"
 import { quatFromAxisAngle } from "../../domain/ueMath"
 import {
@@ -20,7 +21,7 @@ import { transformSelection } from "../actions"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
-import { type DragKeyState, handleDragKey, seedDragKeys, syncDragKeys } from "../snap/dragKeys"
+import { type DragKeyState, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "../snap/dragKeys"
 import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, previewMove, showSnap } from "../snap/moveSession"
 import { baseFaceOf, type DragTarget, dragTargetOf, selectionSnapStart } from "../snap/selectionStart"
 import { snapItemsOf } from "../snap/snapScene"
@@ -116,6 +117,14 @@ const byCopy = (
   }))
 
 const isTranslate = ({ kind }: HandleSpec) => kind === "translateAxis" || kind === "translatePlane"
+
+/** What a handle's drag does, for the keys it can take. */
+const transformOf = ({ kind }: HandleSpec): SnapTransform =>
+  kind === "rotateAxis" || kind === "rotateView"
+    ? "turn"
+    : kind === "scaleAxis" || kind === "scaleUniform"
+    ? "scale"
+    : "move"
 
 const toWorld = toThree
 
@@ -298,7 +307,6 @@ export function GizmoController() {
         flush:
           (spec.kind === "rotateAxis" || spec.kind === "rotateView") && !turnAccumulates(target.selection, pivotMode)
             ? flushPairsOf(
-              config,
               {
                 base: baseFaceOf(s, pivotUnitOf(target.selection, pivotMode)),
                 box: selection.box,
@@ -313,7 +321,7 @@ export function GizmoController() {
         reach: scaleAxis === undefined ? 0 : reachAlong(selection.box, target.pivot, scaleAxis),
         scaleFrom: spec.axis === undefined ? target.active.scale3D.x : target.active.scale3D[spec.axis],
         rangeCm,
-        keys: seedDragKeys(e),
+        keys: seedDragKeys(e, transformOf(spec)),
         lastEvent: undefined
       }
       const axis = spec.kind === "translateAxis" || spec.kind === "scaleAxis" || spec.kind === "rotateAxis"
@@ -349,13 +357,13 @@ export function GizmoController() {
       }
       const turn = turnOf(active.start, now)
       if (turn !== undefined) {
-        const on = config.rotationEnabled !== keys.invert
+        const snap = turnSnapOf(config, "turn", keys.only ?? [], keys.invert)
         const radius = Math.hypot(now.px.x - active.start.originPx.x, now.px.y - active.start.originPx.y)
         const turned = snappedTurn({
           free: turn.angle,
           axis: turn.axis,
-          step: on ? config.rotationStep : undefined,
-          flush: on ? active.flush : [],
+          step: snap.step ? config.rotationStep : undefined,
+          flush: active.flush.filter((pair) => snap.targets.includes(pair.source)),
           reach: config.threshold / Math.max(radius, 1)
         })
         showSnap(turned.label, turned.marks)
@@ -367,15 +375,14 @@ export function GizmoController() {
       }
       const scale = scaleOf(active.start, now)
       if (scale === undefined) return undefined
-      const on = config.scaleEnabled !== keys.invert
+      const snap = turnSnapOf(config, "scale", keys.only ?? [], keys.invert)
       const scaled = snappedScale({
         from: active.scaleFrom,
         free: active.scaleFrom * scale.factor,
-        step: on ? config.scaleStep : undefined,
-        face:
-          on && config.targets.mesh.enabled && scale.axis !== undefined && active.scaleFrom !== 0 && active.reach > 0
-            ? { reach: active.reach / active.scaleFrom, range: active.rangeCm }
-            : undefined,
+        step: snap.step ? config.scaleStep : undefined,
+        face: snap.targets.includes("mesh") && scale.axis !== undefined && active.scaleFrom !== 0 && active.reach > 0
+          ? { reach: active.reach / active.scaleFrom, range: active.rangeCm }
+          : undefined,
         stops: active.stops
       })
       showSnap(scaled.label, scaled.marks)
@@ -437,7 +444,7 @@ export function GizmoController() {
     const onKeyUp = (e: KeyboardEvent) => {
       const active = drag.current
       if (active === null) return
-      active.keys.pressed.delete(e.code)
+      releaseDragKey(active.keys, e.code)
       afterKey(active)
     }
 
