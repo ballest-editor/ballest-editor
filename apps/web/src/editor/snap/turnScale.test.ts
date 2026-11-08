@@ -1,7 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import type { MeshFace } from "../../domain/meshElements"
-import { defaultSnapConfig } from "../../domain/snapConfig"
 import { ORIGIN } from "../../domain/ueMath"
 import { boxAt, cubeAt, loadPieces, meshOfBox } from "../../test/snapFixtures"
 import { sceneRegistry } from "../sceneRegistry"
@@ -20,10 +19,11 @@ const stopsAlongX = (...items: Parameters<typeof scaleStopsOf>[3]) =>
 describe("what a turn and a scale stop on", () => {
   it("turns flush with a mesh's own faces, its box standing in until it has loaded", () => {
     const pairsOf = (mesh: ReturnType<typeof meshOfBox> | undefined) =>
-      flushPairsOf(defaultSnapConfig, selection, [cubeAt("a", at, { mesh: () => mesh })], 10)
+      flushPairsOf(selection, [cubeAt("a", at, { mesh: () => mesh })], 10)
     const curved = { ...meshOfBox(boxAt(at)), faces: meshOfBox(boxAt(at)).faces.slice(0, 2) }
     assert.lengthOf(pairsOf(curved), 2)
     assert.lengthOf(pairsOf(undefined), 6)
+    assert.deepStrictEqual([...new Set(pairsOf(undefined).map((pair) => pair.source))], ["mesh"])
   })
 
   it("scales up to a mesh's own faces, its box standing in until it has loaded", () => {

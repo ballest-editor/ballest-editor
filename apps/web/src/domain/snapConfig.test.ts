@@ -3,10 +3,12 @@ import { Schema } from "effect"
 import {
   defaultSnapConfig,
   isPreset,
+  narrowedTo,
   priorityOf,
   rangeOf,
   SnapConfig,
   targetSummary,
+  turnSnapOf,
   withPreset,
   withTargetMoved
 } from "./snapConfig"
@@ -73,6 +75,44 @@ describe("snapConfig", () => {
       }
     }
     assert.strictEqual(targetSummary(moved, "grid", "cm"), "10 cm, own origin, 30°")
+  })
+
+  it("narrows to the kinds held, the priority list keeping its order among them", () => {
+    const piecesFirst = withPreset(defaultSnapConfig, "piecesFirst")
+    assert.deepStrictEqual(priorityOf(narrowedTo(piecesFirst, ["grid"])), ["grid"])
+    assert.deepStrictEqual(priorityOf(narrowedTo(piecesFirst, ["alignment"])), ["tracking", "alignment"])
+    assert.deepStrictEqual(priorityOf(narrowedTo(piecesFirst, ["grid", "mesh"])), ["mesh", "grid"])
+    assert.strictEqual(narrowedTo(piecesFirst, ["mesh"]).threshold, piecesFirst.threshold)
+    assert.strictEqual(narrowedTo(piecesFirst, []), piecesFirst)
+  })
+
+  it("turns snapping on for the kind held, even a target that was off", () => {
+    const off = {
+      ...defaultSnapConfig,
+      enabled: false,
+      targets: { ...defaultSnapConfig.targets, mesh: { ...defaultSnapConfig.targets.mesh, enabled: false } }
+    }
+    const narrowed = narrowedTo(off, ["mesh"])
+    assert.isTrue(narrowed.enabled)
+    assert.deepStrictEqual(priorityOf(narrowed), ["mesh"])
+    assert.strictEqual(narrowed.targets.mesh.sharpAngle, off.targets.mesh.sharpAngle)
+  })
+
+  it("gives a turn and a scale the step alone under the step's key, and no step under a target's", () => {
+    const off = { ...defaultSnapConfig, rotationEnabled: false, scaleEnabled: false }
+    assert.deepStrictEqual(turnSnapOf(off, "turn", [], false), { step: false, targets: [] })
+    assert.deepStrictEqual(turnSnapOf(off, "turn", [], true), { step: true, targets: ["connectors", "mesh"] })
+    assert.deepStrictEqual(turnSnapOf(off, "turn", ["step"], false), { step: true, targets: [] })
+    assert.deepStrictEqual(turnSnapOf(off, "turn", ["mesh"], false), { step: false, targets: ["mesh"] })
+    assert.deepStrictEqual(turnSnapOf(off, "turn", ["mesh", "step"], false), { step: true, targets: ["mesh"] })
+    assert.deepStrictEqual(turnSnapOf(off, "scale", ["mesh"], false), { step: false, targets: ["mesh"] })
+    assert.deepStrictEqual(turnSnapOf(off, "turn", ["step"], true), { step: false, targets: [] })
+  })
+
+  it("leaves a turn alone under a key that means nothing to it", () => {
+    const on = { ...defaultSnapConfig, rotationEnabled: true, scaleEnabled: true }
+    assert.deepStrictEqual(turnSnapOf(on, "turn", ["grid", "alignment"], false), turnSnapOf(on, "turn", [], false))
+    assert.deepStrictEqual(turnSnapOf(on, "scale", ["connectors"], false), { step: true, targets: ["mesh"] })
   })
 
   it("drags by the body only to join ends, unless a config from before says otherwise", () => {

@@ -19,7 +19,8 @@ describe("snappedTurn", () => {
       normal: { x: 1, y: 0, z: 0 },
       target: { x: 0, y: -1, z: 0 },
       label: "Face of Wall",
-      marks: []
+      marks: [],
+      source: "mesh" as const
     }]
     const turned = snappedTurn({ free: deg(83), axis: Z, step: 15, flush, reach: deg(10) })
     assert.closeTo(turned.angle, deg(90), 1e-9)
@@ -27,12 +28,24 @@ describe("snappedTurn", () => {
   })
 
   it("lets go past the reach", () => {
-    const flush = [{ normal: { x: 1, y: 0, z: 0 }, target: { x: 0, y: -1, z: 0 }, label: "Face", marks: [] }]
+    const flush = [{
+      normal: { x: 1, y: 0, z: 0 },
+      target: { x: 0, y: -1, z: 0 },
+      label: "Face",
+      marks: [],
+      source: "mesh" as const
+    }]
     assert.isUndefined(snappedTurn({ free: deg(50), axis: Z, flush, reach: deg(10) }).label)
   })
 
   it("leaves out a face that can't meet the target about this axis", () => {
-    const flush = [{ normal: { x: 0, y: 0, z: 1 }, target: { x: 0, y: -1, z: 0 }, label: "Face", marks: [] }]
+    const flush = [{
+      normal: { x: 0, y: 0, z: 1 },
+      target: { x: 0, y: -1, z: 0 },
+      label: "Face",
+      marks: [],
+      source: "mesh" as const
+    }]
     assert.isUndefined(snappedTurn({ free: deg(90), axis: Z, flush, reach: deg(10) }).label)
   })
 })

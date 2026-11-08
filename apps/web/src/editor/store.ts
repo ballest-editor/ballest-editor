@@ -80,7 +80,7 @@ import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../d
 import type { RecoveredTab } from "../domain/recovery"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
-import type { SnapConfig } from "../domain/snapConfig"
+import type { SnapConfig, SnapTransform } from "../domain/snapConfig"
 import type { TrackedPoint } from "../domain/snapFrame"
 import { type FaceMeeting, mirroredPoint, type MirrorPlane } from "../domain/snapTools"
 import {
@@ -218,6 +218,19 @@ export interface TransformOptions {
   readonly landing?: RigidDelta | undefined
   /** The edit reflected what it took in this plane, and a Point pivot goes with it. */
   readonly reflection?: MirrorPlane | undefined
+}
+
+/**
+ * The keys a drag can take (docs/SNAPPING.md § Modifiers), for the status bar's hints: set from the press on a handle or
+ * the selection's body to the drag's end, and only when a key changes, so a pointer move doesn't render the bar.
+ */
+export interface DragKeysShown {
+  /** What the drag does, which says which keys mean something to it. */
+  readonly transform: SnapTransform
+  /** The codes down now, in the order they went down. */
+  readonly pressed: ReadonlyArray<string>
+  /** The move's lock, while one is set. */
+  readonly lock: { readonly axis: "x" | "y" | "z"; readonly plane: boolean } | undefined
 }
 
 /** What a current snap says while a drag is under way, for the pane's label and the status bar. */
@@ -599,6 +612,8 @@ export interface EditorState extends TabState {
   readonly tracked: ReadonlyArray<TrackedPoint>
   /** What the current snap says; null with no drag, or none in range. */
   readonly snapFeedback: SnapFeedback | null
+  /** The keys the drag under way can take; null with no drag. */
+  readonly dragKeys: DragKeysShown | null
   /** Whether the Snap popover is open. */
   readonly snapPopoverOpen: boolean
   /** The target picker's request, while a tool waits on a pick. */
@@ -828,6 +843,7 @@ export interface EditorState extends TabState {
   readonly acquireTracked: (point: TrackedPoint, item?: string) => void
   readonly clearTracked: () => void
   readonly setSnapFeedback: (feedback: SnapFeedback | null) => void
+  readonly setDragKeys: (keys: DragKeysShown | null) => void
   readonly setSnapPopoverOpen: (open: boolean) => void
   readonly setPicker: (picker: PickerRequest | null) => void
   readonly setFlipOffer: (offer: FlipOffer | null) => void
@@ -1108,6 +1124,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     lightingPreview: null,
     tracked: [],
     snapFeedback: null,
+    dragKeys: null,
     picker: null,
     flipOffer: null
   } as const
@@ -1165,6 +1182,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     lightingPreview: null,
     tracked: [],
     snapFeedback: null,
+    dragKeys: null,
     snapPopoverOpen: false,
     picker: null,
     flipOffer: null,
@@ -1729,6 +1747,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       }),
     clearTracked: () => set({ tracked: [] }),
     setSnapFeedback: (snapFeedback) => set({ snapFeedback }),
+    setDragKeys: (dragKeys) => set({ dragKeys }),
     setSnapPopoverOpen: (snapPopoverOpen) => set({ snapPopoverOpen }),
     setPicker: (picker) => set({ picker }),
     setFlipOffer: (flipOffer) => set({ flipOffer }),

@@ -13,7 +13,7 @@ import { transformSelection } from "../actions"
 import { type PaneCamera, panePointer } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
 import { fitTransforms, type PickerRequest, snapConfigOf, useEditor } from "../store"
-import { type DragKeyState, handleDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
+import { type DragKeyState, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, previewMove } from "./moveSession"
 import { anchorUnder, hitUnder, pickedOf } from "./pickTarget"
 import { bodyDrags, dragTargetOf, selectionSnapStart } from "./selectionStart"
@@ -35,6 +35,8 @@ interface Pressed {
   readonly pointerId: number
   readonly slot: number
   readonly e: PointerEvent
+  /** The keys from the press on, so one held before the drag's first move counts, and the status bar offers them. */
+  readonly keys: DragKeyState
 }
 
 interface BodyDrag {
@@ -96,10 +98,19 @@ export function SnapInput() {
       useEditor.getState().clearTracked()
     }
 
+    /** A press that won't become a drag: the keys it offered go. */
+    const letGo = () => {
+      pressed = null
+      useEditor.getState().setDragKeys(null)
+    }
+
     const beginDrag = (from: Pressed): BodyDrag | undefined => {
       const s = useEditor.getState()
       const target = dragTargetOf(s)
-      if (target === undefined) return undefined
+      if (target === undefined) {
+        useEditor.getState().setDragKeys(null)
+        return undefined
+      }
       const { transforms } = target
       const pointer = panePointer(el, from.e, from.slot)
       raycaster.setFromCamera(pointer.ndc, pointer.pane.camera)
@@ -123,7 +134,7 @@ export function SnapInput() {
         startTransforms: transforms,
         selection: target.selection,
         pivotMode: s.pivotMode,
-        keys: seedDragKeys(from.e),
+        keys: from.keys,
         last: undefined,
         lastEvent: from.e
       }
@@ -225,7 +236,7 @@ export function SnapInput() {
       const slot = panePointer(el, e).slot
       const key = itemUnder(el, e, raycaster, slot)
       if (key === null || !s.selectedIds.includes(key) || !bodyDrags(s)) return
-      pressed = { x: e.clientX, y: e.clientY, pointerId: e.pointerId, slot, e }
+      pressed = { x: e.clientX, y: e.clientY, pointerId: e.pointerId, slot, e, keys: seedDragKeys(e) }
     }
 
     const onPointerMove = (e: PointerEvent) => {
@@ -243,9 +254,10 @@ export function SnapInput() {
       }
       if (pressed === null) return
       if ((e.buttons & 1) === 0) {
-        pressed = null
+        letGo()
         return
       }
+      syncDragKeys(pressed.keys, e)
       if (Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) <= DRAG_SLOP_PX) return
       const from = pressed
       pressed = null
@@ -254,7 +266,7 @@ export function SnapInput() {
     }
 
     const onPointerUp = (e: PointerEvent) => {
-      pressed = null
+      if (pressed !== null) letGo()
       const active = drag
       if (active === null) return
       e.stopImmediatePropagation()
@@ -288,6 +300,10 @@ export function SnapInput() {
         endSnapDisplay()
         return
       }
+      if (pressed !== null) {
+        handleDragKey(pressed.keys, undefined, e, s.keybinds)
+        return
+      }
       const active = drag
       if (active === null) return
       if (handleDragKey(active.keys, active.session, e, s.keybinds)) {
@@ -301,9 +317,10 @@ export function SnapInput() {
     }
 
     const onKeyUp = (e: KeyboardEvent) => {
+      if (pressed !== null) releaseDragKey(pressed.keys, e.code)
       const active = drag
       if (active === null) return
-      active.keys.pressed.delete(e.code)
+      releaseDragKey(active.keys, e.code)
       moveDrag(active, active.lastEvent)
     }
 
@@ -322,6 +339,7 @@ export function SnapInput() {
       stopHover()
       clearTimeout(itemTimer)
       sceneRegistry.bodyDragActive = () => false
+      if (pressed !== null) letGo()
       if (drag !== null) cancel()
     }
   }, [gl])

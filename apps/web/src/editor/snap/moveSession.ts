@@ -8,7 +8,7 @@ import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
 import type { GroupDelta } from "../../domain/groupTransform"
 import type { Box } from "../../domain/itemBounds"
 import type { Keybinds } from "../../domain/Keybinds"
-import type { SnapConfig } from "../../domain/snapConfig"
+import { kindsFor, narrowedTo, type SnapConfig, type SnapKind } from "../../domain/snapConfig"
 import {
   type Constraint,
   freeOffset,
@@ -27,6 +27,7 @@ import { selectionBases } from "../../domain/snapTools"
 import { annotationsOf } from "../../domain/structure"
 import type { PaneCamera } from "../paneCameras"
 import { type EditorState, type FlipOffer, snapConfigOf, type TransformOptions, useEditor } from "../store"
+import { heldKindsOf } from "./dragKeys"
 import { snapMarks } from "./snapMarks"
 import { snapCasts, snapItemsOf } from "./snapScene"
 import { snapViewOf } from "./snapView"
@@ -37,6 +38,8 @@ export interface DragKeys {
   readonly invert: boolean
   /** Holds the current target. */
   readonly hold: boolean
+  /** The kinds snapping is narrowed to while their keys are held; none narrows nothing. */
+  readonly only?: ReadonlyArray<SnapKind> | undefined
 }
 
 /** The move's own lock: an axis, or the plane square to one. */
@@ -123,7 +126,8 @@ export class MoveSession {
     this.pathBroken = true
   }
 
-  private frame(ray: Ray, px: ScreenPoint): SnapFrame {
+  /** `config`, the session's under the keys held. */
+  private frame(ray: Ray, px: ScreenPoint, config: SnapConfig): SnapFrame {
     const { constraint, start } = this
     const offset = freeOffset(constraint, start.pivot, start.ray, ray) ?? this.lastOffset
     this.lastOffset = offset
@@ -139,14 +143,14 @@ export class MoveSession {
     const { construction, measurements } = annotationsOf(s.doc.structure)
     const stepAxes = this.lock === undefined ? start.stepAxes : undefined
     return {
-      config: this.config,
+      config,
       view: this.view,
       items: this.items,
       constraint,
       pointer: px,
       offset,
       slip,
-      bases: selectionBases(this.config, start, constraint),
+      bases: selectionBases(config, start, constraint),
       box: start.box,
       rotation: start.rotation,
       units: s.settings.general.units,
@@ -162,10 +166,11 @@ export class MoveSession {
   /** The delta for the pointer at `ray`, with `keys` held. */
   update(ray: Ray, px: ScreenPoint, keys: DragKeys): MoveResult {
     const before = this.lastOffset
-    const frame = this.frame(ray, px)
+    const config = narrowedTo(this.config, kindsFor("move", keys.only ?? []))
+    const frame = this.frame(ray, px, config)
     const from = this.pathBroken ? frame.offset : before
     this.pathBroken = false
-    const snapping = this.config.enabled !== keys.invert
+    const snapping = config.enabled !== keys.invert
     // Combined with Ctrl, the held target still holds. What Shift finds current is the last sample's, as this one may
     // have left it.
     const holding = keys.hold ? this.held ?? this.lastHit : undefined
@@ -236,16 +241,18 @@ export const flipOfferOf = (hit: SnapHit | undefined, keys: ReadonlyArray<string
   return meeting?.flipFits === true ? { keys, axis: "y", own: meeting.own, other: meeting.other } : null
 }
 
-/** Hides what a move showed, when it ends. */
+/** Hides what a drag showed, its keys in the status bar among it, when it ends. */
 export const endSnapDisplay = (): void => {
   snapMarks.clear()
   useEditor.getState().setSnapFeedback(null)
+  useEditor.getState().setDragKeys(null)
 }
 
 /** Which of `keybinds`' drag keys are down, of the codes `pressed`. */
 export const dragKeysOf = (keybinds: Keybinds, pressed: ReadonlySet<string>): DragKeys => ({
   invert: keybinds.snapInvert.some((code) => pressed.has(code)),
-  hold: keybinds.snapHold.some((code) => pressed.has(code))
+  hold: keybinds.snapHold.some((code) => pressed.has(code)),
+  only: heldKindsOf(keybinds, pressed)
 })
 
 /** Shown for a rotate or scale snap, as a move's are. */

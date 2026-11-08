@@ -273,4 +273,23 @@ describe("conflictingBindings", () => {
     expect(newConflicts({ ...defaultKeybinds, undo: ["Ctrl+KeyJ"], redo: ["Ctrl+KeyJ"] })).toEqual(["Ctrl+KeyJ"])
     expect(newConflicts({ ...defaultKeybinds, moveForward: ["KeyJ"], translateMode: ["KeyJ"] })).toEqual([])
   })
+
+  it("marks two of a drag's keys sharing a chord", () => {
+    expect(newConflicts({ ...defaultKeybinds, snapOnlyMesh: ["KeyG"] })).toEqual(["KeyG"])
+  })
+
+  it("gives the keys that narrow snapping chords nothing else is bound to", () => {
+    const narrowing = keybindActions.filter((action) => action.startsWith("snapOnly"))
+    expect(narrowing).toEqual([
+      "snapOnlyGrid",
+      "snapOnlyConnectors",
+      "snapOnlyMesh",
+      "snapOnlyAlignment",
+      "snapOnlyStep"
+    ])
+    expect(conflictingBindings(defaultKeybinds).size).toBe(0)
+    for (const action of narrowing) {
+      for (const chord of defaultKeybinds[action]) expect(actionsFor(defaultKeybinds, chord)).toEqual([action])
+    }
+  })
 })
