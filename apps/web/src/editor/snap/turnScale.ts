@@ -75,6 +75,11 @@ const cornersOf = (
   })
 }
 
+const unionOf = (a: Box, b: Box): Box => ({
+  min: { x: Math.min(a.min.x, b.min.x), y: Math.min(a.min.y, b.min.y), z: Math.min(a.min.z, b.min.z) },
+  max: { x: Math.max(a.max.x, b.max.x), y: Math.max(a.max.y, b.max.y), z: Math.max(a.max.z, b.max.z) }
+})
+
 const touches = (a: Box, b: Box, by: number) =>
   a.min.x - by <= b.max.x && a.max.x + by >= b.min.x &&
   a.min.y - by <= b.max.y && a.max.y + by >= b.min.y &&
@@ -176,9 +181,16 @@ export const allTurnStopsOf = (
   const ownAxes = BASIS.map((basis) => rotateVec(rotation, basis))
   const ownLine = (angle: number, i: number) =>
     lineMark(pivot, rotateVec(quatFromAxisAngle(axis, angle), ownAxes[i] ?? X), Math.max(sweep, 100), "source")
+  const ownBox = own.map(({ box }) => box).reduce<Box | undefined>(
+    (a, b) => a === undefined ? b : unionOf(a, b),
+    undefined
+  )
   const stops = items.filter((item) => touches(swept, item.box, sweep + rangeCm)).flatMap((item) => {
     const still = bodyOf(item)
-    const { ahead, behind } = firstContacts({ axis, pivot, moving, still, tolerance: TOUCH_CM })
+    // a neighbour the selection touches or overlaps as the turn starts has been met already: it has no touch to offer,
+    // and doesn't bound the rest, which would otherwise end at the start
+    const together = ownBox !== undefined && touches(ownBox, item.box, TOUCH_CM)
+    const { ahead, behind } = together ? {} : firstContacts({ axis, pivot, moving, still, tolerance: TOUCH_CM })
     // past its first touch each way the selection would be inside the neighbour
     const reachable = (angle: number) => angle >= (behind?.angle ?? -Math.PI) && angle <= (ahead?.angle ?? Math.PI)
     const touching = [ahead, behind].flatMap((contact): ReadonlyArray<TurnStop> =>

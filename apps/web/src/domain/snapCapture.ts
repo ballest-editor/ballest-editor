@@ -12,6 +12,7 @@ import {
   freePoint,
   type HeldShape,
   landingOn,
+  landingUnder,
   pixelDistance,
   type ScreenPoint,
   type SnapFrame,
@@ -89,7 +90,7 @@ const arrives = (frame: SnapFrame, { current, from }: DragPath, hit: SnapHit): b
   const free = freePoint(frame, base)
   const before = view.project(vecAdd(base.start, from))
   const now = view.project(free)
-  const point = view.project(constrained(constraint, base.start, hit.landing))
+  const point = view.project(landingUnder(constraint, hit))
   if (before === undefined || now === undefined || point === undefined) return false
   if (pixelDistance(before, now) === 0) return false
   if ((constraint.kind === "surface" ? hit.distance : pixelDistance(point, now)) < UNDER_PX) return true

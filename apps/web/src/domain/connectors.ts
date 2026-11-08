@@ -19,7 +19,8 @@ import {
   vecDistance,
   vecDot,
   vecNormalize,
-  vecScale
+  vecScale,
+  vecSub
 } from "./ueMath"
 
 /** One end of a placed piece. */
@@ -71,13 +72,22 @@ const handAfter = (hand: Connector["hand"], flip: readonly [number, number, numb
   return swapped ? hand === "left" ? "right" : "left" : hand
 }
 
-/** A local direction under `transform`: turned by it, and flipped along any axis it scales by a negative. */
-const worldDirection = (transform: UeTransform, direction: Vec3): Vec3 => {
+/** How far below this a scale counts as none, which has no inverse: the end keeps its sign alone along that axis. */
+const FLAT_SCALE = 1e-9
+
+/**
+ * An end's directions under `transform`, as its cap stands in the world. The cap's points go through the scale, so a
+ * direction along the cap does too, and `up` is one. `forward` is the cap's normal, which a scale unlike on every axis
+ * would skew if it went through as a direction: it takes the scale's inverse instead, and so stays square to the cap.
+ */
+const worldFrame = (transform: UeTransform, forward: Vec3, up: Vec3): { readonly forward: Vec3; readonly up: Vec3 } => {
   const { x, y, z } = transform.scale3D
-  const sign = (v: number) => v < 0 ? -1 : 1
-  return vecNormalize(
-    rotateVec(transform.rotation, { x: direction.x * sign(x), y: direction.y * sign(y), z: direction.z * sign(z) })
+  const inverse = (s: number) => Math.abs(s) < FLAT_SCALE ? (s < 0 ? -1 : 1) : 1 / s
+  const normal = vecNormalize(
+    rotateVec(transform.rotation, { x: forward.x * inverse(x), y: forward.y * inverse(y), z: forward.z * inverse(z) })
   )
+  const along = rotateVec(transform.rotation, { x: up.x * x, y: up.y * y, z: up.z * z })
+  return { forward: normal, up: vecNormalize(vecSub(along, vecScale(normal, vecDot(along, normal)))) }
 }
 
 /** The ends of `item` (of stable key `key`) under `transform`, each at the spot `connectAt` chooses for it, if any. */
@@ -97,8 +107,7 @@ export const endsOf = (
     return {
       ref: { item: key, end },
       position: localToWorld(transform, position),
-      forward: worldDirection(transform, forward),
-      up: worldDirection(transform, up),
+      ...worldFrame(transform, forward, up),
       profile: connector.profile,
       ...(hand !== undefined && { hand })
     }

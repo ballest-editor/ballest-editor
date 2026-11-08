@@ -10,8 +10,9 @@
 //   ring <i> <x|y|z|view> [deg]   page pixel on the rotate gizmo's ring for an axis, piece i selected with the rotate
 //                            tool: deg (default 45) round the quarter that can be grabbed, 0 to 90; and the gizmo's centre
 //   handle <t-x|t-y|t-z|tp-x|tp-y|tp-z>   page pixel of a translate gizmo handle
-//   drag <x> <y> <dx> <dy> [--steps 40] [--lock x|y|z] [--key KeyG] [--shot file.png] [--hold] [--ms 16]
-//                            --key holds a key (a KeyboardEvent.code) from past the drag slop until after the shot
+//   drag <x> <y> <dx> <dy> [--steps 40] [--lock x|y|z] [--key KeyJ] [--shot file.png] [--hold] [--ms 16]
+//                            --key holds a key (a KeyboardEvent.code) from past the drag slop until after the shot,
+//                            or with --hold until `release` has let the pointer go
 //                            a left drag from (x, y) by (dx, dy) page pixels; prints a trace of what snapped
 //   turn <i> <x|y|z|view> <deg> [--from 45] [--steps 60] [--shot file.png] [--hold] [--ms 16]
 //                            grabs that ring at --from and drags round the gizmo's centre by deg degrees on screen
@@ -432,13 +433,17 @@ const commands = {
         const { data } = await send("Page.captureScreenshot", { format: "png" })
         writeFileSync(shot, Buffer.from(data, "base64"))
       }
-      if (held !== undefined) await send("Input.dispatchKeyEvent", { type: "keyUp", ...codeKey(held) })
+      // under --hold the key stays down too, and `release` lets it go after the pointer, so the landing is the key's
+      if (held !== undefined && !has("hold")) await send("Input.dispatchKeyEvent", { type: "keyUp", ...codeKey(held) })
       if (!has("hold")) {
         await mouse(send, "mouseReleased", ax + Number(dx), ay + Number(dy))
         await sleep(50)
       }
       const runs = fold(samples)
-      writeFileSync(traceFile, JSON.stringify({ samples, runs }, null, 1))
+      writeFileSync(
+        traceFile,
+        JSON.stringify({ samples, runs, ...(has("hold") && held !== undefined && { held }) }, null, 1)
+      )
       printRuns(runs)
       if (!has("hold")) console.log(JSON.stringify(await evaluate(send, "__lab.last()")))
     }),
@@ -503,9 +508,11 @@ const commands = {
     }),
   release: () =>
     withPage(async (send) => {
-      const { samples } = JSON.parse(readFileSync(traceFile, "utf8"))
+      const { held, samples } = JSON.parse(readFileSync(traceFile, "utf8"))
       const last = samples.at(-1)
       await mouse(send, "mouseReleased", last.px, last.py)
+      if (held !== undefined) await send("Input.dispatchKeyEvent", { type: "keyUp", ...codeKey(held) })
+      await sleep(50)
       console.log(JSON.stringify(await evaluate(send, "__lab.last()")))
     }),
   trace: () => {

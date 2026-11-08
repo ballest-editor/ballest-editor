@@ -15,6 +15,7 @@ import {
   constrained,
   freePoint,
   landingOn,
+  landingUnder,
   pixelDistance,
   referenceOf,
   type SnapFrame,
@@ -121,7 +122,7 @@ const hitsOf = (frame: SnapFrame, target: SnapTarget, takes: Takes): ReadonlyArr
 const inReach = (frame: SnapFrame, hit: SnapHit): boolean => {
   if (frame.constraint.kind === "surface") return true
   return (hit.parts ?? [hit]).every((one) => {
-    const landed = frame.view.project(constrained(frame.constraint, one.base.start, one.landing))
+    const landed = frame.view.project(landingUnder(frame.constraint, one))
     const free = frame.view.project(freePoint(frame, one.base))
     return landed !== undefined && free !== undefined &&
       pixelDistance(landed, free) <= rangeOf(frame.config, one.target)
@@ -146,10 +147,10 @@ const bestOf = (frame: SnapFrame, hits: ReadonlyArray<SnapHit>): SnapHit | undef
   })
 }
 
-/** `hit` under the frame's constraint: a line or plane only takes the value along it. */
+/** `hit` under the frame's constraint: a line or plane only takes the value along it, unless it is a join. */
 const underConstraint = (frame: SnapFrame, hit: SnapHit): SnapHit => ({
   ...hit,
-  landing: constrained(frame.constraint, hit.base.start, hit.landing)
+  landing: landingUnder(frame.constraint, hit)
 })
 
 /** `held` for this frame: on its point, or as far along its edge, line or plane as the pointer has gone. */

@@ -72,11 +72,9 @@ const LOCKS = [
 
 /** The key that narrows snapping to each kind while it is held. */
 const ONLY_ACTIONS: Readonly<Record<SnapKind, KeybindAction>> = {
-  grid: "snapOnlyGrid",
   connectors: "snapOnlyConnectors",
   mesh: "snapOnlyMesh",
-  alignment: "snapOnlyAlignment",
-  step: "snapOnlyStep"
+  alignment: "snapOnlyAlignment"
 }
 
 /** The kinds whose keys are held, of the codes `pressed`. */
@@ -95,8 +93,8 @@ export type DragKeyEvent = Pick<
 
 /**
  * A key down during a drag: it's noted, a narrowing key is the drag's alone, and a lock key sets or clears its lock. True
- * when the drag took the key. Ctrl doesn't stop a lock key, so inverted snapping can be locked too. A turn or scale has no
- * `session` and takes no lock.
+ * when the drag took the key. Ctrl doesn't stop a lock key, so a move with snapping off can be locked too. A turn or
+ * scale has no `session` and takes no lock.
  */
 export const handleDragKey = (
   state: DragKeyState,
@@ -106,7 +104,7 @@ export const handleDragKey = (
 ): boolean => {
   state.pressed.add(e.code)
   show(state)
-  if (keybinds.snapInvert.includes(e.code) || keybinds.snapHold.includes(e.code)) return true
+  if (keybinds.snapOff.includes(e.code) || keybinds.snapHold.includes(e.code)) return true
   if (narrowsWith(keybinds, e.code)) {
     // a fly key or a shortcut on the same key would act on it too
     e.preventDefault()
@@ -134,11 +132,9 @@ export interface DragHint {
 }
 
 const KIND_WORDS: Readonly<Record<SnapKind, string>> = {
-  grid: "grid",
   connectors: "connectors",
   mesh: "mesh",
-  alignment: "align",
-  step: "step"
+  alignment: "align"
 }
 
 /**
@@ -163,7 +159,7 @@ export const dragHintsOf = (
   })
   const move = transform === "move"
   return [
-    ...heldHint("invert", "snapInvert", "invert"),
+    ...heldHint("off", "snapOff", "off"),
     ...(move ? heldHint("hold", "snapHold", "hold") : []),
     ...(move && locks.length > 0
       ? [{ id: "lock", keys: locks, word: "lock", active: lock !== undefined }]

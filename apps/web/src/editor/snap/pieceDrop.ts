@@ -38,17 +38,20 @@ export interface SnappedDrop {
   readonly options: TransformOptions
 }
 
-/** Where `piece` lands with the pointer at `free`; undefined when snapping is off, and it lands as it would have. */
+/**
+ * Where `piece` lands with the pointer at `free`; undefined when snapping is off, or Ctrl (`off`) holds it off, and it
+ * lands as it would have.
+ */
 export const snappedDrop = (
   s: EditorState,
   piece: CatalogPiece,
   pane: PaneCamera,
   px: ScreenPoint,
   free: Vec3,
-  invert: boolean
+  off: boolean
 ): SnappedDrop | undefined => {
   const config = snapConfigOf(s)
-  if (config.enabled === invert) return undefined
+  if (!config.enabled || off) return undefined
   const transform = placementTransform(piece, ORIGIN)
   const item = itemFromPiece(piece, transform)
   const pivot = localToWorld(transform, pivotFor(item, s.catalogIndex, "Bottom")?.localPosition ?? ORIGIN)
@@ -102,10 +105,10 @@ export const landDrop = (
   pane: PaneCamera,
   px: ScreenPoint,
   free: Vec3,
-  invert: boolean,
+  off: boolean,
   otherwise: () => void
 ): void => {
-  const snapped = snappedDrop(useEditor.getState(), piece, pane, px, free, invert)
+  const snapped = snappedDrop(useEditor.getState(), piece, pane, px, free, off)
   endSnapDisplay()
   if (snapped !== undefined) placeSnapped(piece, snapped.transform, snapped.options)
   else otherwise()

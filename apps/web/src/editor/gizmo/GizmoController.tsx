@@ -383,7 +383,7 @@ export function GizmoController() {
       const turn = turnOf(active.start, now)
       if (turn !== undefined && active.turn !== undefined) {
         const session = active.turn
-        const snap = turnSnapOf(config, "turn", keys.only ?? [], keys.invert)
+        const snap = turnSnapOf(config, "turn", keys.only ?? [], keys.off)
         const turned = turnLanding({
           free: turn.angle,
           from: session.from,
@@ -405,7 +405,7 @@ export function GizmoController() {
       }
       const scale = scaleOf(active.start, now)
       if (scale === undefined) return undefined
-      const snap = turnSnapOf(config, "scale", keys.only ?? [], keys.invert)
+      const snap = turnSnapOf(config, "scale", keys.only ?? [], keys.off)
       const scaled = snappedScale({
         from: active.scaleFrom,
         free: active.scaleFrom * scale.factor,

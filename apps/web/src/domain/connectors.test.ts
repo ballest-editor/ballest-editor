@@ -3,10 +3,11 @@ import { emptyIndexWith } from "../test/catalogIndex"
 import { TRACK_ENDS, withFlags } from "../test/snapFixtures"
 import { expectVec } from "../test/vec"
 import { endsFit, endsMeet, endsOf, meetingTurn, openEndsOf } from "./connectors"
-import type { Vec3 } from "./coords"
+import type { UeTransform, Vec3 } from "./coords"
 import { identityTransform, itemFromPiece } from "./factory"
 import { MIRROR_X, MIRROR_Y } from "./mirror"
-import { rotateVec, rotatorToQuat } from "./ueMath"
+import { localToWorld } from "./pivot"
+import { quatMul, rotateVec, rotatorToQuat, vecAdd, vecDot, vecLength, vecNormalize, vecSub } from "./ueMath"
 
 const must = <T>(value: T | undefined): T => {
   if (value === undefined) throw new Error("expected a value")
@@ -145,5 +146,59 @@ describe("connecting at a spot", () => {
     assert.isTrue(endsMeet(must(front), must(back)))
     assert.isFalse(endsMeet(must(front), must(endsOf("b", b.item, b.transform, index)[1])))
     assert.deepStrictEqual(must(back).ref, { item: "b", end: 1 })
+  })
+})
+
+describe("an end under a scale that isn't the same on every axis", () => {
+  // a tilted end, as Bend H 25's far one: its cap's plane is skewed by a scale along X and Z unlike each other
+  const tilted = { x: 0.906308, y: 0, z: 0.422619 }
+  const { index, piece } = emptyIndexWith({
+    connectors: [
+      {
+        position: [952.588, 0, 100.336],
+        forward: [tilted.x, tilted.y, tilted.z],
+        up: [-tilted.z, 0, tilted.x],
+        profile: "Tube H",
+        cap: { shape: "polygon", width: 300, height: 150, centre: [984.285, 0, 32.363] }
+      },
+      { position: [0, 0, 0], forward: [-1, 0, 0], up: [0, 0, 1], profile: "Tube H" }
+    ]
+  })
+  const base = identityTransform({ x: 100, y: 200, z: 300 })
+  const transform = {
+    ...base,
+    rotation: { ...base.rotation, ...rotatorToQuat({ pitch: -50, yaw: 20, roll: 0 }) },
+    scale3D: { ...base.scale3D, x: 1, y: 0.63, z: 0.6 }
+  }
+  const item = itemFromPiece(piece, transform)
+  /** A direction along the cap, as the transform carries the cap's points. */
+  const up = { x: -tilted.z, y: 0, z: tilted.x }
+  const side = { x: 0, y: 1, z: 0 }
+  const alongCap = (local: Vec3, under: UeTransform = transform) => {
+    const at = { x: 952.588, y: 0, z: 100.336 }
+    return vecNormalize(vecSub(localToWorld(under, vecAdd(at, local)), localToWorld(under, at)))
+  }
+
+  it("faces out of its cap as the cap stands in the world, its up along the cap", () => {
+    const end = must(endsOf("a", item, transform, index)[0])
+    assert.closeTo(vecDot(end.forward, alongCap(up)), 0, 1e-9)
+    assert.closeTo(vecDot(end.forward, alongCap(side)), 0, 1e-9)
+    expectVec(end.up, alongCap(up))
+    assert.closeTo(vecLength(end.forward), 1, 1e-9)
+  })
+
+  it("lies flush on an end it is turned to meet: its cap in the other's plane", () => {
+    const own = must(endsOf("a", item, transform, index)[0])
+    const other = must(endsOf("b", item, identityTransform({ x: 5000, y: 0, z: 0 }), index)[1])
+    const turn = meetingTurn(own, other)
+    const moved = {
+      ...transform,
+      rotation: quatMul(turn, transform.rotation),
+      translation: vecAdd(other.position, rotateVec(turn, vecSub(transform.translation, own.position)))
+    }
+    expectVec(must(endsOf("a", item, moved, index)[0]).position, other.position)
+    assert.closeTo(vecDot(alongCap(up, moved), other.forward), 0, 1e-9)
+    assert.closeTo(vecDot(alongCap(side, moved), other.forward), 0, 1e-9)
+    expectVec(alongCap(up, moved), other.up)
   })
 })

@@ -5,8 +5,11 @@ import * as THREE from "three"
 import { vi } from "vitest"
 import { identityTransform } from "../../domain/factory"
 import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
+import { annotationsOf } from "../../domain/structure"
+import { ORIGIN } from "../../domain/ueMath"
 import { reactRootPerTest } from "../../test/reactRoot"
 import { catalogWithEnds, DOWN_PANE_SIZE, loadPieces, lookDown } from "../../test/snapFixtures"
+import { assertVec } from "../../test/vec"
 import { GizmoController } from "../gizmo/GizmoController"
 import { SIZE } from "../gizmo/handles"
 import { paneCameraAt } from "../paneCameras"
@@ -14,6 +17,7 @@ import { sceneRegistry } from "../sceneRegistry"
 import { shownTransform, useEditor } from "../store"
 import { landDrop } from "./pieceDrop"
 import { SnapInput } from "./SnapInput"
+import { snapViewOf } from "./snapView"
 
 /** The canvas the viewport would give both controllers, and what a frame runs. */
 const scene = vi.hoisted(() => ({ canvas: document.createElement("canvas"), frame: () => {} }))
@@ -237,17 +241,62 @@ describe("a press and drag on an item's body", () => {
   })
 })
 
+describe("a body drag with J held", () => {
+  afterEach(tearDown)
+
+  /** The item at the origin, and a second whose -X end is at (350, 300, 50), with J held from the press. */
+  const joinDrag = () => {
+    setUp({ targets: { ...defaultSnapConfig.targets, tracking: { ...TRACKING, enabled: false } } })
+    const [a = ""] = useEditor.getState().doc.ids
+    const piece = catalogWithEnds().pieces[0] ?? assert.fail("the bundled catalog is empty")
+    useEditor.getState().placePiece(piece, identityTransform({ x: 600, y: 300, z: 0 }))
+    useEditor.getState().select([a])
+    useEditor.getState().setTool("select")
+    const view = snapViewOf(paneCameraAt(0))
+    /** The pixel that carries the item's origin, under the press at the centre, to `x`, `y`. */
+    const pixelFor = (x: number, y: number) => view.project({ x, y, z: 0 }) ?? assert.fail("off the pane")
+    pointer("pointerdown", CENTRE, CENTRE, 1)
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyJ", key: "j", cancelable: true }))
+    })
+    const move = (x: number, y: number) => {
+      const px = pixelFor(x, y)
+      pointer("pointermove", px.x, px.y, 1)
+      return px
+    }
+    const release = ({ x, y }: { readonly x: number; readonly y: number }) => pointer("pointerup", x, y, 0)
+    return { a, move, release }
+  }
+  const translationOf = (key: string) => shownTransform(useEditor.getState(), key)?.translation
+
+  it("lands where it started when no end meets one", () => {
+    const { a, move, release } = joinDrag()
+    move(40, 30)
+    release(move(137, 42))
+    assertVec(translationOf(a) ?? { x: 1, y: 1, z: 1 }, { x: 0, y: 0, z: 0 }, "where it started")
+  })
+
+  it("joins an end that meets one on screen, and records the joint", () => {
+    const { a, move, release } = joinDrag()
+    move(40, 30)
+    // the item's +X end, 250 cm out, 30 px short of the other's -X end
+    release(move(70, 300))
+    assertVec(translationOf(a) ?? ORIGIN, { x: 100, y: 300, z: 0 }, "its end on the other's")
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).joints, 1)
+  })
+})
+
 describe("a palette drop", () => {
   beforeEach(() => setUp())
   afterEach(tearDown)
 
-  it.each([["snapping on", false], ["snapping inverted off", true]])(
+  it.each([["snapping on", false], ["snapping held off", true]])(
     "lets go of the acquired points, %s",
-    (_, invert) => {
+    (_, off) => {
       const piece = catalogWithEnds().pieces[0] ?? assert.fail("the bundled catalog is empty")
       const pane = lookDown(paneCameraAt(0))
       act(() =>
-        landDrop(piece, pane, { x: CENTRE + 600, y: CENTRE }, { x: 0, y: 600, z: 0 }, invert, () => {
+        landDrop(piece, pane, { x: CENTRE + 600, y: CENTRE }, { x: 0, y: 600, z: 0 }, off, () => {
           useEditor.getState().placePiece(piece, identityTransform({ x: 0, y: 600, z: 0 }))
         })
       )
