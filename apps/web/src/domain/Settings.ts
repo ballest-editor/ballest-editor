@@ -101,7 +101,9 @@ export const PanelSettings = Schema.Struct({
   /** What the Pieces panel's Recent lists, as `pieceIdOf` gives them, newest first (see domain/recentPieces). */
   recentPieces: Schema.Array(Schema.String),
   /** What its Favorites lists, in the order they were starred. */
-  favoritePieces: Schema.Array(Schema.String)
+  favoritePieces: Schema.Array(Schema.String),
+  /** What the Inspector's Scale row shows: a factor of the piece's own size, or its size (see domain/itemBounds). */
+  inspectorScale: Schema.Literals(["factor", "size"])
 })
 
 /** How much bigger or smaller than medium each gizmo size draws, on screen. */
@@ -152,7 +154,13 @@ export const defaultSettings: Settings = {
   },
   lighting: { mapLighting: true, skyVisible: true },
   snapping: defaultSnapConfig,
-  panels: { piecesView: "list", piecesThumbnailSize: "m", recentPieces: [], favoritePieces: [] },
+  panels: {
+    piecesView: "list",
+    piecesThumbnailSize: "m",
+    recentPieces: [],
+    favoritePieces: [],
+    inspectorScale: "factor"
+  },
   gizmo: { size: "m", showForGroups: true }
 }
 

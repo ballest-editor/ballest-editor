@@ -15,7 +15,9 @@ import {
   writeField,
   writeFieldAbout
 } from "../../domain/groupTransform"
+import { extentOf, scaleForSize } from "../../domain/itemBounds"
 import type { PropertyChange } from "../../domain/itemProperties"
+import type { Item } from "../../domain/MapFile"
 import type { FlipAxis } from "../../domain/mirror"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
 import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
@@ -63,19 +65,21 @@ const docTransform = (id: string): UeTransform | undefined => {
 /** An item's own pivot, local and unscaled. */
 const localPivotOf = (id: string): Vec3 => pivotOf(useEditor.getState(), id).localPosition
 
-/** The selected items' document transforms, each put through `edit` (with the item's own pivot). */
+/** The selected items' document transforms, each put through `edit` (with the item's own pivot and the item). */
 const withSelectionEdit = (
-  edit: (t: UeTransform, localPivot: Vec3) => UeTransform
-): ReadonlyMap<string, UeTransform> =>
-  fitTransforms(
-    useEditor.getState(),
+  edit: (t: UeTransform, localPivot: Vec3, item: Item) => UeTransform
+): ReadonlyMap<string, UeTransform> => {
+  const s = useEditor.getState()
+  return fitTransforms(
+    s,
     new Map(
-      useEditor.getState().selectedIds.flatMap((id) => {
-        const t = docTransform(id)
-        return t === undefined ? [] : [[id, edit(t, localPivotOf(id))] as const]
+      s.selectedIds.flatMap((id) => {
+        const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+        return item === undefined ? [] : [[id, edit(editTransform(item), localPivotOf(id), item)] as const]
       })
     )
   )
+}
 
 /**
  * The document transforms through an edit of the selection's units, applied by the pivot setting like a gizmo drag:
@@ -155,6 +159,18 @@ export const moveSelectionBy = (offset: Vec3): boolean => {
  */
 export const setSelectionField = (field: TransformField, value: Vec3): boolean =>
   transformSelection(withSelectionEdit((t, localPivot) => writeFieldAbout(t, field, value, localPivot)))
+
+/**
+ * Gives every selected item the `size` (cm) along its own axes (pasting a copied Size row), each scaled about its pivot.
+ * An item whose size isn't known (`extentOf`) keeps its scale.
+ */
+export const setSelectionSize = (size: Vec3): boolean => {
+  const { catalogIndex } = useEditor.getState()
+  return transformSelection(withSelectionEdit((t, localPivot, item) => {
+    const extent = extentOf(item, catalogIndex)
+    return extent === undefined ? t : writeFieldAbout(t, "scale3D", scaleForSize(extent, t.scale3D, size), localPivot)
+  }))
+}
 
 /** Applies an axis edit (an inspector field) to the selection. */
 export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit): boolean =>

@@ -3,6 +3,7 @@ import { Label } from "@workspace/ui/components/label"
 import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react"
 import { applyNumberEntry, parseNumberEntry, scrubbedValue, scrubSpeedOf } from "../domain/numberEntry"
+import { clearStatusHint, showStatusHint, type StatusHint } from "../editor/statusHint"
 
 /** Pixels the pointer must travel before a press becomes a scrub (else it's a click). */
 const SCRUB_THRESHOLD = 3
@@ -119,6 +120,42 @@ function useScrub(options: {
   }
 }
 
+/** The status bar's hint over a field that scrubs; a scrub keeps it, as the pointer is still on the field. */
+const SCRUB_HINT: StatusHint = [
+  { keys: "Mouse0", text: "Drag to change" },
+  { keys: "Shift", text: "10× faster" },
+  { keys: "Alt", text: "10× slower" },
+  { keys: "Mouse0", text: "Click to type" }
+]
+
+const TYPING_HINT: StatusHint = [{ keys: "Enter", text: "Set" }, { keys: "Escape", text: "Cancel" }]
+
+const RELATIVE_TYPING_HINT: StatusHint = [
+  ...TYPING_HINT,
+  { text: "Type +50, -20, *2 or /2 to change what's there, =-20 for a negative" }
+]
+
+/** Shows the field's hint in the status bar while it is hovered or typed in. */
+function useFieldHint(scrubbable: boolean) {
+  const owner = useId()
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const hint = focused
+    ? scrubbable ? RELATIVE_TYPING_HINT : TYPING_HINT
+    : hovered && scrubbable
+    ? SCRUB_HINT
+    : null
+  useEffect(() => {
+    if (hint === null) return
+    showStatusHint(owner, hint)
+    return () => clearStatusHint(owner)
+  }, [owner, hint])
+  return {
+    hover: { onPointerEnter: () => setHovered(true), onPointerLeave: () => setHovered(false) },
+    focus: { onFocus: () => setFocused(true), onBlur: () => setFocused(false) }
+  }
+}
+
 /**
  * Numeric input that commits on Enter or blur and reverts on Escape or invalid input.
  * With `onScrub`, dragging the field or its label left/right scrubs the value (`step` per pixel,
@@ -129,7 +166,7 @@ function useScrub(options: {
  * negative value. Text edited in place is always a plain number, or changing -2790 to -2795 would subtract. A null `value`
  * is mixed (several items that disagree): the input is blank, typing sets them all, a scrub starts from 0, and a
  * relative entry is refused. `format` and `parse` replace plain decimals, for a value that reads as something else (a
- * time of day).
+ * time of day). While it's hovered or typed in, the status bar says what the mouse and keys do (`useFieldHint`).
  */
 export function NumberField(props: {
   readonly label: string
@@ -171,6 +208,7 @@ export function NumberField(props: {
   const shown = (value: number) => props.format?.(value) ?? round(value).toFixed(digits)
   const text = draft ?? (props.value === null ? "" : shown(props.value))
   const scrubbable = props.onScrub !== undefined
+  const fieldHint = useFieldHint(scrubbable)
   const parse = props.parse ?? ((typed: string) => typed.trim() === "" ? null : Number(typed))
   const commitValue = (n: number | null) => {
     if (n !== null && Number.isFinite(n) && n !== props.value) props.onCommit(n)
@@ -203,7 +241,10 @@ export function NumberField(props: {
     }
   })
   return (
-    <div className="flex h-7 min-w-0 overflow-hidden rounded-control border border-border/70 bg-input focus-ring-within dark:bg-input/30">
+    <div
+      className="flex h-7 min-w-0 overflow-hidden rounded-control border border-border/70 bg-input focus-ring-within dark:bg-input/30"
+      {...fieldHint.hover}
+    >
       {props.handle !== false && (
         <Label
           htmlFor={id}
@@ -239,7 +280,11 @@ export function NumberField(props: {
           if (e.target.value === "") typedOver.current = true
           setDraft(e.target.value)
         }}
-        onBlur={commit}
+        onFocus={fieldHint.focus.onFocus}
+        onBlur={() => {
+          fieldHint.focus.onBlur()
+          commit()
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur()
           if (e.key === "Escape") {

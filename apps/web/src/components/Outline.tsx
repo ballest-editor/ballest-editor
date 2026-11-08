@@ -514,11 +514,7 @@ export function Outline() {
                   </ContextMenuItem>
                 )
             )
-            : (
-              <ContextMenuItem disabled={!canGroup} onClick={() => useEditor.getState().chainSelection()}>
-                Group as chain
-              </ContextMenuItem>
-            )}
+            : <MenuCommand action="chainSelection" disabled={!canGroup}>Group as chain</MenuCommand>}
           <SavePrefabItem item={ContextMenuItem} />
           {instance !== undefined && link !== undefined && (
             <>

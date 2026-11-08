@@ -31,6 +31,13 @@ export default states({
     measure: { selected: store("selectedIds") },
     checks: [{ metric: "selected", equals: 1 }]
   },
+  "editor/selected-size": {
+    views: ["panel:inspector"],
+    fixture: "map:simple",
+    reach: [app.settings({ panels: { inspectorScale: "size" } }), app.select("")],
+    measure: { scale: store("settings.panels.inspectorScale") },
+    checks: [{ metric: "scale", equals: "size" }]
+  },
   "editor/selected-many": {
     views: ["panel:inspector"],
     fixture: "map:simple",

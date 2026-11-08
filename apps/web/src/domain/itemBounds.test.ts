@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import { expectVec } from "../test/vec"
 import { Catalog, indexCatalog } from "./Catalog"
 import { identityTransform, playerStartItem } from "./factory"
-import { boxCentreOf, formatBoxSize, itemsBoxOf, placedBoxOf } from "./itemBounds"
+import { boxCentreOf, extentOf, formatBoxSize, itemsBoxOf, placedBoxOf, scaleForSize, sizeAt } from "./itemBounds"
 import type { Item } from "./MapFile"
 import { rotatorToQuat } from "./ueMath"
 
@@ -97,5 +97,30 @@ describe("formatBoxSize", () => {
   it("gives a box's size in metres, to a decimal", () => {
     const box = { min: { x: -620, y: 10, z: 0 }, max: { x: 620, y: 320, z: 200 } }
     assert.strictEqual(formatBoxSize(box), "12.4 × 3.1 × 2.0 m")
+  })
+})
+
+describe("extentOf", () => {
+  it("is the length of a piece's bounds along its own axes", () => {
+    assert.deepStrictEqual(extentOf(slab(), catalog), { x: 400, y: 20, z: 50 })
+  })
+
+  it("is unknown for a piece without bounds", () => {
+    assert.isUndefined(extentOf(unknown(0), catalog))
+    assert.isUndefined(extentOf(slab(), null))
+  })
+})
+
+describe("sizeAt and scaleForSize", () => {
+  const extent = { x: 400, y: 20, z: 50 }
+
+  it("give a scaled piece's size, a flip counting as its length", () => {
+    assert.deepStrictEqual(sizeAt(extent, { x: 2, y: -1, z: 0.5 }), { x: 800, y: 20, z: 25 })
+  })
+
+  it("find the scale for a size, keeping a flipped axis flipped", () => {
+    const scale = scaleForSize(extent, { x: 2, y: -1, z: 0.5 }, { x: 1000, y: 30, z: 50 })
+    assert.deepStrictEqual(scale, { x: 2.5, y: -1.5, z: 1 })
+    assert.deepStrictEqual(sizeAt(extent, scale), { x: 1000, y: 30, z: 50 })
   })
 })

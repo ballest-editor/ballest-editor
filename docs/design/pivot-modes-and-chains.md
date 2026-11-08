@@ -148,7 +148,7 @@ Move doesn't accumulate: every link moves by the offset, in World or along its o
 
 **Scale in a chain.** An item holds a rotation and a `scale3D`, so a non-uniform scale passed down to a child turned another way would be a shear, which no item can hold and which the game never produces ([qa/gizmo-scale.md](../qa/gizmo-scale.md)). The decision: scale doesn't propagate at all. Each link scales by the factor about its own pivot along its own axes, the ordinary Each rule, and a parent's scale changes nothing about its children. Nothing in the curling-finger example needs scale to accumulate, and this keeps the game's no-shear invariant without a special case.
 
-**Inside a chain.** Double-clicking enters it like any group. A link selected inside it carries the links after it: a move or turn on link 3 of 5 takes 4 and 5 along rigidly, since that is what parenting means, and in Each the accumulation runs through the selected links only. Maya's Preserve Children is the escape from this; here the escape is Unchain, or a modifier held during the drag, and which is an open question.
+**Inside a chain.** Double-clicking enters it like any group. A link selected inside it carries the links after it: a move or turn on link 3 of 5 takes 4 and 5 along rigidly, since that is what parenting means, and in Each the accumulation ran through the selected links only (changed after use, § Bending). Maya's Preserve Children is the escape from this; here the escape is Unchain, or a modifier held during the drag, and which is an open question.
 
 **Outline.** A chain's row has a chain glyph in place of the folder, and its links are numbered. Dragging a link reorders the chain, which rehangs it; nothing moves in the map, because the map only ever holds world transforms. The menu gets Make chain and Unchain on a group row, Group as chain on a selection, which takes selection order as link order, and Reverse chain. The Inspector of a chain shows the link count and the same actions.
 
@@ -167,6 +167,16 @@ Everything the game can't do, so nothing here was measured against it:
 - Pivot dots. The game shows one gizmo and no other pivot.
 
 What the game does and the editor copies: Together's maths, the no-shear scale rule, the frame as the group's pivot, and typed values as deltas.
+
+## Bending, after use (2026-11-08)
+
+Using chains turned up three problems, and the user settled the fixes. What is true now is in [DESKTOP.md § Group pivots and chains](../DESKTOP.md#group-pivots-and-chains).
+
+- **Too many steps.** A bend took: select, group, convert, enter, select all, Each, turn. Each held a chain selected whole at Together, since it is one unit. Now a chain alone is enough for Each, which bends it, and Group as chain has a keybind (Ctrl+Shift+G) and makes one whole group selected a chain itself. A bend is: select in order, Ctrl+Shift+G, period, turn.
+- **Selected links only.** Inside an entered chain, Each accumulated through the selected links only, and an unselected link rode rigidly on the one before it. Select one link of each pair and the pairs turned as if still grouped, which read as a bug. Now a turn bends from the first selected link to the end, selected or not. A move and a scale still act per selected link.
+- **World on a second bend.** The pass above turned every link about one world axis. A straight chain bends cleanly that way, but a curved one doesn't: each link's joint to the next is turned another way, so a fixed axis gives every joint a different turn and the curve kinks. Now the first link takes the turn as the gizmo shows it, read in its own axes, and every later link takes that same local turn in its own axes as the links before it left them. Every joint of a curve then turns alike, and a second bend about another axis winds the curve into a helix. The axes toggle still picks the first link's axis. A link that faces another way from its neighbours turns about its own matching axis, which is what keeps a curve of like pieces even.
+- **Order.** A chain took its links in outline order, or selection order for Group as chain. A row of pieces built by duplicating blocks has a document order that jumps along the row, so Convert to chain made a chain whose bend broke at every block. Now both order the links along the pieces as they lie, nearest pivot next, starting from the first selected or first child when it is an end. Dragging a link in the Outline still reorders it by hand.
+- **Growth.** A chain carries an optional growth in the sidecar. Linear adds a percentage of the first link's turn per link, which makes the curvature grow steadily (a clothoid, what roads use to ease into a bend). Compound multiplies by it per link, which winds a spiral; 3ds Max's Array has the same per-copy percentage as its incremental scale. Growth counts from the first bending link.
 
 ## Open questions
 

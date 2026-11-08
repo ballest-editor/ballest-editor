@@ -59,6 +59,7 @@ export const actionCommands = {
   deselect: () => useEditor.getState().deselect(),
   enterGroup: enterSelectedGroup,
   groupSelection: () => useEditor.getState().groupSelection(),
+  chainSelection: () => useEditor.getState().chainSelection(),
   ungroupSelection: () => useEditor.getState().ungroupSelection(),
   selectMode: () => useEditor.getState().setTool("select"),
   translateMode: () => useEditor.getState().setTool("translate"),

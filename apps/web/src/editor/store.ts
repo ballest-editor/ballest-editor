@@ -61,7 +61,15 @@ import { LIMITS } from "../domain/limits"
 import { type GameWrite, type LinkState, linkStateOf } from "../domain/linkState"
 import type { MapDiff } from "../domain/mapDiff"
 import { isPlayerStart, type Item, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
-import type { Annotations, Construction, EndRef, GroupPivot, Measurement, PrefabLink } from "../domain/MapSidecar"
+import type {
+  Annotations,
+  ChainGrowth,
+  Construction,
+  EndRef,
+  GroupPivot,
+  Measurement,
+  PrefabLink
+} from "../domain/MapSidecar"
 import type { MaterialTable } from "../domain/Materials"
 import { type FlipAxis, withMirrorMesh } from "../domain/mirror"
 import {
@@ -99,6 +107,8 @@ import {
   treeKeys,
   withAnnotations,
   withChain,
+  withChainGrowth,
+  withChildOrder,
   withConnectAt,
   withGroup,
   withGroupName,
@@ -148,6 +158,7 @@ import type {
 import {
   commonMoveOf,
   effectivePivotMode,
+  pathOrder,
   pivotDotsOf,
   type PivotDotSpec,
   type PivotMode,
@@ -775,9 +786,11 @@ export interface EditorState extends TabState {
   readonly freezeGroupPivot: (id: string) => void
   /** Makes a group a chain of its children in outline order, or a plain group again (`withChain`). */
   readonly setChain: (id: string, chain: boolean) => void
-  /** Groups the selection, in selection order, as a chain. */
+  /** Groups the selection, in selection order, as a chain; one whole group selected becomes one. */
   readonly chainSelection: () => void
   readonly reverseChain: (id: string) => void
+  /** Sets how a chain grows as it bends (`withChainGrowth`), one undo step. */
+  readonly setChainGrowth: (id: string, growth: ChainGrowth | undefined) => void
   /** `withMovedNodes` as one undo step. */
   readonly moveNodes: (nodeIds: ReadonlyArray<string>, parentGroupId: string | null, index: number) => void
   /** Restores the previous snapshot, including its selection. */
@@ -1567,11 +1580,12 @@ export const useEditor = create<EditorState>()((set, get) => {
         commitStructure(withGroupPivot(s.doc.structure, id, { choice: "point", world: unit.pivot }))
       }
     },
-    setChain: (id, chain) => commitStructure(withChain(get().doc.structure, id, chain)),
+    setChain: (id, chain) =>
+      commitStructure(chain ? chainedAlong(get(), get().doc.structure, id) : withChain(get().doc.structure, id, false)),
     chainSelection: () => {
       const { doc, selectedIds, enteredGroupId } = get()
       const { tree } = doc.structure
-      // selection order is link order: the first selected is the root
+      // the first selected is the root, and the links follow the pieces from it
       const nodes = selectedIds.map((key) => clickLevelOf(tree, key, enteredGroupId).nodeId)
       const ids = [...new Set(nodes)]
       if (ids.length === 0) return
@@ -1580,9 +1594,10 @@ export const useEditor = create<EditorState>()((set, get) => {
         ? { structure: doc.structure, id: ids[0] ?? "" }
         : { structure: withGroup(doc.structure, ids, id), id }
       if (grouped.structure === undefined) return
-      commitStructure(withChain(grouped.structure, grouped.id, true))
+      commitStructure(chainedAlong(get(), grouped.structure, grouped.id))
     },
     reverseChain: (id) => commitStructure(withReversedChain(get().doc.structure, id)),
+    setChainGrowth: (id, growth) => commitStructure(withChainGrowth(get().doc.structure, id, growth)),
     moveNodes: (nodeIds, parentGroupId, index) =>
       commitStructure(withMovedNodes(get().doc.structure, nodeIds, parentGroupId, index)),
 
@@ -2145,6 +2160,21 @@ const unitContext = (s: EditorState, transformOf: (id: string) => UeTransform | 
   }
 })
 
+/**
+ * Group `id` of `structure` made a chain, its links ordered along the pieces as they lie (`pathOrder`) from its first
+ * child: the order they were placed or grouped in needn't be the order they lie in.
+ */
+const chainedAlong = (s: EditorState, structure: Structure, id: string): Structure | undefined => {
+  const group = findGroup(structure.tree, id)
+  if (group === undefined) return undefined
+  const ctx = unitContext(s, (key) => shownTransform(s, key))
+  const pivots = group.children.flatMap((child) => unitOf(child, ctx)?.pivot ?? [])
+  const ordered = pivots.length === group.children.length
+    ? withChildOrder(structure, id, pathOrder(pivots))
+    : undefined
+  return withChain(ordered ?? structure, id, true)
+}
+
 /** The items an edit of the selection reaches (`reachableKeys`): inside an entered chain, the carried links too. */
 export const editedKeys = (s: EditorState): ReadonlyArray<string> =>
   reachableKeys(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
@@ -2249,15 +2279,21 @@ export const useTabSummary = (tabId: string) =>
     }
   }))
 
-/** Whether Group and Ungroup have anything to do, for the menus that hold them. */
+/** Whether Group, Group as chain and Ungroup have anything to do, for the menus that hold them. */
 export const useCanGroup = () => {
   const tree = useEditor((s) => s.doc.structure.tree)
   const selectedIds = useEditor((s) => s.selectedIds)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
-  return useMemo(() => ({
-    canGroup: canGroupSelection(tree, selectedIds, enteredGroupId),
-    canUngroup: selectedGroupIds(tree, selectedIds, enteredGroupId).length > 0
-  }), [tree, selectedIds, enteredGroupId])
+  return useMemo(() => {
+    const canGroup = canGroupSelection(tree, selectedIds, enteredGroupId)
+    const group = soleGroupOf(tree, selectedIds, enteredGroupId)
+    return {
+      canGroup,
+      // one whole group selected becomes a chain itself
+      canChain: canGroup || (group !== undefined && group.chain !== true && group.prefab === undefined),
+      canUngroup: selectedGroupIds(tree, selectedIds, enteredGroupId).length > 0
+    }
+  }, [tree, selectedIds, enteredGroupId])
 }
 
 /** The definition in the active tab, if that's what it holds: what Export and Play are off for. */

@@ -13,6 +13,7 @@ const state = (over: Partial<MenuState> = {}): MenuState => ({
   canRedo: false,
   hasSelection: false,
   canGroup: false,
+  canChain: false,
   canUngroup: false,
   canPaste: false,
   canSelectAll: true,

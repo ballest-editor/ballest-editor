@@ -20,6 +20,7 @@ import { soleGroupOf } from "../domain/groupSelection"
 import { floorHeightOf } from "../domain/level"
 import { AUTO_GRID_COLORS, isDefaultDisplay, withDefaultDisplay } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
+import { canEach } from "../domain/units"
 import {
   pickGridSize,
   saveSettings,
@@ -112,21 +113,28 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
 
 /**
  * What a selection pivots about: one point for all, the active one's pivot, as the game does (Together), or each unit
- * its own (Each). Each needs two or more pieces or groups, so with fewer the toggle is held at Together and says why.
+ * its own (Each). Each needs two or more pieces or groups, or one chain, which it bends; with less the toggle is held at
+ * Together and says why.
  */
 function PivotToggle({ disabled }: { readonly disabled: boolean }) {
   const each = useEditor((s) => shownPivotMode(s) === "each")
-  const units = useEditor((s) => selectionUnits(s, (id) => shownTransform(s, id))?.units.length ?? 0)
+  const reach = useEditor((s) => {
+    const selection = selectionUnits(s, (id) => shownTransform(s, id))
+    if (selection === undefined || !canEach(selection)) return "none"
+    return selection.units.length === 1 ? "chain" : "units"
+  })
   const soleGroup = useEditor((s) => soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined)
   const worldMove = useEditor((s) => s.tool === "translate" && shownGizmoSpace(s) === "world")
   const togglePivotMode = useEditor((s) => s.togglePivotMode)
-  const held = units < 2
+  const held = reach === "none"
   const label = held
     ? soleGroup
-      ? "One group is one piece to Each: enter it to work on its members"
+      ? "One group is one piece to Each: enter it to work on its members, or make it a chain to bend it"
       : "Each needs two or more pieces or groups selected"
     : each
-    ? `Each piece or group pivots on its own${worldMove ? " (same as Together for a move along world axes)" : ""}`
+    ? reach === "chain"
+      ? "The chain bends: each link turns on its own and carries the links after it"
+      : `Each piece or group pivots on its own${worldMove ? " (same as Together for a move along world axes)" : ""}`
     : `Everything pivots on the active piece, as the game does${
       worldMove ? " (same as Each for a move along world axes)" : ""
     }`
