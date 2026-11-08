@@ -286,7 +286,7 @@ const shownYaw = (key: string) => {
 describe("a turn by the gizmo's ring", () => {
   let own = ""
 
-  const setUp = (snap: Partial<SnapConfig>) => {
+  const setUpTurn = (snap: Partial<SnapConfig>) => {
     // 1000 cm wide pieces 100 cm apart: a corner 707 cm out swings onto the neighbour at 13.05° either way
     const [a = "", b = ""] = loadPieces([{ x: 0, y: 0, z: 0 }, { x: 1100, y: 0, z: 0 }])
     own = a
@@ -321,7 +321,7 @@ describe("a turn by the gizmo's ring", () => {
   })
 
   it("stops where it touches the neighbour, and goes on once the pointer is a threshold past", () => {
-    setUp({ enabled: true })
+    setUpTurn({ enabled: true })
     const shown = turnThrough(30)
     // free to 12°, on the touch from a pixel short of it until 12 px along the 78 px ring past it, then free again
     const held = Array.from({ length: 9 }, () => 13.05)
@@ -329,7 +329,7 @@ describe("a turn by the gizmo's ring", () => {
   })
 
   it("says in the history what it stopped on", () => {
-    setUp({ enabled: true })
+    setUpTurn({ enabled: true })
     turnThrough(16)
     at(onRing(0, 0), "pointerup", 0)
     const s = useEditor.getState()
@@ -338,13 +338,13 @@ describe("a turn by the gizmo's ring", () => {
   })
 
   it("stops on nothing and takes no step with Snap off, whatever Snap rotation says", () => {
-    setUp({ enabled: false, rotationEnabled: true, rotationStep: 15 })
+    setUpTurn({ enabled: false, rotationEnabled: true, rotationStep: 15 })
     const shown = turnThrough(20)
     assert.deepStrictEqual(shown.slice(12, 18), [13, 14, 15, 16, 17, 18])
   })
 
   it("takes the rotation step between stops with Snap and Snap rotation on", () => {
-    setUp({ enabled: true, rotationEnabled: true, rotationStep: 15 })
+    setUpTurn({ enabled: true, rotationEnabled: true, rotationStep: 15 })
     const shown = turnThrough(7)
     assert.deepStrictEqual(shown, [0, 0, 0, 0, 0, 0, 0])
   })

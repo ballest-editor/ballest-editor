@@ -6,7 +6,7 @@ import type { Vec3 } from "./coords"
 import { landedPoint } from "./groupTransform"
 import { type Box, boxCentreOf } from "./itemBounds"
 import type { BasePoint, MarkRole, SnapHit, SnapMark, SnapRelation } from "./snapFrame"
-import { IDENTITY_QUAT, quatFromAxisAngle, rotateVec, vecAdd, vecDot, vecScale, vecSub } from "./ueMath"
+import { IDENTITY_QUAT, rotateVec, vecAdd, vecDot, vecScale, vecSub } from "./ueMath"
 
 /** Closer than this, in cm, a corner is on the side. */
 const ON_SIDE_CM = 1e-3
@@ -62,16 +62,6 @@ const movedMark = (mark: SnapMark, at: (point: Vec3) => Vec3, turn: (direction: 
     case "arrow":
       return { ...mark, at: at(mark.at), direction: turn(mark.direction) }
   }
-}
-
-/** `marks` turned by `angle` radians about the unit `axis` through `about`, as a turn takes the selection. */
-export const turnedMarks = (
-  marks: ReadonlyArray<SnapMark>,
-  { about, angle, axis }: { readonly about: Vec3; readonly axis: Vec3; readonly angle: number }
-): ReadonlyArray<SnapMark> => {
-  const rotation = quatFromAxisAngle(axis, angle)
-  const turn = (direction: Vec3) => rotateVec(rotation, direction)
-  return marks.map((mark) => movedMark(mark, (point) => vecAdd(about, turn(vecSub(point, about))), turn))
 }
 
 /** `marks` moved by `offset`, as a scale moves the face it stops. */
