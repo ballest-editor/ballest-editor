@@ -14,6 +14,7 @@ import {
   previewSelectionAxis,
   setSelectionField,
   setSelectionPivot,
+  setSelectionSize,
   setSelectionUnitField
 } from "./actions"
 import { initialMap, pivotOf, selectionPivot, shownPivotPoint, shownTransform, useEditor } from "./store"
@@ -351,6 +352,16 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     setSelectionPivot(choice)
     return s().selectedIds[0]!
   }
+
+  it("pastes a size onto every item along its own axes, keeping flips and each pivot", () => {
+    const id = cubeAt({ x: 0, y: 0, z: 5000 }, 30, "Left")
+    s().transformItems(new Map([[id, { ...docTransform(id), scale3D: { x: -2, y: 1, z: 0.5 } }]]))
+    const before = shownPivotPoint(s())!
+    setSelectionSize({ x: 500, y: 3000, z: 250 })
+    // the cube is 1000 cm a side: a flipped X stays flipped
+    expectVec(docTransform(id).scale3D, { x: -0.5, y: 3, z: 0.25 }, "scale")
+    expectVec(shownPivotPoint(s())!, before, "pivot")
+  })
 
   it("keeps the left face where it is and grows to the right", () => {
     const id = cubeAt({ x: 0, y: 0, z: 5000 }, 0, "Left")
