@@ -105,7 +105,7 @@ export function PaintPalette() {
         <SelectTrigger className="w-24 shrink-0" aria-label="Finish" tabIndex={-1}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent side="top">
+        <SelectContent side="top" alignItemWithTrigger={false}>
           {paint.map((f) => <SelectItem key={f.name} value={f.name}>{finishLabelOf(f)}</SelectItem>)}
         </SelectContent>
       </Select>
