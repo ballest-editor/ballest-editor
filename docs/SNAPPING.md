@@ -62,6 +62,7 @@ When the selection's end reaches another item's end, it lands on it, facing the 
 Parameters:
 
 - **Range**: how far, in screen pixels, an end keeps hold of the selection, and how near it must be for a drop or a pick. The default is the general threshold (§ Settings).
+- **Pull**: how hard ends pull against the Grid and Mesh, in five stops from ×0.25 to ×4, default ×1. The range is multiplied by it, and above ×1 Connectors is also asked ahead of Grid and Mesh (§ Priority).
 - **Match rotation**: on by default. The piece turns so the ends face each other and their up directions agree. Off positions the end and leaves rotation alone, for a piece meant to leave at an angle.
 - **Profiles**: Strict snaps only matching profiles; Warn snaps any two ends and shows a chip saying the profiles differ; Any snaps silently. Default Warn.
 - **Show open ends**: Never, On hover, Always. An open end is one no other end meets. On hover shows the hovered item's; Always shows every open end in the map, which is the "where does the track still need a piece" view. Default On hover.
@@ -131,6 +132,8 @@ The Grid can't be moved out of range the way a target can: a 10 cm grid zoomed o
 
 Under a handle or a lock, a target must also be within range of where the move has got to, measured along what the move allows, and it is reached when the move's value along the line gets to the target's. A wall far behind a handle lines up with the pointer, but the selection would have to jump to reach it.
 
+Connectors' Pull (§ Connectors) is the one exception to the list's order. Above ×1, Connectors is asked ahead of Grid and Mesh wherever they stand above it, so an end in its range takes the frame from a grid line, a vertex or a face; Construction, Tracking and Alignment keep their places. At ×1 and below the list's order holds, and the Pull only changes the range. So Grid first with a strong pull still lays pieces on the grid, and joins an end whenever one is near.
+
 Two presets, as buttons at the top of the list:
 
 - **Grid first**: Grid, Connectors, Mesh, Construction, Tracking, Alignment. The game's feel, with piece snapping as the extra.
@@ -142,7 +145,7 @@ Within one target the nearest candidate wins, measured in screen pixels in the a
 
 ### Affect
 
-Which transforms snapping applies to. Move is always on. Rotate and Scale are toggles, as today's rotation toggle is.
+Which transforms snapping applies to. Move is always on. Rotate and Scale are toggles, as the rotation pill is. All three sit under snapping as a whole, the magnet in the top bar (§ The Snap popover): with it off nothing snaps, whatever each toggle says, and Ctrl turns it over (§ Modifiers).
 
 - **Move**: the base lands on a target.
 - **Rotate**: rotation snaps to the step, and with a Mesh face (a face of § Under a constrained move, or of the bounds until the mesh has loaded) or a Connector in range it snaps the base face (the face the pivot is on, or the piece's end) flush to the target, so a quarter turn that would meet a face stops there. Connectors' Match rotation and Mesh's Rotate to face are the per-target parts of this.
@@ -182,13 +185,13 @@ A body drag in an orthographic pane keeps its depth, as a rise along the view wo
 
 ### Modifiers
 
-| Key           | While dragging                                                                                                                                                                                                   |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ctrl held     | Inverts snapping: off while held when it is on, on while held when it is off. Blender and Unreal both do this, and it is the one key a user needs to know.                                                       |
-| Shift held    | Holds the current target, if the selection is on one. It stays on the edge, plane or line, sliding along it past the threshold, and no other target takes over. Combined with Ctrl, the held target still holds. |
-| X, Y, Z       | Locks the move to that world axis (or the grid's axis, when rotated), as SketchUp's arrow keys do. A snap target still sets the value along the locked axis. Pressing again unlocks.                             |
-| Shift+X, Y, Z | Locks to the plane perpendicular to that axis.                                                                                                                                                                   |
-| Escape        | Cancels the drag, as today. With no drag, clears acquired tracking points.                                                                                                                                       |
+| Key           | While dragging                                                                                                                                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ctrl held     | Inverts snapping as a whole, the magnet: off while held when it is on, on while held when it is off. What it turns on is what the toggles under it say. Blender and Unreal both do this, and it is the one key a user needs to know. |
+| Shift held    | Holds the current target, if the selection is on one. It stays on the edge, plane or line, sliding along it past the threshold, and no other target takes over. Combined with Ctrl, the held target still holds.                     |
+| X, Y, Z       | Locks the move to that world axis (or the grid's axis, when rotated), as SketchUp's arrow keys do. A snap target still sets the value along the locked axis. Pressing again unlocks.                                                 |
+| Shift+X, Y, Z | Locks to the plane perpendicular to that axis.                                                                                                                                                                                       |
+| Escape        | Cancels the drag, as today. With no drag, clears acquired tracking points.                                                                                                                                                           |
 
 The fly keys and the camera's own modifiers are unchanged ([DESKTOP.md](DESKTOP.md) § View panes); these apply only once a drag has begun, so flying and snapping don't contend.
 

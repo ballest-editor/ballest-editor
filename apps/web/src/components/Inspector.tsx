@@ -27,6 +27,7 @@ import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
 import { assetNameOf } from "../domain/Materials"
+import { snapsGrid, snapsRotation } from "../domain/snapConfig"
 import { pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
 import type { MapValidation } from "../domain/validateMap"
@@ -391,8 +392,8 @@ function TransformRow(props: {
   const { field } = row
   // Scrubs follow the tool bar's snapping, in display units: the grid for location, the step for rotation.
   const snap = field === "translation"
-    ? snapping.enabled ? snapping.gridSize / perUnit : undefined
-    : field === "rotation" && snapping.rotationEnabled
+    ? snapsGrid(snapping) ? snapping.gridSize / perUnit : undefined
+    : field === "rotation" && snapsRotation(snapping)
     ? snapping.rotationStep
     : undefined
   return (

@@ -77,6 +77,22 @@ export const updateSnapTarget = <T extends SnapTarget>(target: T, patch: Partial
   applySnap({ ...config, targets: { ...config.targets, [target]: { ...config.targets[target], ...patch } } })
 }
 
+/** Turns snapping as a whole on or off: the magnet, and what Ctrl inverts during a drag. */
+export const toggleSnapping = () => updateSnap({ enabled: !snapConfigOf(useEditor.getState()).enabled })
+
+/** Picks the grid's step, and turns the Grid target on to use it: snapping as a whole keeps its own say. */
+export const pickGridSize = (gridSize: number) => {
+  const config = snapConfigOf(useEditor.getState())
+  applySnap({ ...config, gridSize, targets: { ...config.targets, grid: { ...config.targets.grid, enabled: true } } })
+}
+
+/** Turns several targets on or off together, as the snap menu's Alignment and tracking row does. */
+export const setSnapTargets = (targets: ReadonlyArray<SnapTarget>, enabled: boolean) => {
+  const config = snapConfigOf(useEditor.getState())
+  const turned = Object.fromEntries(targets.map((target) => [target, { ...config.targets[target], enabled }]))
+  applySnap({ ...config, targets: { ...config.targets, ...turned } })
+}
+
 /** The items a tool that moves "B" moves: the selection if the pick is on it, else the item picked. */
 const movingKeys = (s: EditorState, item: string | undefined): ReadonlyArray<string> =>
   item === undefined ? [] : s.selectedIds.includes(item) ? s.selectedIds : [item]

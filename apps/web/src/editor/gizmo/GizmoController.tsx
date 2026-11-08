@@ -6,6 +6,7 @@ import { selectedGroupIds } from "../../domain/groupSelection"
 import type { GroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { gizmoScaleOf } from "../../domain/Settings"
+import { snapsRotation, snapsScale } from "../../domain/snapConfig"
 import { type FlushPair, type ScaleStop, snappedScale, snappedTurn } from "../../domain/snapRotate"
 import { quatFromAxisAngle } from "../../domain/ueMath"
 import {
@@ -349,7 +350,7 @@ export function GizmoController() {
       }
       const turn = turnOf(active.start, now)
       if (turn !== undefined) {
-        const on = config.rotationEnabled !== keys.invert
+        const on = snapsRotation(config, keys.invert)
         const radius = Math.hypot(now.px.x - active.start.originPx.x, now.px.y - active.start.originPx.y)
         const turned = snappedTurn({
           free: turn.angle,
@@ -367,7 +368,7 @@ export function GizmoController() {
       }
       const scale = scaleOf(active.start, now)
       if (scale === undefined) return undefined
-      const on = config.scaleEnabled !== keys.invert
+      const on = snapsScale(config, keys.invert)
       const scaled = snappedScale({
         from: active.scaleFrom,
         free: active.scaleFrom * scale.factor,

@@ -8,7 +8,7 @@ import type { KeybindAction } from "../domain/Keybinds"
 import { PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { termsOf } from "../domain/outline"
 import { formatGridSize, GRID_SIZES } from "../domain/snap"
-import { isPreset, SNAP_PRESETS, type SnapConfig } from "../domain/snapConfig"
+import { isPreset, SNAP_PRESETS, type SnapConfig, type SnapTarget } from "../domain/snapConfig"
 import { WORLD_PLANES } from "../domain/snapTools"
 import { annotationsOf } from "../domain/structure"
 import { updateCheckBlockedBy } from "../domain/updates"
@@ -34,16 +34,19 @@ import {
   openExternalLink,
   openInGame,
   openRecentInNewWindow,
+  pickGridSize,
   quitApp,
   reimportMap,
   selectConnected,
   selectionPrefabProblem,
+  setSnapTargets,
   startFlush,
   startGridOriginPick,
   startMeasure,
   startMirror,
   startSavePrefab,
   switchProject,
+  toggleSnapping,
   updateSnap
 } from "../editor/actions"
 import { actionCommands, type CommandAction, lookAlong } from "../editor/commands"
@@ -95,6 +98,8 @@ export interface MenuCheck {
   readonly label: string
   readonly checked: boolean
   readonly run: () => void
+  /** The action whose primary binding the row shows. */
+  readonly shortcut?: KeybindAction
 }
 
 /** A named part of a menu whose rows are too different to read as one list. */
@@ -300,6 +305,32 @@ const paneMenus = ({ layout, projection }: MenuState): ReadonlyArray<MenuChoice>
   ]
 }
 
+/** What View › Snap turns on and off under Snapping, each read under it (docs/SNAPPING.md § The Snap popover). */
+const snapToggles = (snapping: SnapConfig): ReadonlyArray<MenuCheck> => {
+  const target = (label: string, targets: ReadonlyArray<SnapTarget>): MenuCheck => {
+    const checked = targets.every((one) => snapping.targets[one].enabled)
+    return { kind: "check", label, checked, run: () => setSnapTargets(targets, !checked) }
+  }
+  return [
+    target("Grid", ["grid"]),
+    {
+      kind: "check",
+      label: "Rotation",
+      checked: snapping.rotationEnabled,
+      run: () => updateSnap({ rotationEnabled: !snapping.rotationEnabled })
+    },
+    {
+      kind: "check",
+      label: "Scale",
+      checked: snapping.scaleEnabled,
+      run: () => updateSnap({ scaleEnabled: !snapping.scaleEnabled })
+    },
+    target("Connectors", ["connectors"]),
+    target("Mesh", ["mesh"]),
+    target("Alignment and tracking", ["alignment", "tracking"])
+  ]
+}
+
 const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
   {
     kind: "section",
@@ -332,10 +363,12 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
     children: [
       {
         kind: "check",
-        label: "Snap",
+        label: "Snapping",
         checked: state.snapping.enabled,
-        run: () => updateSnap({ enabled: !state.snapping.enabled })
+        run: toggleSnapping,
+        shortcut: "snapToggle"
       },
+      ...snapToggles(state.snapping),
       {
         kind: "choice",
         title: "Priority",
@@ -358,7 +391,7 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
         options: GRID_SIZES.map((gridSize) => ({
           label: formatGridSize(gridSize, state.units),
           checked: gridSize === state.snapping.gridSize,
-          run: () => updateSnap({ enabled: true, gridSize })
+          run: () => pickGridSize(gridSize)
         }))
       },
       item("Open snap settings", () => useEditor.getState().setSnapPopoverOpen(true))
@@ -568,7 +601,14 @@ const entriesOf = (nodes: ReadonlyArray<MenuNode>, path: ReadonlyArray<string>):
           ...(node.shortcut !== undefined && { shortcut: node.shortcut })
         }]
       case "check":
-        return [{ label: node.label, path, run: node.run, reason: null, checked: node.checked }]
+        return [{
+          label: node.label,
+          path,
+          run: node.run,
+          reason: null,
+          checked: node.checked,
+          ...(node.shortcut !== undefined && { shortcut: node.shortcut })
+        }]
       case "section":
         return entriesOf(node.children, [...path, node.title])
       case "submenu":

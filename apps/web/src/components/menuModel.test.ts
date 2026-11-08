@@ -82,6 +82,45 @@ describe("searching the menus", () => {
   })
 })
 
+describe("View › Snap", () => {
+  const snapRows = (over?: Partial<MenuState>) =>
+    entries(over).filter(({ path }) => path.join(" › ") === "View › Snap" && path.length === 2)
+  const checks = (over?: Partial<MenuState>) =>
+    snapRows(over).flatMap(({ label, checked }) => checked === undefined ? [] : [[label, checked] as const])
+
+  it("turns snapping as a whole on with its keybind, and each kind of snapping under it", () => {
+    const snapping = { ...defaultSettings.snapping, enabled: true, rotationEnabled: true }
+    assert.deepStrictEqual(checks({ snapping }), [
+      ["Snapping", true],
+      ["Grid", true],
+      ["Rotation", true],
+      ["Scale", false],
+      ["Connectors", true],
+      ["Mesh", true],
+      ["Alignment and tracking", true]
+    ])
+    assert.strictEqual(snapRows().find(({ label }) => label === "Snapping")?.shortcut, "snapToggle")
+  })
+
+  it("shows the grid off on its own while snapping as a whole stays on", () => {
+    const base = defaultSettings.snapping
+    const snapping = {
+      ...base,
+      enabled: true,
+      targets: { ...base.targets, grid: { ...base.targets.grid, enabled: false } }
+    }
+    const rows = new Map(checks({ snapping }))
+    assert.isTrue(rows.get("Snapping"))
+    assert.isFalse(rows.get("Grid"))
+  })
+
+  it("shows Alignment and tracking on only while both are", () => {
+    const base = defaultSettings.snapping
+    const snapping = { ...base, targets: { ...base.targets, tracking: { ...base.targets.tracking, enabled: false } } }
+    assert.isFalse(new Map(checks({ snapping })).get("Alignment and tracking"))
+  })
+})
+
 describe("the menus", () => {
   it("say what's in a browser, which has no project and no updater", () => {
     const rows = crumbs(entries({ capabilities: BROWSER }))

@@ -1,5 +1,5 @@
 /**
- * Which target a frame lands on (docs/SNAPPING.md § Priority): the first in the list with something to be had, the nearest
+ * Which target a frame lands on (docs/SNAPPING.md § Priority): the first asked with something to be had, the nearest
  * within it, and a point before an edge before a face. A pick has all that's in range, and a drag what it has got to
  * (`snapCapture`). The Grid can't be moved out of range the way a target can, so it
  * claims a frame only while its lines stand further apart than the range and one is near; otherwise it waits at the end
@@ -9,7 +9,7 @@ import type { Quat4, Vec3 } from "./coords"
 import { formatGridSize } from "./snap"
 import { alignmentHit } from "./snapAlignment"
 import { type DragPath, takenBy } from "./snapCapture"
-import { priorityOf, rangeOf, type SnapTarget } from "./snapConfig"
+import { askedOrder, rangeOf, type SnapTarget } from "./snapConfig"
 import {
   type BasePoint,
   constrained,
@@ -146,9 +146,12 @@ const stillHeld = (frame: SnapFrame, held: SnapHit): SnapHit => {
   return underConstraint(frame, { ...held, landing, distance: 0 })
 }
 
-/** The first target in the list with something `takes` lets through; else the grid, if it's on. */
+/**
+ * The first target asked (`askedOrder`: the list, with a hard-pulling Connectors ahead of Grid and Mesh) with something
+ * `takes` lets through; else the grid, if it's on.
+ */
 const firstHit = (frame: SnapFrame, takes: Takes): SnapHit | undefined => {
-  for (const target of priorityOf(frame.config)) {
+  for (const target of askedOrder(frame.config)) {
     const best = bestOf(frame, hitsOf(frame, target, takes))
     if (best !== undefined) return underConstraint(frame, best)
   }

@@ -15,13 +15,16 @@ import {
   gridOriginToSelection,
   gridYawToSelection,
   mirrorSelection,
+  pickGridSize,
   selectConnected,
   setFlushOptions,
+  setSnapTargets,
   startAxisFromPoints,
   startFlush,
   startGridOriginPick,
   startMeasure,
   startPlaneFromPoints,
+  toggleSnapping,
   updateSnap,
   updateSnapTarget
 } from "./snapTools"
@@ -57,6 +60,39 @@ describe("snap settings", () => {
     assert.strictEqual(snapConfigOf(s).gridSize, 37)
     assert.strictEqual(snapConfigOf(s).targets.mesh.offset, 5)
     assert.strictEqual(s.settings.snapping.gridSize, defaultSettings.snapping.gridSize)
+  })
+
+  it("turns snapping as a whole over without touching the grid's own toggle", () => {
+    const config = () => snapConfigOf(useEditor.getState())
+    const before = config().enabled
+    toggleSnapping()
+    assert.strictEqual(config().enabled, !before)
+    assert.isTrue(config().targets.grid.enabled)
+    updateSnapTarget("grid", { enabled: false })
+    toggleSnapping()
+    assert.strictEqual(config().enabled, before)
+    assert.isFalse(config().targets.grid.enabled)
+  })
+
+  it("turns the grid on with the step it picks, and leaves snapping as a whole alone", () => {
+    const config = () => snapConfigOf(useEditor.getState())
+    const before = config().enabled
+    updateSnapTarget("grid", { enabled: false })
+    pickGridSize(50)
+    assert.strictEqual(config().gridSize, 50)
+    assert.isTrue(config().targets.grid.enabled)
+    assert.strictEqual(config().enabled, before)
+  })
+
+  it("turns several targets on or off together and leaves the rest", () => {
+    const config = () => snapConfigOf(useEditor.getState())
+    setSnapTargets(["alignment", "tracking"], false)
+    assert.isFalse(config().targets.alignment.enabled)
+    assert.isFalse(config().targets.tracking.enabled)
+    assert.isTrue(config().targets.mesh.enabled)
+    assert.strictEqual(config().targets.tracking.keep, defaultSettings.snapping.targets.tracking.keep)
+    setSnapTargets(["alignment", "tracking"], true)
+    assert.isTrue(config().targets.alignment.enabled && config().targets.tracking.enabled)
   })
 })
 

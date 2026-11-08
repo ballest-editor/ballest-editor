@@ -88,6 +88,7 @@ export const keybindSections = [
   {
     name: "snapping",
     actions: [
+      "snapToggle",
       "snapInvert",
       "snapHold",
       "snapLockX",
@@ -150,6 +151,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   speedSlower: "camera speed down",
   orbit: "orbit",
   pan: "pan",
+  snapToggle: "snapping on / off",
   snapInvert: "invert snapping",
   snapHold: "hold target",
   snapLockX: "lock to x",
@@ -229,6 +231,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   speedSlower: "Lower the camera's fly speed one step.",
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
+  snapToggle:
+    "Turn snapping as a whole on or off: the magnet in the top bar. Grid, rotation, scale and each target keep their own toggles under it. No equivalent in the in-game editor.",
   snapInvert:
     "Hold during a drag: snapping goes off when it is on and on when it is off. Only once a drag has begun, so Ctrl still flies down.",
   snapHold:
@@ -315,6 +319,7 @@ export type Keybinds = Readonly<Record<KeybindAction, Bindings>>
  * defines on top.
  */
 export const defaultKeybinds: Keybinds = {
+  snapToggle: ["KeyM"],
   snapInvert: ["ControlLeft", "ControlRight"],
   snapHold: ["ShiftLeft", "ShiftRight"],
   snapLockX: ["KeyX"],
