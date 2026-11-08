@@ -15,8 +15,10 @@ import { moveOf, resolveSnap } from "../../domain/snapResolve"
 import { selectionBases } from "../../domain/snapTools"
 import { annotationsOf, type Doc } from "../../domain/structure"
 import { ORIGIN, vecSub } from "../../domain/ueMath"
+import { placeSnapped } from "../actions/placement"
 import type { PaneCamera } from "../paneCameras"
-import { type EditorState, snapConfigOf, type TransformOptions } from "../store"
+import { type EditorState, snapConfigOf, type TransformOptions, useEditor } from "../store"
+import { endSnapDisplay } from "./moveSession"
 import { snapMarks } from "./snapMarks"
 import { snapCasts, snapItemsOf } from "./snapScene"
 import { snapViewOf } from "./snapView"
@@ -88,6 +90,25 @@ export const snappedDrop = (
     hit,
     options: { connected: hit.meeting !== undefined }
   }
+}
+
+/**
+ * Lands `piece` dropped with the pointer at `free`: where snapping puts it, else `otherwise` places it. The acquired tracking
+ * points go once it has, as after a drag's landing.
+ */
+export const landDrop = (
+  piece: CatalogPiece,
+  pane: PaneCamera,
+  px: ScreenPoint,
+  free: Vec3,
+  invert: boolean,
+  otherwise: () => void
+): void => {
+  const snapped = snappedDrop(useEditor.getState(), piece, pane, px, free, invert)
+  endSnapDisplay()
+  if (snapped !== undefined) placeSnapped(piece, snapped.transform, snapped.options)
+  else otherwise()
+  useEditor.getState().clearTracked()
 }
 
 /** Shows where a drop would land. */

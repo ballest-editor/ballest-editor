@@ -5,7 +5,15 @@ import { type Box, placedBoxOf } from "../../domain/itemBounds"
 import { findGroup } from "../../domain/structure"
 import type { Unit } from "../../domain/units"
 import { sceneRegistry } from "../sceneRegistry"
-import { editedKeys, type EditorState, pivotOf, type SelectionPivot, selectionPivot, shownTransform } from "../store"
+import {
+  editedKeys,
+  type EditorState,
+  pivotOf,
+  type SelectionPivot,
+  selectionPivot,
+  shownTransform,
+  snapConfigOf
+} from "../store"
 import { faceNormalOf } from "./turnScale"
 
 export interface SelectionSnapStart {
@@ -47,6 +55,20 @@ export const selectionSnapStart = (
     box: placedBoxOf(placed, catalogIndex) ?? NOTHING,
     ends: placed.flatMap(({ item, key, transform }) => endsOf(key, item, transform, catalogIndex))
   }
+}
+
+/**
+ * Whether a press on the selection's body drags it (docs/SNAPPING.md § What a drag looks like): by default only to join
+ * ends, so with snapping and Connectors on and an end among what it carries; else the press is a click as ever.
+ */
+export const bodyDrags = (s: EditorState): boolean => {
+  const config = snapConfigOf(s)
+  if (config.bodyDrag === "never") return false
+  const target = dragTargetOf(s)
+  if (target === undefined) return false
+  if (config.bodyDrag === "always") return true
+  if (!config.enabled || !config.targets.connectors.enabled) return false
+  return selectionSnapStart(s, target.transforms, [...target.transforms.keys()]).ends.length > 0
 }
 
 /**

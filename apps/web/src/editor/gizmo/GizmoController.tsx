@@ -42,6 +42,7 @@ import { GizmoObject, type HandleSpec, toolHandles } from "./handles"
 
 interface ActiveDrag {
   readonly id: string
+  readonly pointerId: number
   /** The pane the drag started in: it measures the pointer against that pane's camera to the end. */
   readonly slot: number
   readonly start: DragStart
@@ -217,7 +218,10 @@ export function GizmoController() {
       useEditor.getState().setPreview(null)
       endSnapDisplay()
     }
-    /** A drag let go of without landing (Escape, unmount): an Alt+drag's copies go, and its tracking points as after a landing. */
+    /**
+     * A drag let go of without landing (Escape, a lost pointer, unmount): an Alt+drag's copies go, and its tracking points
+     * as after a landing.
+     */
     const cancelDrag = (active: ActiveDrag) => {
       endDrag()
       if (active.duplicate === "copied") useEditor.getState().endDuplicateDrag(null)
@@ -273,6 +277,7 @@ export function GizmoController() {
         : []
       drag.current = {
         id,
+        pointerId: e.pointerId,
         slot: pointer.slot,
         start,
         startTransforms: target.transforms,
@@ -423,11 +428,20 @@ export function GizmoController() {
       const active = drag.current
       if (active === null) return
       e.stopImmediatePropagation()
-      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       endDrag()
+      // the drag is over first, so the capture this lets go of doesn't cancel it
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       land(active)
       // a click on a handle isn't a drag: what was acquired for the drag to come stays
       if (active.last !== undefined) useEditor.getState().clearTracked()
+    }
+
+    /** The pointer gone from under a drag (the system took it, or the capture was lost): it goes back, as on Escape. */
+    const onPointerLost = (e: PointerEvent) => {
+      const active = drag.current
+      if (active === null || active.pointerId !== e.pointerId) return
+      applyToObjects(active.startTransforms)
+      cancelDrag(active)
     }
 
     /** A key changing with the pointer still takes effect at once. */
@@ -458,12 +472,16 @@ export function GizmoController() {
     el.addEventListener("pointerdown", onPointerDown, { capture: true })
     el.addEventListener("pointermove", onPointerMove)
     el.addEventListener("pointerup", onPointerUp, { capture: true })
+    el.addEventListener("pointercancel", onPointerLost)
+    el.addEventListener("lostpointercapture", onPointerLost)
     window.addEventListener("keydown", onKeyDown, { capture: true })
     window.addEventListener("keyup", onKeyUp, { capture: true })
     return () => {
       el.removeEventListener("pointerdown", onPointerDown, { capture: true })
       el.removeEventListener("pointermove", onPointerMove)
       el.removeEventListener("pointerup", onPointerUp, { capture: true })
+      el.removeEventListener("pointercancel", onPointerLost)
+      el.removeEventListener("lostpointercapture", onPointerLost)
       window.removeEventListener("keydown", onKeyDown, { capture: true })
       window.removeEventListener("keyup", onKeyUp, { capture: true })
       const active = drag.current

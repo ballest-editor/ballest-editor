@@ -3,7 +3,7 @@
  * and the priority order. Settings holds the set a new map starts on, and a map that changes it keeps its own in its
  * sidecar. No renderer here.
  */
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import type { Vec3 } from "./coords"
 import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, DEFAULT_SCALE_STEP, formatGridSize } from "./snap"
 import { ORIGIN } from "./ueMath"
@@ -21,6 +21,15 @@ export const SNAP_TARGET_NAMES: Readonly<Record<SnapTarget, string>> = {
 }
 
 export const SNAP_BASES = ["pivot", "closest", "centre"] as const
+
+/** When a press on the selection's body drags it: to join ends (with Connectors on and ends to join), always, or never. */
+export const BODY_DRAGS = ["ends", "always", "never"] as const
+
+export const BODY_DRAG_NAMES: Readonly<Record<(typeof BODY_DRAGS)[number], string>> = {
+  ends: "To join",
+  always: "Always",
+  never: "Never"
+}
 
 export const SNAP_PRESETS = {
   gridFirst: ["grid", "connectors", "mesh", "construction", "tracking", "alignment"],
@@ -124,6 +133,7 @@ export const SnapConfig = Schema.Struct({
   /** Scale step in percent. */
   scaleStep: Positive,
   base: Schema.Literals(SNAP_BASES),
+  bodyDrag: Schema.Literals(BODY_DRAGS).pipe(Schema.withDecodingDefaultKey(Effect.succeed("ends" as const))),
   /** The pixels every target shares, unless it has a range of its own. */
   threshold: Positive,
   /** The targets, highest priority first. */
@@ -147,6 +157,7 @@ export const defaultSnapConfig: SnapConfig = {
   scaleEnabled: false,
   scaleStep: DEFAULT_SCALE_STEP,
   base: "pivot",
+  bodyDrag: "ends",
   threshold: 12,
   order: SNAP_PRESETS.gridFirst,
   targets: {

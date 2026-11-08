@@ -64,7 +64,7 @@ Parameters:
 - **Range**: how far, in screen pixels, an end keeps hold of the selection, and how near it must be for a drop or a pick. The default is the general threshold (§ Settings).
 - **Match rotation**: on by default. The piece turns so the ends face each other and their up directions agree. Off positions the end and leaves rotation alone, for a piece meant to leave at an angle.
 - **Profiles**: Strict snaps only matching profiles; Warn snaps any two ends and shows a chip saying the profiles differ; Any snaps silently. Default Warn.
-- **Show open ends**: Never, On hover, Always. An open end is one no other end meets. On hover shows the hovered item's; Always shows every open end in the map, which is the "where does the track still need a piece" view. Default On hover.
+- **Show open ends**: Never, On hover, Always. An open end is one no other end meets. On hover shows the hovered item's, and in a drag those of what the drag carries, the ends about to join; Always shows every open end in the map, which is the "where does the track still need a piece" view. Default On hover. A drag's ends are drawn where the drag has them, through a move, a turn, a scale or a mirror.
 - **Flip to fit**: when the piece's mirrored twin would fit the target end and the piece itself wouldn't (a left-handed bevel against a right-handed end), the editor offers the flip in the chip, one click. This uses the game's Flip X and Flip Y ([FORMAT.md](FORMAT.md) § Mirroring), so it round-trips.
 
 An end that has met another end is closed, and the pair is remembered in the sidecar as a joint. A joint is what Show open ends counts, what a later "select the whole track" can walk, and what a lint check can read (a track with an open end that isn't a start or a goal).
@@ -105,7 +105,7 @@ They snap like geometry: the base lands on the plane or the axis, and an axis cr
 
 #### Tracking
 
-The CAD answer to "alignment guides, in 3D". Hovering a vertex, corner, face centre or connector end for a moment acquires it: a small plus mark appears on it, and it stays acquired until the next drag lands or is cancelled, until more are acquired than the set keeps (6 by default), or until the user clears them (Escape with nothing being dragged, or a button in the popover). What a drag acquires along the way goes when it ends, after the landing has used it. Until then an acquired point belongs to its piece: it goes with the piece through a move, a turn, a mirror, an undo or a re-import from the game, and goes away when the piece is deleted or another map takes its place. During a drag it stays where the document has it. Nothing is acquired on the selection, and a point on what a drag moves isn't a target for that drag: the piece would only be in line with itself.
+The CAD answer to "alignment guides, in 3D". Hovering a vertex, corner, face centre or connector end for a moment acquires it: a small plus mark appears on it, and it stays acquired until the next drag or drop from the palette lands, or a drag is cancelled, until more are acquired than the set keeps (6 by default), or until the user clears them (Escape with nothing being dragged, or a button in the popover). What a drag acquires along the way goes when it ends, after the landing has used it. Until then an acquired point belongs to its piece: it goes with the piece through a move, a turn, a mirror, an undo or a re-import from the game, and goes away when the piece is deleted or another map takes its place. During a drag it stays where the document has it. Nothing is acquired on the selection, and a point on what a drag moves isn't a target for that drag: the piece would only be in line with itself.
 
 While dragging, lines through each acquired point along the world's X, Y and Z axes (or the grid's, when the grid is rotated) are targets: the base stops on one as it crosses it, and appears on it with the line drawn. Where two lines cross, the crossing is a point target. Near an acquired point on the pane's view direction, the line along that direction is offered too, which is how an ortho pane puts something straight above a point. Under a line, a tracking line along the move is left out, as one through a point on the move's own line would be met all the way along it.
 
@@ -161,10 +161,10 @@ Snapping measures a drag on the items that take it as the gizmo shows it (`leadi
 
 ## What a drag looks like
 
-1. The user grabs the selection by a gizmo handle or by an item's body. The base point is drawn: a filled dot in the gizmo's colour. With Closest, the dot jumps between candidates as the pointer moves.
+1. The user grabs the selection by a gizmo handle or by an item's body. A press and drag on the body moves the selection only as the Drag body setting says: by default (To join) only with snapping and the Connectors target on and an end among what the drag carries, since joining two pieces at their ends is what a body drag is for; Always and Never are the others. Otherwise the press is only the click it always was. The base point is drawn: a filled dot in the gizmo's colour. With Closest, the dot jumps between candidates as the pointer moves.
 2. On the way to a target the selection stays with the pointer, or on the grid, and nothing pulls it forward. When it gets to the target it stops there, while the pointer goes on and is never moved. Once the pointer is past the threshold the selection goes free and catches up with it (Baudisch's snap-and-go; § Getting to a target has the rule). The target is highlighted in its own way: a dot on a vertex or corner, a line along an edge, a tinted face, a dashed guide for an alignment, an axis-coloured line for tracking, a ring on a connector end.
 3. One short label in the active pane's corner says what snapped: "Corner of Track L", "End of Curve M", "Centre level with Kicker1 S on Y", "Same gap as Kicker1 S to Track L, 250 cm", "Grid 10 cm", "Plane: Landing". The label is the one place every target reports, so a user who doesn't know which target fired can read it.
-4. Releasing commits one undo step, as a drag does today. The snap that was current is in the step's description ("Move 3 items to end of Curve M"), so the history reads as what happened.
+4. Releasing commits one undo step, as a drag does today. The snap that was current is in the step's description ("Move 3 items to end of Curve M"), so the history reads as what happened. A drag the pointer is taken from (the system cancels it, or the window loses the capture) is cancelled, as Escape cancels it: the selection goes back and nothing is committed.
 
 ### Getting to a target
 
@@ -200,7 +200,7 @@ Dragging a piece out of the palette lands by the same targets and priority as a 
 
 One popover in the view controls, opened by the chevron after the snap pills. Its shape, top to bottom:
 
-- **Base**: Pivot, Closest, Centre, as a segmented control.
+- **Base**: Pivot, Closest, Centre, as a segmented control, and Drag body (To join, Always, Never; § What a drag looks like) under it.
 - **Affect**: Move (always on, shown for the row to read), Rotate, Scale, with their steps beside them.
 - **Targets**: the priority list. Each row is a toggle, the target's name, a one-line summary of its parameters ("10 cm, world origin"; "Warn, show on hover"), and a disclosure that opens the parameters. Rows drag to reorder. The two presets sit above the list.
 - **Tracking points**: how many are acquired, and Clear.
@@ -248,7 +248,7 @@ Export writes none of it, and the game never sees it.
 
 ## Settings
 
-Settings › Editor has a Snapping section for what a new map starts on: snapping on or off, the base, the preset (Grid first or Pieces first), the steps and whether a turn and a scale snap, the threshold in pixels (default 12), and each target's toggle and parameters, with the same controls as the Snap popover behind each target's Parameters. The grid's origin and rotation are numbers there, as there is no selection to take them from. Use this map's makes all of a map's settings, a custom priority among them, what a new map starts on. A map's own settings, once changed, live in its sidecar and override these.
+Settings › Editor has a Snapping section for what a new map starts on: snapping on or off, the base, Drag body, the preset (Grid first or Pieces first), the steps and whether a turn and a scale snap, the threshold in pixels (default 12), and each target's toggle and parameters, with the same controls as the Snap popover behind each target's Parameters. The grid's origin and rotation are numbers there, as there is no selection to take them from. Use this map's makes all of a map's settings, a custom priority among them, what a new map starts on. A map's own settings, once changed, live in its sidecar and override these.
 
 Keybinds for the modifiers (§ Modifiers) sit with the other editor keybinds and can be rebound, since the game's own keybinds take some keys.
 

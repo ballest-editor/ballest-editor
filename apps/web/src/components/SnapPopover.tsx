@@ -15,6 +15,8 @@ import {
   SCALE_STEPS
 } from "../domain/snap"
 import {
+  BODY_DRAG_NAMES,
+  BODY_DRAGS,
   isPreset,
   rowsOf,
   SNAP_BASES,
@@ -248,6 +250,18 @@ export function SnapPopoverContent() {
       >
         {SNAP_BASES.map((base) => <ToggleGroupItem key={base} value={base}>{BASE_NAMES[base]}</ToggleGroupItem>)}
       </ToggleGroup>
+      <Row label="Drag body">
+        <ToggleGroup
+          aria-label="Drag by the body"
+          value={[config.bodyDrag]}
+          onValueChange={(value: ReadonlyArray<string>) => {
+            const bodyDrag = BODY_DRAGS.find((one) => value.includes(one) && one !== config.bodyDrag)
+            if (bodyDrag !== undefined) updateSnap({ bodyDrag })
+          }}
+        >
+          {BODY_DRAGS.map((one) => <ToggleGroupItem key={one} value={one}>{BODY_DRAG_NAMES[one]}</ToggleGroupItem>)}
+        </ToggleGroup>
+      </Row>
       <SectionTitle>Affect</SectionTitle>
       <Row label="Move">
         <Switch aria-label="Move" checked disabled />

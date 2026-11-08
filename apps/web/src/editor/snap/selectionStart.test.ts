@@ -1,14 +1,18 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
 import * as THREE from "three"
+import { indexCatalog } from "../../domain/Catalog"
 import { editTransform } from "../../domain/editTransform"
+import { identityTransform, itemFromPiece, newMapFile } from "../../domain/factory"
+import { defaultSettings } from "../../domain/Settings"
+import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
 import { rotatorToQuat } from "../../domain/ueMath"
 import { leadingKeys, pivotUnitOf } from "../../domain/units"
-import { grouped, loadPieces } from "../../test/snapFixtures"
+import { catalogWithEnds, grouped, loadPieces } from "../../test/snapFixtures"
 import { assertVec } from "../../test/vec"
 import { setSelectionPivot } from "../actions/selection"
 import { sceneRegistry } from "../sceneRegistry"
 import { useEditor } from "../store"
-import { baseFaceOf, dragTargetOf, selectionSnapStart } from "./selectionStart"
+import { baseFaceOf, bodyDrags, dragTargetOf, selectionSnapStart } from "./selectionStart"
 
 const s = () => useEditor.getState()
 
@@ -99,5 +103,58 @@ describe("the face a turn brings flush", () => {
     const id = grouped([a, b])
     s().setGroupPivot(id, { choice: "item", key: a })
     assertVec(faceOfActive() ?? { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, "out of the member's top")
+  })
+})
+
+describe("whether a press on the selection's body drags it", () => {
+  beforeEach(() => sceneRegistry.objects.clear())
+
+  const config = (bodyDrag: SnapConfig["bodyDrag"], enabled: boolean, connectors: boolean): SnapConfig => ({
+    ...defaultSnapConfig,
+    enabled,
+    bodyDrag,
+    targets: {
+      ...defaultSnapConfig.targets,
+      connectors: { ...defaultSnapConfig.targets.connectors, enabled: connectors }
+    }
+  })
+
+  it.each(
+    [
+      ["ends", "snapping on, Connectors on, a piece with ends", true, true, 0, true],
+      ["ends", "snapping off", false, true, 0, false],
+      ["ends", "Connectors off", true, false, 0, false],
+      ["ends", "a piece with no ends", true, true, 1, false],
+      ["always", "snapping off, a piece with no ends", false, false, 1, true],
+      ["never", "snapping on, Connectors on, a piece with ends", true, true, 0, false]
+    ] as const
+  )("%s, with %s: %s", (bodyDrag, _case, enabled, connectors, piece, drags) => {
+    const [a = ""] = loadPieces([{ x: 0, y: 0, z: 0 }], piece)
+    inScene([a])
+    s().setTabSnap(config(bodyDrag, enabled, connectors))
+    s().select([a])
+    assert.strictEqual(bodyDrags(s()), drags)
+  })
+
+  it("counts the ends of everything it carries, not only the active item's", () => {
+    const catalog = catalogWithEnds()
+    const [withEnds, plain] = catalog.pieces
+    if (withEnds === undefined || plain === undefined) return assert.fail("the bundled catalog is short")
+    const map = {
+      ...newMapFile({ displayName: "Test", creatorName: "me", createdAt: "" }),
+      items: [
+        itemFromPiece(withEnds, identityTransform({ x: 0, y: 0, z: 0 })),
+        itemFromPiece(plain, identityTransform({ x: 1000, y: 0, z: 0 }))
+      ]
+    }
+    useEditor.setState({ catalogIndex: indexCatalog(catalog), settings: defaultSettings })
+    s().loadMap(map, null)
+    const [a = "", b = ""] = s().doc.ids
+    inScene([a, b])
+    s().setTabSnap(config("ends", true, true))
+    s().select([b])
+    assert.isFalse(bodyDrags(s()), "the plain piece alone")
+    s().select([b, a])
+    assert.isTrue(bodyDrags(s()), "with the piece that has ends")
   })
 })

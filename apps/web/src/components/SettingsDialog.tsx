@@ -28,6 +28,7 @@ import {
   SCALE_STEPS
 } from "../domain/snap"
 import {
+  BODY_DRAG_NAMES,
   isPreset,
   SNAP_PRESETS,
   SNAP_TARGET_NAMES,
@@ -252,6 +253,24 @@ export function SettingsDialog(props: {
           value={snapping.base}
           items={{ pivot: "Pivot", closest: "Closest", centre: "Centre" }}
           onChange={(base) => updateSnapping({ base })}
+        />
+      )
+    },
+    {
+      ...snapRow(
+        "body-drag",
+        "Drag body",
+        snapping.bodyDrag !== snapDefaults.bodyDrag,
+        () => updateSnapping({ bodyDrag: snapDefaults.bodyDrag })
+      ),
+      description:
+        "When a press and drag on the selection's body moves it: to join ends, with Connectors on and ends to join; always; or never.",
+      keywords: "snapping press move connectors",
+      control: (
+        <Choice
+          value={snapping.bodyDrag}
+          items={BODY_DRAG_NAMES}
+          onChange={(bodyDrag) => updateSnapping({ bodyDrag })}
         />
       )
     },

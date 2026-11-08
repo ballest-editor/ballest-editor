@@ -75,6 +75,12 @@ describe("snapConfig", () => {
     assert.strictEqual(targetSummary(moved, "grid", "cm"), "10 cm, own origin, 30°")
   })
 
+  it("drags by the body only to join ends, unless a config from before says otherwise", () => {
+    assert.strictEqual(defaultSnapConfig.bodyDrag, "ends")
+    const { bodyDrag: _, ...before } = Schema.encodeSync(SnapConfig)(defaultSnapConfig)
+    assert.strictEqual(Schema.decodeSync(SnapConfig)(before).bodyDrag, "ends")
+  })
+
   it("round-trips through its schema", () => {
     const encoded = Schema.encodeSync(SnapConfig)(defaultSnapConfig)
     assert.deepStrictEqual(Schema.decodeSync(SnapConfig)(encoded), defaultSnapConfig)

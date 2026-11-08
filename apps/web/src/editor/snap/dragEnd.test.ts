@@ -3,13 +3,15 @@ import { afterEach, assert, beforeEach, describe, it } from "@effect/vitest"
 import { act, createElement, Fragment } from "react"
 import * as THREE from "three"
 import { vi } from "vitest"
-import { defaultSnapConfig } from "../../domain/snapConfig"
+import { identityTransform } from "../../domain/factory"
+import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
 import { reactRootPerTest } from "../../test/reactRoot"
-import { DOWN_PANE_SIZE, loadPieces, lookDown } from "../../test/snapFixtures"
+import { catalogWithEnds, DOWN_PANE_SIZE, loadPieces, lookDown } from "../../test/snapFixtures"
 import { GizmoController } from "../gizmo/GizmoController"
 import { paneCameraAt } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
 import { useEditor } from "../store"
+import { landDrop } from "./pieceDrop"
 import { SnapInput } from "./SnapInput"
 
 /** The canvas the viewport would give both controllers, and what a frame runs. */
@@ -92,42 +94,47 @@ const dragging = {
   }
 }
 
+/** What was acquired each time the document changed. */
+let atCommit: Array<number> = []
+let stopWatching = () => {}
+
+/** A map of one piece of the catalog's `piece` at the origin, selected, with a point acquired, under both controllers. */
+const setUp = (snap: Partial<SnapConfig> = {}, piece = 0) => {
+  vi.useFakeTimers()
+  vi.spyOn(scene.canvas, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, DOWN_PANE_SIZE, DOWN_PANE_SIZE))
+  // jsdom has no pointer capture
+  scene.canvas.hasPointerCapture = () => false
+  const [key = ""] = loadPieces([{ x: 0, y: 0, z: 0 }], piece)
+  const s = useEditor.getState()
+  s.setTabSnap({
+    ...defaultSnapConfig,
+    enabled: true,
+    targets: { ...defaultSnapConfig.targets, tracking: TRACKING },
+    ...snap
+  })
+  s.setTool("translate")
+  s.select([key])
+  s.acquireTracked(ACQUIRED)
+  lookDown(paneCameraAt(0))
+  place(key)
+  atCommit = []
+  stopWatching = useEditor.subscribe((now, before) => {
+    if (now.doc !== before.doc) atCommit.push(now.tracked.length)
+  })
+  act(() => dom.root.render(createElement(Fragment, null, createElement(GizmoController), createElement(SnapInput))))
+}
+
+const tearDown = () => {
+  stopWatching()
+  sceneRegistry.itemsRoot = null
+  sceneRegistry.objects.clear()
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+}
+
 describe.each(Object.entries(dragging))("a drag %s", (_kind, drag) => {
-  /** What was acquired each time the document changed. */
-  let atCommit: Array<number> = []
-  let stopWatching = () => {}
-
-  beforeEach(() => {
-    vi.useFakeTimers()
-    vi.spyOn(scene.canvas, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, DOWN_PANE_SIZE, DOWN_PANE_SIZE))
-    // jsdom has no pointer capture
-    scene.canvas.hasPointerCapture = () => false
-    const [key = ""] = loadPieces([{ x: 0, y: 0, z: 0 }])
-    const s = useEditor.getState()
-    s.setTabSnap({
-      ...defaultSnapConfig,
-      enabled: true,
-      targets: { ...defaultSnapConfig.targets, tracking: TRACKING }
-    })
-    s.setTool("translate")
-    s.select([key])
-    s.acquireTracked(ACQUIRED)
-    lookDown(paneCameraAt(0))
-    place(key)
-    atCommit = []
-    stopWatching = useEditor.subscribe((now, before) => {
-      if (now.doc !== before.doc) atCommit.push(now.tracked.length)
-    })
-    act(() => dom.root.render(createElement(Fragment, null, createElement(GizmoController), createElement(SnapInput))))
-  })
-
-  afterEach(() => {
-    stopWatching()
-    sceneRegistry.itemsRoot = null
-    sceneRegistry.objects.clear()
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-  })
+  beforeEach(() => setUp())
+  afterEach(tearDown)
 
   it("lets go of the acquired points once it has landed, not before", () => {
     drag()
@@ -142,6 +149,17 @@ describe.each(Object.entries(dragging))("a drag %s", (_kind, drag) => {
     escape()
     assert.deepStrictEqual(atCommit, [])
     assert.lengthOf(useEditor.getState().tracked, 0)
+  })
+
+  it.each(["pointercancel", "lostpointercapture"])("lets go of them, and lands nothing, when %s ends it", (type) => {
+    drag()
+    assert.isNotNull(useEditor.getState().preview)
+    pointer(type, CENTRE, CENTRE, 0)
+    assert.isNull(useEditor.getState().preview, "the preview goes")
+    assert.lengthOf(useEditor.getState().tracked, 0)
+    assert.isFalse(sceneRegistry.gizmoDragActive(), "the drag is over")
+    pointer("pointerup", CENTRE, CENTRE, 0)
+    assert.deepStrictEqual(atCommit, [], "nothing lands after")
   })
 
   it("lets go of them when the viewport goes with it still in hand", () => {
@@ -184,4 +202,56 @@ describe.each(Object.entries(dragging))("a drag %s", (_kind, drag) => {
     vi.advanceTimersByTime(REST_MS)
     assert.lengthOf(useEditor.getState().tracked, 1)
   })
+})
+
+describe("a press and drag on an item's body", () => {
+  afterEach(tearDown)
+
+  const bodyDrag = () => {
+    useEditor.getState().setTool("select")
+    pointer("pointerdown", CENTRE, CENTRE, 1)
+    pointer("pointermove", CENTRE + 40, CENTRE + 30, 1)
+    const moving = useEditor.getState().preview !== null
+    pointer("pointerup", CENTRE + 40, CENTRE + 30, 0)
+    return moving
+  }
+
+  it.each(
+    [
+      ["ends", "a piece with ends", 0, true],
+      ["ends", "a piece with no ends", 1, false],
+      ["always", "a piece with no ends", 1, true],
+      ["never", "a piece with ends", 0, false]
+    ] as const
+  )("with %s, on %s, moves it: %s", (setting, _piece, piece, moves) => {
+    setUp({ bodyDrag: setting }, piece)
+    assert.strictEqual(bodyDrag(), moves)
+    assert.lengthOf(atCommit, moves ? 1 : 0)
+  })
+
+  it("with ends, leaves it be while snapping is off", () => {
+    setUp({ enabled: false })
+    assert.isFalse(bodyDrag())
+    assert.lengthOf(atCommit, 0)
+  })
+})
+
+describe("a palette drop", () => {
+  beforeEach(() => setUp())
+  afterEach(tearDown)
+
+  it.each([["snapping on", false], ["snapping inverted off", true]])(
+    "lets go of the acquired points, %s",
+    (_, invert) => {
+      const piece = catalogWithEnds().pieces[0] ?? assert.fail("the bundled catalog is empty")
+      const pane = lookDown(paneCameraAt(0))
+      act(() =>
+        landDrop(piece, pane, { x: CENTRE + 600, y: CENTRE }, { x: 0, y: 600, z: 0 }, invert, () => {
+          useEditor.getState().placePiece(piece, identityTransform({ x: 0, y: 600, z: 0 }))
+        })
+      )
+      assert.deepStrictEqual(atCommit, [1], "it landed with them still there")
+      assert.lengthOf(useEditor.getState().tracked, 0)
+    }
+  )
 })

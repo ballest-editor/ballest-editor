@@ -23,7 +23,7 @@ import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gridColorsOf } from "../domain/Settings"
-import { holdsDrop, placeAt, placePrefab, placeSnapped } from "./actions"
+import { holdsDrop, placeAt, placePrefab } from "./actions"
 import { fadeFineLines, gridReach } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
@@ -43,7 +43,7 @@ import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
 import { endSnapDisplay } from "./snap/moveSession"
-import { showDrop, snappedDrop } from "./snap/pieceDrop"
+import { landDrop, showDrop, snappedDrop } from "./snap/pieceDrop"
 import { SnapInput } from "./snap/SnapInput"
 import { SnapOverlay } from "./snap/SnapOverlay"
 import { groupBoxOf, noTabOpen, type SelectMode, shownPivotDots, snapConfigOf, useEditor, useOpenPrefab } from "./store"
@@ -243,12 +243,8 @@ const dropPiece = (
   e: { clientX: number; clientY: number; ctrlKey: boolean }
 ) => {
   const { pane, point, px, slot, surface } = dropTarget(piece, canvas, e)
-  const s = useEditor.getState()
-  s.setActivePane(slot)
-  const snapped = snappedDrop(s, piece, pane, px, point, e.ctrlKey)
-  endSnapDisplay()
-  if (snapped !== undefined) placeSnapped(piece, snapped.transform, snapped.options)
-  else placeAt(piece, point, pane.placementView(), surface)
+  useEditor.getState().setActivePane(slot)
+  landDrop(piece, pane, px, point, e.ctrlKey, () => placeAt(piece, point, pane.placementView(), surface))
 }
 
 /** Shows where a piece on its way would land. */

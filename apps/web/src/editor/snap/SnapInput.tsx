@@ -16,7 +16,7 @@ import { fitTransforms, type PickerRequest, snapConfigOf, useEditor } from "../s
 import { type DragKeyState, handleDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, previewMove } from "./moveSession"
 import { anchorUnder, hitUnder, pickedOf } from "./pickTarget"
-import { dragTargetOf, selectionSnapStart } from "./selectionStart"
+import { bodyDrags, dragTargetOf, selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
 import { gameRayOf, toGame } from "./snapView"
 
@@ -39,6 +39,7 @@ interface Pressed {
 
 interface BodyDrag {
   readonly session: MoveSession
+  readonly pointerId: number
   readonly slot: number
   readonly startTransforms: ReadonlyMap<string, UeTransform>
   /** The selection as units at drag start, which the pivot setting applies the delta by. */
@@ -89,7 +90,7 @@ export function SnapInput() {
       endSnapDisplay()
     }
 
-    /** A drag let go of without landing. Its tracking points go with it, as they do after a landing. */
+    /** A drag let go of without landing (Escape, a lost pointer, unmount). Its tracking points go, as after a landing. */
     const cancel = () => {
       end()
       useEditor.getState().clearTracked()
@@ -117,6 +118,7 @@ export function SnapInput() {
       })
       const begun: BodyDrag = {
         session,
+        pointerId: from.pointerId,
         slot: from.slot,
         startTransforms: transforms,
         selection: target.selection,
@@ -222,7 +224,7 @@ export function SnapInput() {
       if (sceneRegistry.isNavigationChord(mouseChordOf(e)) || e.ctrlKey || e.shiftKey || e.altKey) return
       const slot = panePointer(el, e).slot
       const key = itemUnder(el, e, raycaster, slot)
-      if (key === null || !s.selectedIds.includes(key)) return
+      if (key === null || !s.selectedIds.includes(key) || !bodyDrags(s)) return
       pressed = { x: e.clientX, y: e.clientY, pointerId: e.pointerId, slot, e }
     }
 
@@ -256,16 +258,24 @@ export function SnapInput() {
       const active = drag
       if (active === null) return
       e.stopImmediatePropagation()
-      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       const { last, session, startTransforms } = active
       const options = session.commitOptions(startTransforms.size)
       const offer = flipOfferOf(session.current, [...startTransforms.keys()])
       end()
+      // the drag is over first, so the capture this lets go of doesn't cancel it
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       if (last !== undefined) {
         useEditor.getState().setFlipOffer(offer)
         transformSelection(last, options)
       }
       useEditor.getState().clearTracked()
+    }
+
+    /** The pointer gone from under a drag (the system took it, or the capture was lost) cancels it. */
+    const onPointerLost = (e: PointerEvent) => {
+      if (e.pointerId === pressed?.pointerId) pressed = null
+      if (drag?.pointerId !== e.pointerId) return
+      cancel()
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -302,6 +312,8 @@ export function SnapInput() {
     el.addEventListener("pointerdown", onPointerDown, { capture: true, signal })
     el.addEventListener("pointermove", onPointerMove, { signal })
     el.addEventListener("pointerup", onPointerUp, { capture: true, signal })
+    el.addEventListener("pointercancel", onPointerLost, { signal })
+    el.addEventListener("lostpointercapture", onPointerLost, { signal })
     el.addEventListener("pointerleave", stopHover, { signal })
     window.addEventListener("keydown", onKeyDown, { capture: true, signal })
     window.addEventListener("keyup", onKeyUp, { capture: true, signal })
