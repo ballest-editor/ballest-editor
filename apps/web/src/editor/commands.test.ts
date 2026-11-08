@@ -69,4 +69,19 @@ describe("commands", () => {
     commandFor("selectAll")?.()
     assert.deepStrictEqual(s().selectedIds, [first!])
   })
+
+  it("enters the selected group, and does nothing unless the selection is one group", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null)
+    const [first] = s().doc.ids
+    s().select([first!])
+    commandFor("enterGroup")?.()
+    assert.isNull(s().enteredGroupId)
+    s().groupSelection()
+    const groupId = s().doc.structure.tree.find((node) => node.kind === "group")?.id ?? null
+    s().select([first!])
+    commandFor("enterGroup")?.()
+    assert.strictEqual(s().enteredGroupId, groupId)
+    assert.deepStrictEqual(s().selectedIds, [])
+  })
 })

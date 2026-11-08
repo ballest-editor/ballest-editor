@@ -2,6 +2,7 @@
  * The editor's commands: what a one-shot keybind runs, and what the menu bar runs for
  * the same action, so the two can't drift apart.
  */
+import { groupPathOf, soleGroupOf } from "../domain/groupSelection"
 import type { KeybindAction } from "../domain/Keybinds"
 import type { ViewProjection } from "../domain/viewLayout"
 import {
@@ -30,6 +31,17 @@ const onOpenTab = (command: () => void) => () => {
   if (!noTabOpen(useEditor.getState())) command()
 }
 
+/** Enters the group the selection is, if it is one, with nothing selected inside it, as the outline's Enter group does. */
+const enterSelectedGroup = () => {
+  const { doc, selectedIds, enteredGroupId, expandGroups, select, enterGroup } = useEditor.getState()
+  const { tree } = doc.structure
+  const group = soleGroupOf(tree, selectedIds, enteredGroupId)
+  if (group === undefined) return
+  expandGroups([...groupPathOf(tree, group.id), group.id])
+  select([])
+  enterGroup(group.id)
+}
+
 /**
  * The command for each one-shot action. Held keys and mouse drags aren't here (FlyCamera
  * runs them), nor are selection clicks (the viewport does).
@@ -45,6 +57,7 @@ export const actionCommands = {
   focusSelection: () => useEditor.getState().requestFocus(),
   selectAll,
   deselect: () => useEditor.getState().deselect(),
+  enterGroup: enterSelectedGroup,
   groupSelection: () => useEditor.getState().groupSelection(),
   ungroupSelection: () => useEditor.getState().ungroupSelection(),
   selectMode: () => useEditor.getState().setTool("select"),
