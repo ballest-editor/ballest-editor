@@ -214,12 +214,34 @@ describe("copy and paste", () => {
     assert.deepStrictEqual(pasted.items.get("a2"), { name: "A", tags: ["t"] })
   })
 
-  it("leaves a partly copied group's items beside their sources, in that group", () => {
+  it("puts a partly copied group's items in that group, together after the last of their sources", () => {
     const start = structure(group("x", item("a"), item("b"), item("c")))
     const clip = copyStructure(start, new Set(["a", "c"]))
     assert.deepStrictEqual(clip.tree, [item("a"), item("c")])
     assert.deepStrictEqual(withPasted(start, clip, keyOf).tree, [
-      group("x", item("a"), item("a2"), item("b"), item("c"), item("c2"))
+      group("x", item("a"), item("b"), item("c"), item("a2"), item("c2"))
+    ])
+  })
+
+  it("appends several copies as one block rather than each beside its source, so a copied row keeps its order", () => {
+    const start = structure(item("a"), item("b"), item("c"), item("z"))
+    const clip = copyStructure(start, new Set(["a", "b", "c"]))
+    assert.deepStrictEqual(withPasted(start, clip, keyOf).tree, [
+      item("a"),
+      item("b"),
+      item("c"),
+      item("a2"),
+      item("b2"),
+      item("c2"),
+      item("z")
+    ])
+    // copies from two groups land in their own groups
+    const split = structure(group("x", item("a"), item("b")), group("y", item("c"), item("z")))
+    const copied = copyStructure(split, new Set(["a", "b", "c"]))
+    assert.deepStrictEqual(withPasted(split, copied, keyOf, () => "copy").tree, [
+      group("x", item("a"), item("b")),
+      { ...group("x", item("a2"), item("b2")), id: "copy" },
+      group("y", item("c"), item("c2"), item("z"))
     ])
   })
 

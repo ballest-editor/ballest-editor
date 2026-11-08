@@ -347,8 +347,10 @@ export const copyStructure = (structure: Structure, keys: ReadonlySet<string>): 
 
 /**
  * Adds a clip's items to `structure`, under the new keys `keyOf` gives for their source keys, keeping their names and
- * tags. A copied node lands right after its source if the tree still has it, which puts a copied item in the same group
- * as its source; else at the end of the root. A group's copy is a new group of the same name and shape.
+ * tags. The copies of nodes the tree still has go in beside them, in the same group: all of one group's copies as one
+ * block after the last of their sources, in order, so a copied row stays a row rather than interleaving with the
+ * original. Copies of nodes that have gone land at the end of the root. A group's copy is a new group of the same name
+ * and shape.
  */
 export const withPasted = (
   structure: Structure,
@@ -372,12 +374,19 @@ export const withPasted = (
     return key === undefined ? [] : [itemNode(key)]
   }
   const waiting = new Map(clip.tree.map((node) => [idOf(node), copyOf(node)]))
-  const tree = rewriteTree(structure.tree, (node) => {
-    const copy = waiting.get(idOf(node))
-    if (copy === undefined) return [node]
-    waiting.delete(idOf(node))
-    return [node, ...copy]
-  })
+  // the copies of one group's children go in as a block after the last of their sources, in order
+  const place = (siblings: ReadonlyArray<TreeNode>): ReadonlyArray<TreeNode> => {
+    const kept = siblings.map((node) => node.kind === "group" ? { ...node, children: place(node.children) } : node)
+    const last = siblings.findLastIndex((node) => waiting.has(idOf(node)))
+    if (last < 0) return kept
+    const copies = siblings.flatMap((node) => {
+      const copy = waiting.get(idOf(node)) ?? []
+      waiting.delete(idOf(node))
+      return copy
+    })
+    return [...kept.slice(0, last + 1), ...copies, ...kept.slice(last + 1)]
+  }
+  const tree = place(structure.tree)
   const items = new Map(structure.items)
   for (const [source, meta] of clip.items) {
     const key = keyOf.get(source)
