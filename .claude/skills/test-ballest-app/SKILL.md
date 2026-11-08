@@ -55,7 +55,7 @@ node $L boot                                                    # after browser.
 node $L scene '{"pieces":[{"name":"Track L","x":-2000},{"name":"Track S","x":-300}],"view":"top","snap":{"enabled":true}}'
 node $L px 1; node $L end 1 0; node $L arrow 1 x 35            # page pixels: a piece's origin, a connector end, a translate handle
 node $L drag 620 148 0 330 --steps 110 --lock x --shot /tmp/a.png   # a drag by page pixels, with a lock key, a screenshot before release
-node $L drag 620 148 0 330 --key KeyG --hold --shot /tmp/b.png  # with a key held through the drag (a KeyboardEvent.code), still pressed for `release`
+node $L drag 620 148 0 330 --key KeyJ --hold --shot /tmp/b.png  # with a key held through the drag (a KeyboardEvent.code), still pressed for `release`, which lets it go after the pointer
 node $L ring 1 z                                                # the Z ring's grabbable quarter with piece 1 selected and the rotate tool, and the gizmo's centre
 node $L turn 1 z 120 --steps 120 --hold --shot /tmp/t.png       # grab that ring and drag round the centre by 120° on screen, a degree a step
 ```
