@@ -241,6 +241,13 @@ export const constrained = (constraint: Constraint, start: Vec3, landing: Vec3):
   }
 }
 
+/**
+ * Where `hit` puts its base under `constraint`. A join is the two ends meeting, so it puts the base on the other end
+ * whatever the handle or lock, as it turns the piece anyway; every other target only sets the value along them.
+ */
+export const landingUnder = (constraint: Constraint, hit: Pick<SnapHit, "target" | "base" | "landing">): Vec3 =>
+  hit.target === "connectors" ? hit.landing : constrained(constraint, hit.base.start, hit.landing)
+
 /** The directions a constraint can move along. */
 export const axesOf = (constraint: Constraint): ReadonlyArray<Vec3> => {
   if (constraint.kind === "line") return [constraint.direction]
@@ -279,15 +286,16 @@ export const segmentNearRay = (from: Vec3, to: Vec3, ray: Ray): Vec3 => {
   return vecAdd(from, vecScale(direction, t))
 }
 
+/** The point of the constraint through `origin` under `ray`: what a drag holds by; undefined when the ray can't say. */
+export const pointOn = (constraint: Constraint, origin: Vec3, ray: Ray): Vec3 | undefined =>
+  constraint.kind === "line"
+    ? lineNearRay(origin, constraint.direction, ray)
+    : rayOnPlane(ray, origin, constraint.normal)
+
 /** How far the pointer's ray has moved what started under `from`, under a constraint; undefined when the ray can't say. */
 export const freeOffset = (constraint: Constraint, origin: Vec3, from: Ray, to: Ray): Vec3 | undefined => {
-  if (constraint.kind === "line") {
-    const start = lineNearRay(origin, constraint.direction, from)
-    const now = lineNearRay(origin, constraint.direction, to)
-    return start === undefined || now === undefined ? undefined : vecSub(now, start)
-  }
-  const start = rayOnPlane(from, origin, constraint.normal)
-  const now = rayOnPlane(to, origin, constraint.normal)
+  const start = pointOn(constraint, origin, from)
+  const now = pointOn(constraint, origin, to)
   return start === undefined || now === undefined ? undefined : vecSub(now, start)
 }
 

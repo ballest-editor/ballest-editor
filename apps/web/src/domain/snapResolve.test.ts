@@ -231,6 +231,26 @@ describe("resolveSnap", () => {
     assert.deepStrictEqual(hit?.landing, { x: 150, y: 0, z: 0 })
   })
 
+  it("joins an end off a locked move's line where the two ends meet, which is what its label says", () => {
+    const at = { x: 300, y: 5, z: 100 }
+    const end = { ...endAlongX("a", 0, 300, -1), position: at }
+    const own: BasePoint = { start: ORIGIN, label: "End", end: endAlongX("own", 0, 0, 1) }
+    const extra = {
+      config: on(defaultSnapConfig, "connectors"),
+      items: [cubeAt("a", at, { ends: [end] })],
+      bases: [own],
+      constraint: { kind: "line", direction: { x: 1, y: 0, z: 0 } },
+      slip: { x: 0, y: 5 }
+    } as const
+    const frame = frameOf({ x: 300, y: 0, z: 0 }, extra)
+    const picked = resolveSnap(frame)
+    assert.strictEqual(picked?.relation, "join")
+    assert.deepStrictEqual(picked?.landing, at)
+    const dragged = resolveDrag(frame, { from: { x: 280, y: 0, z: 0 }, current: undefined })
+    assert.deepStrictEqual(dragged?.landing, at)
+    assert.deepStrictEqual(dragged === undefined ? undefined : resolveSnap(frame, dragged)?.landing, at, "held")
+  })
+
   it("doesn't pull a locked move to a face it would have to jump to", () => {
     const config = on(defaultSnapConfig, "mesh")
     const line = { kind: "line", direction: { x: 1, y: 0, z: 0 } } as const
