@@ -50,6 +50,16 @@ describe("what a turn and a scale stop on", () => {
     ])
   })
 
+  it("offers no touch with a neighbour it touches or overlaps at the start, and keeps its flush stops all the way round", () => {
+    // sharing part of a face, a corner of the neighbour comes onto the turning face at 53°: they touched all along
+    for (const there of [{ x: 100, y: 60, z: 0 }, { x: 100, y: 0, z: 0 }, { x: 80, y: 0, z: 0 }]) {
+      const stops = turnStops([cubeAt("a", there)])
+      assert.notInclude(stops.map(([, label]) => label), "Touching Cube", `a neighbour at ${there.x}, ${there.y}`)
+    }
+    const sharing = turnStops([cubeAt("a", { x: 100, y: 0, z: 0 })])
+    assert.includeDeepMembers(sharing, [[0, "Flush with Cube"], [90, "Flush with Cube"], [-90, "Flush with Cube"]])
+  })
+
   it("lines up with a neighbour's axes and the grid's, short of the touch", () => {
     const turned = {
       ...identityTransform({ x: 0, y: 300, z: 0 }),
