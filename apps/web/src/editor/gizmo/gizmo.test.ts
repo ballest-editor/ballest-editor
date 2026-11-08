@@ -6,7 +6,7 @@ import { applyGroupDelta } from "../../domain/groupTransform"
 import { defaultSnapConfig } from "../../domain/snapConfig"
 import { constrained, freeOffset } from "../../domain/snapFrame"
 import { gridLanding } from "../../domain/snapGrid"
-import { snappedTurn } from "../../domain/snapRotate"
+import { turnLanding } from "../../domain/snapRotate"
 import { quatFromAxisAngle, rotateVec, rotatorToQuat, vecAdd } from "../../domain/ueMath"
 import { sceneAxisColors } from "../axisColors"
 import { constraintOf, type DragStart, localFrameOf, type PointerSample, scaleOf, stepAxesOf, turnOf } from "./drag"
@@ -255,7 +255,15 @@ describe("gizmo drags (game space)", () => {
     }
     const turn = turnOf(s, now)
     if (turn !== undefined) {
-      const { angle } = snappedTurn({ free: turn.angle, axis: turn.axis, step: rotationStep, flush: [], reach: 0 })
+      const { angle } = turnLanding({
+        free: turn.angle,
+        from: 0,
+        on: undefined,
+        stops: [],
+        reach: 0,
+        nudge: 0,
+        step: rotationStep
+      })
       const delta = { kind: "rotate", rotation: quatFromAxisAngle(turn.axis, angle) } as const
       return applyGroupDelta(s.transform, s.transform.translation, delta)
     }

@@ -1,29 +1,100 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
+import type { Vec3 } from "../../domain/coords"
+import { identityTransform } from "../../domain/factory"
 import type { MeshFace } from "../../domain/meshElements"
 import { defaultSnapConfig } from "../../domain/snapConfig"
-import { ORIGIN } from "../../domain/ueMath"
-import { boxAt, cubeAt, loadPieces, meshOfBox } from "../../test/snapFixtures"
+import type { SnapItem } from "../../domain/snapFrame"
+import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
+import { boxAt, cubeAt, endAlongX, loadPieces, meshOfBox } from "../../test/snapFixtures"
 import { sceneRegistry } from "../sceneRegistry"
 import { useEditor } from "../store"
 import { snapItemsOf } from "./snapScene"
 import { toThree } from "./snapView"
-import { flushPairsOf, scaleStopsOf } from "./turnScale"
+import { scaleStopsOf, turnStopsOf } from "./turnScale"
 
 const at = { x: 100, y: 0, z: 0 }
 const alongX = { x: 1, y: 0, z: 0 }
-const selection = { base: { x: 1, y: 0, z: 0 }, box: boxAt(ORIGIN), ends: [], pivotPoint: ORIGIN }
+const selection = { box: boxAt(ORIGIN) }
+
+/** A turn about Z through `pivot` of the 100 cm cube at the origin. */
+const turnOf = (pivot: Vec3, own: SnapItem = cubeAt("own", ORIGIN)) => ({
+  axis: { x: 0, y: 0, z: 1 },
+  pivot,
+  rotation: own.transform.rotation,
+  own: [own],
+  ends: own.ends
+})
+
+/** Where the turn stops, in degrees to the hundredth, with what it says. */
+const turnStops = (items: ReadonlyArray<SnapItem>, pivot: Vec3 = ORIGIN, rangeCm = 10, own?: SnapItem) =>
+  turnStopsOf(defaultSnapConfig, turnOf(pivot, own), items, rangeCm).map(({ angle, label }) => [
+    Math.round(angle * 18000 / Math.PI) / 100 + 0,
+    label
+  ])
 
 const stopsAlongX = (...items: Parameters<typeof scaleStopsOf>[3]) =>
   scaleStopsOf(alongX, ORIGIN, selection.box, items).map((stop) => stop.at).toSorted((a, b) => a - b)
 
 describe("what a turn and a scale stop on", () => {
-  it("turns flush with a mesh's own faces, its box standing in until it has loaded", () => {
-    const pairsOf = (mesh: ReturnType<typeof meshOfBox> | undefined) =>
-      flushPairsOf(defaultSnapConfig, selection, [cubeAt("a", at, { mesh: () => mesh })], 10)
-    const curved = { ...meshOfBox(boxAt(at)), faces: meshOfBox(boxAt(at)).faces.slice(0, 2) }
-    assert.lengthOf(pairsOf(curved), 2)
-    assert.lengthOf(pairsOf(undefined), 6)
+  it("stops a turn where it first touches a neighbour each way, and square to the grid", () => {
+    // a corner 70.7 cm out swings onto the face 10 cm off at 13.05°; past that the turn is inside the neighbour
+    const stops = turnStops([cubeAt("a", { x: 110, y: 0, z: 0 })])
+    assert.deepStrictEqual(stops, [
+      [-90, "Square to the grid"],
+      [-13.05, "Touching Cube"],
+      [0, "Flush with Cube"],
+      [13.05, "Touching Cube"],
+      [90, "Square to the grid"],
+      [180, "Square to the grid"]
+    ])
+  })
+
+  it("lines up with a neighbour's axes and the grid's, short of the touch", () => {
+    const turned = {
+      ...identityTransform({ x: 0, y: 300, z: 0 }),
+      rotation: rotatorToQuat({ pitch: 0, roll: 0, yaw: 30 })
+    }
+    const stops = turnStops([cubeAt("a", { x: 0, y: 300, z: 0 }, { transform: turned })], { x: 0, y: 0, z: 0 }, 200)
+    assert.includeDeepMembers(stops, [[30, "Aligned with Cube on X and Y"], [-60, "Square to Cube"], [
+      90,
+      "Square to the grid"
+    ]])
+  })
+
+  it("names a face swung flush onto another, over the touch", () => {
+    // a door hung on its edge at (50, 50) closes onto a wall whose face is at x = 150
+    const stops = turnStops([cubeAt("a", { x: 200, y: 0, z: 0 })], { x: 50, y: 50, z: 0 })
+    assert.deepInclude(stops, [90, "Flush with Cube"])
+  })
+
+  it("meets a mesh with its own corners and faces once it has loaded", () => {
+    // the mesh is smaller than the bounds, its near face 20 cm off: the corner reaches it later than the box's
+    const mesh = meshOfBox(boxAt({ x: 110, y: 0, z: 0 }, 40))
+    const stops = turnStops([cubeAt("a", { x: 110, y: 0, z: 0 }, { mesh: () => mesh, faces: () => mesh.faces })])
+    assert.deepInclude(stops, [36.87, "Touching Cube"])
+    assert.notDeepInclude(stops, [13.05, "Touching Cube"])
+  })
+
+  it("brings an end onto an end in range", () => {
+    const own = cubeAt("own", ORIGIN, { ends: [endAlongX("own", 0, 50, 1)] })
+    const other = cubeAt("a", { x: 0, y: 160, z: 0 }, { ends: [endAlongX("a", 0, 0, 1)] })
+    const end = { ...endAlongX("a", 0, 0, 1), position: { x: 0, y: 50, z: 0 }, forward: { x: 0, y: -1, z: 0 } }
+    const stops = turnStops([{ ...other, ends: [end] }], ORIGIN, 10, own)
+    assert.deepInclude(stops, [90, "End of Cube"])
+  })
+
+  it("leaves out what the targets that are off would stop on", () => {
+    const off = (target: "mesh" | "grid" | "alignment") => ({
+      ...defaultSnapConfig,
+      targets: { ...defaultSnapConfig.targets, [target]: { ...defaultSnapConfig.targets[target], enabled: false } }
+    })
+    const near = [cubeAt("a", { x: 110, y: 0, z: 0 })]
+    const kinds = (config: typeof defaultSnapConfig) =>
+      new Set(turnStopsOf(config, turnOf(ORIGIN), near, 10).map(({ kind }) => kind))
+    assert.isFalse(kinds(off("mesh")).has("touch"))
+    assert.isFalse(kinds(off("grid")).has("grid"))
+    assert.isFalse(kinds(off("alignment")).has("aligned"))
   })
 
   it("scales up to a mesh's own faces, its box standing in until it has loaded", () => {

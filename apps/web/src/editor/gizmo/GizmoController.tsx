@@ -6,26 +6,34 @@ import { selectedGroupIds } from "../../domain/groupSelection"
 import type { GroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { gizmoScaleOf } from "../../domain/Settings"
-import { type FlushPair, type ScaleStop, snappedScale, snappedTurn } from "../../domain/snapRotate"
-import { quatFromAxisAngle } from "../../domain/ueMath"
 import {
-  applyDelta,
-  leadingKeys,
-  type PivotMode,
-  pivotUnitOf,
-  type SelectionUnits,
-  turnAccumulates
-} from "../../domain/units"
+  type ScaleStop,
+  snappedScale,
+  turnLanding,
+  turnReach,
+  turnSnapOf,
+  type TurnStop
+} from "../../domain/snapRotate"
+import { quatFromAxisAngle } from "../../domain/ueMath"
+import { applyDelta, leadingKeys, type PivotMode, type SelectionUnits, turnAccumulates } from "../../domain/units"
 import { transformSelection } from "../actions"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
 import { type DragKeyState, handleDragKey, seedDragKeys, syncDragKeys } from "../snap/dragKeys"
-import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, previewMove, showSnap } from "../snap/moveSession"
-import { baseFaceOf, type DragTarget, dragTargetOf, selectionSnapStart } from "../snap/selectionStart"
-import { snapItemsOf } from "../snap/snapScene"
+import {
+  dragKeysOf,
+  endSnapDisplay,
+  flipOfferOf,
+  MoveSession,
+  previewMove,
+  showSnap,
+  turnCommitOptions
+} from "../snap/moveSession"
+import { type DragTarget, dragTargetOf, selectionSnapStart } from "../snap/selectionStart"
+import { ownSnapItemsOf, snapItemsOf } from "../snap/snapScene"
 import { gameRayOf, snapViewOf, toThree } from "../snap/snapView"
-import { flushPairsOf, reachAlong, scaleStopsOf } from "../snap/turnScale"
+import { reachAlong, scaleStopsOf, turnStopsOf } from "../snap/turnScale"
 import { fitTransforms, selectionUnits, shownGizmoSpace, snapConfigOf, useEditor } from "../store"
 import { useDarkTheme } from "../theme"
 import {
@@ -38,7 +46,7 @@ import {
   stepAxesOf,
   turnOf
 } from "./drag"
-import { GizmoObject, type HandleSpec, toolHandles } from "./handles"
+import { GizmoObject, type HandleSpec, SIZE, toolHandles } from "./handles"
 
 interface ActiveDrag {
   readonly id: string
@@ -59,7 +67,7 @@ interface ActiveDrag {
   duplicate: "pending" | "copied" | undefined
   /** The snapping session of a move; a turn and a scale keep what they can meet instead. */
   readonly move: MoveSession | undefined
-  readonly flush: ReadonlyArray<FlushPair>
+  readonly turn: TurnSession | undefined
   readonly stops: ReadonlyArray<ScaleStop>
   /** How far the active item's scaled face reaches from the pivot at the drag's start, in cm. */
   readonly reach: number
@@ -70,6 +78,17 @@ interface ActiveDrag {
   readonly keys: DragKeyState
   /** The last pointer position, to go again when a key changes with the pointer still. */
   lastEvent: { readonly clientX: number; readonly clientY: number } | undefined
+}
+
+/** What a turn can stop on, and where it has got to (docs/SNAPPING.md § Affect). */
+interface TurnSession {
+  readonly stops: ReadonlyArray<TurnStop>
+  /** Radians past a stop the pointer can go and hold it, and ahead of it that reach it: pixels along the ring. */
+  readonly reach: number
+  readonly nudge: number
+  /** The last sample's free angle, and the stop it landed on. */
+  from: number
+  on: TurnStop | undefined
 }
 
 const applyToObject = (object: THREE.Object3D, transform: UeTransform) => {
@@ -268,6 +287,7 @@ export function GizmoController() {
       const constraint = constraintOf(start)
       const axisWorld = spec.kind === "scaleAxis" ? dragAxisWorld(start) : undefined
       const scaleAxis = axisWorld === undefined ? undefined : threeToGame(axisWorld)
+      const turnAxis = spec.kind === "rotateAxis" || spec.kind === "rotateView" ? dragAxisWorld(start) : undefined
       const items = constraint === undefined
         ? snapItemsOf(s, new Set(target.transforms.keys()), config.targets.mesh.sharpAngle)
         : []
@@ -294,21 +314,27 @@ export function GizmoController() {
           ray: gameRayOf({ origin: start.pointer.rayOrigin, direction: start.pointer.rayDir }),
           px: start.pointer.px
         }),
-        // what a turn stops on assumes the unit ends up turned by the angle dragged, which a chain's pass goes past
-        flush:
-          (spec.kind === "rotateAxis" || spec.kind === "rotateView") && !turnAccumulates(target.selection, pivotMode)
-            ? flushPairsOf(
-              config,
-              {
-                base: baseFaceOf(s, pivotUnitOf(target.selection, pivotMode)),
-                box: selection.box,
-                ends: selection.ends,
-                pivotPoint: target.pivot
-              },
-              items,
-              rangeCm
-            )
-            : [],
+        turn: turnAxis === undefined ? undefined : {
+          // what a turn stops on assumes the unit ends up turned by the angle dragged, which a chain's pass goes past
+          stops: turnAccumulates(target.selection, pivotMode) ? [] : turnStopsOf(
+            config,
+            {
+              axis: threeToGame(turnAxis),
+              pivot: target.pivot,
+              rotation: target.rotation,
+              own: ownSnapItemsOf(s, leads, config.targets.mesh.sharpAngle),
+              ends: selection.ends
+            },
+            items,
+            rangeCm
+          ),
+          ...turnReach(
+            config.threshold,
+            (spec.kind === "rotateView" ? SIZE.viewRing : SIZE.ring) * gizmoScaleOf(settings.gizmo.size)
+          ),
+          from: 0,
+          on: undefined
+        },
         stops: scaleAxis === undefined ? [] : scaleStopsOf(scaleAxis, target.pivot, selection.box, items),
         reach: scaleAxis === undefined ? 0 : reachAlong(selection.box, target.pivot, scaleAxis),
         scaleFrom: spec.axis === undefined ? target.active.scale3D.x : target.active.scale3D[spec.axis],
@@ -348,17 +374,22 @@ export function GizmoController() {
         return active.move.update(gameRayOf({ origin: now.rayOrigin, direction: now.rayDir }), now.px, keys).delta
       }
       const turn = turnOf(active.start, now)
-      if (turn !== undefined) {
-        const on = config.rotationEnabled !== keys.invert
-        const radius = Math.hypot(now.px.x - active.start.originPx.x, now.px.y - active.start.originPx.y)
-        const turned = snappedTurn({
+      if (turn !== undefined && active.turn !== undefined) {
+        const session = active.turn
+        const snapping = turnSnapOf(config, keys.invert)
+        const turned = turnLanding({
           free: turn.angle,
-          axis: turn.axis,
-          step: on ? config.rotationStep : undefined,
-          flush: on ? active.flush : [],
-          reach: config.threshold / Math.max(radius, 1)
+          from: session.from,
+          on: snapping.stops ? session.on : undefined,
+          stops: snapping.stops ? session.stops : [],
+          reach: session.reach,
+          nudge: session.nudge,
+          hold: keys.hold,
+          step: snapping.step ? config.rotationStep : undefined
         })
-        showSnap(turned.label, turned.marks)
+        session.from = turn.angle
+        session.on = turned.on
+        showSnap(turned.on?.label, turned.on?.marks)
         const rotation = quatFromAxisAngle(turn.axis, turned.angle)
         const frame = localFrameOf(active.start)
         return (frame === undefined
@@ -406,7 +437,8 @@ export function GizmoController() {
 
     /** Commits what the drag came to. */
     const land = (active: ActiveDrag) => {
-      const options = active.move?.commitOptions(active.startTransforms.size)
+      const options = active.move?.commitOptions(active.startTransforms.size) ??
+        turnCommitOptions(active.turn?.on, active.startTransforms.size)
       if (active.duplicate === "copied") {
         // the copy and the move are one undo entry; refused, the copies go
         useEditor.getState().endDuplicateDrag(active.last ?? null, options)

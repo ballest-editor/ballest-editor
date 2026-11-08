@@ -23,6 +23,7 @@ import {
 } from "../../domain/snapFrame"
 import { gridAxes } from "../../domain/snapGrid"
 import { baseNearPointer, moveOf, resolveDrag, resolveSnap } from "../../domain/snapResolve"
+import type { TurnStop } from "../../domain/snapRotate"
 import { selectionBases } from "../../domain/snapTools"
 import { annotationsOf } from "../../domain/structure"
 import type { PaneCamera } from "../paneCameras"
@@ -211,6 +212,12 @@ export class MoveSession {
     return this.lastHit
   }
 }
+
+/** How a turn that ended on `stop` commits: what the history calls it, "Turn 1 item flush with Track L". */
+export const turnCommitOptions = (stop: TurnStop | undefined, count: number): TransformOptions =>
+  stop === undefined
+    ? {}
+    : { description: `Turn ${plural(count)} ${stop.kind === "end" ? "to " : ""}${lowered(stop.label)}` }
 
 /** Shows a drag's live transforms, and says when `delta` is a landing, which a Point pivot follows. */
 export const previewMove = (next: ReadonlyMap<string, UeTransform>, delta: GroupDelta): void =>
