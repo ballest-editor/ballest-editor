@@ -37,6 +37,18 @@ export const quatNormalize = (q: Quat4): Quat4 => {
   return { x: q.x / n, y: q.y / n, z: q.z / n, w: q.w / n }
 }
 
+/** How alike two unit quaternions are: ±1 when they are the same rotation. */
+export const quatDot = (a: Quat4, b: Quat4): number => a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w
+
+/** The same turn `k` times as far, about the same axis: a turn of 270° stays one, not -90°. */
+export const quatPow = (q: Quat4, k: number): Quat4 => {
+  const half = Math.acos(Math.max(-1, Math.min(1, q.w)))
+  const sin = Math.sin(half)
+  if (Math.abs(sin) < 1e-12) return { x: 0, y: 0, z: 0, w: 1 }
+  const s = Math.sin(half * k) / sin
+  return { x: q.x * s, y: q.y * s, z: q.z * s, w: Math.cos(half * k) }
+}
+
 /** The inverse rotation of a unit quaternion. */
 export const quatConjugate = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.y, z: -q.z, w: q.w })
 

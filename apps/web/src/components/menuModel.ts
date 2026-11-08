@@ -129,6 +129,7 @@ export interface MenuState {
   readonly canRedo: boolean
   readonly hasSelection: boolean
   readonly canGroup: boolean
+  readonly canChain: boolean
   readonly canUngroup: boolean
   readonly canPaste: boolean
   readonly canSelectAll: boolean
@@ -238,6 +239,7 @@ const editMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
     command("deselect", "Deselect", selectionOff),
     SEPARATOR,
     command("groupSelection", "Group", state.canGroup ? null : "Select what to group first."),
+    command("chainSelection", "Group as chain", state.canChain ? null : "Select what to chain first."),
     command("ungroupSelection", "Ungroup", state.canUngroup ? null : "Select a group first."),
     SEPARATOR,
     item("Save selection as prefab…", startSavePrefab, state.prefabProblem ?? null)
@@ -382,7 +384,7 @@ export const useMenus = (): Menus => {
   const canUndo = useEditor((s) => s.past.length > 0 && s.preview === null)
   const canRedo = useEditor((s) => s.future.length > 0 && s.preview === null)
   const hasSelection = useEditor((s) => s.selectedIds.length > 0)
-  const { canGroup, canUngroup } = useCanGroup()
+  const { canGroup, canChain, canUngroup } = useCanGroup()
   const canPaste = useEditor((s) => s.clipboard !== null)
   const canSelectAll = useEditor((s) => s.doc.ids.length > 0)
   const prefabProblem = useEditor(selectionPrefabProblem)
@@ -406,6 +408,7 @@ export const useMenus = (): Menus => {
     canRedo,
     hasSelection,
     canGroup,
+    canChain,
     canUngroup,
     canPaste,
     canSelectAll,

@@ -5,7 +5,7 @@
  */
 import type { CatalogIndex } from "./Catalog"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
-import type { GroupNode, GroupPivot, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
+import type { ChainGrowth, GroupNode, GroupPivot, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
 import { pieceLabelOf } from "./pieceName"
 
 /** What an item has beyond the game's data. An item with neither has no entry. */
@@ -171,17 +171,46 @@ export const DEFAULT_CHAIN_NAME = "Chain"
 
 /**
  * Makes group `id` a chain of its children in their order, or a plain group again. A chain pivots on its first link, so
- * its own pivot goes. A group still called Group becomes Chain, and back; a name the user gave stays.
+ * its own pivot goes, and a chain that becomes a group loses its growth. A group still called Group becomes Chain, and
+ * back; a name the user gave stays.
  */
 export const withChain = (structure: Structure, id: string, chain: boolean): Structure | undefined => {
   const group = findGroup(structure.tree, id)
   if (group === undefined || group.prefab !== undefined || (group.chain === true) === chain) return undefined
   const [was, becomes] = chain ? [DEFAULT_GROUP_NAME, DEFAULT_CHAIN_NAME] : [DEFAULT_CHAIN_NAME, DEFAULT_GROUP_NAME]
-  return withGroupNode(structure, id, ({ chain: _, pivot, ...node }) => ({
+  return withGroupNode(structure, id, ({ chain: _, growth: __, pivot, ...node }) => ({
     ...node,
     name: node.name === was ? becomes : node.name,
     ...(chain ? { chain: true } : pivot !== undefined && { pivot })
   }))
+}
+
+/** Sets how chain `id` grows as it bends (`ChainGrowth`); undefined turns every link alike. */
+export const withChainGrowth = (
+  structure: Structure,
+  id: string,
+  growth: ChainGrowth | undefined
+): Structure | undefined => {
+  const group = findGroup(structure.tree, id)
+  const same = growth === undefined
+    ? group?.growth === undefined
+    : group?.growth?.curve === growth.curve && group.growth.percent === growth.percent
+  if (group?.chain !== true || same) return undefined
+  return withGroupNode(structure, id, ({ growth: _, ...node }) => growth === undefined ? node : { ...node, growth })
+}
+
+/** Puts group `id`'s children in `order`, each a place among them as they are; undefined when nothing moves. */
+export const withChildOrder = (
+  structure: Structure,
+  id: string,
+  order: ReadonlyArray<number>
+): Structure | undefined => {
+  const group = findGroup(structure.tree, id)
+  if (group === undefined || order.every((i, k) => i === k)) return undefined
+  const children = order.flatMap((i) => group.children[i] ?? [])
+  return children.length === group.children.length && new Set(order).size === order.length
+    ? withGroupNode(structure, id, (node) => ({ ...node, children }))
+    : undefined
 }
 
 /** Turns chain `id` round: its last link becomes the root. */

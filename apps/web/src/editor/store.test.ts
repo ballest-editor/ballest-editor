@@ -1522,7 +1522,7 @@ describe("groups and the selection", () => {
     assert.deepStrictEqual(shown((t) => ({ ...t, scale3D: { x: 2, y: 1, z: 1 } })), { x: 0, y: 0, z: 0 })
   })
 
-  it("makes, reverses and unmakes a chain, and groups a selection as one in selection order", () => {
+  it("makes, reverses and unmakes a chain, and groups a selection as one from the first selected", () => {
     mapWithCubes(0, 100, 200)
     const [a = "", b = "", c = ""] = state().doc.ids.slice(1)
     state().select([c, a, b])
@@ -1530,10 +1530,10 @@ describe("groups and the selection", () => {
     const chain = state().doc.structure.tree.find((n) => n.kind === "group")
     assert.strictEqual(chain?.kind === "group" ? chain.chain : undefined, true)
     assert.strictEqual(chain?.kind === "group" ? chain.name : undefined, "Chain", "a default name follows")
-    assert.deepStrictEqual(chain?.kind === "group" ? treeKeys(chain.children) : [], [c, a, b], "selection order")
+    assert.deepStrictEqual(chain?.kind === "group" ? treeKeys(chain.children) : [], [c, b, a], "along the row from c")
     const id = chain?.kind === "group" ? chain.id : ""
     state().reverseChain(id)
-    assert.deepStrictEqual(treeKeys(findGroup(state().doc.structure.tree, id)!.children), [b, a, c])
+    assert.deepStrictEqual(treeKeys(findGroup(state().doc.structure.tree, id)!.children), [a, b, c])
     state().setChain(id, false)
     assert.isUndefined(findGroup(state().doc.structure.tree, id)?.chain)
     assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Group", "and back")
@@ -1545,6 +1545,48 @@ describe("groups and the selection", () => {
     assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Finger")
     state().setChain(id, true)
     assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Finger")
+    // a growth is one undo step, and goes with the chain
+    const steps = state().past.length
+    state().setChainGrowth(id, { curve: "compound", percent: 20 })
+    state().setChainGrowth(id, { curve: "compound", percent: 20 })
+    assert.strictEqual(state().past.length, steps + 1, "the same growth again is no step")
+    assert.deepStrictEqual(findGroup(state().doc.structure.tree, id)?.growth, { curve: "compound", percent: 20 })
+    state().setChain(id, false)
+    assert.isUndefined(findGroup(state().doc.structure.tree, id)?.growth)
+    state().setChain(id, true)
+    assert.isUndefined(findGroup(state().doc.structure.tree, id)?.growth, "a chain made again starts even")
+    state().setChainGrowth(id, { curve: "linear", percent: 5 })
+    state().setChainGrowth(id, undefined)
+    assert.isUndefined(findGroup(state().doc.structure.tree, id)?.growth)
+  })
+
+  it("orders a chain's links along its pieces as they lie, from the first selected", () => {
+    // placed in blocks, so the document order isn't the order along the row
+    mapWithCubes(0, 2000, 3000, 1000)
+    const [a = "", b = "", c = "", d = ""] = state().doc.ids.slice(1)
+    const linksOf = (id: string) => treeKeys(findGroup(state().doc.structure.tree, id)!.children)
+    state().select([a, b, c, d])
+    state().groupSelection()
+    const { id } = state().doc.structure.tree.find((n) => n.kind === "group")!
+    state().setChain(id, true)
+    assert.deepStrictEqual(linksOf(id), [a, d, b, c], "Convert to chain")
+    state().undo()
+    state().undo()
+    state().select([c, a, d, b])
+    state().chainSelection()
+    const chain = state().doc.structure.tree.find((n) => n.kind === "group")!
+    assert.deepStrictEqual(linksOf(chain.id), [c, b, d, a], "Group as chain")
+  })
+
+  it("chains one whole group selected in place, and bends it in Each without entering it", () => {
+    const { a, b, c, outer } = nestedMap()
+    state().select([a, b, c])
+    state().chainSelection()
+    assert.strictEqual(findGroup(state().doc.structure.tree, outer)?.chain, true, "the group itself")
+    assert.strictEqual(state().enteredGroupId, null)
+    assert.strictEqual(shownPivotMode(state()), "together")
+    state().togglePivotMode()
+    assert.strictEqual(shownPivotMode(state()), "each", "a chain alone bends")
   })
 
   it("pivots a prefab instance on its origin, and follows a live move", () => {

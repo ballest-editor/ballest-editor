@@ -6,7 +6,7 @@
  * chain's first link's.
  *
  * Together, the game's rule, puts every item through one edit about the active unit's pivot. Each puts every unit
- * through the edit about its own, and a chain unit passes a turn down its links so it accumulates (§ Chains).
+ * through the edit about its own, and a chain unit bends: it passes a turn down its links so it accumulates (§ Chains).
  */
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { identityTransform } from "./factory"
@@ -14,10 +14,10 @@ import { selectedNodes } from "./groupSelection"
 import { applyGroupDelta, forUnit, type GroupDelta } from "./groupTransform"
 import type { Box } from "./itemBounds"
 import { boxCentreOf } from "./itemBounds"
-import type { GroupNode, GroupPivot, GroupPivotFace, TreeNode } from "./MapSidecar"
+import type { ChainGrowth, GroupNode, GroupPivot, GroupPivotFace, TreeNode } from "./MapSidecar"
 import { localToWorld } from "./pivot"
 import { findGroup, idOf, rewriteTree, type Structure, treeKeys } from "./structure"
-import { ORIGIN, quatMul, quatNormalize, rotateVec, sameVec, vecAdd, vecSub } from "./ueMath"
+import { ORIGIN, quatConjugate, quatMul, quatNormalize, quatPow, rotateVec, sameVec, vecAdd, vecSub } from "./ueMath"
 
 export type PivotMode = "together" | "each"
 
@@ -32,6 +32,8 @@ export interface Unit {
   readonly transform: UeTransform
   /** A chain's links in order, each a unit; a plain unit has none. */
   readonly links?: ReadonlyArray<Unit>
+  /** A chain's growth, when it has one. */
+  readonly growth?: ChainGrowth
 }
 
 /** What a unit is made from: the tree and how to read each item as it stands (the document, or a live edit). */
@@ -110,10 +112,53 @@ export const unitOf = (node: TreeNode, ctx: UnitContext): Unit | undefined => {
     const links = node.children.flatMap((child) => unitOf(child, ctx) ?? [])
     const [root] = links
     if (root === undefined) return undefined
-    return { id: node.id, keys, pivot: root.pivot, transform: root.transform, links }
+    return {
+      id: node.id,
+      keys,
+      pivot: root.pivot,
+      transform: root.transform,
+      links,
+      ...(node.growth !== undefined && { growth: node.growth })
+    }
   }
   const placed = groupPivotOf(keys, node.pivot, ctx)
   return placed === undefined ? undefined : { id: node.id, keys, ...placed }
+}
+
+const distance = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+
+/**
+ * An order that walks `points` as a path, each to the nearest one left: how a chain's links are ordered when it is
+ * made, so they follow the pieces as they lie rather than the order they were placed or selected in. It starts at
+ * `root` when that is an end of the path, else at the end nearer to it.
+ */
+export const pathOrder = (points: ReadonlyArray<Vec3>, root = 0): ReadonlyArray<number> => {
+  const start = points[root]
+  if (start === undefined) return [...points.keys()]
+  const walk = (from: number, at: Vec3): ReadonlyArray<number> => {
+    const order = [from]
+    const left = new Map(points.entries())
+    left.delete(from)
+    let last = at
+    for (;;) {
+      let next: [number, Vec3] | undefined
+      for (const entry of left) {
+        if (next === undefined || distance(entry[1], last) < distance(next[1], last)) next = entry
+      }
+      if (next === undefined) return order
+      order.push(next[0])
+      left.delete(next[0])
+      last = next[1]
+    }
+  }
+  // walking from anywhere ends at an end; walking back from there covers the path end to end
+  const end = walk(root, start).at(-1) ?? root
+  const path = walk(end, points[end] ?? start)
+  const [first = root, last = root] = [path[0], path.at(-1)]
+  if (first === root) return path
+  if (last === root) return path.toReversed()
+  const near = (i: number) => distance(points[i] ?? start, start)
+  return near(first) <= near(last) ? path : path.toReversed()
 }
 
 /** The units a selection makes up, and how they relate. */
@@ -132,6 +177,8 @@ export interface SelectionUnits {
    * it (§ Chains).
    */
   readonly chain?: ReadonlyArray<Unit>
+  /** The entered chain's growth, when it has one. */
+  readonly growth?: ChainGrowth
 }
 
 /** The selection as units; undefined when nothing selected can be read. `activeKey` is the last selected item. */
@@ -153,9 +200,8 @@ export const selectionUnitsOf = (
     const unit = units.find((u) => u.id === idOf(child))
     return unit ?? unitOf(child, ctx) ?? []
   })
-  return chain.some((link) => selected.has(link.id))
-    ? { units, active, activeItem, chain }
-    : { units, active, activeItem }
+  if (!chain.some((link) => selected.has(link.id))) return { units, active, activeItem }
+  return { units, active, activeItem, chain, ...(entered.growth !== undefined && { growth: entered.growth }) }
 }
 
 /** The items an edit of the selection can reach: its own, and inside an entered chain the links a selected one carries. */
@@ -174,9 +220,18 @@ export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit =>
     ? selection.active
     : selection.activeItem
 
-/** The effective mode: Each needs two or more units, else a selection is Together whatever the setting holds. */
+/**
+ * The effective mode: Each needs two or more units, or one chain of two or more links, which bends; else a selection is
+ * Together whatever the setting holds.
+ */
 export const effectivePivotMode = (mode: PivotMode, selection: SelectionUnits | undefined): PivotMode =>
-  mode === "each" && selection !== undefined && selection.units.length >= 2 ? "each" : "together"
+  mode === "each" && selection !== undefined && canEach(selection) ? "each" : "together"
+
+/** Whether Each does anything to `selection`: two or more units, or a chain alone that can bend. */
+export const canEach = (selection: SelectionUnits): boolean => {
+  const [first, second] = selection.units
+  return second !== undefined || (first?.links?.length ?? 0) >= 2
+}
 
 /**
  * What an edit does to the items of one unit: a function of the unit (its pivot and axes) that maps each item's
@@ -232,38 +287,72 @@ const applyTo = (
   }
 }
 
+/** How far link `i` turns when a chain bends, as a share of the first bending link's turn (`ChainGrowth`). */
+export const growthOf = (growth: ChainGrowth | undefined, i: number): number => {
+  if (growth === undefined) return 1
+  return growth.curve === "linear" ? 1 + i * growth.percent / 100 : Math.max(0, 1 + growth.percent / 100) ** i
+}
+
 /**
- * The pass down a chain (docs/design/pivot-modes-and-chains.md § Chains): each link is carried by the motion the links
- * before it made, then, if `selected`, takes the edit about its own moved pivot. A turn accumulates, so link k of a
- * chain turned θ ends up turned kθ. A move carries the links after the moved one by the same offset, once. A scale
- * stays with its link: it never reaches the next, so nothing shears.
+ * A chain bending by `q`, the turn its first link takes (docs/design/pivot-modes-and-chains.md § Chains). The turn is
+ * read in that link's own axes, and every link takes it in its own axes as the links before it left them, grown by
+ * `growth`, about its own moved pivot. So a turn accumulates down the chain, every joint of a curve takes the same turn
+ * whichever axes the gizmo showed, and a second bend of a curved chain winds it into a helix instead of kinking it.
+ */
+const bend = (
+  out: Map<string, UeTransform>,
+  links: ReadonlyArray<Unit>,
+  q: Quat4,
+  transforms: ReadonlyMap<string, UeTransform>,
+  growth: ChainGrowth | undefined
+) => {
+  const [head] = links
+  if (head === undefined) return
+  const axes = head.transform.rotation
+  const local = quatMul(quatMul(quatConjugate(axes), q), axes)
+  let carried = IDENTITY
+  links.forEach((link, i) => {
+    const moved = rigidUnit(carried, link)
+    const frame = moved.transform.rotation
+    const own = quatNormalize(quatMul(quatMul(frame, quatPow(local, growthOf(growth, i))), quatConjugate(frame)))
+    const motion = compose({ q: own, t: vecSub(moved.pivot, rotateVec(own, moved.pivot)) }, carried)
+    applyTo(out, link.keys, transforms, (t) => rigidTransform(motion, t))
+    carried = motion
+  })
+}
+
+/**
+ * The pass down a chain in Each. A turn bends it from the first selected link to its end, selected or not (`bend`). A
+ * move carries the links after the moved one by the same offset, once. A scale stays with its link: it never reaches
+ * the next, so nothing shears.
  */
 const chainPass = (
   out: Map<string, UeTransform>,
   links: ReadonlyArray<Unit>,
   selected: (link: Unit) => boolean,
   transforms: ReadonlyMap<string, UeTransform>,
-  edit: UnitEdit
+  edit: UnitEdit,
+  growth: ChainGrowth | undefined
 ) => {
+  const from = links.findIndex(selected)
+  const head = links[from]
+  if (head === undefined) return
+  const turn = motionOf(edit(head), head.pivot)
+  if (turn !== undefined && turn !== "move") {
+    bend(out, links.slice(from), turn.q, transforms, growth)
+    return
+  }
   let carried = IDENTITY
-  for (const link of links) {
-    const moved = rigidUnit(carried, link)
+  for (const link of links.slice(from)) {
     if (!selected(link)) {
       if (!isIdentity(carried)) applyTo(out, link.keys, transforms, (t) => rigidTransform(carried, t))
       continue
     }
-    const own = edit(moved)
-    const motion = motionOf(own, moved.pivot)
-    if (motion === "move") {
-      // a move is the link's own, not on top of what an earlier moved link passed down
-      const first = edit(link)
-      applyTo(out, link.keys, transforms, first)
-      const probe = first(identityTransform(link.pivot))
-      carried = { q: IDENTITY.q, t: vecSub(probe.translation, link.pivot) }
-      continue
-    }
-    applyTo(out, link.keys, transforms, (t) => own(rigidTransform(carried, t)))
-    if (motion !== undefined) carried = compose(motion, carried)
+    const own = edit(link)
+    applyTo(out, link.keys, transforms, own)
+    // a move is the link's own, not on top of what an earlier moved link passed down
+    const probe = own(identityTransform(link.pivot))
+    if (!sameVec(probe.translation, link.pivot)) carried = { q: IDENTITY.q, t: vecSub(probe.translation, link.pivot) }
   }
 }
 
@@ -292,11 +381,11 @@ export const applyUnitEdit = (
     return out
   }
   if (chain !== undefined) {
-    chainPass(out, chain, (link) => selected.has(link.id), transforms, edit)
+    chainPass(out, chain, (link) => selected.has(link.id), transforms, edit, selection.growth)
     return out
   }
   for (const unit of units) {
-    if (unit.links !== undefined) chainPass(out, unit.links, () => true, transforms, edit)
+    if (unit.links !== undefined) chainPass(out, unit.links, () => true, transforms, edit, unit.growth)
     else applyTo(out, unit.keys, transforms, edit(unit))
   }
   return out

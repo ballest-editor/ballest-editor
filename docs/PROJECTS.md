@@ -49,7 +49,14 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
     },
     "tree": [
       { "kind": "item", "key": "<key>" },
-      { "kind": "group", "id": "<id>", "name": "Bridge", "tags": [], "children": [] },
+      {
+        "kind": "group",
+        "id": "<id>",
+        "name": "Bridge",
+        "tags": [],
+        "children": [],
+        "pivot": { "choice": "Top" }
+      },
       {
         "kind": "group",
         "id": "<id>",
@@ -64,8 +71,8 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
         "name": "Finger",
         "tags": [],
         "children": [],
-        "pivot": { "choice": "Top" },
-        "chain": true
+        "chain": true,
+        "growth": { "curve": "linear", "percent": 25 }
       }
     ]
   }
@@ -75,7 +82,7 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
   - `items` has an entry per item. `index` is its place in `map.items`. `fingerprint` is its class and transform, rounded to 0.01 cm and four places for rotation and scale, with a quaternion and its negative written alike. `name` and `tags` are optional, and tags are free strings. Groups have tags too.
   - `tree` holds every item in exactly one place, and groups nest to any depth. A group left empty by an edit goes with it, as the game's do.
   - `prefab` makes a group an instance of a prefab ([DESKTOP.md § Prefabs](DESKTOP.md#prefabs)). `tier` and `name` say which, and `hash` is the SHA-256 of its file when the instance was placed or last updated. `items` has a signature per item the definition held then, in its frame and document order: class, transform and a digest of the rest (`signatureOf`, `domain/prefabInstance.ts`). It is what tells an unedited instance once the file has moved on. Copying an instance copies its link.
-  - `pivot` is where a group turns and scales, and where its gizmo sits, when that isn't the centre of its items' box ([DESKTOP.md § Group pivots](DESKTOP.md#group-pivots-and-chains)): `{ "choice": "Top" }` or another face (`Bottom`, `Left`, `Right`, `Back`, `Front`), `{ "choice": "item", "key": "<key>" }` for one member's own pivot, or `{ "choice": "point", "world": { "x", "y", "z" } }` for a point frozen in the world. Absent for the centre. `chain: true` makes the group a chain: its children, in this order, are its links. Save writes the pivot as the game group's `frame`, and a map with no sidecar whose frame sits off the centre comes in with a `point` pivot there ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)).
+  - `pivot` is where a group turns and scales, and where its gizmo sits, when that isn't the centre of its items' box ([DESKTOP.md § Group pivots](DESKTOP.md#group-pivots-and-chains)): `{ "choice": "Top" }` or another face (`Bottom`, `Left`, `Right`, `Back`, `Front`), `{ "choice": "item", "key": "<key>" }` for one member's own pivot, or `{ "choice": "point", "world": { "x", "y", "z" } }` for a point frozen in the world. Absent for the centre. `chain: true` makes the group a chain: its children, in this order, are its links, and a chain has no `pivot`. `growth` is how much more each link turns than the one before when the chain bends: `curve` `linear` adds `percent` of the first link's turn per link, `compound` multiplies by `1 + percent / 100` per link; absent, every link turns alike. Save writes the pivot as the game group's `frame`, and a map with no sidecar whose frame sits off the centre comes in with a `point` pivot there ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)).
   - **Loading** (`loadStructure`, `domain/sidecar.ts`). A `mapHash` equal to the `.balledit`'s hash means `index` is right. Otherwise something rewrote the file, and each entry looks for its item by fingerprint: the same class and transform first, in document order, then the same class and the nearest transform within 1 cm and 0.01 on any rotation or scale component. Items left over get fresh keys and join the root. Entries left over are dropped, and their count is reported (`sidecarUnmatched`). The re-matched sidecar is written back at once, so the loss is reported once and the old file goes to the backups. A hash that matches but indices that can't be right (past the items, or two on one item) re-match the same way.
   - A map with no sidecar loads with fresh keys, a flat tree, and one tree group per game group ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). It gets a sidecar on its first Save. A sidecar that doesn't decode leaves the map on its own and says so (`sidecarUnreadable`); the next Save replaces the file, and the old one goes to the backups.
   - **Saving** writes the `.balledit`, then the sidecar with the `.balledit`'s new hash, each atomically. A crash between the two leaves a sidecar that re-matches on the next open.
