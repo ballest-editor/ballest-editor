@@ -35,8 +35,12 @@ function TagsField({ id, owner, tags }: {
   )
 }
 
-/** How many items a group holds and how much room they take, as shown (live during a drag). */
+/**
+ * What kind of group it is, how many items it holds and how much room they take, as shown (live during a drag): the
+ * kind of thing in grey under its name, as a piece's category is.
+ */
 function groupSummaryOf(
+  group: GroupNode,
   items: ReadonlyArray<Item>,
   transforms: ReadonlyArray<UeTransform>,
   catalogIndex: CatalogIndex | null
@@ -48,8 +52,9 @@ function groupSummaryOf(
     }),
     catalogIndex
   )
-  const count = itemCountOf(items.length)
-  return box === undefined ? count : `${count} · ${formatBoxSize(box)}`
+  const kind = group.prefab !== undefined ? "Instance" : group.chain === true ? "Chain" : "Group"
+  const count = group.chain === true ? counted(group.children.length, "link") : itemCountOf(items.length)
+  return [kind, count, ...(box === undefined ? [] : [formatBoxSize(box)])].join(" · ")
 }
 
 /** A group's glyph on its identity's tile, as its Outline row draws it. */
@@ -77,7 +82,12 @@ export function GroupIdentity({ group, items, transforms, actions }: {
 }) {
   const renameGroup = useEditor((s) => s.renameGroup)
   const catalogIndex = useEditor((s) => s.catalogIndex)
-  const summary = useMemo(() => groupSummaryOf(items, transforms, catalogIndex), [items, transforms, catalogIndex])
+  const summary = useMemo(() => groupSummaryOf(group, items, transforms, catalogIndex), [
+    group,
+    items,
+    transforms,
+    catalogIndex
+  ])
   return (
     <IdentityBlock>
       <Identity
@@ -359,6 +369,9 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-body-strong" title={link.name}>{link.name}</span>
         <span className="text-body text-fg-tertiary">{instanceStatusOf(found, current, unmodified)}</span>
+        <span className="text-caption text-fg-tertiary">
+          Its paint and properties below edit its items, so an edit there leaves it no longer following its definition.
+        </span>
       </div>
       <div className="flex flex-wrap gap-1">
         <Button

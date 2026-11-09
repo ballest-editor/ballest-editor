@@ -77,11 +77,76 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
   )
 }
 
-/** A fixed pivot still has an editable world position, which moves the selection. */
-function FixedPivotSection({ point, reason }: { readonly point: Vec3 | undefined; readonly reason: string }) {
+/**
+ * The pivot's choices as one segmented control, the same for a piece (four to a row) and a group (three). `inUse` tints
+ * the choices a mixed selection holds, short of pressed; `disabled` greys the lot where none can be set here.
+ */
+function PivotChoices<C extends string>(
+  { label, choices, columns, value, inUse, isOff, disabled = false, labelOf, onPick }: {
+    readonly label: string
+    readonly choices: ReadonlyArray<C>
+    readonly columns: 3 | 4
+    readonly value: ReadonlyArray<C>
+    readonly inUse?: ReadonlySet<string>
+    readonly isOff?: (choice: C) => boolean
+    readonly disabled?: boolean
+    readonly labelOf?: (choice: C) => string
+    readonly onPick: (choice: C) => void
+  }
+) {
   return (
-    <Section id="pivot" title="Pivot" className="gap-1.5">
-      <p className="text-body text-fg-tertiary">{reason}</p>
+    <ToggleGroup
+      aria-label={label}
+      value={[...value]}
+      disabled={disabled}
+      onValueChange={(picked) => {
+        const next = choices.find((c) => picked.includes(c))
+        if (next !== undefined) onPick(next)
+      }}
+      className={cn("grid w-full", columns === 4 ? "grid-cols-4" : "grid-cols-3")}
+    >
+      {choices.map((choice) => (
+        <ToggleGroupItem
+          key={choice}
+          value={choice}
+          disabled={disabled || (isOff?.(choice) ?? false)}
+          data-in-use={inUse?.has(choice) === true ? "" : undefined}
+          className={cn("min-w-0 px-1", IN_USE_CLASSES)}
+        >
+          {labelOf?.(choice) ?? choice}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  )
+}
+
+const PIECE_PIVOT_HINT = "Where the piece turns and scales, and where the gizmo sits in the game."
+const GROUP_PIVOT_HINT =
+  "Where the group turns and scales, and where the gizmo sits in the game. Set here freezes it where it is now, so a turn no longer moves it."
+
+/**
+ * A pivot nothing here can set: the choices stay where they always are, greyed, with why under them, and the pivot's
+ * world position still moves the selection.
+ */
+function FixedPivotSection({ choices, columns, hint, point, reason }: {
+  readonly choices: ReadonlyArray<string>
+  readonly columns: 3 | 4
+  readonly hint: string
+  readonly point: Vec3 | undefined
+  readonly reason: string
+}) {
+  return (
+    <Section id="pivot" title="Pivot" actions={<InfoHint>{hint}</InfoHint>} className="gap-1.5">
+      <PivotChoices
+        label="Pivot"
+        choices={choices}
+        columns={columns}
+        value={[]}
+        disabled
+        labelOf={groupChoiceLabel}
+        onPick={() => undefined}
+      />
+      <p className="text-caption text-fg-tertiary">{reason}</p>
       {point !== undefined && <PivotPosition point={point} />}
     </Section>
   )
@@ -90,6 +155,8 @@ function FixedPivotSection({ point, reason }: { readonly point: Vec3 | undefined
 /** A group's pivot choices, in the order of a piece's: the centre of its items' box, a face of it, a member, a frozen point. */
 const GROUP_CHOICES = ["Center", ...GROUP_PIVOT_FACES, "Item", "Point"] as const
 type GroupChoice = (typeof GROUP_CHOICES)[number]
+
+const groupChoiceLabel = (choice: string) => choice === "Point" ? "Set here" : choice
 
 const groupChoiceOf = (pivot: GroupPivot | undefined): GroupChoice =>
   pivot === undefined ? "Center" : pivot.choice === "item" ? "Item" : pivot.choice === "point" ? "Point" : pivot.choice
@@ -127,6 +194,9 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
   if (group.prefab !== undefined || group.chain === true) {
     return (
       <FixedPivotSection
+        choices={GROUP_CHOICES}
+        columns={3}
+        hint={GROUP_PIVOT_HINT}
         point={point}
         reason={group.prefab !== undefined
           ? "An instance pivots on its definition's origin, so it stays a placement of its prefab."
@@ -138,29 +208,19 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
     <Section
       id="pivot"
       title="Pivot"
-      actions={
-        <InfoHint>
-          Where the group turns and scales, and where the gizmo sits in the game. Point freezes it where it is now, so a
-          turn no longer moves it.
-        </InfoHint>
-      }
+      actions={<InfoHint>{GROUP_PIVOT_HINT}</InfoHint>}
       className="gap-1.5"
     >
-      <ToggleGroup
-        aria-label="Group pivot"
+      <PivotChoices
+        label="Group pivot"
+        choices={GROUP_CHOICES}
+        columns={3}
         value={[choice]}
-        onValueChange={(value) => {
-          const next = GROUP_CHOICES.find((c) => value.includes(c))
-          if (next !== undefined && (next !== choice || next === "Point")) pick(next)
+        labelOf={groupChoiceLabel}
+        onPick={(next) => {
+          if (next !== choice || next === "Point") pick(next)
         }}
-        className="grid w-full grid-cols-3"
-      >
-        {GROUP_CHOICES.map((c) => (
-          <ToggleGroupItem key={c} value={c} className="min-w-0 px-1">
-            {c === "Point" ? "Set here" : c}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      />
       {group.pivot?.choice === "item" && (
         <Select
           value={group.pivot.key}
@@ -209,8 +269,11 @@ export function PivotSection() {
   if (!canSet) {
     return (
       <FixedPivotSection
+        choices={PIVOT_CHOICES}
+        columns={4}
+        hint={PIECE_PIVOT_HINT}
         point={point}
-        reason="Enter a group to change its members' pivot presets. Position moves the selection's gizmo pivot."
+        reason="A group is selected with these pieces: enter it to set its members' pivots, or select it alone for its own."
       />
     )
   }
@@ -219,37 +282,28 @@ export function PivotSection() {
     <Section
       id="pivot"
       title="Pivot"
-      actions={mixed || !allBounded
-        ? (
-          <>
-            {mixed && <span className="text-caption text-fg-tertiary">Mixed</span>}
-            {!allBounded && <InfoHint>This piece's bounds are unknown, so only Default is available.</InfoHint>}
-          </>
-        )
-        : undefined}
+      actions={
+        <>
+          {mixed && <span className="text-caption text-fg-tertiary">Mixed</span>}
+          <InfoHint>
+            {allBounded
+              ? PIECE_PIVOT_HINT
+              : `${PIECE_PIVOT_HINT} This piece's bounds are unknown, so only Default is available.`}
+          </InfoHint>
+        </>
+      }
       className="gap-1.5"
     >
-      <ToggleGroup
-        aria-label="Pivot"
-        value={mixed ? [] : choices.slice(0, 1)}
-        onValueChange={(value) => {
-          const next = PIVOT_CHOICES.find((c) => value.includes(c))
-          if (next !== undefined) setSelectionPivot(next) // clicking the pressed choice keeps it
-        }}
-        className="grid w-full grid-cols-4"
-      >
-        {PIVOT_CHOICES.map((choice) => (
-          <ToggleGroupItem
-            key={choice}
-            value={choice}
-            disabled={choice !== "Default" && !allBounded}
-            data-in-use={mixed && used.has(choice) ? "" : undefined}
-            className={cn("min-w-0 px-1", IN_USE_CLASSES)}
-          >
-            {choice}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <PivotChoices
+        label="Pivot"
+        choices={PIVOT_CHOICES}
+        columns={4}
+        value={mixed ? [] : PIVOT_CHOICES.filter((c) => c === choices[0])}
+        {...(mixed && { inUse: used })}
+        isOff={(choice) => choice !== "Default" && !allBounded}
+        // clicking the pressed choice keeps it
+        onPick={setSelectionPivot}
+      />
       {point !== undefined && <PivotPosition point={point} />}
     </Section>
   )

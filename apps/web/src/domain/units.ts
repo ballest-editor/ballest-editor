@@ -63,6 +63,11 @@ export interface Unit {
   readonly links?: ReadonlyArray<Unit>
   /** A chain's growth, when it has one. */
   readonly growth?: ChainGrowth
+  /**
+   * The item whose transform the unit takes as its own: an item itself, the member a group pivots on, a chain's first
+   * link's. None for a group's frame at its pivot, which is world-aligned and scale 1.
+   */
+  readonly anchor?: string
 }
 
 /** What a unit is made from: the tree and how to read each item as it stands (the document, or a live edit). */
@@ -106,7 +111,8 @@ const itemUnit = (key: string, ctx: UnitContext): Unit | undefined => {
     id: key,
     keys: [key],
     pivot: localToWorld(transform, ctx.localPivotOf(key)),
-    transform
+    transform,
+    anchor: key
   }
 }
 
@@ -115,10 +121,10 @@ const groupPivotOf = (
   keys: ReadonlyArray<string>,
   choice: GroupPivot | undefined,
   ctx: UnitContext
-): Pick<Unit, "pivot" | "transform"> | undefined => {
+): Pick<Unit, "pivot" | "transform" | "anchor"> | undefined => {
   if (choice?.choice === "item") {
     const item = keys.includes(choice.key) ? itemUnit(choice.key, ctx) : undefined
-    if (item !== undefined) return { pivot: item.pivot, transform: item.transform }
+    if (item !== undefined) return { pivot: item.pivot, transform: item.transform, anchor: choice.key }
   }
   if (choice?.choice === "point") {
     const world = ctx.livePointOf(keys, choice.world)
@@ -147,7 +153,8 @@ export const unitOf = (node: TreeNode, ctx: UnitContext): Unit | undefined => {
       pivot: root.pivot,
       transform: root.transform,
       links,
-      ...(node.growth !== undefined && { growth: node.growth })
+      ...(node.growth !== undefined && { growth: node.growth }),
+      ...(root.anchor !== undefined && { anchor: root.anchor })
     }
   }
   const placed = groupPivotOf(keys, node.pivot, ctx)

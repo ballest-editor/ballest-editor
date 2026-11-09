@@ -236,3 +236,19 @@ export const canSetItemPivots = (
   const nodes = selectedNodes(tree, selectedIds, enteredGroupId)
   return nodes.length > 0 && nodes.every((node) => node.kind === "item")
 }
+
+/**
+ * A selection counted by what it's made of, when that holds a group among other things: "1 group and 2 items", as the
+ * gizmo takes them. Undefined when every unit is an item, where a count of items already says it.
+ */
+export const unitSummaryOf = (
+  tree: ReadonlyArray<TreeNode>,
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
+): string | undefined => {
+  const nodes = selectedNodes(tree, selectedIds, enteredGroupId)
+  const groups = nodes.filter((node) => node.kind === "group").length
+  const items = nodes.length - groups
+  if (groups === 0 || nodes.length < 2) return undefined
+  return items === 0 ? counted(groups, "group") : `${counted(groups, "group")} and ${counted(items, "item")}`
+}

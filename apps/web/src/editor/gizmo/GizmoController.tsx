@@ -2,10 +2,8 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector, ueToScene, type UeTransform, type Vec3 } from "../../domain/coords"
-import { isDecal } from "../../domain/editTransform"
 import { selectedGroupIds } from "../../domain/groupSelection"
 import type { GroupDelta } from "../../domain/groupTransform"
-import { extentOf } from "../../domain/itemBounds"
 import { gizmoScaleOf } from "../../domain/Settings"
 import { scaleSnapStep, type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
 import { type ScaleStop, snappedScale, turnLanding, turnReach, type TurnStop } from "../../domain/snapRotate"
@@ -45,7 +43,7 @@ import { type DragTarget, dragTargetOf, selectionSnapStart } from "../snap/selec
 import { ownSnapItemsOf, snapItemsOf } from "../snap/snapScene"
 import { gameRayOf, snapViewOf, toThree } from "../snap/snapView"
 import { allTurnStopsOf, reachAlong, scaleStopsOf, turnStopsFrom } from "../snap/turnScale"
-import { fitTransforms, selectionUnits, shownGizmoSpace, snapConfigOf, useEditor } from "../store"
+import { fitTransforms, selectionUnits, shownGizmoSpace, snapConfigOf, unitExtentOf, useEditor } from "../store"
 import { useDarkTheme } from "../theme"
 import {
   constraintOf,
@@ -327,12 +325,7 @@ export function GizmoController() {
         ? snapItemsOf(s, new Set(target.transforms.keys()), config.targets.mesh.sharpAngle)
         : []
       const unit = pivotUnitOf(target.selection, pivotMode)
-      const item = s.doc.map.items[s.doc.ids.indexOf(unit.id)]
-      const extent = item === undefined
-        ? undefined
-        : isDecal(item)
-        ? { x: 1, y: 1, z: 1 }
-        : extentOf(item, s.catalogIndex)
+      const extent = unitExtentOf(s, unit)
       // a caret scales two axes by one factor, measured on the first of them
       const scaleKey = spec.kind === "scalePlane" && spec.axis !== undefined ? pairOf(spec.axis)[0] : spec.axis ?? "x"
       drag.current = {

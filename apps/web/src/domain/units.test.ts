@@ -751,3 +751,19 @@ describe("pivot dots and Point pivots", () => {
     assert.deepStrictEqual(identityTransform().rotation, { x: 0, y: 0, z: 0, w: 1 })
   })
 })
+
+describe("a unit's anchor", () => {
+  const transforms = new Map([["a", at(0)], ["b", at(2000, 0, 0, 30)], ["c", at(4000)]])
+  const anchorOf = (node: TreeNode) => unitOf(node, contextOf([node], transforms))?.anchor
+
+  it("is the item whose transform the unit takes: itself, the member a group pivots on, a chain's first link", () => {
+    assert.strictEqual(anchorOf(item("a")), "a")
+    assert.strictEqual(anchorOf(group("g", [item("a"), item("b")], { pivot: { choice: "item", key: "b" } })), "b")
+    assert.strictEqual(anchorOf(group("ch", [item("c"), item("a")], { chain: true })), "c")
+  })
+
+  it("is none for a group's own frame, at its pivot", () => {
+    assert.isUndefined(anchorOf(group("g", [item("a"), item("b")])))
+    assert.isUndefined(anchorOf(group("g", [item("a"), item("b")], { pivot: { choice: "Top" } })))
+  })
+})

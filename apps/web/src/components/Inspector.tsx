@@ -28,7 +28,7 @@ import type { UeTransform, Vec3 } from "../domain/coords"
 import { creatorChipText, mapCreatorLabel } from "../domain/creator"
 import { editTransform, isDecal } from "../domain/editTransform"
 import { mapLabelOf } from "../domain/factory"
-import { counted, soleGroupOf } from "../domain/groupSelection"
+import { counted, groupTrail, selectedNodes, soleGroupOf, unitSummaryOf } from "../domain/groupSelection"
 import { type Axis, readField, type TransformField } from "../domain/groupTransform"
 import { extentOf, sizeAt } from "../domain/itemBounds"
 import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
@@ -36,7 +36,7 @@ import { formatBindings, type KeybindAction, keybindActionLabels } from "../doma
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
 import { assetNameOf } from "../domain/Materials"
 import { scaleSnapStep, snapsGrid, snapsRotation } from "../domain/snapConfig"
-import { pieceNameOf } from "../domain/structure"
+import { idOf, pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
 import { pivotModeFor, pivotUnitOf } from "../domain/units"
 import type { MapValidation } from "../domain/validateMap"
@@ -53,12 +53,14 @@ import {
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import {
+  type EditorState,
   noTabOpen,
   selectedIndices,
   selectionPivot,
   shownTransform,
   shownValidation,
   snapConfigOf,
+  unitExtentOf,
   useCreator,
   useEditor,
   useOpenPrefab
@@ -361,14 +363,18 @@ const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<T
     field: "translation",
     label: "Location",
     unit: units,
-    help: `The piece's origin, as the map stores it, in ${units === "m" ? "meters" : "centimeters"}, Z up`,
+    help: of === "item"
+      ? `The piece's origin, as the map stores it, in ${units === "m" ? "meters" : "centimeters"}, Z up`
+      : `Where the group is: its pivot, or the origin of the member it pivots on, in ${
+        units === "m" ? "meters" : "centimeters"
+      }, Z up. A change moves the whole group`,
     axisLabels: AXIS_LABELS,
     step: units === "m" ? 0.01 : 1,
     digits: units === "m" ? 3 : 1,
     grid: units === "m" ? 100 : 1
   }
   return [
-    ...(of === "item" ? [location] : []),
+    location,
     {
       field: "rotation",
       label: "Rotation",
@@ -410,11 +416,13 @@ const DECAL_SIZE_ROW: TransformRowSpec = {
  * The Scale row as a size: the piece's bounds along its own axes at its scale (domain/itemBounds), in display units. A
  * change scales the selection as the factor row does, by the ratio it makes of the active item's size.
  */
-const sizeRow = (units: "cm" | "m"): TransformRowSpec => ({
+const sizeRow = (units: "cm" | "m", of: "item" | "group"): TransformRowSpec => ({
   field: "scale3D",
   label: "Size",
   unit: units,
-  help: "The piece's size along its own axes. A change scales it",
+  help: of === "item"
+    ? "The piece's size along its own axes. A change scales it"
+    : "The box around the group's items, or the size of the member it pivots on. A change scales the group",
   axisLabels: AXIS_LABELS,
   step: units === "m" ? 0.01 : 1,
   digits: units === "m" ? 3 : 1,
@@ -448,7 +456,12 @@ function ScaleModeItem({ value, label, disabled = false, children }: {
 }
 
 /** Whether the Scale row shows a factor or a size, kept in settings; Size needs the active piece's bounds. */
-function ScaleModeToggle({ units, sizeKnown }: { readonly units: "cm" | "m"; readonly sizeKnown: boolean }) {
+function ScaleModeToggle({ units, sizeKnown, unknown }: {
+  readonly units: "cm" | "m"
+  readonly sizeKnown: boolean
+  /** Why there's no size to show, on the disabled Size choice. */
+  readonly unknown: string
+}) {
   const mode = useEditor((s) => s.settings.panels.inspectorScale)
   return (
     <ToggleGroup
@@ -465,7 +478,7 @@ function ScaleModeToggle({ units, sizeKnown }: { readonly units: "cm" | "m"; rea
       </ScaleModeItem>
       <ScaleModeItem
         value="size"
-        label={sizeKnown ? `Size in ${units}` : "This piece's size isn't known"}
+        label={sizeKnown ? `Size in ${units}` : unknown}
         disabled={!sizeKnown}
       >
         <IconRuler2 />
@@ -643,6 +656,16 @@ function MeshWarning({ item }: { readonly item: Item }) {
   )
 }
 
+/** Which link a lone selected link of an entered chain is, "Link 2 of 5", since everything a chain does counts from 1. */
+const linkOf = (s: EditorState): string | undefined => {
+  const chain = groupTrail(s.doc.structure.tree, s.enteredGroupId).at(-1)
+  if (chain?.chain !== true) return undefined
+  const [only, second] = selectedNodes(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
+  if (only === undefined || second !== undefined) return undefined
+  const index = chain.children.findIndex((child) => idOf(child) === idOf(only))
+  return index < 0 ? undefined : `Link ${index + 1} of ${chain.children.length}`
+}
+
 const PLAYER_START_HINT =
   "A map has exactly one player start. Copy, Cut and Duplicate leave it out, and if you delete it, Save and Export refuse the map until Undo brings it back."
 
@@ -658,6 +681,9 @@ function SelectionIdentity(
   const ownName = useEditor((s) => itemKey === undefined ? undefined : s.doc.structure.items.get(itemKey)?.name)
   const only = items.length === 1 ? items[0] : undefined
   const kinds = new Set(items.map((item) => item.actorToSpawn)).size
+  // a group among pieces moves as one, so say so: the gizmo takes it as one unit
+  const units = useEditor((s) => unitSummaryOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId))
+  const link = useEditor(linkOf)
   const identity = only === undefined || itemKey === undefined
     ? (
       <Identity
@@ -667,7 +693,7 @@ function SelectionIdentity(
           </span>
         }
         title={<IdentityName>{`${items.length} items`}</IdentityName>}
-        subtitle={kinds === 1 ? "All one piece" : `${kinds} kinds of piece`}
+        subtitle={units ?? (kinds === 1 ? "All one piece" : `${kinds} kinds of piece`)}
         actions={<SelectionActions />}
       />
     )
@@ -684,7 +710,8 @@ function SelectionIdentity(
         }
         subtitle={[
           ownName === undefined ? undefined : pieceNameOf(only, catalogIndex),
-          catalogIndex?.pieceByClass.get(only.actorToSpawn)?.category || "Piece"
+          catalogIndex?.pieceByClass.get(only.actorToSpawn)?.category || "Piece",
+          link
         ].filter((part) => part !== undefined).join(" · ")}
         actions={<SelectionActions />}
       />
@@ -784,18 +811,19 @@ const sizeRowProps = (
 }
 
 /**
- * The Transform section: the selection's unit, edited as one thing. For items that is the active one with the rest
- * following; for a whole group it is the frame, with the group's items as `transforms` only to mark what differs.
+ * The Transform section: the selection's unit, edited as one thing, the same rows for a piece and a group. For items
+ * that is the active one with the rest following; for a whole group it is its frame, with the group's items as
+ * `transforms` only to mark what differs. `extent` is the unit's own size at scale 1 (`unitExtentOf`), which gives the
+ * Scale row its Size mode and a snapped scrub its grid.
  */
-function TransformSection({ of, unit, transforms, active, activeIndex = -1, items = NO_ITEMS, children }: {
+function TransformSection({ of, unit, transforms, active, extent, items = NO_ITEMS, children }: {
   readonly of: "item" | "group"
   readonly unit: UeTransform
   readonly transforms: ReadonlyArray<UeTransform>
-  /** Which of `items` is the unit, whose size a Scale row shows; the last when absent. */
-  readonly activeIndex?: number
   /** The active item's document transform, which a copy reads; a group's copy reads the unit as shown. */
   readonly active?: UeTransform | undefined
-  /** The selected items, in line with `transforms`, whose Scale row can show a size; none for a group. */
+  readonly extent: Vec3 | undefined
+  /** The selected items, in line with `transforms`, whose sizes mark a Size row Mixed; none for a group. */
   readonly items?: ReadonlyArray<Item>
   readonly children?: ReactNode
 }) {
@@ -804,10 +832,8 @@ function TransformSection({ of, unit, transforms, active, activeIndex = -1, item
   const scaleMode = useEditor((s) => s.settings.panels.inspectorScale)
   // Display units only; the map always stores centimetres (rotation and scale don't convert).
   const perUnit = units === "m" ? 100 : 1
-  // a decal's scale is its size already; a group's is a factor of nothing it holds
+  // a decal's scale is its size already
   const decals = items.length > 0 && items.every(isDecal)
-  const activeItem = decals ? undefined : items.at(activeIndex)
-  const extent = activeItem === undefined ? undefined : extentOf(activeItem, catalog)
   return (
     <Section id="transform" title="Transform" className="@container gap-2">
       {transformRows(units, of).map((row) => {
@@ -819,23 +845,40 @@ function TransformSection({ of, unit, transforms, active, activeIndex = -1, item
           // a piece's paste sets every item; a group's takes the group there, as typing the three values would
           onPaste: (value: Vec3) =>
             of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value),
-          extent: extent ?? (decals ? uniform(1) : undefined),
+          extent,
           perUnit: uniform(row.field === "translation" ? perUnit : 1)
         }
         if (row.field !== "scale3D") return <TransformRow key={row.field} {...props} />
         if (decals) return <TransformRow key={row.field} {...props} row={DECAL_SIZE_ROW} />
-        if (activeItem === undefined) return <TransformRow key={row.field} {...props} />
-        const mode = <ScaleModeToggle units={units} sizeKnown={extent !== undefined} />
+        const mode = (
+          <ScaleModeToggle
+            units={units}
+            sizeKnown={extent !== undefined}
+            unknown={of === "item"
+              ? "This piece's size isn't known"
+              : "A group's items scale along their own axes, so it has no one size. Pivot it on a member to size it by that member"}
+          />
+        )
         if (extent === undefined || scaleMode === "factor") {
           // the toggle says it's a factor
           return <TransformRow key={row.field} {...props} row={{ ...row, unit: "" }} mode={mode} />
         }
+        const size = sizeRowProps({ unit, active: active ?? unit, extent, items, transforms, catalog, perUnit })
         return (
           <TransformRow
             key={row.field}
             {...props}
-            {...sizeRowProps({ unit, active: active ?? unit, extent, items, transforms, catalog, perUnit })}
-            row={sizeRow(units)}
+            {...size}
+            // a group's pasted size scales it to that size, as typing the three values would
+            onPaste={of === "item"
+              ? size.onPaste
+              : (value: Vec3) =>
+                setSelectionUnitField("scale3D", {
+                  x: value.x / extent.x,
+                  y: value.y / extent.y,
+                  z: value.z / extent.z
+                })}
+            row={sizeRow(units, of)}
             mode={mode}
           />
         )
@@ -853,9 +896,11 @@ const EMPTY_AXES: ReadonlySet<Axis> = new Set()
  * Everything that edits the selection's items, all of them at once. A whole group's items get no Transform section:
  * the group has its own, over its frame.
  */
-function ItemEditor({ items, ids, transforms, placed, transform, unit, groupUnit, unitIndex }: {
+function ItemEditor({ items, ids, transforms, placed, transform, unit, extent, groupUnit, unitIndex }: {
   /** The gizmo's unit as shown, which the Transform rows edit: a piece, a whole group, or a chain's first link. */
   readonly unit: UeTransform | undefined
+  /** That unit's own size at scale 1 (`unitExtentOf`). */
+  readonly extent: Vec3 | undefined
   /** Whether that unit is a group among the selection rather than one of `items`. */
   readonly groupUnit: boolean
   /** The unit's index in `items`, -1 when it is a group. */
@@ -878,7 +923,7 @@ function ItemEditor({ items, ids, transforms, placed, transform, unit, groupUnit
             unit={unit ?? shownActive}
             transforms={transforms}
             active={groupUnit ? unit : editTransform(items[unitIndex] ?? active)}
-            activeIndex={unitIndex}
+            extent={extent}
             items={groupUnit ? NO_ITEMS : items}
           >
             <FlipSection items={placed} />
@@ -931,11 +976,16 @@ export function Inspector() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the target is built from, read inside
   }, [doc, preview, previewLanding, catalogIndex, pivotMode, chainMode, selectedIds, enteredGroupId])
   const frame = target?.unit
-  const unitKey = target === undefined
+  const unitNode = target === undefined
     ? undefined
-    : pivotUnitOf(target.selection, pivotModeFor({ pivotMode, chainMode }, target.selection)).id
+    : pivotUnitOf(target.selection, pivotModeFor({ pivotMode, chainMode }, target.selection))
+  const unitKey = unitNode?.id
   const groupUnit = unitKey !== undefined && !ids.includes(unitKey)
   const unitIndex = unitKey === undefined ? -1 : ids.indexOf(unitKey)
+  const extent = useMemo(() => {
+    if (unitNode === undefined) return undefined
+    return unitExtentOf(useEditor.getState(), unitNode)
+  }, [unitNode])
 
   const prefab = useOpenPrefab()
   const noTab = useEditor(noTabOpen)
@@ -977,6 +1027,7 @@ export function Inspector() {
       placed={placed}
       transform={group === undefined}
       unit={frame}
+      extent={extent}
       groupUnit={groupUnit}
       unitIndex={unitIndex}
     />
@@ -1007,24 +1058,13 @@ export function Inspector() {
               <ContentsSection items={items} />
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
               {frame !== undefined && (
-                <TransformSection of="group" unit={frame} transforms={transforms}>
+                <TransformSection of="group" unit={frame} transforms={transforms} extent={extent}>
                   <FlipSection items={placed} />
                 </TransformSection>
               )}
               <PivotSection />
               <ChainSection group={group} />
-              <Section
-                id="groupItems"
-                title={items.length === 1 ? "Edit its item" : `Edit all ${items.length} items`}
-                defaultOpen={false}
-              >
-                {group.prefab !== undefined && (
-                  <p className="text-body text-fg-tertiary">
-                    An edit in here changes the instance, so it no longer follows its definition.
-                  </p>
-                )}
-                <SectionStack>{editor}</SectionStack>
-              </Section>
+              {editor}
             </>
           )}
       </SectionStack>

@@ -14,7 +14,8 @@ import {
   selectableKeys,
   selectedGroupIds,
   selectionNodeIds,
-  selectionSummaryOf
+  selectionSummaryOf,
+  unitSummaryOf
 } from "./groupSelection"
 import type { TreeNode } from "./MapSidecar"
 
@@ -268,5 +269,13 @@ describe("item pivot eligibility", () => {
     assert.isFalse(canSetItemPivots(tree, ["e"], null))
     assert.isTrue(canSetItemPivots(tree, ["a", "b"], "inner"))
     assert.isTrue(canSetItemPivots(tree, ["e"], "only"))
+  })
+})
+
+describe("unitSummaryOf", () => {
+  it("counts groups and items when a group is among other units, and says nothing otherwise", () => {
+    assert.isUndefined(unitSummaryOf(tree, ["d"], null))
+    assert.isUndefined(unitSummaryOf(tree, ["a", "b", "c"], null))
+    assert.strictEqual(unitSummaryOf(tree, ["a", "b", "c", "d"], null), "1 group and 1 item")
   })
 })

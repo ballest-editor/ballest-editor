@@ -36,7 +36,7 @@ import {
   type SlotMaterial,
   validateItem
 } from "../domain/edits"
-import { editTransform, fitEditTransform } from "../domain/editTransform"
+import { editTransform, fitEditTransform, isDecal } from "../domain/editTransform"
 import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
@@ -52,7 +52,7 @@ import {
   soleGroupOf
 } from "../domain/groupSelection"
 import { landedPoint, type RigidDelta } from "../domain/groupTransform"
-import { placedBoxOf } from "../domain/itemBounds"
+import { extentOf, placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import { jointsAfterMove } from "../domain/joints"
 import type { Keybinds } from "../domain/Keybinds"
@@ -174,6 +174,7 @@ import {
   reachableKeys,
   type SelectionUnits,
   selectionUnitsOf,
+  type Unit,
   type UnitContext,
   unitOf,
   withCarriedPoints
@@ -2427,15 +2428,26 @@ export const selectionPivot = (
 }
 
 /**
- * The point the selection turns and scales about, live, when that's a pivot away from the active item's origin: what the
- * game's Location field shows for one piece (docs/qa/gizmo-scale.md). A whole group's pivot, always.
+ * The point the selection turns and scales about, live, when it isn't where the Transform rows' Location already says:
+ * what the game's Location field shows for one piece (docs/qa/gizmo-scale.md). The rows edit the gizmo's unit, so this
+ * is the same rule for a piece, several, a group (whose Location is its pivot unless it pivots on a member) and a chain.
  */
 export const shownPivotPoint = (s: EditorState): Vec3 | undefined => {
   const target = selectionPivot(s, (id) => shownTransform(s, id))
   if (target === undefined) return undefined
-  // a whole group has no origin of its own, so its pivot is its one position and always shows
-  if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) return target.pivot
-  return s.selectedIds.length > 1 || !sameVec(target.pivot, target.active.translation) ? target.pivot : undefined
+  return sameVec(target.pivot, target.unit.translation) ? undefined : target.pivot
+}
+
+/**
+ * A unit's own size along its axes at scale 1 (cm): what the Scale row's Size mode shows and a size snap keeps on the
+ * grid. The extent of the item it takes its transform from (a decal's scale is its size already). A group's frame has
+ * none: its items scale along their own axes, so the box around turned items doesn't scale by the factor.
+ */
+export const unitExtentOf = (s: EditorState, unit: Unit): Vec3 | undefined => {
+  if (unit.anchor === undefined) return undefined
+  const item = s.doc.map.items[indexOfKey(s.doc.ids, unit.anchor)]
+  if (item === undefined) return undefined
+  return isDecal(item) ? { x: 1, y: 1, z: 1 } : extentOf(item, s.catalogIndex)
 }
 
 /** Edit transforms as the game would take them, so a drag stops at a decal's limits as it happens. */
