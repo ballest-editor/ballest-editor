@@ -7,6 +7,8 @@ import { defaultSnapConfig } from "./snapConfig"
 import {
   alignOffsets,
   angleBetweenFaces,
+  arrangeMarks,
+  arrangeOffsets,
   axisFromPoints,
   distributeOffsets,
   faceMeeting,
@@ -64,7 +66,7 @@ describe("alignOffsets and distributeOffsets", () => {
 
   it("spaces centres evenly, the outer two staying", () => {
     const boxes = [box(0, 100), box(100, 200), box(900, 1000)]
-    assert.deepStrictEqual(distributeOffsets(boxes, "x", "spacing").map(({ x }) => x), [0, 350, 0])
+    assert.deepStrictEqual(distributeOffsets(boxes, "x", "centres").map(({ x }) => x), [0, 350, 0])
   })
 
   it("makes the gaps equal, the outer two staying", () => {
@@ -74,6 +76,56 @@ describe("alignOffsets and distributeOffsets", () => {
 
   it("leaves two or fewer where they are", () => {
     assert.deepStrictEqual(distributeOffsets([box(0, 100), box(500, 600)], "x", "gaps").map(({ x }) => x), [0, 0])
+  })
+
+  it("sets every gap to a fixed spacing, counted out both ways from the box that stays", () => {
+    const boxes = [box(1000, 1200), box(300, 350), box(0, 100)]
+    const offsets = distributeOffsets(boxes, "x", "gaps", { spacing: 50, from: 1 })
+    assert.deepStrictEqual(offsets.map(({ x }) => x), [-600, 0, 150])
+  })
+
+  it("stacks them with a fixed gap of 0, two boxes as well as more", () => {
+    assert.deepStrictEqual(
+      distributeOffsets([box(0, 100), box(500, 600)], "x", "gaps", { spacing: 0, from: 0 }).map(({ x }) => x),
+      [0, -400]
+    )
+  })
+
+  it("sets every step between centres to a fixed spacing", () => {
+    const boxes = [box(0, 100), box(300, 350), box(1000, 1200)]
+    const offsets = distributeOffsets(boxes, "x", "centres", { spacing: 200, from: 1 })
+    assert.deepStrictEqual(offsets.map(({ x }) => x), [75, 0, -575])
+  })
+})
+
+describe("arrangeOffsets and arrangeMarks", () => {
+  const boxes = [box(0, 100), box(250, 300), box(700, 1000)]
+
+  it("lines the others up on the active box, or on the box around them all", () => {
+    const toActive = arrangeOffsets(boxes, { kind: "align", axis: "x", side: "max", to: "active" }, 1, undefined)
+    assert.deepStrictEqual(toActive.map(({ x }) => x), [200, 0, -700])
+    const toAll = arrangeOffsets(boxes, { kind: "align", axis: "x", side: "max", to: "bounds" }, 1, undefined)
+    assert.deepStrictEqual(toAll.map(({ x }) => x), [900, 700, 0])
+  })
+
+  it("marks each moving box's side, where it lands, and the active box's side on the plane they meet", () => {
+    const op = { kind: "align", axis: "x", side: "min", to: "active" } as const
+    const offsets = arrangeOffsets(boxes, op, 1, undefined)
+    const marks = arrangeMarks(boxes, offsets, op, 1)
+    assert.lengthOf(marks.landings, 2, "the active box doesn't move")
+    assert.deepStrictEqual(marks.faces.map(({ from }) => from.map(({ x }) => x)), [[0, 0, 0, 0], [700, 700, 700, 700]])
+    assert.deepStrictEqual(marks.faces.map(({ to }) => to[0]?.x), [250, 250])
+    assert.deepStrictEqual(marks.reference?.map(({ x }) => x), [250, 250, 250, 250])
+    assert.deepStrictEqual(marks.plane?.map(({ x }) => x), [250, 250, 250, 250])
+    assert.deepStrictEqual(marks.paths.map(({ from, to }) => [from.x, to.x]), [[0, 250], [700, 250]])
+  })
+
+  it("measures the gaps Distribute makes equal", () => {
+    const spread = [box(0, 100), box(150, 350), box(900, 1000)]
+    const op = { kind: "distribute", axis: "x", by: "gaps" } as const
+    const marks = arrangeMarks(spread, arrangeOffsets(spread, op, 0, undefined), op, 0)
+    assert.deepStrictEqual(marks.dimensions.map(({ cm }) => cm), [300, 300])
+    assert.isUndefined(marks.plane)
   })
 })
 

@@ -94,7 +94,7 @@ import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import type { SnapConfig, SnapTarget, SnapTransform } from "../domain/snapConfig"
 import type { SnapRelation, TrackedPoint } from "../domain/snapFrame"
-import { type FaceMeeting, mirroredPoint, type MirrorPlane } from "../domain/snapTools"
+import { type ArrangeOp, type FaceMeeting, mirroredPoint, type MirrorPlane } from "../domain/snapTools"
 import {
   annotationsOf,
   copyStructure,
@@ -674,6 +674,10 @@ export interface EditorState extends TabState {
   /** Flush and tangent's panel: which, and how far the faces stand apart in cm. */
   readonly flushMode: FaceMeeting
   readonly flushOffset: number
+  /** The Align or Distribute button under the pointer, which the panes preview; null with none. */
+  readonly arrangeHover: ArrangeOp | null
+  /** Distribute's spacing in cm, counted out from the active unit; null for Auto, where the two ends stay. */
+  readonly arrangeSpacing: number | null
   /** Multiplier on the fly speed, changed by speedFaster/speedSlower. */
   readonly cameraSpeed: number
   /** Bumped to frame the selection in the active pane. */
@@ -1289,6 +1293,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     hoveredItem: null,
     flushMode: "flush",
     flushOffset: 0,
+    arrangeHover: null,
+    arrangeSpacing: null,
     cameraSpeed: 1,
     focusRequest: 0,
     frameAllRequest: 0,

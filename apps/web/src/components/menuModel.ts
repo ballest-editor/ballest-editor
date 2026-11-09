@@ -392,11 +392,11 @@ const toolsMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
     SEPARATOR,
     {
       kind: "submenu",
-      title: "Align to first selected",
-      description: "Line the selection up on the item selected first.",
+      title: "Align to active",
+      description: "Line the selection up on the active item, the one the gizmo sits on.",
       reason: alignOff,
       children: axes.flatMap((axis) =>
-        sides.map(([side, word]) => item(`${axis.toUpperCase()} ${word}`, () => alignSelection(axis, side, "first")))
+        sides.map(([side, word]) => item(`${axis.toUpperCase()} ${word}`, () => alignSelection(axis, side, "active")))
       )
     },
     {
@@ -411,11 +411,11 @@ const toolsMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
     {
       kind: "submenu",
       title: "Distribute",
-      description: "Spread the selection evenly, the outer two staying.",
+      description: "Spread the selection evenly: the outer two stay, or with a fixed Spacing out from the active item.",
       reason: distributeOff,
       children: axes.flatMap((axis) => [
-        item(`${axis.toUpperCase()}: equal spacing`, () => distributeSelection(axis, "spacing")),
-        item(`${axis.toUpperCase()}: equal gaps`, () => distributeSelection(axis, "gaps"))
+        item(`${axis.toUpperCase()}: equal gaps`, () => distributeSelection(axis, "gaps")),
+        item(`${axis.toUpperCase()}: equal centres`, () => distributeSelection(axis, "centres"))
       ])
     },
     SEPARATOR,

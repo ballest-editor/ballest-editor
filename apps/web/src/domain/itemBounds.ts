@@ -3,10 +3,11 @@
  * § Groups): each item's local bounds (`pivotBoundsOf`), turned and scaled by its transform.
  */
 import type { CatalogIndex } from "./Catalog"
-import type { UeTransform, Vec3 } from "./coords"
+import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { editTransform } from "./editTransform"
 import type { Item } from "./MapFile"
 import { localToWorld, pivotBoundsOf } from "./pivot"
+import { quatConjugate, rotateVec } from "./ueMath"
 
 export interface Box {
   readonly min: Vec3
@@ -30,12 +31,19 @@ export interface PlacedItem {
 
 /**
  * The box around `placed`; undefined with none. A loop, not `Math.min(...corners)`: a group can hold more corners than a
- * call has room for arguments.
+ * call has room for arguments. With `frame`, the box is square to the frame's axes rather than the world's, and in its
+ * coordinates: turned back by `frame`, it is the world's box around them in those axes.
  */
-export const placedBoxOf = (placed: ReadonlyArray<PlacedItem>, catalog: CatalogIndex | null): Box | undefined => {
+export const placedBoxOf = (
+  placed: ReadonlyArray<PlacedItem>,
+  catalog: CatalogIndex | null,
+  frame?: Quat4
+): Box | undefined => {
+  const into = frame === undefined ? undefined : quatConjugate(frame)
   let box: Box | undefined
   for (const { item, transform } of placed) {
-    for (const { x, y, z } of cornersOf(item, transform, catalog)) {
+    for (const corner of cornersOf(item, transform, catalog)) {
+      const { x, y, z } = into === undefined ? corner : rotateVec(into, corner)
       const { max, min } = box ?? { min: { x, y, z }, max: { x, y, z } }
       box = {
         min: { x: Math.min(min.x, x), y: Math.min(min.y, y), z: Math.min(min.z, z) },
@@ -46,9 +54,9 @@ export const placedBoxOf = (placed: ReadonlyArray<PlacedItem>, catalog: CatalogI
   return box
 }
 
-/** The box around `items` where the document has them. */
-export const itemsBoxOf = (items: ReadonlyArray<Item>, catalog: CatalogIndex | null): Box | undefined =>
-  placedBoxOf(items.map((item) => ({ item, transform: editTransform(item) })), catalog)
+/** The box around `items` where the document has them, square to the world or to `frame` (`placedBoxOf`). */
+export const itemsBoxOf = (items: ReadonlyArray<Item>, catalog: CatalogIndex | null, frame?: Quat4): Box | undefined =>
+  placedBoxOf(items.map((item) => ({ item, transform: editTransform(item) })), catalog, frame)
 
 /** A box's size in metres, the way a group's card gives it: "12.4 × 3.1 × 2.0 m". */
 export const formatBoxSize = ({ max, min }: Box): string => {

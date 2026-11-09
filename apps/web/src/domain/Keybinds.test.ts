@@ -86,7 +86,11 @@ describe("keybind table", () => {
       ["enter group", ["Enter", "NumpadEnter"]], // editor only
       ["group", ["Ctrl+KeyG"]],
       ["make chain", ["Ctrl+Shift+KeyG"]], // editor only
-      ["ungroup", ["Shift+KeyG"]]
+      ["ungroup", ["Shift+KeyG"]],
+      ["align left", ["Ctrl+Shift+ArrowLeft"]], // editor only
+      ["align right", ["Ctrl+Shift+ArrowRight"]], // editor only
+      ["align up", ["Ctrl+Shift+ArrowUp"]], // editor only
+      ["align down", ["Ctrl+Shift+ArrowDown"]] // editor only
     ])
   })
 

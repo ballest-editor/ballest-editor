@@ -6,6 +6,7 @@ import { groupPathOf, soleGroupOf } from "../domain/groupSelection"
 import type { KeybindAction } from "../domain/Keybinds"
 import type { ViewProjection } from "../domain/viewLayout"
 import {
+  alignToScreen,
   closeActiveTab,
   cycleTab,
   deleteSelection,
@@ -61,6 +62,10 @@ export const actionCommands = {
   groupSelection: () => useEditor.getState().groupSelection(),
   chainSelection: () => useEditor.getState().chainSelection(),
   ungroupSelection: () => useEditor.getState().ungroupSelection(),
+  alignLeft: () => alignToScreen("left"),
+  alignRight: () => alignToScreen("right"),
+  alignUp: () => alignToScreen("up"),
+  alignDown: () => alignToScreen("down"),
   selectMode: () => useEditor.getState().setTool("select"),
   translateMode: () => useEditor.getState().setTool("translate"),
   rotateMode: () => useEditor.getState().setTool("rotate"),

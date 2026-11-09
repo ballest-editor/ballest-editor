@@ -1,18 +1,22 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
 import { indexCatalog } from "../../domain/Catalog"
 import { editTransform } from "../../domain/editTransform"
+import { itemsBoxOf } from "../../domain/itemBounds"
 import { MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "../../domain/mirror"
 import { defaultSettings } from "../../domain/Settings"
 import { defaultSnapConfig, SNAP_PRESETS, withTargetMoved } from "../../domain/snapConfig"
 import { defaultSnapPrefs } from "../../domain/snapPrefs"
 import { annotationsOf, findGroup } from "../../domain/structure"
-import { catalogWithEnds, endAlongX, grouped, loadPieces } from "../../test/snapFixtures"
+import { rotatorToQuat } from "../../domain/ueMath"
+import { catalogWithEnds, endAlongX, grouped, loadPieces, lookDown } from "../../test/snapFixtures"
+import { activePaneCamera } from "../paneCameras"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
 import {
   addWorldAxis,
   addWorldPlane,
   alignSelection,
   applyFlipOffer,
+  arrangePlanOf,
   distributeSelection,
   gridOriginToSelection,
   gridYawToSelection,
@@ -22,7 +26,9 @@ import {
   resetSnapDefaults,
   resetSnapToDefaults,
   saveSnapDefaults,
+  screenAlignOf,
   selectConnected,
+  setArrangeSpacing,
   setFlushOptions,
   setSnapTargets,
   snapDefaultsAreFactory,
@@ -41,10 +47,31 @@ import { saveSettings } from "./startup"
 
 const load = (xs: ReadonlyArray<number>) => loadPieces(xs.map((x) => ({ x, y: 0, z: 0 })))
 
-const xOf = (key: string) => {
+/** Where the item `key` stands along `axis`. */
+const standing = (key: string, axis: "x" | "y") => {
   const { doc } = useEditor.getState()
   const item = doc.map.items[doc.ids.indexOf(key)]
-  return item === undefined ? NaN : editTransform(item).translation.x
+  return item === undefined ? NaN : editTransform(item).translation[axis]
+}
+
+const xOf = (key: string) => standing(key, "x")
+
+const yOf = (key: string) => standing(key, "y")
+
+/** Turns the item `key` to `yaw` degrees where it stands. */
+const turn = (key: string, yaw: number) => {
+  const { doc } = useEditor.getState()
+  const item = doc.map.items[doc.ids.indexOf(key)]
+  if (item === undefined) return assert.fail("no such item")
+  const rotation = rotatorToQuat({ pitch: 0, yaw, roll: 0 })
+  useEditor.getState().transformItems(new Map([[key, { ...editTransform(item), rotation }]]))
+}
+
+/** The test piece's length along X. */
+const arrangeWidth = () => {
+  const { catalogIndex, doc } = useEditor.getState()
+  const box = itemsBoxOf(doc.map.items.slice(0, 1), catalogIndex)
+  return box === undefined ? NaN : box.max.x - box.min.x
 }
 
 const pointOf = (id: string) => {
@@ -197,18 +224,19 @@ describe("the grid's origin on a whole group", () => {
 })
 
 describe("align and distribute", () => {
-  it("aligns on the first selected", () => {
+  it("aligns on the active item, the last selected", () => {
     const [a = "", b = ""] = load([0, 300])
     useEditor.getState().select([a, b])
-    alignSelection("x", "centre", "first")
-    assert.strictEqual(xOf(b), 0)
+    alignSelection("x", "centre", "active")
+    assert.strictEqual(xOf(a), 300)
+    assert.strictEqual(xOf(b), 300)
   })
 
-  it("distributes with equal spacing as one step", () => {
+  it("distributes with equal centre steps as one step", () => {
     const [a = "", b = "", c = ""] = load([0, 100, 1000])
     useEditor.getState().select([a, b, c])
     const before = useEditor.getState().past.length
-    distributeSelection("x", "spacing")
+    distributeSelection("x", "centres")
     assert.closeTo(xOf(b), 500, 1e-6)
     assert.strictEqual(useEditor.getState().past.length, before + 1)
   })
@@ -216,8 +244,8 @@ describe("align and distribute", () => {
   it("aligns a whole group by its box, which keeps its spacing", () => {
     const [a = "", b = "", c = ""] = load([0, 1000, 5000])
     grouped([a, b])
-    useEditor.getState().select([c, a, b])
-    alignSelection("x", "min", "first")
+    useEditor.getState().select([a, b, c])
+    alignSelection("x", "min", "active")
     assert.closeTo(xOf(a), 5000, 1e-6)
     assert.closeTo(xOf(b), 6000, 1e-6)
     assert.strictEqual(xOf(c), 5000)
@@ -228,21 +256,21 @@ describe("align and distribute", () => {
     assert.strictEqual(xOf(c), 5000)
   })
 
-  it("aligns on the first selected unit whichever comes first in the tree", () => {
+  it("aligns on the active item's whole unit whichever comes first in the tree", () => {
     const [a = "", b = "", c = ""] = load([0, 1000, 5000])
     grouped([a, b])
-    useEditor.getState().select([a, b, c])
-    alignSelection("x", "max", "first")
-    assert.closeTo(xOf(c), 1000, 1e-6, "on the group's far side, not its first item's")
+    useEditor.getState().select([c, a, b])
+    alignSelection("x", "max", "active")
+    assert.closeTo(xOf(c), 1000, 1e-6, "on the group's far side, not its last item's")
     assert.strictEqual(xOf(a), 0)
     assert.strictEqual(xOf(b), 1000)
   })
 
-  it("spreads a whole group as one unit, by equal spacing or equal gaps", () => {
+  it("spreads a whole group as one unit, by equal centre steps or equal gaps", () => {
     const [a = "", b = "", c = "", d = ""] = load([0, 400, 1000, 5000])
     grouped([a, b])
     useEditor.getState().select([a, b, c, d])
-    distributeSelection("x", "spacing")
+    distributeSelection("x", "centres")
     assert.closeTo(xOf(c), 2600, 1e-6, "halfway from the group's centre to the last")
     assert.strictEqual(xOf(a), 0)
     assert.strictEqual(xOf(b), 400)
@@ -261,7 +289,7 @@ describe("align and distribute", () => {
     useEditor.getState().select([a, b, c])
     const before = useEditor.getState().past.length
     alignSelection("x", "min", "bounds")
-    distributeSelection("x", "spacing")
+    distributeSelection("x", "centres")
     assert.lengthOf(useEditor.getState().past, before)
   })
 
@@ -269,23 +297,60 @@ describe("align and distribute", () => {
     const [a = "", b = "", c = ""] = load([0, 1000, 5000])
     const id = grouped([a, b])
     useEditor.getState().setGroupPivot(id, { choice: "point", world: { x: 10, y: 20, z: 30 } })
-    useEditor.getState().select([c, a, b])
-    alignSelection("x", "min", "first")
+    useEditor.getState().select([a, b, c])
+    alignSelection("x", "min", "active")
     assert.deepStrictEqual(pointOf(id), { x: 5010, y: 20, z: 30 })
   })
 
-  it("carries the links after a selected link inside an entered chain, up to the next selected one", () => {
-    const [root = "", one = "", two = "", three = ""] = load([0, 1000, 2000, 3000])
-    useEditor.getState().enterGroup(grouped([root, one, two, three], true))
-    useEditor.getState().select([three, one])
-    alignSelection("x", "min", "first")
-    assert.strictEqual(xOf(root), 0)
-    assert.closeTo(xOf(one), 3000, 1e-6)
-    assert.closeTo(xOf(two), 4000, 1e-6, "carried by the link before it")
-    assert.strictEqual(xOf(three), 3000, "a selected link takes its own offset, here none")
+  it("stacks the selection out from the active item with a fixed spacing of 0, two units as well as more", () => {
+    const [a = "", b = ""] = load([0, 3000])
+    useEditor.getState().select([b, a])
+    setArrangeSpacing(0)
+    distributeSelection("x", "gaps")
+    setArrangeSpacing(null)
+    assert.strictEqual(xOf(a), 0, "the active item stays")
+    const width = arrangeWidth()
+    assert.closeTo(xOf(b), width, 1e-6, "touching it")
+  })
+
+  it("works along the active item's own axes with the gizmo in Local", () => {
+    const [a = "", b = ""] = loadPieces([{ x: 0, y: 0, z: 0 }, { x: 1000, y: 700, z: 0 }])
+    turn(b, 90)
+    useEditor.setState({ gizmoSpace: "local" })
+    useEditor.getState().select([a, b])
+    alignSelection("x", "centre", "active")
+    useEditor.setState({ gizmoSpace: "world" })
+    assert.closeTo(yOf(a), 700, 1e-6, "along the active item's X, which is the world's Y")
+    assert.closeTo(xOf(a), 0, 1e-6)
+  })
+
+  it("previews nothing it wouldn't do, and what it would do in the world", () => {
+    const [a = "", b = ""] = load([0, 300])
+    useEditor.getState().select([a, b])
+    const align = { kind: "align", axis: "x", side: "min", to: "active" } as const
+    const plan = arrangePlanOf(useEditor.getState(), align)
+    assert.strictEqual(plan?.moving, 1)
+    assert.deepStrictEqual(plan?.marks.paths.map(({ from, to }) => to.x - from.x), [300])
+    alignSelection("x", "min", "active")
+    assert.strictEqual(arrangePlanOf(useEditor.getState(), align)?.moving, 0)
+    useEditor.getState().select([a])
+    assert.isUndefined(arrangePlanOf(useEditor.getState(), align), "one unit has nothing to line up on")
+  })
+
+  it("lines up by screen direction along the axis that runs most nearly that way", () => {
+    const [a = "", b = ""] = load([0, 300])
+    useEditor.getState().select([a, b])
+    const pane = lookDown(activePaneCamera())
+    const { right } = pane.screenAxes()
+    const toRight = screenAlignOf(useEditor.getState(), "right")
+    const toLeft = screenAlignOf(useEditor.getState(), "left")
+    assert.notStrictEqual(toRight.axis, "z", "looking down, right is across the ground")
+    assert.strictEqual(toLeft.axis, toRight.axis)
+    assert.notStrictEqual(toLeft.kind === "align" && toLeft.side, toRight.kind === "align" && toRight.side)
+    const along = { x: 0, y: 0, z: 0, [toRight.axis]: toRight.kind === "align" && toRight.side === "max" ? 1 : -1 }
+    assert.isAbove(along.x * right.x + along.y * right.y + along.z * right.z, 0.5)
   })
 })
-
 describe("measure", () => {
   it("keeps two clicks as a measurement and says the distance", () => {
     load([0])
