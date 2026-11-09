@@ -2,10 +2,8 @@ import { assert, describe, it } from "@effect/vitest"
 import { defaultSettings } from "../domain/Settings"
 import { defaultViewLayout } from "../domain/viewLayout"
 import { PREFAB_TAB_STAYS_HERE } from "../editor/store"
+import { BROWSER, DESKTOP } from "../test/capabilities"
 import { menuEntries, type MenuEntry, menusOf, type MenuState, searchMenus } from "./menuModel"
-
-const DESKTOP = { projects: true, exportToGame: true, launchGame: true, play: true, updates: true }
-const BROWSER = { projects: false, exportToGame: false, launchGame: false, play: false, updates: false }
 
 const state = (over: Partial<MenuState> = {}): MenuState => ({
   capabilities: DESKTOP,

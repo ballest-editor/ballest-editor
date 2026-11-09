@@ -1,4 +1,5 @@
 export * from "./channels"
+export * from "./collect"
 export * from "./DesktopBridge"
 export * from "./limits"
 export * from "./names"

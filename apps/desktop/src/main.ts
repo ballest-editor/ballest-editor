@@ -25,6 +25,8 @@ import { Recovery } from "./project/Recovery"
 import { WindowRegistry } from "./project/WindowRegistry"
 import { DesktopSettings } from "./settings/DesktopSettings"
 import { DesktopUpdates } from "./updates/DesktopUpdates"
+import { CollectClient } from "./usage/CollectClient"
+import { UsageStats } from "./usage/UsageStats"
 import { DesktopWindow } from "./window/DesktopWindow"
 import { WindowLauncher } from "./window/WindowLauncher"
 
@@ -67,8 +69,10 @@ const layerDesktopRuntime = Layer.mergeAll(
   DesktopUpdates.layer,
   WindowLauncher.layer,
   NotificationLog.layer,
-  GamePlay.layer
+  GamePlay.layer,
+  UsageStats.layer
 ).pipe(
+  Layer.provideMerge(CollectClient.layer),
   Layer.provideMerge(layerProjectsAndGame),
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),

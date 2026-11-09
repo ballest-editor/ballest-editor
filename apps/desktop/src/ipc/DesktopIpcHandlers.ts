@@ -7,6 +7,7 @@ import { pingHandlers } from "./methods/ping"
 import { projectHandlers } from "./methods/project"
 import { shellHandlers } from "./methods/shell"
 import { updateHandlers } from "./methods/updates"
+import { usageHandlers } from "./methods/usage"
 import { windowHandlers } from "./methods/window"
 
 /** One handler per method in `DesktopMethods`: a method without one fails typecheck here. */
@@ -17,7 +18,8 @@ const handlers = {
   ...shellHandlers,
   ...gameHandlers,
   ...notificationHandlers,
-  ...updateHandlers
+  ...updateHandlers,
+  ...usageHandlers
 } satisfies DesktopIpcHandlers
 
 /** The services the handlers need, together. */

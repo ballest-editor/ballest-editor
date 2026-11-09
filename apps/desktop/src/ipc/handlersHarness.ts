@@ -23,6 +23,8 @@ import { Recovery } from "../project/Recovery"
 import { type WindowEntry, WindowRegistry } from "../project/WindowRegistry"
 import { DesktopSettings, DesktopSettingsFile } from "../settings/DesktopSettings"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
+import { CollectClient } from "../usage/CollectClient"
+import { UsageStats } from "../usage/UsageStats"
 import { WindowLauncher, WindowLaunchError } from "../window/WindowLauncher"
 import { DesktopIpc, type DesktopIpcHandleListener, type DesktopIpcMain } from "./DesktopIpc"
 import { installDesktopIpcHandlers } from "./DesktopIpcHandlers"
@@ -145,6 +147,29 @@ const updatesLayer = Layer.succeed(
   })
 )
 
+/**
+ * The collect endpoint, answering from `collectAnswers` (a status and a JSON body) and keeping what it was sent in
+ * `collected`. Without an answer queued it makes issue 1.
+ */
+export const collected: Array<{ readonly url: string; readonly body: unknown }> = []
+export const collectAnswers: Array<{ readonly status: number; readonly body?: unknown }> = []
+const collectLayer = Layer.succeed(
+  CollectClient,
+  CollectClient.make(
+    Option.some("https://collect.test"),
+    { appVersion: "0.3.0", platform: "linux", osVersion: "6.18" },
+    (url, init) => {
+      collected.push({ url, body: JSON.parse(init.body) })
+      const answer = collectAnswers.shift() ?? { status: 200, body: { issueNumber: 1, issueUrl: "https://x/1" } }
+      return Promise.resolve(
+        answer.body === undefined
+          ? new Response(null, { status: answer.status })
+          : Response.json(answer.body, { status: answer.status })
+      )
+    }
+  )
+)
+
 /** Stands in for starting a copy of the app: records each project, and fails while `failing.now` is set. */
 const fakeLauncher = () => {
   const started: Array<string> = []
@@ -219,9 +244,14 @@ export const withHandlers = <A, E>(
       Layer.provideMerge(game),
       Layer.provideMerge(registry)
     )
-    const services = Layer.effect(GamePlay, GamePlay.make).pipe(
+    const usage = Layer.effect(
+      UsageStats,
+      UsageStats.make(path.join(dir, "userData", "usage-queue.json"), { home: dir, user: "" })
+    )
+    const services = Layer.merge(Layer.effect(GamePlay, GamePlay.make), usage).pipe(
       Layer.provideMerge(projects),
       Layer.provide(Layer.mergeAll(shellLayer, windowLayer)),
+      Layer.provideMerge(collectLayer),
       Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(path.join(dir, "desktop-settings.json")))),
       Layer.merge(Layer.mergeAll(
         dialogs.layer,

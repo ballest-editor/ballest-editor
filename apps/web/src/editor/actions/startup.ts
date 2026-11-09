@@ -8,6 +8,7 @@ import { MaterialLibrary } from "../../services/MaterialLibrary"
 import { Platform } from "../../services/Platform"
 import { SettingsStore } from "../../services/SettingsStore"
 import { useEditor } from "../store"
+import { loadUsageStatsEffect } from "./feedback"
 import { checkGameLinkEffect, findCreatorEffect } from "./gameLink"
 import { followOpenMapEffect, openStartingMap } from "./maps"
 import { checkPrefabs } from "./prefabs"
@@ -110,6 +111,7 @@ export const loadPlatform = () =>
       }
       if (capabilities.exportToGame) yield* checkGameLinkEffect
       yield* checkExportsEffect
+      yield* loadUsageStatsEffect
       // last: a dialog that opens takes another's place, and this is the one not to miss
       yield* offerRecovery
     })

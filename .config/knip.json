@@ -42,6 +42,13 @@
       "ignoreDependencies": ["@ballest/web"]
     },
     "tools/app-driver": {},
-    "packages/ballest-driver": {}
+    "packages/ballest-driver": {},
+    // Each function's entry is bundled by build/vercelBuild.ts, which the build script runs.
+    "apps/collect": {
+      "entry": ["src/functions/*.ts"]
+    },
+    "apps/admin": {
+      "entry": ["src/functions/*.ts"]
+    }
   }
 }

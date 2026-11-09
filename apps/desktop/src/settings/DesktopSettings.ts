@@ -1,4 +1,4 @@
-import { GameLinkResult, MutedNotificationKinds } from "@ballest/contracts"
+import { GameLinkResult, InstallId, MutedNotificationKinds } from "@ballest/contracts"
 import { Context, Effect, FileSystem, Layer, Path, Schema, Semaphore } from "effect"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 
@@ -47,6 +47,16 @@ const GameLinkSettings = Schema.Struct({ last: Schema.optional(GameLinkResult) }
 /** The notification centre's "Don't show again", per notification kind. */
 const NotificationSettings = Schema.Struct({ muted: Schema.optional(MutedNotificationKinds) })
 
+/** Anonymous usage statistics (usage/UsageStats.ts). Unset `enabled` is on. */
+export const UsageSettings = Schema.Struct({
+  enabled: Schema.optional(Schema.Boolean),
+  /** Made on the first launch that collects, and dropped when usage statistics are turned off. */
+  installId: Schema.optional(InstallId),
+  /** Whether the first-launch notice saying what is sent has been shown. */
+  noticeShown: Schema.optional(Schema.Boolean)
+})
+export type UsageSettings = typeof UsageSettings.Type
+
 /** `desktop-settings.json`: what the main process remembers between runs. The renderer's settings live in its own storage. */
 export const DesktopSettingsFile = Schema.Struct({
   window: Schema.optional(WindowState),
@@ -54,7 +64,8 @@ export const DesktopSettingsFile = Schema.Struct({
   game: Schema.optional(GamePathOverrides),
   backups: Schema.optional(BackupSettings),
   gameLink: Schema.optional(GameLinkSettings),
-  notifications: Schema.optional(NotificationSettings)
+  notifications: Schema.optional(NotificationSettings),
+  usage: Schema.optional(UsageSettings)
 })
 export type DesktopSettingsFile = typeof DesktopSettingsFile.Type
 

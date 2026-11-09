@@ -24,6 +24,7 @@ import {
   resetKeybinds,
   resetSnapDefaults,
   saveSettings,
+  setUsageStatsEnabled,
   snapDefaultsAreFactory,
   updateSettings,
   watchGameLink
@@ -147,6 +148,7 @@ export function SettingsDialog(props: {
   const creator = useCreator()
   const foundCreator = useEditor((s) => s.foundCreator)
   const snapFactory = useEditor(snapDefaultsAreFactory)
+  const usageStats = useEditor((s) => s.usageStats)
 
   // The game or the plugin manager may have been installed, run or moved since, and Steam logged in as someone else:
   // look the folders, the plugin and the creator name up each time the dialog opens.
@@ -287,6 +289,23 @@ export function SettingsDialog(props: {
                 onChange={(v) => update("general", { projectOpensIn: v })}
               />
             )
+          } satisfies Row
+        ]
+        : []),
+      ...(usageStats !== null
+        ? [
+          {
+            id: "usageStats",
+            category: "general",
+            label: "Send usage statistics",
+            description: usageStats.collecting
+              ? "Anonymous: sessions, the version and errors."
+              : "This build sends none: only an installed Ballest Editor does.",
+            info:
+              "Sent: a random install id, the app's version, your platform and its version, how long each session runs, and errors with paths and names taken out. Never your maps, your names or your Steam account. Off also deletes the install id and anything not sent yet.",
+            keywords: "telemetry privacy analytics",
+            changes: { modified: !usageStats.enabled, reset: () => void setUsageStatsEnabled(true) },
+            control: <Switch checked={usageStats.enabled} onCheckedChange={(v) => void setUsageStatsEnabled(v)} />
           } satisfies Row
         ]
         : []),

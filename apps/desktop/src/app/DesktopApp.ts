@@ -6,6 +6,7 @@ import { type DesktopProtocolSource, ElectronProtocol } from "../electron/Electr
 import { installDesktopIpcHandlers } from "../ipc/DesktopIpcHandlers"
 import { WindowRegistry } from "../project/WindowRegistry"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
+import { UsageStats } from "../usage/UsageStats"
 import { devMenuTemplate } from "../window/chrome"
 import { DesktopWindow } from "../window/DesktopWindow"
 import { DesktopEnvironment } from "./DesktopEnvironment"
@@ -44,6 +45,8 @@ const run = Effect.gen(function*() {
   yield* environment.isPackaged ? menu.remove : menu.set(devMenuTemplate)
   yield* (yield* ElectronProtocol).register(protocolSource(environment))
   yield* installDesktopIpcHandlers()
+  // A session lasts until this scope closes with the window; its end is queued and sent then.
+  yield* (yield* UsageStats).run
   // The first check waits a while, so the page is up to show what it finds.
   yield* (yield* DesktopUpdates).run
   yield* (yield* DesktopWindow).runMain
@@ -53,11 +56,17 @@ const run = Effect.gen(function*() {
 export const program = Effect.gen(function*() {
   const app = yield* ElectronApp
   const dialog = yield* ElectronDialog
+  const usage = yield* UsageStats
   yield* run.pipe(
     Effect.tapCause((cause) =>
       Cause.hasInterruptsOnly(cause)
         ? Effect.void
-        : dialog.showErrorBox("Ballest Editor failed", Cause.pretty(cause))
+        : Effect.gen(function*() {
+          const error = Cause.squash(cause)
+          // Queued for the next launch to send: this one is about to quit.
+          yield* usage.recordError("main", error instanceof Error ? error.message : String(error), Cause.pretty(cause))
+          yield* dialog.showErrorBox("Ballest Editor failed", Cause.pretty(cause))
+        })
     ),
     Effect.ensuring(app.quit)
   )

@@ -48,6 +48,9 @@ export const runNotificationCommand = (command: NotificationCommand): void => {
       return
     case "InstallPlugin":
       void installPlugin()
+      return
+    case "OpenSettings":
+      useEditor.getState().openDialog({ id: "settings", category: "general" })
   }
 }
 

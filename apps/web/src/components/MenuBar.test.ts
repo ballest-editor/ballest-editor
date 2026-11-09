@@ -4,6 +4,7 @@ import { Effect } from "effect"
 import { act, createElement, Fragment } from "react"
 import { vi } from "vitest"
 import { type EditorState, useEditor } from "../editor/store"
+import { BROWSER, DESKTOP } from "../test/capabilities"
 import { reactRootPerTest } from "../test/reactRoot"
 import { MenuBar } from "./MenuBar"
 import { MENU_TITLES, menuEntries, type Menus, useMenus } from "./menuModel"
@@ -14,9 +15,6 @@ vi.mock("./dock/dockControl", async (importActual) => ({
   useViewMenuPanels: () => [{ id: "project", title: "Project" }, { id: "outline", title: "Outline" }],
   useOpenPanels: () => new Set(["project"])
 }))
-
-const DESKTOP = { projects: true, exportToGame: true, launchGame: true, play: true, updates: true }
-const BROWSER = { projects: false, exportToGame: false, launchGame: false, play: false, updates: false }
 
 /** Hears the menus the app is drawing, as the model has them. */
 const onMenus = vi.fn<(menus: Menus) => void>()

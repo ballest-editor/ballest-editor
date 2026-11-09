@@ -25,6 +25,7 @@ export default states({
   "dialog/game-link": dialog("gameLink"),
   "dialog/keybinds": dialog("keybinds"),
   "dialog/about": dialog("about", undefined, { anchor: true }),
+  "dialog/feedback": dialog("feedback"),
   "dialog/new-project": dialog("newProject"),
   "dialog/recover": dialog("recover"),
   "dialog/recover-unsaved": dialog("recoverUnsaved", app.recoverUnsaved("Waterfront")),

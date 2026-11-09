@@ -2,6 +2,7 @@ import type {
   BackupPlace,
   DesktopBridge,
   EditOutcome,
+  FeedbackForm,
   FoundCreator,
   GameLinkResult,
   GamePaths,
@@ -19,10 +20,12 @@ import type {
   ProjectInfo,
   ProjectMap,
   ProjectTarget,
+  SendFeedbackResult,
   UnloadKind,
   UnsavedChoice,
   UnsavedPrompt,
-  UpdateState
+  UpdateState,
+  UsageStatsState
 } from "@ballest/contracts"
 import {
   isMapFileName,
@@ -125,6 +128,13 @@ export interface TestDisk {
     checks: number
     downloads: number
     installs: number
+  }
+  /** Feedback sent and what the next sends answer (issue 1 once they run out); usage statistics and errors reported. */
+  readonly feedback: {
+    readonly sent: Array<FeedbackForm>
+    readonly answers: Array<SendFeedbackResult>
+    usage: UsageStatsState
+    readonly errors: Array<{ readonly message: string; readonly stack: string }>
   }
 }
 
@@ -236,7 +246,13 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
     editOutcome: "opened",
     inGame: null
   },
-  updater: makeTestUpdater()
+  updater: makeTestUpdater(),
+  feedback: {
+    sent: [],
+    answers: [],
+    usage: { enabled: true, noticeShown: false, collecting: true },
+    errors: []
+  }
 })
 
 const PublishedId = Schema.fromJsonString(Schema.Struct({
@@ -775,6 +791,21 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     onUpdateState: (listener) => {
       disk.updater.listeners.add(listener)
       return () => void disk.updater.listeners.delete(listener)
+    },
+    sendFeedback: (form) => {
+      disk.feedback.sent.push(form)
+      return Promise.resolve(
+        disk.feedback.answers.shift() ?? { _tag: "Sent", issueNumber: 1, issueUrl: "https://github.com/x/issues/1" }
+      )
+    },
+    usageStats: () => Promise.resolve(disk.feedback.usage),
+    setUsageStats: (patch) => {
+      disk.feedback.usage = { ...disk.feedback.usage, ...patch }
+      return Promise.resolve(disk.feedback.usage)
+    },
+    reportError: (error) => {
+      disk.feedback.errors.push(error)
+      return Promise.resolve()
     }
   }
   return bridge

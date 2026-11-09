@@ -2,6 +2,9 @@
   "path": [
     "../apps/web/src",
     "../apps/desktop/src",
+    "../apps/collect/src",
+    "../apps/collect/build",
+    "../apps/admin/src",
     "../packages/ui/src",
     "../packages/contracts/src",
     "../tools/extract",

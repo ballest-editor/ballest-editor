@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import type { InvokeChannels, PushChannels } from "./channels"
+import { ERROR_TEXT_LIMIT, FeedbackForm, FeedbackReceipt } from "./collect"
 import { isMapFileName, isPrefabName, PREFAB_NAME_RULE } from "./names"
 
 /** Runtime versions of the desktop app, for bug reports and the about dialog. */
@@ -462,7 +463,9 @@ export const NotificationCommand = Schema.TaggedUnion({
   /** Opens a web page in the default browser (the plugin manager's install steps). */
   OpenExternal: { url: OpenExternalPayload.fields.url },
   /** Installs (or updates) the `ballest-editor-link` plugin Play needs. */
-  InstallPlugin: {}
+  InstallPlugin: {},
+  /** Opens Settings on its General page (the usage statistics notice's Settings). */
+  OpenSettings: {}
 })
 export type NotificationCommand = typeof NotificationCommand.Type
 
@@ -751,6 +754,45 @@ export const UpdateState = Schema.Struct({
 })
 export type UpdateState = typeof UpdateState.Type
 
+/**
+ * `sendFeedback`'s result: the issue it became, or why not. `RateLimited`: the endpoint has had enough from this
+ * address for now. `Unavailable`: this build sends nothing (unpackaged, without `BALLEST_COLLECT_URL`). `Failed`: the
+ * request or the endpoint failed, `message` saying how.
+ */
+export const SendFeedbackResult = Schema.TaggedUnion({
+  Sent: { ...FeedbackReceipt.fields },
+  RateLimited: {},
+  Unavailable: {},
+  Failed: { message: Schema.String }
+})
+export type SendFeedbackResult = typeof SendFeedbackResult.Type
+
+/**
+ * Anonymous usage statistics (docs/DESKTOP.md § Feedback and usage statistics). `enabled` is the user's choice (on
+ * unless turned off), `noticeShown` whether the first-launch notice has been shown, and `collecting` whether this build
+ * sends at all: only installed builds do.
+ */
+export const UsageStatsState = Schema.Struct({
+  enabled: Schema.Boolean,
+  noticeShown: Schema.Boolean,
+  collecting: Schema.Boolean
+})
+export type UsageStatsState = typeof UsageStatsState.Type
+
+const SetUsageStatsPayload = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  noticeShown: Schema.optionalKey(Schema.Boolean)
+})
+
+/** The most of a page error's message or stack `reportError` takes: room for the paths scrubbing takes out. */
+export const REPORTED_ERROR_LIMIT = 4 * ERROR_TEXT_LIMIT
+
+/** An unhandled error in the page, as it was thrown; main takes paths and map names out before keeping it. */
+const ReportErrorPayload = Schema.Struct({
+  message: Schema.String.check(Schema.isMaxLength(REPORTED_ERROR_LIMIT)),
+  stack: Schema.String.check(Schema.isMaxLength(REPORTED_ERROR_LIMIT))
+})
+
 /** What a bridge method takes and gives: its payload's schema and its result's, neither needing services. */
 interface DesktopMethodSchemas {
   readonly payload: Schema.ConstraintCodec<unknown>
@@ -916,7 +958,21 @@ export const DesktopMethods = {
   /** Starts downloading the release on offer (`available`); progress and the outcome arrive through `onUpdateState`. */
   downloadUpdate: { payload: noPayload, result: Schema.Void },
   /** Quits, installs the downloaded release (`ready`) and starts it. Unsaved edits are lost. */
-  installUpdate: { payload: noPayload, result: Schema.Void }
+  installUpdate: { payload: noPayload, result: Schema.Void },
+  /**
+   * Help › Send feedback: main adds the app's version and platform and posts it to the collect endpoint, which makes a
+   * public GitHub issue of the message. The Discord and creator names go to the endpoint only, never into the issue.
+   */
+  sendFeedback: { payload: FeedbackForm, result: SendFeedbackResult },
+  /** Whether usage statistics are on, and whether this build sends them. */
+  usageStats: { payload: noPayload, result: UsageStatsState },
+  /**
+   * Turns usage statistics on or off, or records that the notice was shown. Off drops the install id and every event
+   * not yet sent.
+   */
+  setUsageStats: { payload: SetUsageStatsPayload, result: UsageStatsState },
+  /** Keeps an unhandled error from the page for the next usage batch; nothing while usage statistics are off. */
+  reportError: { payload: ReportErrorPayload, result: Schema.Void }
 } as const satisfies { readonly [K in keyof typeof InvokeChannels]: DesktopMethodSchemas }
 
 /** What main pushes to the page (`webContents.send` on `PushChannels[name]`), by the bridge member that listens. */
