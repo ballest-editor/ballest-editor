@@ -24,6 +24,7 @@ import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gizmoScaleOf, gridColorsOf } from "../domain/Settings"
 import { snapsGrid } from "../domain/snapConfig"
+import { isLocked } from "../domain/visibility"
 import { holdsDrop, placeAt, placePrefab } from "./actions"
 import { useAreaDrag } from "./areaDrag"
 import { AreaOverlay, AreaSelect } from "./AreaSelect"
@@ -36,7 +37,14 @@ import { ItemObject } from "./ItemObject"
 import { keyContextOf } from "./keyContext"
 import { advanceGameTime } from "./materials"
 import { OrthoGrid } from "./OrthoGrid"
-import { paintSpotOf, type PaintTarget, paintTargetOf, pickedBrushOf, showsTarget } from "./paintTarget"
+import {
+  lockedPaintTarget,
+  paintSpotOf,
+  type PaintTarget,
+  paintTargetOf,
+  pickedBrushOf,
+  showsTarget
+} from "./paintTarget"
 import { floorGridOnly, panePointer } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
 import { draggedPiece, isPieceDrag } from "./pieceDrag"
@@ -59,8 +67,10 @@ import {
   groupBoxOf,
   indexOfKey,
   noTabOpen,
+  pickableOf,
   type SelectMode,
   shownChainStart,
+  shownOf,
   shownPivotDots,
   snapConfigOf,
   useEditor,
@@ -185,7 +195,8 @@ function ClickSelect() {
       const { ndc, pane } = panePointer(el, e, slot)
       raycaster.setFromCamera(ndc, pane.camera)
       const root = sceneRegistry.itemsRoot
-      return hitItemId(root === null ? [] : raycaster.intersectObject(root, true))
+      // a locked or hidden item lets the click through to what's behind it
+      return hitItemId(root === null ? [] : raycaster.intersectObject(root, true), pickableOf(useEditor.getState()))
     }
     const onDown = (e: PointerEvent) => {
       const mode = selectModeOf(e)
@@ -258,7 +269,9 @@ function PaintTool() {
       const { ndc, pane } = panePointer(el, at, slot)
       raycaster.setFromCamera(ndc, pane.camera)
       const root = sceneRegistry.itemsRoot
-      return paintSpotOf(root === null ? [] : raycaster.intersectObject(root, true))
+      return paintSpotOf(
+        hitsOn(root === null ? [] : raycaster.intersectObject(root, true), shownOf(useEditor.getState()))
+      )
     }
     const itemOf = (id: string) => {
       const { doc } = useEditor.getState()
@@ -271,7 +284,9 @@ function PaintTool() {
       const brush = currentBrush(s)
       if (spot === undefined || item === undefined || brush === undefined) return undefined
       const whole = stroke?.whole ?? holdsModifiersOf(s.keybinds, "paintWholePiece", modifiers)
-      return paintTargetOf(spot, item, s.catalogIndex, brush, whole)
+      return isLocked(s.doc.structure, spot.itemId)
+        ? lockedPaintTarget(spot, whole)
+        : paintTargetOf(spot, item, s.catalogIndex, brush, whole)
     }
     const show = (target: PaintTarget | undefined) => {
       hover = target
@@ -417,18 +432,25 @@ function PaintTool() {
   return null
 }
 
-/** The item under the nearest hit, if any. */
-const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
-  for (const hit of hits) {
-    let o: THREE.Object3D | null = hit.object
-    while (o !== null && o.userData["itemId"] === undefined) o = o.parent
-    if (o !== null) {
-      const itemId: unknown = o.userData["itemId"]
-      return typeof itemId === "string" ? itemId : null
-    }
+/** The item an object is part of, if any. */
+const itemAbove = (object: THREE.Object3D): string | null => {
+  for (let o: THREE.Object3D | null = object; o !== null; o = o.parent) {
+    const itemId: unknown = o.userData["itemId"]
+    if (itemId !== undefined) return typeof itemId === "string" ? itemId : null
   }
   return null
 }
+
+/** The hits on items `accepts` takes. A hidden item is still in the scene, and three's raycasts don't skip it. */
+const hitsOn = (hits: ReadonlyArray<THREE.Intersection>, accepts: (key: string) => boolean) =>
+  hits.filter((hit) => {
+    const id = itemAbove(hit.object)
+    return id !== null && accepts(id)
+  })
+
+/** The item under the nearest hit that `accepts` takes, if any. */
+const hitItemId = (hits: ReadonlyArray<THREE.Intersection>, accepts: (key: string) => boolean): string | null =>
+  hitsOn(hits, accepts).map((hit) => itemAbove(hit.object))[0] ?? null
 
 /**
  * What's under a pointer dragging `piece`: the item it is over, else the floor, or in an orthographic view the plane a
@@ -436,14 +458,15 @@ const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
  */
 const dropTarget = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: number; clientY: number }) => {
   const { ndc, pane, px, slot } = panePointer(canvas, e)
-  const { floorHeight, settings } = useEditor.getState()
+  const s = useEditor.getState()
+  const { floorHeight, settings } = s
   const raycaster = new THREE.Raycaster()
   raycaster.setFromCamera(ndc, pane.camera)
   const { ray } = raycaster
   const root = sceneRegistry.itemsRoot
   const surface = (root === null ? [] : raycaster.intersectObject(root, true)).flatMap((hit) => {
-    const id = isMesh(hit.object) ? hitItemId([hit]) : null
-    return id !== null && holdsDrop(id) ? [{ id, point: hit.point }] : []
+    const id = isMesh(hit.object) ? itemAbove(hit.object) : null
+    return id !== null && shownOf(s)(id) && holdsDrop(id) ? [{ id, point: hit.point }] : []
   })[0]
   const point = surface !== undefined
     ? threeToUeVector(surface.point)

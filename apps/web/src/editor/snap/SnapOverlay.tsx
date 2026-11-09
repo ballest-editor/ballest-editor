@@ -358,6 +358,7 @@ export function SnapOverlay() {
   const hovered = useEditor((s) => s.hoveredItem)
   const preview = useEditor((s) => s.preview)
   const dragSnap = useEditor((s) => s.dragSnap)
+  const isolation = useEditor((s) => s.isolation)
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   const persistent = useMemo(() => new MarkLayer(), [])
   /** The open ends, apart: a drag moves them on every event. */
@@ -366,8 +367,9 @@ export function SnapOverlay() {
 
   const docEnds = useMemo(() => showOpen === "never" ? [] : endsInDoc(doc, index), [doc, index, showOpen])
   const open = useMemo(
-    () => ringedEnds({ doc, catalogIndex: index, preview, hoveredItem: hovered, dragSnap }, showOpen, docEnds),
-    [doc, index, preview, hovered, dragSnap, showOpen, docEnds]
+    () =>
+      ringedEnds({ doc, catalogIndex: index, preview, hoveredItem: hovered, dragSnap, isolation }, showOpen, docEnds),
+    [doc, index, preview, hovered, dragSnap, isolation, showOpen, docEnds]
   )
   const inputs: Inputs = useMemo(() => {
     const { construction, measurements } = annotationsOf(doc.structure)

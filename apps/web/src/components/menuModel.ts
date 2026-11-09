@@ -3,6 +3,7 @@
  * the two can't drift apart (docs/DESKTOP.md § Menus).
  */
 import { type GameMap, type RecentProject, RELEASES_URL } from "@ballest/contracts"
+import { useShallow } from "zustand/react/shallow"
 import { mapLabelOf } from "../domain/factory"
 import { counted, selectedNodes } from "../domain/groupSelection"
 import type { KeybindAction } from "../domain/Keybinds"
@@ -21,6 +22,7 @@ import {
   viewProjectionLabels,
   viewProjections
 } from "../domain/viewLayout"
+import { flagStateOf, keysWith } from "../domain/visibility"
 import {
   alignSelection,
   checkForUpdates,
@@ -187,6 +189,18 @@ export interface MenuState {
   readonly projection: ViewProjection
   /** The updater's state; null in a browser, which has no updater. */
   readonly update: EditorState["update"]
+  /** What hiding, isolating and locking would act on (docs/DESKTOP.md § Hide, isolate and lock). */
+  readonly visibility: VisibilityState
+}
+
+export interface VisibilityState {
+  /** Every selected item is hidden, so hiding the selection shows it. */
+  readonly selectionHidden: boolean
+  readonly selectionLocked: boolean
+  /** How many items are hidden and locked in the map. */
+  readonly hidden: number
+  readonly locked: number
+  readonly isolated: boolean
 }
 
 const SEPARATOR: MenuSeparator = { kind: "separator" }
@@ -336,6 +350,20 @@ const paneMenus = ({ layout, projection }: MenuState): ReadonlyArray<MenuChoice>
   ]
 }
 
+/** Hide, isolate and lock, each acting on the selection or the whole map (docs/DESKTOP.md § Hide, isolate and lock). */
+const visibilityItems = ({ hasSelection, noTabOff, visibility }: MenuState): ReadonlyArray<MenuNode> => {
+  const selected = hasSelection ? null : NOTHING_SELECTED
+  return [
+    command("hideSelection", visibility.selectionHidden ? "Show selection" : "Hide selection", selected),
+    command("showAll", "Show all", noTabOff ?? (visibility.hidden > 0 ? null : "Nothing is hidden.")),
+    visibility.isolated
+      ? command("isolateSelection", "End isolation")
+      : command("isolateSelection", "Isolate selection", noTabOff ?? selected),
+    command("lockSelection", visibility.selectionLocked ? "Unlock selection" : "Lock selection", selected),
+    command("unlockAll", "Unlock all", noTabOff ?? (visibility.locked > 0 ? null : "Nothing is locked."))
+  ]
+}
+
 const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
   {
     kind: "section",
@@ -345,6 +373,8 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
       command("frameAll", "Frame all", state.noTabOff)
     ]
   },
+  SEPARATOR,
+  { kind: "section", title: "Hide and lock", children: visibilityItems(state) },
   SEPARATOR,
   {
     kind: "section",
@@ -523,6 +553,7 @@ export const useMenus = (): Menus => {
   const layout = useEditor((s) => s.viewLayout)
   const projection = useEditor((s) => s.viewLayout.projections[s.activePane] ?? "perspective")
   const update = useUpdateState()
+  const visibility = useEditor(useShallow(visibilityStateOf))
   return menusOf({
     canUndo,
     canRedo,
@@ -552,8 +583,21 @@ export const useMenus = (): Menus => {
     units: general.units,
     layout,
     projection,
-    update
+    update,
+    visibility
   })
+}
+
+/** What the menus say of hiding, isolating and locking in the active tab. */
+export const visibilityStateOf = (s: EditorState): VisibilityState => {
+  const { structure } = s.doc
+  return {
+    selectionHidden: s.selectedIds.length > 0 && flagStateOf(structure, s.selectedIds, "hidden") === "all",
+    selectionLocked: s.selectedIds.length > 0 && flagStateOf(structure, s.selectedIds, "locked") === "all",
+    hidden: keysWith(structure, "hidden").length,
+    locked: keysWith(structure, "locked").length,
+    isolated: s.isolation !== null
+  }
 }
 
 /** One row a search can find: the menus' leaves, whatever they are in the menu. */

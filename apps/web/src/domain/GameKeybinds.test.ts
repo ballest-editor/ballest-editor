@@ -149,8 +149,15 @@ describe("GameKeybinds", () => {
   const real = path.join(repoRoot, "assets", "keybinds.json")
   it.skipIf(!fs.existsSync(real))("leaves the view keys to the editor: the game binds none of them", () => {
     const file = Schema.decodeUnknownSync(GameKeybindsFile)(JSON.parse(fs.readFileSync(real, "utf8")))
+    // H is the game's Show/Hide Overlay only while spectating a ghost (IMC_GhostPOV), which the editor leaves out, so it
+    // is free for hiding pieces as in Blender, Unity and Unreal (docs/design/hide-isolate-lock.md)
+    const spectating = new Set(["IMC_GhostPOV"])
     const codes = new Set(
-      file.contexts.flatMap((context) => context.mappings.flatMap((mapping) => UE_KEY_TO_CODE[mapping.key ?? ""] ?? []))
+      file.contexts.flatMap((context) =>
+        spectating.has(context.name)
+          ? []
+          : context.mappings.flatMap((mapping) => UE_KEY_TO_CODE[mapping.key ?? ""] ?? [])
+      )
     )
     const { keybinds, fromGame } = deriveKeybinds(file)
     const view = keybindSections.find((section) => section.name === "view")?.actions ?? []

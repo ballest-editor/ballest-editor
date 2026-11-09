@@ -21,7 +21,7 @@ export const enteredScopeOf = (
   enteredGroupId: string | null
 ): ReadonlyArray<string> => enteredGroupId === null ? [] : [...groupPathOf(tree, enteredGroupId), enteredGroupId]
 
-/** What Select all selects: every item in the tree, or in the entered group. */
+/** Every item in the tree, or in the entered group: what a box or lasso looks at, before hidden and locked ones leave. */
 export const selectableKeys = (
   tree: ReadonlyArray<TreeNode>,
   enteredGroupId: string | null

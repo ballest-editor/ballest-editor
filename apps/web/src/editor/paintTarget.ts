@@ -67,7 +67,8 @@ export const PAINT_BLOCKED = {
   nothing: "Nothing here takes paint.",
   noComponents: "The game discards a map with this piece painted.",
   unknownSlots: "The catalog doesn't know this mesh's slots.",
-  noSurface: "The game gives this piece no surface."
+  noSurface: "The game gives this piece no surface.",
+  locked: "The piece is locked. Unlock it in the Outline to paint it."
 } as const
 
 /** What the paint tool's clicks do, for the status bar, in the keys they are bound to. */
@@ -261,6 +262,14 @@ export const paintTargetOf = (
     : materialEffect(spot, item, index, brush._tag === "Material" ? brush.material : undefined, whole)
   return { spot, whole, key, effect }
 }
+
+/** A locked piece under the pointer: it takes nothing, and says so, as the viewport's other edits pass it by. */
+export const lockedPaintTarget = (spot: PaintSpot, wholePiece: boolean): PaintTarget => ({
+  spot,
+  whole: wholePiece,
+  key: spot.itemId,
+  effect: blocked(PAINT_BLOCKED.locked)
+})
 
 /**
  * The eyedropper: the item's surface when it has one (that's what shows), else the material drawn at the spot, or the

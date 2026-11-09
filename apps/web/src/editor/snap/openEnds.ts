@@ -5,7 +5,7 @@ import { editTransform } from "../../domain/editTransform"
 import type { MarkRole } from "../../domain/snapFrame"
 import type { SnapPrefs } from "../../domain/snapPrefs"
 import type { Doc } from "../../domain/structure"
-import type { EditorState } from "../store"
+import { type EditorState, shownOf } from "../store"
 
 type ShowOpenEnds = SnapPrefs["showOpenEnds"]
 
@@ -37,16 +37,19 @@ export type RingedEnd = WorldEnd & { readonly role: MarkRole }
 /**
  * The open ends to ring, as the pieces show: every one, none, or on hover the hovered item's and, in a drag, those of what
  * it carries and those near them it could join. What a drag carries is the source's, the rest the target's. A drag that
- * Connectors isn't snapping rings none. The end a drag will join is the target's mark, not one of these.
+ * Connectors isn't snapping rings none, and a hidden piece's are never rung. The end a drag will join is the target's
+ * mark, not one of these.
  */
 export const ringedEnds = (
-  s: Pick<EditorState, "catalogIndex" | "doc" | "preview" | "hoveredItem" | "dragSnap">,
+  s: Pick<EditorState, "catalogIndex" | "doc" | "preview" | "hoveredItem" | "dragSnap" | "isolation">,
   show: ShowOpenEnds,
   docEnds: ReadonlyArray<WorldEnd> = endsInDoc(s.doc, s.catalogIndex)
 ): ReadonlyArray<RingedEnd> => {
   const { dragSnap, hoveredItem, preview } = s
   if (show === "never" || dragSnap?.targets.includes("connectors") === false) return []
-  const open = openEndsOf(shownEnds(s, docEnds))
+  // an end met by a hidden piece is still met: only the ringing leaves hidden pieces out
+  const drawn = shownOf(s)
+  const open = openEndsOf(shownEnds(s, docEnds)).filter((end) => drawn(end.ref.item))
   const near = (end: WorldEnd) =>
     dragSnap?.nearEnds.some(({ end: index, item }) => item === end.ref.item && index === end.ref.end) === true
   const shown = show === "always"

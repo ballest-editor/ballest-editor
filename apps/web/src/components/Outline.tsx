@@ -22,6 +22,7 @@ import {
   useRef,
   useState
 } from "react"
+import { useShallow } from "zustand/react/shallow"
 import {
   activeNodeOf,
   enteredScopeOf,
@@ -45,12 +46,14 @@ import {
   visibleRange
 } from "../domain/outline"
 import { findNode, groupNames, numberedNameText } from "../domain/structure"
+import { flagStateOf } from "../domain/visibility"
 import { detachInstance, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { elementOf } from "../editor/keyTargets"
 import { nextSelection, nodeNamesOf, noTabOpen, useCanGroup, useEditor } from "../editor/store"
 import { EnteredGroupBreadcrumb } from "./EnteredGroupStatus"
 import { MenuKey } from "./KeyChip"
+import { visibilityStateOf } from "./menuModel"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
 import { SavePrefabItem } from "./SavePrefabItem"
 import { TagInput } from "./TagInput"
@@ -177,6 +180,9 @@ function CollapseAllButton({ groupIds, disabled }: {
  * The map's tree, a self-contained panel: it fills what it is mounted in and scrolls by itself, drawing only the rows in
  * view (docs/DESKTOP.md § Outline). Selection is the store's, so it stays in step with the viewport both ways.
  */
+/** A row's items as the document has them now. */
+const liveKeysOf = (id: string) => nodeKeys(useEditor.getState().doc.structure.tree, id)
+
 export function Outline() {
   const doc = useEditor((s) => s.doc)
   const { map, ids, structure } = doc
@@ -184,6 +190,7 @@ export function Outline() {
   const selectedIds = useEditor((s) => s.selectedIds)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
   const collapsedGroups = useEditor((s) => s.collapsedGroups)
+  const isolation = useEditor((s) => s.isolation)
   const { tree } = structure
 
   const [query, setQuery] = useState("")
@@ -364,6 +371,7 @@ export function Outline() {
   const [tagsTarget, setTagsTarget] = useState<Parameters<typeof TagsPopover>[0]["target"]>(null)
   const { canGroup, canUngroup } = useCanGroup()
   const hasSelection = selectedIds.length > 0
+  const visibility = useEditor(useShallow(visibilityStateOf))
   const instance = useMemo(
     () => exactSelectedGroup(tree, selectedIds, enteredGroupId),
     [tree, selectedIds, enteredGroupId]
@@ -449,6 +457,8 @@ export function Outline() {
             {rows.slice(start, end).map((row, i) => {
               const rowIndex = start + i
               const state = groupStates.get(row.id)
+              const keys = row.kind === "item" ? [row.id] : nodeKeys(tree, row.id)
+              const outside = isolation !== null && keys.every((key) => isolation.outside.has(key))
               return (
                 <OutlineRowView
                   key={row.id}
@@ -459,7 +469,11 @@ export function Outline() {
                     : state === "all" && !enteredScope.includes(row.id)}
                   partial={state === "some"}
                   entered={row.id === enteredGroupId}
-                  dimmed={enteredRange !== undefined && (rowIndex < enteredRange.start || rowIndex >= enteredRange.end)}
+                  dimmed={outside ||
+                    (enteredRange !== undefined && (rowIndex < enteredRange.start || rowIndex >= enteredRange.end))}
+                  hidden={flagStateOf(structure, keys, "hidden")}
+                  locked={flagStateOf(structure, keys, "locked")}
+                  keysOf={liveKeysOf}
                   dragged={drag?.set.has(row.id) === true}
                   dropInto={drag?.target?.position === "into" && drag.target.rowId === row.id}
                   filtering={filtering}
@@ -556,6 +570,15 @@ export function Outline() {
           <MenuCommand action="deleteSelection" disabled={!hasSelection}>Delete</MenuCommand>
           <ContextMenuSeparator />
           <MenuCommand action="focusSelection" disabled={!hasSelection}>Focus</MenuCommand>
+          <MenuCommand action="hideSelection" disabled={!hasSelection}>
+            {visibility.selectionHidden ? "Show" : "Hide"}
+          </MenuCommand>
+          <MenuCommand action="isolateSelection" disabled={!hasSelection && !visibility.isolated}>
+            {visibility.isolated ? "End isolation" : "Isolate"}
+          </MenuCommand>
+          <MenuCommand action="lockSelection" disabled={!hasSelection}>
+            {visibility.selectionLocked ? "Unlock" : "Lock"}
+          </MenuCommand>
           <ContextMenuItem
             disabled={menuRow === null}
             onClick={() => {

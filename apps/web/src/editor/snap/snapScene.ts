@@ -20,7 +20,7 @@ import { pivotBoundsOf } from "../../domain/pivot"
 import type { SnapItem, SnapView, SurfaceHit } from "../../domain/snapFrame"
 import type { PaneCamera } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
-import { type EditorState, nodeNamesOf } from "../store"
+import { type EditorState, nodeNamesOf, shownOf } from "../store"
 import { isMesh } from "../threeGuards"
 import { toGame, toThree } from "./snapView"
 
@@ -96,7 +96,7 @@ const worldFacesOf = (key: string, sharpAngle: number): ReadonlyArray<MeshFace> 
 
 /** What's in the map that `keep` keeps, as targets. */
 const snapItemsWhere = (
-  s: Pick<EditorState, "doc" | "catalogIndex">,
+  s: Pick<EditorState, "doc" | "catalogIndex" | "isolation">,
   keep: (key: string) => boolean,
   sharpAngle: number
 ): ReadonlyArray<SnapItem> => {
@@ -128,16 +128,22 @@ const snapItemsWhere = (
   })
 }
 
-/** What's in the map but for `except`, as targets. */
+/**
+ * What's drawn in the map but for `except`, as targets: a hidden item, or one an isolation leaves out, isn't one, and a
+ * locked one is (docs/DESKTOP.md § Hide, isolate and lock).
+ */
 export const snapItemsOf = (
-  s: Pick<EditorState, "doc" | "catalogIndex">,
+  s: Pick<EditorState, "doc" | "catalogIndex" | "isolation">,
   except: ReadonlySet<string>,
   sharpAngle: number
-): ReadonlyArray<SnapItem> => snapItemsWhere(s, (key) => !except.has(key), sharpAngle)
+): ReadonlyArray<SnapItem> => {
+  const shown = shownOf(s)
+  return snapItemsWhere(s, (key) => !except.has(key) && shown(key), sharpAngle)
+}
 
 /** The items `keys` as `snapItemsOf` has a target, for what measures the selection's own shape. */
 export const ownSnapItemsOf = (
-  s: Pick<EditorState, "doc" | "catalogIndex">,
+  s: Pick<EditorState, "doc" | "catalogIndex" | "isolation">,
   keys: ReadonlyArray<string>,
   sharpAngle: number
 ): ReadonlyArray<SnapItem> => {

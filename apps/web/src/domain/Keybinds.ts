@@ -96,7 +96,12 @@ export const keybindSections = [
       "viewRight",
       "viewLeft",
       "toggleOrthographic",
-      "frameAll"
+      "frameAll",
+      "hideSelection",
+      "showAll",
+      "isolateSelection",
+      "lockSelection",
+      "unlockAll"
     ]
   },
   {
@@ -200,6 +205,11 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   viewLeft: "left view",
   toggleOrthographic: "perspective view",
   frameAll: "frame all",
+  hideSelection: "hide / show",
+  showAll: "show all",
+  isolateSelection: "isolate",
+  lockSelection: "lock / unlock",
+  unlockAll: "unlock all",
   newMap: "new map",
   openMap: "import map",
   saveMap: "save map",
@@ -249,7 +259,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Add the copied items where they were when copied, and select them. Ctrl+V in the in-game editor, which also pastes in place.",
   undo: "Undo the last change. Ctrl+Z in the in-game editor; a whole gizmo drag or number-field scrub is one step.",
   redo: "Redo the last undone change. Ctrl+Y in the in-game editor; Ctrl+Shift+Z also works.",
-  selectAll: "Select every item in the map; inside an entered group, every item in that group.",
+  selectAll:
+    "Select every item in the map; inside an entered group, every item in that group. Hidden and locked items are left out.",
   deselect:
     "Clear the selection. Inside an entered group it steps out of the group instead, and with a pane maximised it restores the panes. (The game uses Ctrl+click.)",
   cancelDrag:
@@ -313,7 +324,16 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   viewLeft: "Look at the map from its left (the -Y side) in the active pane, orthographic.",
   toggleOrthographic:
     "Switch the active pane between perspective and the orthographic view closest to where it is looking.",
-  frameAll: "Frame the whole map in the active pane.",
+  frameAll: "Frame the whole map in the active pane, as far as it's drawn.",
+  hideSelection:
+    "Hide the selection: it isn't drawn, picked or snapped to until it's shown again. With all of it hidden already (picked in the Outline), show it. H in Blender, Unity and Unreal; the game has no hiding.",
+  showAll:
+    "Show every hidden item, and select them. Alt+H, as in Blender. Editor only, like hiding: the game always draws everything.",
+  isolateSelection:
+    "Draw only the selection in the map's panes, until this is pressed again; nothing is hidden for good, and pieces added meanwhile show. Shift+H in Unity; Numpad / is Blender's local view. Editor only.",
+  lockSelection:
+    "Lock the selection: it's still drawn and snapped to, but a click goes through it, and Select all and the paint tool leave it alone. Pick it in the Outline to unlock it. Ctrl+L, as in Godot and Rhino. Editor only.",
+  unlockAll: "Unlock every locked item, and select them. Editor only.",
   newMap: "Start a new map.",
   openMap:
     "Import a .balledit or .ballmap file: it is copied into the project and opened from there. In the browser, open it.",
@@ -426,6 +446,11 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   viewLeft: {},
   toggleOrthographic: {},
   frameAll: {},
+  hideSelection: {},
+  showAll: {},
+  isolateSelection: {},
+  lockSelection: {},
+  unlockAll: {},
   snapToggle: {},
   snapOff: { drag: ["move", "turn", "scale", "place"] },
   snapHold: { drag: ["move", "turn"] },
@@ -563,6 +588,11 @@ export const defaultKeybinds: Keybinds = {
   viewLeft: ["Ctrl+Numpad3"],
   toggleOrthographic: ["Numpad5"],
   frameAll: ["Shift+KeyF"],
+  hideSelection: ["KeyH"],
+  showAll: ["Alt+KeyH"],
+  isolateSelection: ["Shift+KeyH", "NumpadDivide"],
+  lockSelection: ["Ctrl+KeyL"],
+  unlockAll: ["Alt+KeyL"],
   newMap: ["Alt+KeyN"],
   openMap: ["Ctrl+KeyO"],
   saveMap: ["Ctrl+KeyS"],

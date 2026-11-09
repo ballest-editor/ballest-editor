@@ -248,11 +248,13 @@ export const loadStructure = (
   const keys = byIndex ?? keysByFingerprint(map, entries)
   const matched = new Set(keys.flatMap((key) => key ?? []))
   const ids = keys.map((key) => key ?? freshKey())
-  const items = new Map(entries.flatMap(([key, { connectAt, name, tags }]) => {
+  const items = new Map(entries.flatMap(([key, { connectAt, hidden, locked, name, tags }]) => {
     const meta: ItemMeta = {
       ...(name !== undefined && { name }),
       ...(tags !== undefined && tags.length > 0 && { tags }),
-      ...(connectAt !== undefined && Object.keys(connectAt).length > 0 && { connectAt })
+      ...(connectAt !== undefined && Object.keys(connectAt).length > 0 && { connectAt }),
+      ...(hidden === true && { hidden }),
+      ...(locked === true && { locked })
     }
     return matched.has(key) && Object.keys(meta).length > 0 ? [[key, meta] as const] : []
   }))

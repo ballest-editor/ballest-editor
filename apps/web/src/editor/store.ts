@@ -147,6 +147,16 @@ import {
   withoutMaximised,
   withPaneChange
 } from "../domain/viewLayout"
+import {
+  type Isolation,
+  isolationOf,
+  isPickable,
+  isShown,
+  type ItemFlag,
+  keysWith,
+  toggledFlag,
+  withFlag
+} from "../domain/visibility"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
   GamePathKind,
@@ -535,6 +545,12 @@ export interface TabState {
   readonly enteredGroupId: string | null
   /** The groups the Outline shows closed. Outside the document and its history, so undo doesn't touch them. */
   readonly collapsedGroups: ReadonlySet<string>
+  /**
+   * What the tab's panes leave out while the selection is isolated; null when nothing is. A view of the tab, like
+   * `collapsedGroups`: outside the document and its history, and gone with the tab (docs/DESKTOP.md § Hide, isolate
+   * and lock).
+   */
+  readonly isolation: Isolation | null
   /** How the tab divides its view into panes; kept per map in MapPrefsStore. */
   readonly viewLayout: ViewLayout
   /** The slot of the active pane: what the fly keys, Focus selection and Frame all act on. */
@@ -871,6 +887,17 @@ export interface EditorState extends TabState {
   /** Checks the document against the game's format; `shownValidation` has the result until the next edit. */
   readonly validateDoc: () => void
   readonly setGroupCollapsed: (groupId: string, collapsed: boolean) => void
+  /**
+   * Hides or locks the items `keys` (`on`), or shows or unlocks them, as one undo step. What becomes hidden or locked
+   * leaves the selection, as the viewport can no longer pick it.
+   */
+  readonly setItemFlag: (keys: ReadonlyArray<string>, flag: ItemFlag, on: boolean) => void
+  /** Hides the selection, or shows it when all of it is hidden already (as it can be, picked in the Outline). */
+  readonly toggleSelectionFlag: (flag: ItemFlag) => void
+  /** Shows every hidden item, or unlocks every locked one, as one undo step, and selects them, as Blender's Alt+H. */
+  readonly clearFlag: (flag: ItemFlag) => void
+  /** Isolates the selection in the tab's panes, or ends the isolation; nothing with neither. */
+  readonly toggleIsolation: () => void
   readonly expandGroups: (groupIds: ReadonlyArray<string>) => void
   readonly setTool: (tool: Tool) => void
   readonly setBrush: (brush: Brush) => void
@@ -976,6 +1003,7 @@ const freshTabState = (
     savedSnap: snap,
     enteredGroupId: null,
     collapsedGroups: new Set(),
+    isolation: null,
     viewLayout,
     activePane: maximisedSlotOf(viewLayout) ?? 0,
     validation: null
@@ -1007,6 +1035,7 @@ const activeTabOf = (s: EditorState): TabState => ({
   savedSnap: s.savedSnap,
   enteredGroupId: s.enteredGroupId,
   collapsedGroups: s.collapsedGroups,
+  isolation: s.isolation,
   viewLayout: s.viewLayout,
   activePane: s.activePane,
   validation: s.validation
@@ -1085,6 +1114,12 @@ const withMovedItems = (
     options?.connected === true,
     catalog
   )
+}
+
+/** What Undo names each hide and lock step: setting the flag, clearing it, and clearing it everywhere. */
+const FLAG_STEPS: Readonly<Record<ItemFlag, readonly [string, string, string]>> = {
+  hidden: ["Hide", "Show", "Show all"],
+  locked: ["Lock", "Unlock", "Unlock all"]
 }
 
 export const useEditor = create<EditorState>()((set, get) => {
@@ -1825,6 +1860,35 @@ export const useEditor = create<EditorState>()((set, get) => {
       set(({ doc, catalogIndex }) => ({
         validation: { doc, result: validateMap(gameMapOf(doc, catalogIndex), catalogIndex) }
       })),
+    setItemFlag: (keys, flag, on) => {
+      const { doc, selectedIds } = get()
+      const structure = withFlag(doc.structure, keys, flag, on)
+      if (structure === undefined) return
+      const gone = new Set(on ? keys : [])
+      commit(
+        { ...doc, structure },
+        { selectedIds: selectedIds.filter((id) => !gone.has(id)) },
+        undefined,
+        FLAG_STEPS[flag][on ? 0 : 1]
+      )
+    },
+    toggleSelectionFlag: (flag) => {
+      const { doc, selectedIds, setItemFlag } = get()
+      if (selectedIds.length > 0) setItemFlag(selectedIds, flag, toggledFlag(doc.structure, selectedIds, flag))
+    },
+    clearFlag: (flag) => {
+      const { doc } = get()
+      const keys = keysWith(doc.structure, flag)
+      const structure = withFlag(doc.structure, keys, flag, false)
+      if (structure !== undefined) commit({ ...doc, structure }, { selectedIds: keys }, undefined, FLAG_STEPS[flag][2])
+    },
+    toggleIsolation: () =>
+      set((s) => {
+        if (noTabOpen(s)) return s
+        if (s.isolation !== null) return { isolation: null }
+        const isolation = isolationOf(s.doc.ids, s.selectedIds)
+        return isolation === undefined ? s : { isolation }
+      }),
     setGroupCollapsed: (groupId, collapsed) =>
       set((s) => {
         if (s.collapsedGroups.has(groupId) === collapsed) return s
@@ -2015,6 +2079,17 @@ export const useEditor = create<EditorState>()((set, get) => {
 })
 
 /** Tab `tabId`'s state, wherever it is; undefined when no tab has that id. */
+/** Whether the active tab draws item `key` (`isShown`): what the viewport shows and snapping lands on. */
+export const shownOf = (s: Pick<TabState, "doc" | "isolation">) => (key: string): boolean =>
+  isShown(s.doc.structure, s.isolation, key)
+
+/**
+ * Whether the viewport can pick item `key` in the active tab (`isPickable`): drawn and not locked. Clicks, Select all
+ * and box and lasso select (#85) all ask this.
+ */
+export const pickableOf = (s: Pick<TabState, "doc" | "isolation">) => (key: string): boolean =>
+  isPickable(s.doc.structure, s.isolation, key)
+
 export const tabStateOf = (s: EditorState, tabId: string): TabState | undefined => {
   if (noTabOpen(s)) return undefined
   return tabId === s.tabId ? activeTabOf(s) : s.parkedTabs.get(tabId)
@@ -2221,11 +2296,12 @@ export const nextSelection = (current: Selection, ids: ReadonlyArray<string>, mo
 }
 
 /**
- * What a box or lasso can catch, in Outline order: what Select all takes, the map's items or the entered group's. The
- * one place hidden and locked items (#81) are to leave the box, as they leave a click.
+ * What a box or lasso can catch, in Outline order: the map's items or the entered group's that the viewport can pick
+ * (`pickableOf`), so hidden and locked items leave a box as they leave a click. A caught unit still brings its hidden
+ * and locked members (`caughtUnitsOf`), as a click on a group does.
  */
-export const areaCandidates = (s: Pick<EditorState, "doc" | "enteredGroupId">): ReadonlyArray<string> =>
-  selectableKeys(s.doc.structure.tree, s.enteredGroupId)
+export const areaCandidates = (s: Pick<EditorState, "doc" | "enteredGroupId" | "isolation">): ReadonlyArray<string> =>
+  selectableKeys(s.doc.structure.tree, s.enteredGroupId).filter(pickableOf(s))
 
 /** Each key's place in `ids`, kept per array: a group's selection can be thousands of items. */
 const keyIndices = new WeakMap<ReadonlyArray<string>, ReadonlyMap<string, number>>()

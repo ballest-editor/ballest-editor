@@ -51,7 +51,7 @@ Under a handle or a lock the pivot and the selection's stations land too, whatev
 
 ### Snap targets
 
-Where the base can land. Each target is a row in the snap menu's Advanced with its own toggle, its own parameters, and a place in the priority list (§ Priority). A target that is off contributes nothing.
+Where the base can land. Each target is a row in the snap menu's Advanced with its own toggle, its own parameters, and a place in the priority list (§ Priority). A target that is off contributes nothing. A hidden piece, or one an isolation leaves out, is no target of any kind, and a locked one is ([DESKTOP.md § Hide, isolate and lock](DESKTOP.md#hide-isolate-and-lock)).
 
 #### Grid
 

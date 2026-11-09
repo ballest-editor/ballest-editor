@@ -1,4 +1,4 @@
-/** Group trees for the selection rules' tests. */
+/** Trees of groups and items for tests of what selecting, hiding and locking reach. */
 import type { TreeNode } from "../domain/MapSidecar"
 
 export const item = (key: string): TreeNode => ({ kind: "item", key })

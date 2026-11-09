@@ -20,6 +20,7 @@ import {
   withItemName,
   withTags
 } from "./structure"
+import { withFlag } from "./visibility"
 
 const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
 
@@ -88,6 +89,24 @@ describe("loadStructure", () => {
     assert.deepStrictEqual(loadStructure(map, HASH, file).structure.items.get(keys.k3), {
       connectAt: { "0": "bottomLeft" }
     })
+  })
+
+  // #81's done-when: hidden and locked pieces survive a reload, and the map the game gets is the same either way.
+  it("reads back hidden and locked items through the file, and after the game rewrote others", () => {
+    const { ids, keys, map, structure } = authored()
+    const flagged = withFlag(withFlag(structure, [keys.k0, keys.k3], "hidden", true)!, [keys.k1], "locked", true)!
+    const Codec = Schema.fromJsonString(MapSidecar)
+    const file = Schema.decodeSync(Codec)(Schema.encodeSync(Codec)(sidecarOf(map, ids, flagged, HASH)))
+    assert.deepStrictEqual(file.items[keys.k0], { index: 0, fingerprint: fingerprintOf(map.items[0]!), hidden: true })
+    const reloaded = loadStructure(map, HASH, file).structure
+    assert.deepStrictEqual(reloaded.items, flagged.items)
+
+    const [first, second, third, fourth] = map.items
+    const edited = mapOf([fourth!, first!, at(9000), second!, third!])
+    const rematched = loadStructure(edited, OTHER_HASH, file).structure
+    assert.deepStrictEqual(rematched.items.get(keys.k0), { hidden: true })
+    assert.deepStrictEqual(rematched.items.get(keys.k1), { name: "Named", locked: true })
+    assert.deepStrictEqual(rematched.items.get(keys.k3), { connectAt: { "0": "bottomLeft" }, hidden: true })
   })
 
   it("makes keys and a flat tree without a sidecar, with the file's groups", () => {

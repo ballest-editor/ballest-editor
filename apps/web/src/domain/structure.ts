@@ -15,6 +15,10 @@ export interface ItemMeta {
   readonly tags?: ReadonlyArray<string>
   /** Where its ends connect, when not where they were measured (docs/SNAPPING.md § Connectors). */
   readonly connectAt?: ConnectAt
+  /** Hidden: not drawn, picked or snapped to (docs/DESKTOP.md § Hide, isolate and lock). */
+  readonly hidden?: true
+  /** Locked: drawn and snapped to, but not picked in the viewport. */
+  readonly locked?: true
 }
 
 export interface Structure {
@@ -129,9 +133,9 @@ export const withoutKeys = (structure: Structure, keys: ReadonlySet<string>): St
   items: new Map([...structure.items].filter(([key]) => !keys.has(key)))
 })
 
-const withMeta = (structure: Structure, key: string, meta: ItemMeta): Structure => {
+export const withMeta = (structure: Structure, key: string, meta: ItemMeta): Structure => {
   const items = new Map(structure.items)
-  if (meta.name === undefined && meta.tags === undefined && meta.connectAt === undefined) items.delete(key)
+  if (Object.values(meta).every((value) => value === undefined)) items.delete(key)
   else items.set(key, meta)
   return { ...structure, items }
 }

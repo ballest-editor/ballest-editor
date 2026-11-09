@@ -1,7 +1,7 @@
 /** Selection edits: each is one undo step, however many items it touches. */
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
-import { canSetItemPivots, selectableKeys } from "../../domain/groupSelection"
+import { canSetItemPivots } from "../../domain/groupSelection"
 import {
   applyGroupDelta,
   type Axis,
@@ -23,9 +23,11 @@ import { type PivotChoice, pivotFor } from "../../domain/pivot"
 import type { RepeatOptions } from "../../domain/repeat"
 import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
 import { applyUnitEdit, pivotModeFor, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
+import { pickableSelection } from "../../domain/visibility"
 import {
   editedKeys,
   fitTransforms,
+  pickableOf,
   pivotOf,
   selectionPivot,
   type SlotPaint,
@@ -52,10 +54,10 @@ export const repeatSelection = (options: RepeatOptions) => useEditor.getState().
 
 export const duplicateSelection = () => useEditor.getState().duplicateSelection()
 
-/** Selects every item a click could reach from here: the map's, or the entered group's. */
+/** Selects everything a click could reach from here, the map's or the entered group's, but what is hidden or locked. */
 export const selectAll = () => {
-  const { doc, enteredGroupId, select } = useEditor.getState()
-  select(selectableKeys(doc.structure.tree, enteredGroupId))
+  const s = useEditor.getState()
+  s.select(pickableSelection(s.doc.structure.tree, s.enteredGroupId, pickableOf(s)))
 }
 
 /** An item's edit transform in the document: never the live preview. */

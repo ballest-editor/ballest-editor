@@ -25,6 +25,7 @@ import {
 import { DECAL_VISUAL_SCALE, editTransform, isDecal } from "../domain/editTransform"
 import type { Item } from "../domain/MapFile"
 import { mirrorScaleOf } from "../domain/mirror"
+import { isShown } from "../domain/visibility"
 import { LaserBeam } from "./LaserBeam"
 import { applySlotMaterials } from "./materials"
 import { sceneRegistry } from "./sceneRegistry"
@@ -177,6 +178,8 @@ export const ItemObject = memo(function ItemObjectView(props: {
 
   // A continuous interaction (gizmo drag, inspector scrub) shows here before it commits.
   const live = useEditor((s) => s.preview?.get(id))
+  // hidden, or left out by an isolation: still in the scene, so it keeps its place for the gizmo and its group's box
+  const shown = useEditor((s) => isShown(s.doc.structure, s.isolation, id))
   const itemTransform = live ?? editTransform(item)
   const transform = useMemo(() => ueToScene(itemTransform), [itemTransform])
   const surfaces = useEditor((s) => s.surfaces)
@@ -198,6 +201,7 @@ export const ItemObject = memo(function ItemObjectView(props: {
     <FixedGroup
       ref={ref}
       userData={{ itemId: id }}
+      visible={shown}
       position={transform.position}
       quaternion={transform.quaternion}
       scale={transform.scale}

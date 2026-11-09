@@ -135,6 +135,19 @@ describe("keybind table", () => {
     expect(isOneShotChord(defaultKeybinds, "KeyX")).toBe(false)
   })
 
+  // docs/design/hide-isolate-lock.md: Blender's H and Alt+H, Unity's Shift+H, Blender's Numpad / for local view, and
+  // Godot's and Rhino's Ctrl+L, as L is snapping's while a drag is held
+  it("hides, isolates and locks on the keys the other editors use, as the game has none", () => {
+    const view = keybindSections.find((s) => s.name === "view")!
+    expect(view.actions.slice(-5).map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
+      ["hide / show", ["KeyH"]],
+      ["show all", ["Alt+KeyH"]],
+      ["isolate", ["Shift+KeyH", "NumpadDivide"]],
+      ["lock / unlock", ["Ctrl+KeyL"]],
+      ["unlock all", ["Alt+KeyL"]]
+    ])
+  })
+
   it("merges stored bindings, accepting the old single-string form", () => {
     const merged = mergeKeybinds({ undo: "Ctrl+KeyU", redo: ["Ctrl+KeyR", "Ctrl+KeyR", ""], bogus: "KeyX" })
     expect(merged.undo).toEqual(["Ctrl+KeyU"])

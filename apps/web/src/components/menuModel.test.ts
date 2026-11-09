@@ -35,12 +35,40 @@ const state = (over: Partial<MenuState> = {}): MenuState => ({
   layout: defaultViewLayout,
   projection: "perspective",
   update: null,
+  visibility: { selectionHidden: false, selectionLocked: false, hidden: 0, locked: 0, isolated: false },
   ...over
 })
 
 const entries = (over?: Partial<MenuState>) => menuEntries(menusOf(state(over)))
 const crumbs = (found: ReadonlyArray<MenuEntry>) => found.map(({ label, path }) => [...path, label].join(" › "))
 const find = (query: string, over?: Partial<MenuState>) => crumbs(searchMenus(entries(over), query))
+
+describe("the View menu's Hide and lock", () => {
+  const rows = (over?: Partial<MenuState>) =>
+    entries(over).filter(({ path }) => path.join(" › ") === "View › Hide and lock")
+      .map(({ label, reason }) => [label, reason])
+
+  it("acts on the selection, and says when the map has nothing hidden or locked", () => {
+    assert.deepStrictEqual(rows(), [
+      ["Hide selection", "Select something first."],
+      ["Show all", "Nothing is hidden."],
+      ["Isolate selection", "Select something first."],
+      ["Lock selection", "Select something first."],
+      ["Unlock all", "Nothing is locked."]
+    ])
+  })
+
+  it("shows or unlocks a selection that is all hidden or locked, and ends an isolation", () => {
+    const visibility = { selectionHidden: true, selectionLocked: true, hidden: 2, locked: 1, isolated: true }
+    assert.deepStrictEqual(rows({ hasSelection: true, visibility }), [
+      ["Show selection", null],
+      ["Show all", null],
+      ["End isolation", null],
+      ["Unlock selection", null],
+      ["Unlock all", null]
+    ])
+  })
+})
 
 describe("searching the menus", () => {
   it("finds a row in any menu, those that can run first", () => {

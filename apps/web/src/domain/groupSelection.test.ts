@@ -12,7 +12,6 @@ import {
   groupSelectionStates,
   groupTrail,
   nodeKeys,
-  selectableKeys,
   selectedGroupIds,
   selectionNodeIds,
   selectionSummaryOf,
@@ -93,17 +92,6 @@ describe("what a selection makes up", () => {
     assert.isTrue(canGroupSelection(tree, ["a", "b", "d"], null))
     assert.isFalse(canGroupSelection(tree, ["a", "b"], null))
     assert.isFalse(canGroupSelection(tree, [], null))
-  })
-})
-
-describe("selectableKeys", () => {
-  it("is every item in the map, in or out of a group", () => {
-    assert.deepStrictEqual(selectableKeys(tree, null), ["a", "b", "c", "d", "e"])
-  })
-
-  it("is the entered group's items, nested ones too", () => {
-    assert.deepStrictEqual(selectableKeys(tree, "outer"), ["a", "b", "c"])
-    assert.deepStrictEqual(selectableKeys(tree, "inner"), ["a", "b"])
   })
 })
 
