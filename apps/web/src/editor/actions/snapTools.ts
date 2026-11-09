@@ -5,7 +5,7 @@
 import { Effect, Equal } from "effect"
 import { endsOf, meetingTurn } from "../../domain/connectors"
 import type { SpotId } from "../../domain/connectorSpots"
-import type { UeTransform, Vec3 } from "../../domain/coords"
+import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
 import { applyGroupDelta, type RigidDelta } from "../../domain/groupTransform"
 import { type Box, itemsBoxOf } from "../../domain/itemBounds"
@@ -24,19 +24,22 @@ import {
   type SnapTarget
 } from "../../domain/snapConfig"
 import {
-  alignOffsets,
   angleBetweenFaces,
+  type ArrangeMarks,
+  arrangeMarks,
+  arrangeOffsets,
+  type ArrangeOp,
   axisFromPoints,
   axisFromWorld,
   type BoxAxis,
   type BoxSide,
-  distributeOffsets,
   type Distribution,
   type FaceMeeting,
   faceMeeting,
   measurementFacts,
   mirroredTransform,
   type MirrorPlane,
+  movesBox,
   planeFromFace,
   planeFromOffset,
   planeFromPoints,
@@ -46,7 +49,7 @@ import {
   type WorldPlane
 } from "../../domain/snapTools"
 import { annotationsOf, freshKey } from "../../domain/structure"
-import { ORIGIN, rotateVec, vecSub } from "../../domain/ueMath"
+import { IDENTITY_QUAT, ORIGIN, rotateVec, vecDot, vecSub } from "../../domain/ueMath"
 import {
   applyDelta,
   applyUnitOffsets,
@@ -56,6 +59,7 @@ import {
   type Unit
 } from "../../domain/units"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
+import { activePaneCamera } from "../paneCameras"
 import { snapMarks } from "../snap/snapMarks"
 import {
   editedKeys,
@@ -247,11 +251,11 @@ interface UnitBox {
   readonly box: Box
 }
 
-/** The selection as units, each with its box where the document has one. */
-const selectedBoxes = (s: EditorState) => {
+/** The selection as units, each with its box where the document has one, square to `frame`'s axes and in its terms. */
+const selectedBoxes = (s: EditorState, frame?: Quat4) => {
   const selection = selectionUnits(s, (key) => editTransformOf(s, key))
   const boxes = (selection?.units ?? []).flatMap((unit): ReadonlyArray<UnitBox> => {
-    const box = itemsBoxOf(itemsOf(s, unit.keys), s.catalogIndex)
+    const box = itemsBoxOf(itemsOf(s, unit.keys), s.catalogIndex, frame)
     return box === undefined ? [] : [{ unit, box }]
   })
   return { selection, boxes }
@@ -274,24 +278,112 @@ const offsetUnits = (
   s.transformItems(fitTransforms(s, moved), { description: description(moved.size) })
 }
 
-/** Lines the selection's `side` up on `axis`: on the first selected unit, or on the box around them all. */
-export const alignSelection = (axis: BoxAxis, side: BoxSide, to: "first" | "bounds") => {
-  const s = useEditor.getState()
-  const { boxes, selection } = selectedBoxes(s)
-  const first = s.selectedIds.flatMap((key) => boxes.filter(({ unit }) => unit.keys.includes(key)))[0]?.box
-  const all = itemsBoxOf(itemsOf(s, boxes.flatMap(({ unit }) => unit.keys)), s.catalogIndex)
-  const reference = to === "first" ? first : all
-  if (selection === undefined || reference === undefined || boxes.length < 2) return
-  const offsets = alignOffsets(boxes.map(({ box }) => box), axis, side, reference)
-  offsetUnits(selection, boxes, offsets, (count) => `Align ${count} items on ${axis.toUpperCase()}`)
+/**
+ * The axes Align and Distribute work along: the world's, or with the gizmo in Local the active unit's, as a move's
+ * axis handle would run (docs/SNAPPING.md § Align and distribute).
+ */
+const arrangeFrameOf = (s: EditorState, active: Unit): Quat4 =>
+  s.gizmoSpace === "local" ? active.transform.rotation : IDENTITY_QUAT
+
+/** What one Align or Distribute does to the selection, which its preview draws and its button runs. */
+export interface ArrangePlan {
+  readonly selection: SelectionUnits
+  readonly boxes: ReadonlyArray<UnitBox>
+  /** How far each of `boxes` moves, in the world. */
+  readonly offsets: ReadonlyArray<Vec3>
+  /** How many units move: none when the selection already stands as `op` would put it. */
+  readonly moving: number
+  /** What the preview draws: in the world, but for its landings, which are boxes in `frame`'s terms. */
+  readonly marks: ArrangeMarks
+  /** The axes the boxes are square to: turn a landing's corners by it to put them in the world. */
+  readonly frame: Quat4
+  /** The world's direction of `op`'s axis. */
+  readonly direction: Vec3
 }
 
-export const distributeSelection = (axis: BoxAxis, by: Distribution) => {
-  const { boxes, selection } = selectedBoxes(useEditor.getState())
-  if (selection === undefined || boxes.length < 3) return
-  const offsets = distributeOffsets(boxes.map(({ box }) => box), axis, by)
-  offsetUnits(selection, boxes, offsets, (count) => `Distribute ${count} items along ${axis.toUpperCase()}`)
+const UNIT_AXES = { x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: 1, z: 0 }, z: { x: 0, y: 0, z: 1 } } as const
+
+/** `op` on the selection as it stands; undefined unless two or more units are selected. */
+export const arrangePlanOf = (s: EditorState, op: ArrangeOp): ArrangePlan | undefined => {
+  const first = selectedBoxes(s)
+  if (first.selection === undefined || first.selection.units.length < 2) return undefined
+  const frame = arrangeFrameOf(s, first.selection.active)
+  const { boxes, selection } = frame === IDENTITY_QUAT ? first : selectedBoxes(s, frame)
+  if (selection === undefined || boxes.length < 2) return undefined
+  const active = boxes.findIndex(({ unit }) => unit.id === selection.active.id)
+  const own = arrangeOffsets(boxes.map(({ box }) => box), op, Math.max(active, 0), s.arrangeSpacing ?? undefined)
+  const toWorld = (v: Vec3) => rotateVec(frame, v)
+  const points = (list: ReadonlyArray<Vec3>) => list.map(toWorld)
+  const marks = arrangeMarks(boxes.map(({ box }) => box), own, op, Math.max(active, 0))
+  return {
+    selection,
+    boxes,
+    offsets: own.map(toWorld),
+    moving: own.filter(movesBox).length,
+    marks: {
+      // a landing stays a box in the frame's terms: the overlay turns its corners
+      landings: marks.landings,
+      faces: marks.faces.map(({ from, to }) => ({ from: points(from), to: points(to) })),
+      ...(marks.reference !== undefined && { reference: points(marks.reference) }),
+      ...(marks.plane !== undefined && { plane: points(marks.plane) }),
+      paths: marks.paths.map(({ from, to }) => ({ from: toWorld(from), to: toWorld(to) })),
+      dimensions: marks.dimensions.map(({ cm, from, to }) => ({ cm, from: toWorld(from), to: toWorld(to) }))
+    },
+    frame,
+    direction: toWorld(UNIT_AXES[op.axis])
+  }
 }
+
+const describeArrange = (op: ArrangeOp, count: number) => {
+  const axis = op.axis.toUpperCase()
+  const items = `${count} item${count === 1 ? "" : "s"}`
+  return op.kind === "align" ? `Align ${items} on ${axis}` : `Distribute ${items} along ${axis}`
+}
+
+/** Runs `op` on the selection as one undo step; nothing when it would move nothing. */
+export const arrangeSelection = (op: ArrangeOp) => {
+  const plan = arrangePlanOf(useEditor.getState(), op)
+  if (plan === undefined || plan.moving === 0) return
+  offsetUnits(plan.selection, plan.boxes, plan.offsets, (count) => describeArrange(op, count))
+}
+
+/** Lines the selection's `side` up on `axis`: on the active unit, or on the box around them all. */
+export const alignSelection = (axis: BoxAxis, side: BoxSide, to: "active" | "bounds") =>
+  arrangeSelection({ kind: "align", axis, side, to })
+
+export const distributeSelection = (axis: BoxAxis, by: Distribution) =>
+  arrangeSelection({ kind: "distribute", axis, by })
+
+/** Which Align button the panes preview, or none. */
+export const setArrangeHover = (op: ArrangeOp | null) => useEditor.setState({ arrangeHover: op })
+
+/** Distribute's spacing: a number of cm out from the active unit, or null for Auto. */
+export const setArrangeSpacing = (spacing: number | null) => useEditor.setState({ arrangeSpacing: spacing })
+
+export type ScreenDirection = "left" | "right" | "up" | "down"
+
+/**
+ * The Align that lines the selection up on the active unit's side facing `direction` on screen in the active pane: the
+ * frame's axis that runs most nearly that way, and its end that way (docs/SNAPPING.md § Align and distribute).
+ */
+export const screenAlignOf = (s: EditorState, direction: ScreenDirection): ArrangeOp => {
+  const { right, up } = activePaneCamera().screenAxes()
+  const toward = direction === "left" || direction === "right" ? right : up
+  const sign = direction === "left" || direction === "down" ? -1 : 1
+  const selection = selectionUnits(s, (key) => editTransformOf(s, key))
+  const frame = selection === undefined ? IDENTITY_QUAT : arrangeFrameOf(s, selection.active)
+  const reach = (axis: BoxAxis) => sign * vecDot(rotateVec(frame, UNIT_AXES[axis]), toward)
+  const [best] = (["x", "y", "z"] as const).toSorted((a, b) => Math.abs(reach(b)) - Math.abs(reach(a)))
+  const axis = best ?? "x"
+  return { kind: "align", axis, side: reach(axis) > 0 ? "max" : "min", to: "active" }
+}
+
+/** The Align `direction` on screen means in the active pane as it is now. */
+export const screenAlignNow = (direction: ScreenDirection): ArrangeOp => screenAlignOf(useEditor.getState(), direction)
+
+/** Ctrl+Shift+an arrow: lines the selection up on the active unit's side that way on screen. */
+export const alignToScreen = (direction: ScreenDirection) =>
+  arrangeSelection(screenAlignOf(useEditor.getState(), direction))
 
 const round = (value: number) => Math.round(value * 10) / 10
 

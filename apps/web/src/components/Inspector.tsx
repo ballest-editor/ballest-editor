@@ -67,6 +67,7 @@ import {
 } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
+import { AlignSection } from "./AlignSection"
 import { ConnectsAtSection } from "./ConnectsAtSection"
 import { Fact, Facts } from "./Facts"
 import { FlipSection } from "./FlipSection"
@@ -929,6 +930,7 @@ function ItemEditor({ items, ids, transforms, placed, transform, unit, extent, g
             <FlipSection items={placed} />
           </TransformSection>
           <PivotSection />
+          <AlignSection />
           {items.length === 1 && ids[0] !== undefined && <ConnectsAtSection itemKey={ids[0]} />}
         </>
       )}

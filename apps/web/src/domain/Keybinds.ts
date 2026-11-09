@@ -56,7 +56,11 @@ export const keybindSections = [
       "enterGroup",
       "groupSelection",
       "chainSelection",
-      "ungroupSelection"
+      "ungroupSelection",
+      "alignLeft",
+      "alignRight",
+      "alignUp",
+      "alignDown"
     ]
   },
   {
@@ -152,6 +156,10 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   groupSelection: "group",
   chainSelection: "make chain",
   ungroupSelection: "ungroup",
+  alignLeft: "align left",
+  alignRight: "align right",
+  alignUp: "align up",
+  alignDown: "align down",
   moveForward: "forward",
   moveBack: "reverse",
   moveLeft: "left",
@@ -245,6 +253,14 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   chainSelection:
     "Make the selection a chain, its links in order along the pieces from the first selected; one whole group selected becomes a chain itself. A turn then bends it. Editor only.",
   ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the in-game editor.",
+  alignLeft:
+    "Line the selection up on the active item's side that's left on screen in the active pane, along whichever axis runs most nearly that way. Editor only.",
+  alignRight:
+    "Line the selection up on the active item's side that's right on screen in the active pane, along whichever axis runs most nearly that way. Editor only.",
+  alignUp:
+    "Line the selection up on the active item's side that's up on screen in the active pane, along whichever axis runs most nearly that way. Editor only.",
+  alignDown:
+    "Line the selection up on the active item's side that's down on screen in the active pane, along whichever axis runs most nearly that way. Editor only.",
   moveForward: "Fly the camera forward while held.",
   moveBack: "Fly the camera backward while held.",
   moveLeft: "Fly the camera left while held.",
@@ -371,6 +387,10 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   groupSelection: {},
   chainSelection: {},
   ungroupSelection: {},
+  alignLeft: {},
+  alignRight: {},
+  alignUp: {},
+  alignDown: {},
   moveForward: FLYING,
   moveBack: FLYING,
   moveLeft: FLYING,
@@ -501,6 +521,10 @@ export const defaultKeybinds: Keybinds = {
   groupSelection: ["Ctrl+KeyG"],
   chainSelection: ["Ctrl+Shift+KeyG"],
   ungroupSelection: ["Shift+KeyG"],
+  alignLeft: ["Ctrl+Shift+ArrowLeft"],
+  alignRight: ["Ctrl+Shift+ArrowRight"],
+  alignUp: ["Ctrl+Shift+ArrowUp"],
+  alignDown: ["Ctrl+Shift+ArrowDown"],
   moveForward: ["KeyW"],
   moveBack: ["KeyS"],
   moveLeft: ["KeyA"],

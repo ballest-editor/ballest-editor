@@ -46,6 +46,7 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
+import { ArrangeOverlay } from "./snap/ArrangeOverlay"
 import { dropSnapOff } from "./snap/dragKeys"
 import { endSnapDisplay } from "./snap/moveSession"
 import { landDrop, showDrop, snappedDrop } from "./snap/pieceDrop"
@@ -788,6 +789,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <PivotDots />
         <ChainStartMarker />
         <SnapOverlay />
+        <ArrangeOverlay />
         <GizmoController />
         <SnapInput />
         <ClickSelect />

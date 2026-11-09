@@ -32,6 +32,7 @@ export const SectionStack = ({ children }: { readonly children: ReactNode }) => 
 export type SectionId =
   | "transform"
   | "pivot"
+  | "align"
   | "connectsAt"
   | "paint"
   | "properties"

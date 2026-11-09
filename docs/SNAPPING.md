@@ -301,11 +301,22 @@ The status bar's right end says what snapped while a drag is in progress, its gl
 These are open issues already. What changes is that each takes its points, faces and planes from the same target picker as a drag, so there is one way to say "that corner" or "that face" in the whole app: hover and click, with the same highlights and label.
 
 - **Flush and tangent** (#89). Click a face on item A, click a face on item B: B moves so the faces are coplanar (Flush) or touching (Tangent). An offset field in the same small panel. With Connectors on, clicking two ends joins them, which is the same tool with ends for faces.
-- **Align and distribute** (#88). The menu form of alignment snapping: align the selection's min, centre or max on an axis to the first-selected item or the selection's bounds; distribute with equal spacing or equal gaps. Equal gaps is the gap guide made permanent. Both work on the selection's units ([pivot modes and chains](design/pivot-modes-and-chains.md) § Units): a whole group moves as one box and keeps its layout, and it takes two units to align and three to distribute. Inside an entered chain a selected link takes its own offset, and the links after it follow as far as the next selected link.
+- **Align and distribute** (#88). The button form of alignment snapping, in the Inspector and under Tools (§ Align and distribute).
 - **Measure** (#99). Two clicks on any target give the distance and per-axis deltas; a click on two faces gives the angle. A measurement is a sidecar annotation that stays until cleared, and it is a target itself, so a jump can be measured and then built to.
 - **Mirror** (#87). The plane comes from the target picker: a face, a construction plane, a world plane through the grid origin. One reflection takes the whole selection, Together or Each, so a group comes out as its mirror image with its Point pivot reflected too. Inside an entered chain the links a selected link carries are reflected with it.
 - **Grid origin** (#84). Pick a point with the target picker.
 - **Select connected**. Walks the joints from the selection to select the whole track. Not an issue yet; it falls out of joints being recorded.
+
+### Align and distribute
+
+Align lines the selection up on the active item, the one the gizmo sits on; Distribute spreads it out. Both work on the selection's units ([pivot modes and chains](design/pivot-modes-and-chains.md) § Units): a whole group moves as one box and keeps its layout, and the active item's whole unit is what the others line up on. It takes two units to align and three to distribute, or two with a fixed spacing. Inside an entered chain a selected link takes its own offset, and the links after it follow as far as the next selected link. Each is one undo step, and a button that would move nothing is off.
+
+- **Axes.** The world's, or with the gizmo in Local the active unit's own, which is how a row lines up beside a piece turned off the grid. A box is measured square to those axes.
+- **Align** Min, Centre or Max on X, Y or Z puts each unit's side or centre where the active unit's is. Tools › Align to selection bounds does the same on the box around the whole selection, for centring a row on itself.
+- **Distribute** with equal gaps or equal centre steps. With Spacing on Auto the two units at the ends stay and what's between is evened out; equal gaps is the gap guide made permanent. With a fixed Spacing every gap, or every step between centres, is that many cm, counted out both ways from the active unit, which stays; a gap of 0 stacks them.
+- **Ctrl+Shift+an arrow** aligns by screen direction in the active pane: the axis that runs most nearly that way on screen, and its side that way. Looking down, up and down are across the ground, not height.
+
+The Inspector's Align section (`components/AlignSection.tsx`) has a row per axis, its letter on the axis's colour as the Transform rows have it, an arrow for the way the axis points on the active pane's screen, and Tabler's align and distribute icons in segmented tracks. Pointing at a button previews it in every pane in the colours of § Snap indications (`editor/snap/ArrangeOverlay.tsx`): what moves in the source's violet, each unit that moves as a lightly filled box where it lands, the face of it that lines up filled where it starts and more strongly where it lands; what they line up on in the target's amber, the active unit's face; and the plane through it and the gaps or centre steps Distribute makes equal, with their length, as guides. Nothing moves until the button is pressed. The plan the preview draws and the button runs is one (`arrangePlanOf`).
 
 ## Connector data
 

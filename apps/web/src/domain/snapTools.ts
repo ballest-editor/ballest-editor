@@ -56,6 +56,8 @@ export const faceMeeting = (a: PickedFace, b: PickedFace, mode: FaceMeeting, sta
 export type BoxAxis = "x" | "y" | "z"
 export type BoxSide = "min" | "centre" | "max"
 
+const BOX_AXES: ReadonlyArray<BoxAxis> = ["x", "y", "z"]
+
 const sideOf = (box: Box, axis: BoxAxis, side: BoxSide) =>
   side === "centre" ? (box.min[axis] + box.max[axis]) / 2 : box[side][axis]
 
@@ -69,24 +71,54 @@ export const alignOffsets = (
   reference: Box
 ): ReadonlyArray<Vec3> => boxes.map((box) => along(axis, sideOf(reference, axis, side) - sideOf(box, axis, side)))
 
-export type Distribution = "spacing" | "gaps"
+/** What Distribute makes equal: the gaps between the boxes, or the steps between their centres. */
+export type Distribution = "gaps" | "centres"
 
-/** What spreads the boxes along `axis`, the outer two staying: even centres, or even gaps between them. */
+/**
+ * What spreads the boxes along `axis`, in order of their centres. With no `fixed` spacing the outer two stay and the
+ * gaps or centre steps come out equal, which takes three boxes. With one, each gap or step is that many cm, counted out
+ * both ways from box `fixed.from`, which stays; a gap of 0 stacks them.
+ */
 export const distributeOffsets = (
   boxes: ReadonlyArray<Box>,
   axis: BoxAxis,
-  by: Distribution
+  by: Distribution,
+  fixed?: { readonly spacing: number; readonly from: number }
 ): ReadonlyArray<Vec3> => {
   const none = boxes.map(() => ORIGIN)
-  if (boxes.length < 3) return none
+  if (boxes.length < (fixed === undefined ? 3 : 2)) return none
   const order = boxes.map((box, index) => ({ box, index }))
     .sort((a, b) => sideOf(a.box, axis, "centre") - sideOf(b.box, axis, "centre"))
+  const size = (box: Box) => box.max[axis] - box.min[axis]
+  const out = [...none]
+  if (fixed !== undefined) {
+    const at = order.findIndex(({ index }) => index === fixed.from)
+    if (at === -1) return none
+    // where each box ends up along the axis, as its min: the fixed one stays, the rest follow out from it
+    const placed = new Map<number, number>([[at, order[at]?.box.min[axis] ?? 0]])
+    const step = (from: number, to: number) => {
+      const a = order[from]?.box
+      const b = order[to]?.box
+      const start = placed.get(from)
+      if (a === undefined || b === undefined || start === undefined) return
+      const sign = to > from ? 1 : -1
+      const next = by === "gaps"
+        ? (sign > 0 ? start + size(a) + fixed.spacing : start - fixed.spacing - size(b))
+        : start + size(a) / 2 + sign * fixed.spacing - size(b) / 2
+      placed.set(to, next)
+    }
+    for (let i = at + 1; i < order.length; i++) step(i - 1, i)
+    for (let i = at - 1; i >= 0; i--) step(i + 1, i)
+    order.forEach(({ box, index }, i) => {
+      out[index] = along(axis, (placed.get(i) ?? box.min[axis]) - box.min[axis])
+    })
+    return out
+  }
   const [first] = order
   const last = order.at(-1)
   if (first === undefined || last === undefined) return none
   const steps = order.length - 1
-  const out = [...none]
-  if (by === "spacing") {
+  if (by === "centres") {
     const from = sideOf(first.box, axis, "centre")
     const step = (sideOf(last.box, axis, "centre") - from) / steps
     order.forEach(({ box, index }, i) => {
@@ -94,7 +126,6 @@ export const distributeOffsets = (
     })
     return out
   }
-  const size = (box: Box) => box.max[axis] - box.min[axis]
   const filled = order.reduce((sum, { box }) => sum + size(box), 0)
   const gap = (last.box.max[axis] - first.box.min[axis] - filled) / steps
   let at = first.box.min[axis]
@@ -103,6 +134,167 @@ export const distributeOffsets = (
     at += size(box) + gap
   }
   return out
+}
+
+/**
+ * One Align or Distribute along one axis (docs/SNAPPING.md § Align and distribute). Align lines each box's side up on
+ * the active unit's, or on the box around them all; Distribute spreads them (`distributeOffsets`).
+ */
+export type ArrangeOp =
+  | {
+    readonly kind: "align"
+    readonly axis: BoxAxis
+    readonly side: BoxSide
+    readonly to: "active" | "bounds"
+  }
+  | { readonly kind: "distribute"; readonly axis: BoxAxis; readonly by: Distribution }
+
+/** The box around `boxes`; undefined with none. */
+const boxAround = (boxes: ReadonlyArray<Box>): Box | undefined =>
+  boxes.reduce<Box | undefined>((around, box) =>
+    around === undefined ? box : {
+      min: {
+        x: Math.min(around.min.x, box.min.x),
+        y: Math.min(around.min.y, box.min.y),
+        z: Math.min(around.min.z, box.min.z)
+      },
+      max: {
+        x: Math.max(around.max.x, box.max.x),
+        y: Math.max(around.max.y, box.max.y),
+        z: Math.max(around.max.z, box.max.z)
+      }
+    }, undefined)
+
+/**
+ * What `op` moves each box by, in the boxes' own coordinates. `active` is the index of the active unit's box, which
+ * Align lines the others up on and a fixed `spacing` counts out from; `spacing` undefined is Auto.
+ */
+export const arrangeOffsets = (
+  boxes: ReadonlyArray<Box>,
+  op: ArrangeOp,
+  active: number,
+  spacing: number | undefined
+): ReadonlyArray<Vec3> => {
+  if (op.kind === "distribute") {
+    return distributeOffsets(boxes, op.axis, op.by, spacing === undefined ? undefined : { spacing, from: active })
+  }
+  const reference = op.to === "active" ? boxes[active] : boxAround(boxes)
+  if (reference === undefined || boxes.length < 2) return boxes.map(() => ORIGIN)
+  return alignOffsets(boxes, op.axis, op.side, reference)
+}
+
+/** Under this an offset moves nothing: a box already where `op` puts it. */
+const STILL_CM = 0.01
+
+/** Whether an offset moves its box. */
+export const movesBox = (offset: Vec3): boolean => vecLength(offset) > STILL_CM
+
+/** The face of `box` on `side` of `axis`, its corners round in order. */
+export const boxFace = (box: Box, axis: BoxAxis, side: "min" | "max"): ReadonlyArray<Vec3> => {
+  const k = BOX_AXES.indexOf(axis)
+  const i = BOX_AXES[(k + 1) % 3] ?? "x"
+  const j = BOX_AXES[(k + 2) % 3] ?? "y"
+  const at = box[side][axis]
+  const point = (a: number, b: number) => ({ ...ORIGIN, [axis]: at, [i]: a, [j]: b }) as Vec3
+  return [
+    point(box.min[i], box.min[j]),
+    point(box.max[i], box.min[j]),
+    point(box.max[i], box.max[j]),
+    point(box.min[i], box.max[j])
+  ]
+}
+
+const faceCentre = (corners: ReadonlyArray<Vec3>): Vec3 =>
+  vecScale(corners.reduce((sum, corner) => vecAdd(sum, corner), ORIGIN), 1 / Math.max(corners.length, 1))
+
+const shifted = (box: Box, by: Vec3): Box => ({ min: vecAdd(box.min, by), max: vecAdd(box.max, by) })
+
+/** A dimension: a span between two points along the axis, and what it measures. */
+export interface ArrangeDimension {
+  readonly from: Vec3
+  readonly to: Vec3
+  readonly cm: number
+}
+
+/**
+ * What the preview of `op` draws, in the boxes' coordinates (docs/SNAPPING.md § Align and distribute): where each box
+ * that moves lands, the face of it that lines up and where that face goes, the active unit's face they meet and the
+ * plane through it, and for Distribute the gaps or centre steps it makes equal.
+ */
+export interface ArrangeMarks {
+  readonly landings: ReadonlyArray<Box>
+  /** Each moving box's face that lines up, where it starts and where it lands. */
+  readonly faces: ReadonlyArray<{ readonly from: ReadonlyArray<Vec3>; readonly to: ReadonlyArray<Vec3> }>
+  /** The active unit's face the others line up on: Align to a side of the active unit only. */
+  readonly reference?: ReadonlyArray<Vec3>
+  /** The plane the faces or centres meet on: Align only. */
+  readonly plane?: ReadonlyArray<Vec3>
+  /** From where each moving box starts to where it lands: its lining-up face's centre, or its own. */
+  readonly paths: ReadonlyArray<{ readonly from: Vec3; readonly to: Vec3 }>
+  readonly dimensions: ReadonlyArray<ArrangeDimension>
+}
+
+/** How far past the boxes the plane reaches, as a share of their span, and at least this many cm. */
+const PLANE_MARGIN = 0.08
+const PLANE_MARGIN_CM = 20
+
+export const arrangeMarks = (
+  boxes: ReadonlyArray<Box>,
+  offsets: ReadonlyArray<Vec3>,
+  op: ArrangeOp,
+  active: number
+): ArrangeMarks => {
+  const after = boxes.map((box, i) => shifted(box, offsets[i] ?? ORIGIN))
+  const moving = boxes.flatMap((box, i) => movesBox(offsets[i] ?? ORIGIN) ? [{ box, landing: after[i] ?? box }] : [])
+  const landings = moving.map(({ landing }) => landing)
+  const { axis } = op
+  if (op.kind === "distribute") {
+    const order = after.toSorted((a, b) => sideOf(a, axis, "centre") - sideOf(b, axis, "centre"))
+    const dimensions = order.slice(1).map((next, i): ArrangeDimension => {
+      const previous = order[i] ?? next
+      const middle = vecScale(vecAdd(boxCentreOf(previous), boxCentreOf(next)), 0.5)
+      const from = { ...middle, [axis]: op.by === "gaps" ? previous.max[axis] : sideOf(previous, axis, "centre") }
+      const to = { ...middle, [axis]: op.by === "gaps" ? next.min[axis] : sideOf(next, axis, "centre") }
+      return { from, to, cm: to[axis] - from[axis] }
+    })
+    const faces = op.by === "gaps"
+      ? moving.flatMap(({ box, landing }) =>
+        (["min", "max"] as const).map((side) => ({ from: boxFace(box, axis, side), to: boxFace(landing, axis, side) }))
+      )
+      : []
+    const paths = moving.map(({ box, landing }) => ({ from: boxCentreOf(box), to: boxCentreOf(landing) }))
+    return { landings, faces, paths, dimensions }
+  }
+  const reference = op.to === "active" ? boxes[active] : boxAround(boxes)
+  const around = boxAround([...boxes, ...after])
+  if (reference === undefined || around === undefined) return { landings, faces: [], paths: [], dimensions: [] }
+  const at = sideOf(reference, axis, op.side)
+  const plane = BOX_AXES.filter((other) => other !== axis)
+  const [i = "x", j = "y"] = plane
+  const reach = (other: BoxAxis) => {
+    const span = around.max[other] - around.min[other]
+    const margin = Math.max(span * PLANE_MARGIN, PLANE_MARGIN_CM)
+    return [around.min[other] - margin, around.max[other] + margin] as const
+  }
+  const [i0, i1] = reach(i)
+  const [j0, j1] = reach(j)
+  const point = (a: number, b: number) => ({ ...ORIGIN, [axis]: at, [i]: a, [j]: b }) as Vec3
+  const planeCorners = [point(i0, j0), point(i1, j0), point(i1, j1), point(i0, j1)]
+  if (op.side === "centre") {
+    const paths = moving.map(({ box, landing }) => ({ from: boxCentreOf(box), to: boxCentreOf(landing) }))
+    return { landings, faces: [], plane: planeCorners, paths, dimensions: [] }
+  }
+  const side = op.side
+  const faces = moving.map(({ box, landing }) => ({ from: boxFace(box, axis, side), to: boxFace(landing, axis, side) }))
+  const paths = faces.map(({ from, to }) => ({ from: faceCentre(from), to: faceCentre(to) }))
+  return {
+    landings,
+    faces,
+    ...(op.to === "active" && { reference: boxFace(reference, axis, side) }),
+    plane: planeCorners,
+    paths,
+    dimensions: []
+  }
 }
 
 export const measurementFacts = (a: Vec3, b: Vec3) => {
