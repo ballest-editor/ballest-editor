@@ -154,7 +154,10 @@ const threeToGame = (v: THREE.Vector3): Vec3 => threeToUeVector({ x: v.x, y: v.y
 export function GizmoController() {
   const gl = useThree((s) => s.gl)
   const tool = useEditor((s) => s.tool)
-  const gizmo = useMemo(() => (tool === "select" ? null : new GizmoObject(toolHandles[tool])), [tool])
+  // the select and paint tools have no gizmo
+  const gizmo = useMemo(() => (tool === "select" || tool === "paint" ? null : new GizmoObject(toolHandles[tool])), [
+    tool
+  ])
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => gizmo?.setDark(dark), [gizmo, dark])
   const hovered = useRef<string | null>(null)

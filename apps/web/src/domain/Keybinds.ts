@@ -13,7 +13,7 @@ import type { ViewProjection } from "./viewLayout"
  * follow the game: the in-game editor's hotkey overlay ("focus selection", "delete"...) and
  * its settings screen ("forward", "reverse"...). The exceptions: the tools get plain
  * "select", "move", "rotate", "scale" instead of the overlay's "select mode", "move
- * mode"..., and the overlay's edit commands (undo, copy, delete...) get their own "edit"
+ * mode"..., the paint tool is the editor's own, and the overlay's edit commands (undo, copy, delete...) get their own "edit"
  * section, in the Edit menu's order. Game actions that mean nothing in the editor (replay
  * controls, nameplates) are omitted; editor-only actions get plain lower-case names in the
  * same style. keybinds.json `label` fields, when the extractor provides them, override the
@@ -28,11 +28,14 @@ export const keybindSections = [
       "translateMode",
       "rotateMode",
       "scaleMode",
+      "paintMode",
       "toggleGizmoSpace",
       "togglePivotMode",
       "focusSelection",
       "addToSelection",
-      "toggleSelection"
+      "toggleSelection",
+      "paintWholePiece",
+      "pickPaint"
     ]
   },
   {
@@ -124,11 +127,14 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   translateMode: "move",
   rotateMode: "rotate",
   scaleMode: "scale",
+  paintMode: "paint",
   toggleGizmoSpace: "local / world axes",
   togglePivotMode: "together / each pivot",
   focusSelection: "focus selection",
   addToSelection: "add to selection",
   toggleSelection: "toggle selection",
+  paintWholePiece: "paint whole piece",
+  pickPaint: "pick paint",
   deleteSelection: "delete",
   duplicateSelection: "duplicate",
   copySelection: "copy",
@@ -197,6 +203,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   rotateMode: "Rotate: drag a ring to rotate the selection. E in the in-game editor.",
   scaleMode:
     "Scale: drag a cube to scale along one axis, or the center ring to scale uniformly. R in the in-game editor.",
+  paintMode:
+    "Paint: click or drag over pieces to paint the slot under the pointer with the tool's paint or surface, no gizmo. Editor only: the game paints from its Paint panel.",
   toggleGizmoSpace:
     "Switch the move and rotate gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. Scale always uses each item's own axes. C in the in-game editor.",
   togglePivotMode:
@@ -206,6 +214,10 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
   toggleSelection:
     "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the in-game editor uses to deselect.",
+  paintWholePiece:
+    "With the paint tool, click or drag with this to paint every slot of a piece instead of the one under the pointer; hold its modifier to see which pieces. A surface always covers the whole piece.",
+  pickPaint:
+    "With the paint tool, click a piece to take its paint (or its surface) as the tool's, painting nothing. Dragging still orbits.",
   deleteSelection: "Delete the selected items. Backspace in the in-game editor; Delete also works.",
   duplicateSelection:
     "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game has no key for this and duplicates with Alt+drag on the move gizmo (see General settings).",
@@ -299,8 +311,18 @@ export const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>>
   right: "viewRight"
 }
 
+/**
+ * The paint tool's clicks. They mean something only while it is the tool, when clicks don't select, so they share
+ * chords with the selection clicks (Shift+click) and with orbit (Alt+click picks, Alt+drag orbits).
+ */
+export const paintClickActions: ReadonlySet<KeybindAction> = new Set(["paintWholePiece", "pickPaint"])
+
 /** Actions bound to a mouse click (with modifiers) on an item in the viewport. */
-export const mouseClickActions: ReadonlySet<KeybindAction> = new Set(["addToSelection", "toggleSelection"])
+export const mouseClickActions: ReadonlySet<KeybindAction> = new Set([
+  "addToSelection",
+  "toggleSelection",
+  ...paintClickActions
+])
 
 /** Actions bound to a mouse button held while dragging. */
 export const mouseDragActions: ReadonlySet<KeybindAction> = new Set(["look", "orbit", "pan"])
@@ -358,11 +380,14 @@ export const defaultKeybinds: Keybinds = {
   translateMode: ["KeyW"],
   rotateMode: ["KeyE"],
   scaleMode: ["KeyR"],
+  paintMode: ["KeyB"],
   toggleGizmoSpace: ["KeyC"],
   togglePivotMode: ["Period"],
   focusSelection: ["KeyF"],
   addToSelection: ["Shift+Mouse0"],
   toggleSelection: ["Ctrl+Mouse0"],
+  paintWholePiece: ["Shift+Mouse0"],
+  pickPaint: ["Alt+Mouse0"],
   deleteSelection: ["Backspace", "Delete"],
   duplicateSelection: ["Ctrl+KeyD"],
   copySelection: ["Ctrl+KeyC"],
@@ -480,7 +505,7 @@ const MODIFIER_CODES = new Set([
   "MetaRight"
 ])
 
-interface ModifierState {
+export interface ModifierState {
   readonly ctrlKey: boolean
   readonly shiftKey: boolean
   readonly altKey: boolean
@@ -538,6 +563,13 @@ export const wheelSpeedStep = (keybinds: Keybinds, e: WheelState): 1 | -1 | 0 =>
 
 /** The key code a binding waits for, ignoring modifiers (used for held movement keys). */
 export const baseCodeOf = (binding: string): string => binding.slice(binding.lastIndexOf("+") + 1)
+
+/**
+ * Whether the modifiers held are exactly those of one of the action's bindings that has any: Shift held reads as
+ * "Shift+Mouse0" before the click, for a hover that shows what the click will do.
+ */
+export const holdsModifiersOf = (keybinds: Keybinds, action: KeybindAction, e: ModifierState): boolean =>
+  keybinds[action].some((binding) => binding.includes("+") && withModifiers(e, baseCodeOf(binding)) === binding)
 
 /** True when `chord` is bound to a one-shot action (anything that isn't held or a drag). */
 export const isOneShotChord = (keybinds: Keybinds, chord: string): boolean =>
@@ -660,10 +692,24 @@ export const formatBinding = (binding: string, mac = onMac): string =>
 export const formatBindings = (bindings: Bindings): string =>
   bindings.length === 0 ? "Unbound" : bindings.map((binding) => formatBinding(binding)).join(" / ")
 
+/** A click binding as a hint says it: "Alt + click", "Click"; anything else as `formatBinding` has it. */
+export const formatClick = (binding: string, mac = onMac): string => {
+  if (baseCodeOf(binding) !== "Mouse0") return formatBinding(binding, mac)
+  const at = binding.lastIndexOf("+")
+  return at < 0 ? "Click" : `${formatBinding(binding.slice(0, at), mac)} + click`
+}
+
+/** The modifiers of a click binding, as a hint says them ("Shift"); undefined when it has none. */
+export const formatModifiers = (binding: string, mac = onMac): string | undefined => {
+  const at = binding.lastIndexOf("+")
+  return at < 0 ? undefined : formatBinding(binding.slice(0, at), mac)
+}
+
 /**
  * The chords two actions of the same kind share. A fly key doubling as a tool shortcut (W: forward + translate, as in the
  * game) is fine: the "movement keys need the look button" setting decides which one it does. Mouse drags and selection
- * clicks share a kind: a camera drag chord never reaches click selection.
+ * clicks share a kind: a camera drag chord never reaches click selection. The paint tool's clicks are a kind of their
+ * own (`paintClickActions`).
  */
 export const conflictingBindings = (keybinds: Keybinds): ReadonlySet<string> => {
   const kinds = new Map<string, Set<string>>()
@@ -672,6 +718,8 @@ export const conflictingBindings = (keybinds: Keybinds): ReadonlySet<string> => 
       ? "held"
       : duringDragActions.has(action)
       ? "duringDrag"
+      : paintClickActions.has(action)
+      ? "paint"
       : mouseDragActions.has(action) || mouseClickActions.has(action)
       ? "mouse"
       : "oneShot"

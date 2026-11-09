@@ -122,37 +122,100 @@ export interface SlotMaterial {
   readonly index: number
   readonly component: number
   readonly slot: number
-  /** Class-qualified, as map files store it; a bare object path is qualified. */
-  readonly material: string
+  /**
+   * Class-qualified, as map files store it; a bare object path is qualified. Undefined takes the slot's entry out, so
+   * the item draws and saves its catalog default there, as the game does for a slot a file leaves out.
+   */
+  readonly material: string | undefined
+  /**
+   * The slot's catalog default, for an undefined `material`: written in place of taking the entry out while a higher
+   * slot keeps one, as the game lists a component's slots from 0 with none missing. Without it that entry stays.
+   */
+  readonly fallback?: string | undefined
+  /**
+   * The component to add when `component` is one past the item's last: an item with none draws its class's Main mesh,
+   * and painting it saves that mesh (`mainMeshComponentOf`).
+   */
+  readonly creates?: MeshComponent | undefined
 }
 
-/** A mesh component with `slot` set to `material`, and `materialAssetPaths` kept in step (as the game writes it). */
+/** `mesh` listing `materials`, with `materialAssetPaths` kept in step where it has them (as the game writes it). */
+const withMaterials = (mesh: MeshComponent, materials: MeshComponent["materials"]): MeshComponent =>
+  mesh.materialAssetPaths === undefined
+    ? { ...mesh, materials }
+    : { ...mesh, materials, materialAssetPaths: materials.map((m) => objectPathOf(m.material)) }
+
+/** A mesh component with `slot` set to `material`. */
 const withSlotMaterial = (mesh: MeshComponent, slot: number, material: string): MeshComponent => {
   const existing = mesh.materials.some((m) => m.materialIndex === slot)
   const materials = existing
     ? mesh.materials.map((m) => (m.materialIndex === slot ? { ...m, material } : m))
     : [...mesh.materials, { material, materialIndex: slot }].sort((a, b) => a.materialIndex - b.materialIndex)
-  return mesh.materialAssetPaths === undefined
-    ? { ...mesh, materials }
-    : { ...mesh, materials, materialAssetPaths: materials.map((m) => objectPathOf(m.material)) }
+  return withMaterials(mesh, materials)
 }
 
 /**
- * Sets material slots on several items at once, all or nothing: None when an item or mesh
- * component doesn't exist. Slots that already hold the material are left alone, and the same
- * map comes back when nothing changed.
+ * `mesh` with the entries of `cleared` slots taken out, except where a slot that isn't cleared keeps a higher entry:
+ * there the slot gets its fallback (the catalog default) instead, so the list stays contiguous.
+ */
+const withSlotsCleared = (mesh: MeshComponent, cleared: ReadonlyMap<number, string | undefined>): MeshComponent => {
+  const top = Math.max(-1, ...mesh.materials.flatMap((m) => cleared.has(m.materialIndex) ? [] : [m.materialIndex]))
+  let next = mesh
+  for (const [slot, fallback] of cleared) {
+    if (slot > top) next = withMaterials(next, next.materials.filter((m) => m.materialIndex !== slot))
+    else if (fallback !== undefined) next = withSlotMaterial(next, slot, qualifyMaterialPath(fallback))
+  }
+  return next
+}
+
+const sameMaterials = (a: MeshComponent, b: MeshComponent): boolean =>
+  a.materials.length === b.materials.length &&
+  a.materials.every((m, i) => {
+    const other = b.materials[i]
+    return m.material === other?.material && m.materialIndex === other.materialIndex
+  })
+
+/**
+ * Sets material slots on several items at once, all or nothing: None when an item or mesh component doesn't exist (and
+ * the edit creates none). A slot set to undefined loses its entry (`SlotMaterial.material`), after every other edit,
+ * and one on a component that doesn't exist has nothing to lose. Slots that already hold the material are left alone,
+ * and the same map comes back when nothing changed.
  */
 export const setSlotMaterials = (map: MapFile, edits: ReadonlyArray<SlotMaterial>): Option.Option<MapFile> => {
   const items = map.items.slice()
   let changed = false
-  for (const { index, component, slot, material } of edits) {
+  /** The slots to clear on each component, with their fallbacks, by `<index>:<component>`. */
+  const cleared = new Map<
+    string,
+    { readonly index: number; readonly component: number; readonly slots: Map<number, string | undefined> }
+  >()
+  for (const { index, component, slot, material, fallback, creates } of edits) {
     const item = items[index]
-    const mesh = item?.meshComponents[component]
+    const mesh = item?.meshComponents[component] ??
+      (component === item?.meshComponents.length ? creates : undefined)
     if (item === undefined || mesh === undefined || !Number.isInteger(slot) || slot < 0) return Option.none()
+    if (material === undefined) {
+      const key = `${index}:${component}`
+      const entry = cleared.get(key) ?? { index, component, slots: new Map() }
+      cleared.set(key, entry)
+      entry.slots.set(slot, fallback)
+      continue
+    }
     const qualified = qualifyMaterialPath(material)
     if (mesh.materials.find((m) => m.materialIndex === slot)?.material === qualified) continue
     const meshComponents = item.meshComponents.slice()
     meshComponents[component] = withSlotMaterial(mesh, slot, qualified)
+    items[index] = { ...item, meshComponents }
+    changed = true
+  }
+  for (const { index, component, slots } of cleared.values()) {
+    const item = items[index]
+    const mesh = item?.meshComponents[component]
+    if (item === undefined || mesh === undefined) continue
+    const next = withSlotsCleared(mesh, slots)
+    if (sameMaterials(next, mesh)) continue
+    const meshComponents = item.meshComponents.slice()
+    meshComponents[component] = next
     items[index] = { ...item, meshComponents }
     changed = true
   }

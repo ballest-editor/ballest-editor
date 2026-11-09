@@ -1,8 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
 import { UE_TO_THREE_MATRIX, ueToScene } from "../domain/coords"
-import { OUTLINE_COLORS, outlineOf, SelectionOutline, setOutlineTheme } from "./selectionOutline"
-import { isLine } from "./threeGuards"
+import { showsTarget } from "./paintTarget"
+import { OUTLINE_COLORS, outlineOf, PAINT_HOVER_COLORS, SelectionOutline, setOutlineTheme } from "./selectionOutline"
+import { isLine, isMesh } from "./threeGuards"
+import { VISUAL_KEY } from "./visuals"
 
 /** A wedge (ramp) in UE local space: 400 long in X, 100 wide in Y, rising 0..30 cm in Z. */
 const wedge = (): THREE.BufferGeometry => {
@@ -164,6 +166,99 @@ describe("selection outline", () => {
     expect(colorOf()).toBe(OUTLINE_COLORS.light.selected)
     setOutlineTheme(true)
     expect(colorOf()).toBe(OUTLINE_COLORS.dark.selected)
+  })
+
+  describe("the paint tool's hover", () => {
+    /** An item as ItemObject builds it, mirrored or not: visual `m0` holding a primitive per slot, slot 1 two-sided. */
+    const paintable = (mirrored = false) => {
+      const { item, mesh } = makeItem(wedge())
+      item.userData = { itemId: "a" }
+      if (mirrored) mesh.scale.set(-1, 1, 1) // as ItemObject mirrors a piece: its source mesh at a negative scale
+      const visual = mesh.parent!
+      visual.userData = { [VISUAL_KEY]: "m0" }
+      mesh.geometry.userData = { ueMaterialIndex: 0 }
+      const glass = new THREE.Mesh(
+        new THREE.BoxGeometry(10, 10, 10),
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
+      )
+      glass.geometry.userData = { ueMaterialIndex: 1 }
+      visual.add(glass)
+      item.updateMatrixWorld(true)
+      const outline = new SelectionOutline()
+      item.add(outline)
+      return { item, outline, slots: [mesh, glass] as const }
+    }
+    const fillsOf = (outline: THREE.Group) =>
+      outline.children.filter((c): c is THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> => isMesh(c))
+    const spotAt = (slot: number) => ({ itemId: "a", visual: "m0", slot })
+
+    it("shades the target's faces under its outline: the slot's primitives, or every mesh for the whole piece", () => {
+      const { item, outline, slots } = paintable()
+      outline.updatePaintHover(item, showsTarget({ spot: spotAt(1), whole: false }), false)
+      expect(fillsOf(outline).map((fill) => fill.geometry)).toEqual([slots[1].geometry])
+      expect(outline.children.filter(isLine)).toHaveLength(1)
+      outline.updatePaintHover(item, showsTarget({ spot: spotAt(1), whole: true }), false)
+      expect(fillsOf(outline).map((fill) => fill.geometry)).toEqual(slots.map((mesh) => mesh.geometry))
+      // the selection's outline has no fill, and leaves none behind
+      outline.update(item)
+      expect(fillsOf(outline)).toHaveLength(0)
+      expect(outline.children.filter(isLine)).toHaveLength(2)
+    })
+
+    it("lies on the mesh's faces, mirrored with it, translucent over them, and is never raycast", () => {
+      const signs = [false, true].map((mirrored) => {
+        const { item, outline, slots } = paintable(mirrored)
+        outline.updatePaintHover(item, showsTarget({ spot: spotAt(0), whole: false }), false)
+        outline.updateMatrixWorld(true)
+        const [fill] = fillsOf(outline)
+        expect(fill?.matrixWorld.toArray().map((n) => Math.round(n * 1e6) / 1e6)).toEqual(
+          slots[0].matrixWorld.toArray().map((n) => Math.round(n * 1e6) / 1e6)
+        )
+
+        expect([fill!.material.transparent, fill!.material.depthWrite, fill!.material.side]).toEqual([
+          true,
+          false,
+          THREE.FrontSide
+        ])
+        // a ray straight down through the mesh hits it, and not its fill
+        const centre = new THREE.Box3().setFromObject(slots[0]).getCenter(new THREE.Vector3())
+        const ray = new THREE.Raycaster(centre.clone().setY(10_000), new THREE.Vector3(0, -1, 0))
+        expect(ray.intersectObject(slots[0])).not.toHaveLength(0)
+        expect(ray.intersectObject(outline, true)).toHaveLength(0)
+        return Math.sign(fill!.matrixWorld.determinant())
+      })
+      // the determinant's sign is what the renderer picks the front faces by: a mirror flips the fill's as the mesh's
+      expect(signs[0]).toBe(-signs[1]!)
+    })
+
+    it("is two-sided where the mesh is, and red where the game takes no paint, in either theme", () => {
+      const { item, outline } = paintable()
+      const look = () => fillsOf(outline).map(({ material: m }) => [`#${m.color.getHexString()}`, m.opacity, m.side])
+      outline.updatePaintHover(item, () => true, false)
+      expect(look()).toEqual([
+        [PAINT_HOVER_COLORS.dark.paint, PAINT_HOVER_COLORS.dark.fill, THREE.FrontSide],
+        [PAINT_HOVER_COLORS.dark.paint, PAINT_HOVER_COLORS.dark.fill, THREE.DoubleSide]
+      ])
+      outline.updatePaintHover(item, () => true, true)
+      expect(look().map(([color]) => color)).toEqual([PAINT_HOVER_COLORS.dark.blocked, PAINT_HOVER_COLORS.dark.blocked])
+      setOutlineTheme(false)
+      expect(look()[0]).toEqual([PAINT_HOVER_COLORS.light.blocked, PAINT_HOVER_COLORS.light.fill, THREE.FrontSide])
+      outline.updatePaintHover(item, () => true, false)
+      expect(look()[1]).toEqual([PAINT_HOVER_COLORS.light.paint, PAINT_HOVER_COLORS.light.fill, THREE.DoubleSide])
+      setOutlineTheme(true)
+    })
+
+    it("is never outlined or shaded itself, by its own outline or the selection's", () => {
+      const { item, outline } = paintable()
+      const selection = new SelectionOutline()
+      item.add(selection)
+      outline.updatePaintHover(item, () => true, false)
+      selection.update(item)
+      outline.updatePaintHover(item, () => true, false)
+      expect(selection.children).toHaveLength(2)
+      expect(fillsOf(outline)).toHaveLength(2)
+      expect(outline.children.filter(isLine)).toHaveLength(2)
+    })
   })
 
   it("caches edges per geometry and frees them with it", () => {

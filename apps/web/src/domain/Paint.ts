@@ -37,6 +37,12 @@ export const parsePaint = (json: unknown): PaintPicker => {
   return Array.isArray(list) ? list.flatMap((value) => Option.toArray(decodeFinish(value))) : []
 }
 
+/** Why an item on a surface takes no paint: the game lists no slots for it, and draws the surface over any. */
+export const SURFACE_LOCKED = "Paint is locked while a surface is set."
+
+/** Why a piece takes no paint at all: its class doesn't, and a map file can't paint it either. */
+export const NOT_PAINTED = "The game doesn't paint this piece."
+
 /** A selected item, with whatever the caller needs to keep beside it. */
 interface HasItem {
   readonly item: Item

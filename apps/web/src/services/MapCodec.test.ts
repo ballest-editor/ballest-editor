@@ -84,7 +84,8 @@ describe("MapCodec", () => {
   )
 
   // Paint every slot of every item, cycling through the game's picker, and the file still
-  // round-trips: each slot and its materialAssetPaths entry carry the chosen material.
+  // round-trips: each slot and its materialAssetPaths entry carry the chosen material. Then
+  // put every slot back to its default, and it round-trips with no slot listed.
   it.effect.each(samples.map((s) => [s.name, s] as const))(
     "round-trips %s with every slot painted",
     ([, sample]) =>
@@ -93,7 +94,7 @@ describe("MapCodec", () => {
         const codec = yield* MapCodec
         const map = yield* codec.decode(readSample(sample))
         let n = 0
-        const edits: Array<SlotMaterial> = map.items.flatMap((item, index) =>
+        const edits: Array<SlotMaterial & { readonly material: string }> = map.items.flatMap((item, index) =>
           item.meshComponents.flatMap((mesh, component) =>
             mesh.materials.map(({ materialIndex: slot }) => ({
               index,
@@ -114,6 +115,15 @@ describe("MapCodec", () => {
           if (mesh.materialAssetPaths !== undefined) {
             assert.strictEqual(mesh.materialAssetPaths[slot], objectPathOf(material))
           }
+        }
+        const reset = Option.getOrThrow(
+          setSlotMaterials(painted, edits.map((edit) => ({ ...edit, material: undefined })))
+        )
+        const back = yield* codec.decode(yield* codec.encode(reset))
+        assert.deepStrictEqual(back, reset)
+        for (const { index, component } of edits) {
+          const mesh = back.items[index]!.meshComponents[component]!
+          assert.deepStrictEqual([mesh.materials, mesh.materialAssetPaths ?? []], [[], []])
         }
       }).pipe(Effect.provide(MapCodec.layer))
   )

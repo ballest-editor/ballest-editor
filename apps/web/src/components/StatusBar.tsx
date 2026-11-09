@@ -3,6 +3,7 @@ import { DragKeyHints, useDragKeysShown } from "./DragKeyHints"
 import { EnteredGroupStatus } from "./EnteredGroupStatus"
 import { LastExportStatus, LinkStatus } from "./LinkStatus"
 import { NotificationCenter } from "./NotificationCenter"
+import { PaintToolStatus } from "./PaintPalette"
 import { SelectionStatus } from "./SelectionStatus"
 import { SnapStatus } from "./SnapStatus"
 import { StatusHintLine } from "./StatusHintLine"
@@ -17,8 +18,9 @@ function CenterStatus() {
 }
 
 /**
- * Along the bottom of the window (docs/PROJECTS.md § Shell): the selection, the map's sync status, updates, the bell.
- * While a control shows a hint (editor/statusHint) the hint takes the selection's place, as in Blender.
+ * Along the bottom of the window (docs/PROJECTS.md § Shell): the selection and the paint tool's hint, the map's sync
+ * status, updates, the bell. While a control shows a hint (editor/statusHint) the hint takes the selection's place, as
+ * in Blender.
  */
 export function StatusBar() {
   const hinting = useStatusHint((s) => s.hint !== null)
@@ -28,6 +30,7 @@ export function StatusBar() {
         {hinting ? <StatusHintLine /> : (
           <>
             <SelectionStatus />
+            <PaintToolStatus />
             <UpdateStatus />
             <EnteredGroupStatus />
           </>

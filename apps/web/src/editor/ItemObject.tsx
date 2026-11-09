@@ -29,7 +29,7 @@ import { LaserBeam } from "./LaserBeam"
 import { applySlotMaterials } from "./materials"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
-import { glbUrl, type Visual, visualsOf } from "./visuals"
+import { glbUrl, type Visual, VISUAL_KEY, visualsOf } from "./visuals"
 import { fixSceneWinding } from "./winding"
 
 const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
@@ -74,11 +74,17 @@ function LoadingHint({ bounds }: { readonly bounds: Bounds | undefined }) {
 }
 
 /** Solid stand-in for a mesh that failed to load or that the catalog doesn't know. */
-function BoundsBox({ bounds, warn }: { readonly bounds: Bounds | undefined; readonly warn: boolean }) {
+function BoundsBox(
+  { bounds, warn, visualKey }: {
+    readonly bounds: Bounds | undefined
+    readonly warn: boolean
+    readonly visualKey?: string
+  }
+) {
   const b = bounds ?? DEFAULT_BOUNDS
   const { size, center } = ueBoundsToScene(b.min, b.max)
   return (
-    <mesh position={center}>
+    <mesh position={center} userData={visualKey === undefined ? {} : { [VISUAL_KEY]: visualKey }}>
       <boxGeometry args={boxSize(size)} />
       <meshStandardMaterial color={warn ? "#c9803a" : "#8b93a1"} roughness={0.8} />
     </mesh>
@@ -87,7 +93,11 @@ function BoundsBox({ bounds, warn }: { readonly bounds: Bounds | undefined; read
 
 /** A glb in UE local space, re-expressed in the scene frame by the UE -> three matrix. */
 function GlbMesh(
-  { url, slotMaterials }: { readonly url: string; readonly slotMaterials: ReadonlyArray<string | undefined> }
+  { url, slotMaterials, visualKey }: {
+    readonly url: string
+    readonly slotMaterials: ReadonlyArray<string | undefined>
+    readonly visualKey: string
+  }
 ) {
   const gltf = useGLTF(url)
   const table = useEditor((s) => s.materialTable)
@@ -106,6 +116,9 @@ function GlbMesh(
     return root
   }, [gltf])
   useLayoutEffect(() => applySlotMaterials(object, table, slotMaterials), [object, table, slotMaterials])
+  useLayoutEffect(() => {
+    object.userData[VISUAL_KEY] = visualKey
+  }, [object, visualKey])
   return <primitive object={object} />
 }
 
@@ -126,18 +139,21 @@ class GlbBoundary extends Component<
   }
 }
 
+/** One of an item's visuals, tagged with its key (`VISUAL_KEY`) for the paint tool's hits. */
 function MeshVisual(
-  { mesh, slotMaterials }: {
+  { mesh, slotMaterials, visualKey }: {
     readonly mesh: MeshInfo | undefined
     readonly slotMaterials: ReadonlyArray<string | undefined>
+    readonly visualKey: string
   }
 ) {
   const url = glbUrl(mesh?.glb)
-  if (url === undefined) return <BoundsBox bounds={mesh?.bounds} warn />
+  const box = <BoundsBox bounds={mesh?.bounds} warn visualKey={visualKey} />
+  if (url === undefined) return box
   return (
-    <GlbBoundary url={url} fallback={<BoundsBox bounds={mesh?.bounds} warn />}>
+    <GlbBoundary url={url} fallback={box}>
       <Suspense fallback={<LoadingHint bounds={mesh?.bounds} />}>
-        <GlbMesh url={url} slotMaterials={slotMaterials} />
+        <GlbMesh url={url} slotMaterials={slotMaterials} visualKey={visualKey} />
       </Suspense>
     </GlbBoundary>
   )
@@ -200,7 +216,7 @@ function ItemVisuals({ visuals }: { readonly visuals: ReadonlyArray<Visual> }) {
       {visuals.length === 0 && <BoundsBox bounds={undefined} warn />}
       {visuals.map((v) =>
         v.relative === undefined
-          ? <MeshVisual key={v.key} mesh={v.mesh} slotMaterials={v.slotMaterials} />
+          ? <MeshVisual key={v.key} mesh={v.mesh} slotMaterials={v.slotMaterials} visualKey={v.key} />
           : (
             <FixedGroup
               key={v.key}
@@ -208,7 +224,7 @@ function ItemVisuals({ visuals }: { readonly visuals: ReadonlyArray<Visual> }) {
               quaternion={v.relative.quaternion}
               scale={v.relative.scale}
             >
-              <MeshVisual mesh={v.mesh} slotMaterials={v.slotMaterials} />
+              <MeshVisual mesh={v.mesh} slotMaterials={v.slotMaterials} visualKey={v.key} />
             </FixedGroup>
           )
       )}
