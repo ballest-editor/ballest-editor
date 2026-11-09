@@ -4,6 +4,7 @@ import type { Vec3 } from "./coords"
 import { alignmentHit } from "./snapAlignment"
 import { defaultSnapConfig } from "./snapConfig"
 import type { SnapFrame, SnapItem, SnapView } from "./snapFrame"
+import { defaultSnapPrefs } from "./snapPrefs"
 import { cornersOf } from "./snapRelation"
 import { IDENTITY_QUAT, ORIGIN, vecAdd, vecScale } from "./ueMath"
 
@@ -23,6 +24,7 @@ const pillar = { min: { x: -50, y: -50, z: -500 }, max: { x: 50, y: 50, z: 500 }
 
 const frame = (offset: Vec3, items: ReadonlyArray<SnapItem>, extra: Partial<SnapFrame> = {}): SnapFrame => ({
   config: defaultSnapConfig,
+  prefs: defaultSnapPrefs,
   view: view(true),
   items,
   constraint: { kind: "line", direction: X },

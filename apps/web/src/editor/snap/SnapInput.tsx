@@ -181,8 +181,10 @@ export function SnapInput() {
     const trackHover = (e: PointerEvent) => {
       const s = useEditor.getState()
       const config = snapConfigOf(s)
-      const { acquire, enabled, hoverMs } = config.targets.tracking
-      if (!enabled || !config.enabled || (acquire === "shift" && !e.shiftKey) || s.picker !== null) {
+      const { trackingAcquire: acquire, trackingHoverMs: hoverMs } = s.settings.snapPrefs
+      if (
+        !config.targets.tracking.enabled || !config.enabled || (acquire === "shift" && !e.shiftKey) || s.picker !== null
+      ) {
         stopHover()
         return
       }
@@ -207,7 +209,7 @@ export function SnapInput() {
     /** Which item shows its open ends: asked once the pointer pauses, as a raycast per move costs a large map too much. */
     const followHover = (e: PointerEvent) => {
       clearTimeout(itemTimer)
-      if (snapConfigOf(useEditor.getState()).targets.connectors.showOpenEnds !== "hover" || e.buttons !== 0) return
+      if (useEditor.getState().settings.snapPrefs.showOpenEnds !== "hover" || e.buttons !== 0) return
       itemTimer = setTimeout(() => {
         const s = useEditor.getState()
         const key = itemUnder(el, e, raycaster)

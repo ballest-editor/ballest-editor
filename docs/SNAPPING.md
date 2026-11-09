@@ -62,12 +62,12 @@ When the selection's end reaches another item's end, it lands on it, facing the 
 
 Parameters:
 
-- **Range**: how far, in screen pixels, an end keeps hold of the selection, and how near it must be for a drop or a pick. The default is the general threshold (§ Settings).
+- **Range**: how far, in screen pixels, an end keeps hold of the selection, and how near it must be for a drop or a pick. The default is the general threshold, Snap distance (§ The snap menu).
 - **Pull**: how hard ends pull against the Grid and Mesh, in five stops from ×0.25 to ×4, default ×1. The range is multiplied by it, and above ×1 Connectors is also asked ahead of Grid and Mesh (§ Priority).
 - **Match rotation**: on by default. The piece turns so the ends face each other and their up directions agree. Off positions the end and leaves rotation alone, for a piece meant to leave at an angle.
-- **Profiles**: Strict snaps only matching profiles; Warn snaps any two ends and shows a chip saying the profiles differ; Any snaps silently. Default Warn.
-- **Show open ends**: Never, On hover, Always. An open end is one no other end meets. On hover shows the hovered item's, and in a drag those of what the drag carries and the open ends of other items within six times the Range on screen of one of them, depth aside, the ends it could join; Always shows every open end in the map, which is the "where does the track still need a piece" view. Default On hover. They are ringed in the colours of § Snap indications: the ends a drag carries in the source's violet, every other in the target's amber. A drag's ends are drawn where the drag has them, through a move, a turn, a scale or a mirror. A drag that isn't snapping to Connectors rings none, so under M or L, or with Connectors off, the rings go, and under J they come back (`dragSnap` in the store holds the targets a drag is snapping to).
-- **Flip to fit**: when the piece's mirrored twin would fit the target end and the piece itself wouldn't (a left-handed bevel against a right-handed end), the editor offers the flip in the chip, one click. This uses the game's Flip X and Flip Y ([FORMAT.md](FORMAT.md) § Mirroring), so it round-trips.
+- **Profiles** (yours, § Settings): Strict snaps only matching profiles; Warn snaps any two ends and shows a chip saying the profiles differ; Any snaps silently. Default Warn.
+- **Show open ends** (yours, § Settings): Never, On hover, Always. An open end is one no other end meets. On hover shows the hovered item's, and in a drag those of what the drag carries and the open ends of other items within six times the Range on screen of one of them, depth aside, the ends it could join; Always shows every open end in the map, which is the "where does the track still need a piece" view. Default On hover. They are ringed in the colours of § Snap indications: the ends a drag carries in the source's violet, every other in the target's amber. A drag's ends are drawn where the drag has them, through a move, a turn, a scale or a mirror. A drag that isn't snapping to Connectors rings none, so under M or L, or with Connectors off, the rings go, and under J they come back (`dragSnap` in the store holds the targets a drag is snapping to).
+- **Flip to fit** (yours, § Settings): when the piece's mirrored twin would fit the target end and the piece itself wouldn't (a left-handed bevel against a right-handed end), the editor offers the flip in the chip, one click. This uses the game's Flip X and Flip Y ([FORMAT.md](FORMAT.md) § Mirroring), so it round-trips.
 
 **Where on an end** a piece connects is the item's choice, end by end, from a fixed set of spots on the end's cap (`domain/connectorSpots.ts`), named as seen looking out of the end with its up up (the game's +Y to the right of its +X). A rectangle or a polygon has nine: its box's four corners, the middles of its four sides and its centre ("Top left", "Top", "Centre", "Bottom right"…), the box's corners even where a polygon's own don't reach them. A circle or a ring has five: the points of its outer rim straight up, down and to either side, and its centre. Until one is chosen an end connects where it was measured, which is one of its spots: a track's Top, a tube's Centre. The chosen spot moves the end's point and nothing else, its directions stay, so a join, a turn's end stops, a drop, the open-end rings and the snap's marks all use it, and two ends meet at their chosen spots as at their measured ones. Facing each other, one end's left is the other's right, so a piece's Top left lands on a neighbour's Top right with their caps overlapping, and on its Top left a whole width aside. A mirrored item keeps the names as seen. The Inspector's Connects at section sets it for one selected item: a row per end, a grid of its spots with the one in use pressed, the spot ringed in the viewport in the source's colour while its button is hovered. A change is one undo step ("Connect Track S at top left") and takes apart the item's joints it leaves. During a drag the join's label names the spot the end is joining by and points to the Inspector; a hold key would be wrong for a choice that stays with the item.
 
@@ -81,7 +81,7 @@ Parameters:
 
 - **Elements**, each its own toggle: bounds corners, bounds face centres, bounds faces, vertices where sharp edges meet, sharp edges, edge midpoints, face centres, faces. All are on by default. A vertex is where sharp edges meet at a corner, and an edge's middle is the middle of the whole edge, not of a facet of it. The mesh elements come from the piece's mesh as the renderer has it. Bounds stand in for a piece whose mesh hasn't loaded, and a piece with a mesh offers none of them, so a curved piece doesn't offer a box face or a corner in the air.
 - **Sharp edge angle**: an edge counts when its two faces meet at more than this angle. Default 30°. Below it, flat faces would offer their triangulation as edges, which is never wanted.
-- **Occlusion**: In front only (the default), or Through pieces. In front only means a target hidden behind a surface from the active pane's camera doesn't count, so a drag can't land on a vertex the user can't see.
+- **Occlusion** (yours, § Settings): In front only (the default), or Through pieces. In front only means a target hidden behind a surface from the active pane's camera doesn't count, so a drag can't land on a vertex the user can't see.
 - **Rotate to face**: Keep rotation (the default), Upright on the face, or Align to the face's normal. Upright turns the item about Z only, so its +X faces out of the face and it stays standing: a lamp on a wall. Align is Unreal's "rotate to surface normal": its +Z leaves the face, and a decal or a light placed on a slope faces out of it.
 - **Offset**: a distance from the face, in cm, along its normal. Default 0. For things that hover (lights, floating decals).
 
@@ -115,7 +115,7 @@ While dragging, lines through each acquired point along the world's X, Y and Z a
 
 This is how a piece is put level with one touched 40 m back, or directly above a landing, without the editor searching the whole map for things that line up.
 
-Parameters: how many points are kept, how long a hover takes to acquire (default 400 ms), and whether acquisition is automatic or needs Shift held, as AutoCAD offers both.
+Its parameters are yours, not the map's (§ Settings): how many points are kept, how long a hover takes to acquire (default 400 ms), and whether acquisition is automatic or needs Shift held, as AutoCAD offers both.
 
 #### Alignment
 
@@ -173,7 +173,7 @@ Snapping measures a drag on the items that take it as the gizmo shows it (`leadi
 
 ## What a drag looks like
 
-1. The user grabs the selection by a gizmo handle or by an item's body. A press and drag on the body moves the selection only as the Drag body setting says: by default (To join) only with snapping and the Connectors target on and an end among what the drag carries, since joining two pieces at their ends is what a body drag is for; Always and Never are the others. Otherwise the press is only the click it always was. While nothing is in range the base point is drawn as a white dot. With Closest, the dot jumps between candidates as the pointer moves.
+1. The user grabs the selection by a gizmo handle or by an item's body. A press and drag on the body moves the selection only as the Drag body setting says (§ Settings): by default (To join) only with snapping and the Connectors target on and an end among what the drag carries, since joining two pieces at their ends is what a body drag is for; Always and Never are the others. Otherwise the press is only the click it always was. While nothing is in range the base point is drawn as a white dot. With Closest, the dot jumps between candidates as the pointer moves.
 2. On the way to a target the selection stays with the pointer, or on the grid, and nothing pulls it forward. When it gets to the target it stops there, while the pointer goes on and is never moved. Once the pointer is past the threshold the selection goes free and catches up with it (Baudisch's snap-and-go; § Getting to a target has the rule). The snap is drawn as § Snap indications says: what landed, what it landed on, and the glyph of the kind of snap.
 3. One short label in the active pane's corner says what snapped, the same glyph before its words: "Corner of Track L", "End of Curve M", "Center level with Kicker1 S on Y", "Same gap as Kicker1 S to Track L, 250 cm", "Grid 10 cm", "Plane: Landing". The label is the one place every target reports, so a user who doesn't know which target fired can read it.
 4. Releasing commits one undo step, as a drag does today. The snap that was current is in the step's description ("Move 3 items to end of Curve M"), so the history reads as what happened. A drag the pointer is taken from (the system cancels it, or the window loses the capture) is cancelled, as Escape cancels it: the selection goes back and nothing is committed.
@@ -258,11 +258,11 @@ The plain screen, top to bottom (`components/SnapMagnet.tsx`):
 
 **Advanced** is a disclosure under them, closed until opened (`components/SnapAdvanced.tsx`):
 
-- **Snap from**: the base (Pivot, Closest, Centre), and **Drag body** (To join, Always, Never; § What a drag looks like).
-- **Order**: the priority list. Each row is a handle to drag it by, the target's name, a one-line summary of its parameters ("10 cm, world origin"; "Warn, show on hover, pull ×2"), a chevron that opens its parameters, and its switch. Here Guides is two rows, Line-up guides (Alignment) and Point guides (Tracking).
+- **Snap from**: the base (Pivot, Closest, Centre).
+- **Order**: the priority list. Each row is a handle to drag it by, the target's name, a one-line summary of its parameters ("10 cm, world origin"; "12 px, match rotation, pull ×2"), a chevron that opens its parameters, and its switch. Here Guides is two rows, Line-up guides (Alignment) and Point guides (Tracking). Point guides has no parameters of the map's, so its row is its name and its switch.
 - **Points remembered**: how many tracking points are acquired, and Clear.
 
-At the bottom, **Save as defaults** makes all of this map's settings, a custom priority among them, what new maps start on (§ Settings), and **Reset to defaults** gives the map those back. Both are off while the map's settings are the defaults.
+Everything in the menu is the map's snapping and goes in its sidecar; how snapping behaves for the user is in Settings (§ Settings), and no row is in both. At the bottom, **Save as defaults** makes all of this map's settings, a custom priority among them, what new maps start on, and **Reset to defaults** gives the map those back. Both are off while the map's settings are the defaults.
 
 Every row has one sentence of help behind an (i) beside its label, the same `InfoHint` the inspector uses, with an example where one helps: "The ends of tracks, tubes and ramps join end to end. Example: a Curve's end joins a Track's end with no step."
 
@@ -298,7 +298,7 @@ Connectors need, per piece, the ends: position and the two directions in the pie
 
 All of this is the editor's, none of it the game's, so it goes in the map's sidecar ([PROJECTS.md](PROJECTS.md) § The files):
 
-- The snap settings for the map: base, affect, steps, each target's toggle and parameters, and the priority order.
+- The snap settings for the map, the snap menu's rows: base, affect, steps, each target's toggle and parameters, and the priority order. The user's rows (§ Settings) aren't in it, and a sidecar from before they moved still reads, without them.
 - The grid's origin and rotation.
 - Construction planes and axes, named.
 - Joints: pairs of item ends that met. They are recorded when a connector snap commits and dropped when either item moves away or is deleted, here or in a save from the in-game editor.
@@ -310,7 +310,22 @@ Export writes none of it, and the game never sees it.
 
 ## Settings
 
-What a new map starts on is kept in the editor's settings, and set from a map: the snap menu's Save as defaults makes all of the open map's snap settings the defaults, and Reset to defaults gives a map them back (§ The snap menu). Settings has no Snapping section. A map's own settings, once changed, live in its sidecar and override the defaults.
+Snapping is set in two places, by whom it is about. The snap menu (§ The snap menu) is the map's: it lives in the sidecar and travels with the map. Settings › Editor › Snapping is the user's, kept in the editor's settings (`snapPrefs`, `domain/snapPrefs.ts`) and the same in every map:
+
+| Row             | What it is                                                                        | Default       |
+| --------------- | --------------------------------------------------------------------------------- | ------------- |
+| Drag body       | When a press on the body drags (§ What a drag looks like): To join, Always, Never | To join       |
+| Show open ends  | When open ends are ringed (§ Connectors): Never, On hover, Always                 | On hover      |
+| Profiles        | Whether ends of different profiles join (§ Connectors): Strict, Warn, Any         | Warn          |
+| Flip to fit     | Whether the chip offers the mirrored twin (§ Connectors)                          | On            |
+| Occlusion       | Whether Mesh offers what is hidden (§ Mesh): In front only, Through pieces        | In front only |
+| Points kept     | How many points Tracking keeps (§ Tracking)                                       | 6             |
+| Hover time      | How long a rest takes to acquire a point                                          | 400 ms        |
+| Remember points | Automatically, or only with Shift held                                            | Automatically |
+
+Each row has the help it had in the snap menu behind its (i). A save from before these moved takes them from the map defaults it kept them in. The drag keys' hint in the status bar waits a fixed 150 ms (`DRAG_KEYS_DELAY_MS`).
+
+What a new map starts on is kept in the editor's settings too, and set from a map: the snap menu's Save as defaults makes all of the open map's snap settings the defaults, and Reset to defaults gives a map them back. The Snapping group's **Reset snapping defaults** puts those defaults back to the factory's; a map with snapping of its own keeps it. A map's own settings, once changed, live in its sidecar and override the defaults.
 
 Keybinds for the modifiers (§ Modifiers) sit with the other editor keybinds and can be rebound, since the game's own keybinds take some keys.
 

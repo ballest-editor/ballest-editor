@@ -38,13 +38,7 @@ const pickingConfig = (config: SnapConfig, accepts: Accepts): SnapConfig => {
       grid: { ...config.targets.grid, enabled: !onlyFaces && !anchor && config.targets.grid.enabled },
       construction: { enabled: !anchor && config.targets.construction.enabled },
       tracking: { ...config.targets.tracking, enabled: !anchor && config.targets.tracking.enabled },
-      connectors: {
-        ...connectors,
-        enabled: accepts !== "face",
-        profiles: "any",
-        matchRotation: false,
-        flipToFit: false
-      },
+      connectors: { ...connectors, enabled: accepts !== "face", matchRotation: false },
       mesh: {
         ...mesh,
         enabled: true,
@@ -86,6 +80,8 @@ export const hitUnder = (
   const { construction, measurements } = annotationsOf(s.doc.structure)
   const frame: SnapFrame = {
     config,
+    // Any end will do for a pick, and none is offered its twin.
+    prefs: { ...s.settings.snapPrefs, profiles: "any", flipToFit: false },
     view,
     items,
     constraint: { kind: "surface", normal: UP },

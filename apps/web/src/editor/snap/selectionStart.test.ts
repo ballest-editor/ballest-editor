@@ -4,6 +4,7 @@ import { indexCatalog } from "../../domain/Catalog"
 import { identityTransform, itemFromPiece, newMapFile } from "../../domain/factory"
 import { defaultSettings } from "../../domain/Settings"
 import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
+import type { SnapPrefs } from "../../domain/snapPrefs"
 import { leadingKeys } from "../../domain/units"
 import { catalogWithEnds, grouped, loadPieces } from "../../test/snapFixtures"
 import { sceneRegistry } from "../sceneRegistry"
@@ -77,10 +78,13 @@ describe("the ends a drag carries and comes up to", () => {
 describe("whether a press on the selection's body drags it", () => {
   beforeEach(() => sceneRegistry.objects.clear())
 
-  const config = (bodyDrag: SnapConfig["bodyDrag"], enabled: boolean, connectors: boolean): SnapConfig => ({
+  const config = (bodyDrag: SnapPrefs["bodyDrag"], enabled: boolean, connectors: boolean): SnapConfig => {
+    useEditor.setState((st) => ({ settings: { ...st.settings, snapPrefs: { ...st.settings.snapPrefs, bodyDrag } } }))
+    return configOf(enabled, connectors)
+  }
+  const configOf = (enabled: boolean, connectors: boolean): SnapConfig => ({
     ...defaultSnapConfig,
     enabled,
-    bodyDrag,
     targets: {
       ...defaultSnapConfig.targets,
       connectors: { ...defaultSnapConfig.targets.connectors, enabled: connectors }

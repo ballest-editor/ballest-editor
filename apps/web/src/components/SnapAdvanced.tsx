@@ -5,14 +5,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ReactNode, useState } from "react"
-import {
-  BODY_DRAG_NAMES,
-  rowsOf,
-  type SnapConfig,
-  type SnapTarget,
-  targetSummary,
-  withTargetMoved
-} from "../domain/snapConfig"
+import { rowsOf, type SnapConfig, type SnapTarget, targetSummary, withTargetMoved } from "../domain/snapConfig"
 import { WORLD_AXES, WORLD_PLANES } from "../domain/snapTools"
 import { annotationsOf } from "../domain/structure"
 import {
@@ -190,7 +183,13 @@ function Parameters({ config, target }: { readonly config: SnapConfig; readonly 
   }
 }
 
-/** One row of the priority list: a handle, the name, what it's set to, its help, its switch, and its parameters. */
+/** The targets whose rows have no parameters of the map's: what is left of Tracking's is Settings › Editor › Snapping's. */
+const NO_PARAMETERS: ReadonlySet<SnapTarget> = new Set(["tracking"])
+
+/**
+ * One row of the priority list: a handle, the name, what it's set to, its help, its switch, and its parameters, where
+ * it has any.
+ */
 function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
   readonly config: SnapConfig
   readonly target: SnapTarget
@@ -203,6 +202,12 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
   const constructions = useEditor((s) => annotationsOf(s.doc.structure).construction.length)
   const summary = targetSummary(config, target, units, { construction: constructions })
   const { label, help } = TARGET_WORDS[target]
+  const title = (
+    <>
+      <span className="shrink-0 text-body-strong">{label}</span>
+      <span className="min-w-0 flex-1 truncate text-caption text-fg-tertiary">{summary}</span>
+    </>
+  )
   return (
     <Collapsible
       data-snap-target={target}
@@ -226,11 +231,20 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
         >
           <IconGripVertical className="size-4" />
         </span>
-        <CollapsibleTrigger className="group/disclosure flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-control px-1 text-left focus-ring hover:bg-hover">
-          <span className="shrink-0 text-body-strong">{label}</span>
-          <span className="min-w-0 flex-1 truncate text-caption text-fg-tertiary">{summary}</span>
-          <DisclosureChevron />
-        </CollapsibleTrigger>
+        {NO_PARAMETERS.has(target)
+          ? (
+            <div className="flex min-h-7 min-w-0 flex-1 items-center gap-2 px-1">
+              {title}
+              {/* the chevron's room, so the switches line up down the list */}
+              <span className="size-4 shrink-0" />
+            </div>
+          )
+          : (
+            <CollapsibleTrigger className="group/disclosure flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-control px-1 text-left focus-ring hover:bg-hover">
+              {title}
+              <DisclosureChevron />
+            </CollapsibleTrigger>
+          )}
         <InfoHint>{help}</InfoHint>
         <Switch
           aria-label={label}
@@ -238,16 +252,18 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
           onCheckedChange={(enabled) => updateSnapTarget(target, { enabled })}
         />
       </div>
-      <CollapsibleContent className={DISCLOSURE_BODY}>
-        <Parameters config={config} target={target} />
-      </CollapsibleContent>
+      {!NO_PARAMETERS.has(target) && (
+        <CollapsibleContent className={DISCLOSURE_BODY}>
+          <Parameters config={config} target={target} />
+        </CollapsibleContent>
+      )}
     </Collapsible>
   )
 }
 
 /**
- * The snap menu's Advanced (docs/SNAPPING.md § The snap menu): which point snaps, when a drag on the body moves, the
- * priority list with each target's parameters, and the remembered points.
+ * The snap menu's Advanced (docs/SNAPPING.md § The snap menu): which point snaps, the priority list with each target's
+ * parameters, and the remembered points.
  */
 export function SnapAdvanced() {
   const config = useEditor(snapConfigOf)
@@ -266,17 +282,6 @@ export function SnapAdvanced() {
             value={config.base}
             items={BASE_NAMES}
             onChange={(base) => updateSnap({ base })}
-          />
-        </Row>
-        <Row
-          label="Drag body"
-          help="When dragging the piece itself, not the gizmo, moves it: only to join ends, always, or never."
-        >
-          <Segmented
-            label="Drag by the body"
-            value={config.bodyDrag}
-            items={BODY_DRAG_NAMES}
-            onChange={(bodyDrag) => updateSnap({ bodyDrag })}
           />
         </Row>
       </div>

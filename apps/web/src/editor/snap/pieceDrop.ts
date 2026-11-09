@@ -63,6 +63,7 @@ export const snappedDrop = (
   const { construction, measurements } = annotationsOf(s.doc.structure)
   const frame: SnapFrame = {
     config,
+    prefs: s.settings.snapPrefs,
     view,
     items,
     constraint: { kind: "surface", normal: { x: 0, y: 0, z: 1 } },

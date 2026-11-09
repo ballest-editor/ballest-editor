@@ -15,7 +15,14 @@ import type { Item } from "../../domain/MapFile"
 import { prefabSnapKeyOf } from "../../domain/MapPrefs"
 import type { Construction, EndRef } from "../../domain/MapSidecar"
 import { withMirrorMesh } from "../../domain/mirror"
-import { isPreset, SNAP_PRESETS, type SnapConfig, type SnapPreset, type SnapTarget } from "../../domain/snapConfig"
+import {
+  defaultSnapConfig,
+  isPreset,
+  SNAP_PRESETS,
+  type SnapConfig,
+  type SnapPreset,
+  type SnapTarget
+} from "../../domain/snapConfig"
 import {
   alignOffsets,
   angleBetweenFaces,
@@ -128,6 +135,16 @@ export const saveSnapDefaults = () => {
 
 /** Gives the tab the snap settings new maps start on. */
 export const resetSnapToDefaults = () => applySnap(useEditor.getState().settings.snapping)
+
+/** Whether what new maps start on is the factory's. */
+export const snapDefaultsAreFactory = (s: Pick<EditorState, "settings">): boolean =>
+  Equal.equals(s.settings.snapping, defaultSnapConfig)
+
+/**
+ * Puts what new maps start on back to the factory's (Settings › Editor › Snapping). A map with snapping of its own keeps
+ * it, and the user's snapping stays as it is.
+ */
+export const resetSnapDefaults = () => saveSettings({ ...useEditor.getState().settings, snapping: defaultSnapConfig })
 
 /** The items a tool that moves "B" moves: the selection if the pick is on it, else the item picked. */
 const movingKeys = (s: EditorState, item: string | undefined): ReadonlyArray<string> =>

@@ -536,7 +536,7 @@ export const stationsTogether = (frame: SnapFrame, hits: ReadonlyArray<SnapHit>)
 
 /** What an end meeting `other` says: refused under Strict, and a chip's words under Warn. */
 const meetingOf = (frame: SnapFrame, own: WorldEnd, other: WorldEnd) => {
-  const { flipToFit, profiles } = frame.config.targets.connectors
+  const { flipToFit, profiles } = frame.prefs
   const fit = endsFit(own, other)
   if (profiles === "strict" && !fit.profile) return undefined
   return {

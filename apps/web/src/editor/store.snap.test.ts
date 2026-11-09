@@ -151,10 +151,9 @@ describe("tracked points", () => {
   it("keeps the newest few, and isn't saved or undone", () => {
     load()
     const s = useEditor.getState()
-    s.setTabSnap({
-      ...defaultSnapConfig,
-      targets: { ...defaultSnapConfig.targets, tracking: { ...defaultSnapConfig.targets.tracking, keep: 2 } }
-    })
+    useEditor.setState((st) => ({
+      settings: { ...st.settings, snapPrefs: { ...st.settings.snapPrefs, trackingKeep: 2 } }
+    }))
     for (const x of [1, 2, 3]) s.acquireTracked({ at: { x, y: 0, z: 0 }, label: "Corner" })
     assert.deepStrictEqual(useEditor.getState().tracked.map(({ at }) => at.x), [2, 3])
     s.acquireTracked({ at: { x: 3, y: 0, z: 0 }, label: "Corner" })

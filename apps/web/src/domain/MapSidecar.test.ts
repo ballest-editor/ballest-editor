@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { MapSidecar } from "./MapSidecar"
+import { defaultSnapConfig, SnapConfig } from "./snapConfig"
 
 const Codec = Schema.fromJsonString(MapSidecar)
 
@@ -81,6 +82,18 @@ describe("snap data", () => {
 
   it("reads a sidecar written before snapping had any", () => {
     assert.isTrue(Option.isSome(decode(bare)))
+  })
+
+  it("reads a map's snapping from before your snapping moved to Settings, without what moved", () => {
+    const snap = Schema.encodeSync(SnapConfig)(defaultSnapConfig)
+    const old = {
+      ...snap,
+      bodyDrag: "never",
+      targets: { ...snap.targets, mesh: { ...snap.targets.mesh, occlusion: "through" } }
+    }
+    const decoded = decode({ ...bare, snap: old })
+    assert.isTrue(Option.isSome(decoded))
+    assert.deepStrictEqual(Option.getOrThrow(decoded).snap, defaultSnapConfig)
   })
 
   it("reads annotations and turns down a joint that names no item", () => {

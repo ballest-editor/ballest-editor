@@ -15,7 +15,7 @@ import { annotationsOf } from "../../domain/structure"
 import { vecAdd, vecCross, vecLerp, vecScale } from "../../domain/ueMath"
 import { sceneAxisColors } from "../axisColors"
 import { useBeforePaneDraw } from "../PaneRenderer"
-import { snapConfigOf, useEditor } from "../store"
+import { useEditor } from "../store"
 import { useDarkTheme } from "../theme"
 import { isLine, isMesh } from "../threeGuards"
 import { endsInDoc, ringedEnds } from "./openEnds"
@@ -388,7 +388,7 @@ export function SnapOverlay() {
   const doc = useEditor((s) => s.doc)
   const index = useEditor((s) => s.catalogIndex)
   const tracked = useEditor((s) => s.tracked)
-  const showOpen = useEditor((s) => snapConfigOf(s).targets.connectors.showOpenEnds)
+  const showOpen = useEditor((s) => s.settings.snapPrefs.showOpenEnds)
   const hovered = useEditor((s) => s.hoveredItem)
   const preview = useEditor((s) => s.preview)
   const dragSnap = useEditor((s) => s.dragSnap)
