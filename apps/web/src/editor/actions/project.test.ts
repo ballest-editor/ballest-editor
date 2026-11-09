@@ -13,14 +13,23 @@ import {
 import { balledits, fileNameOf, layerFor, reset, s } from "../../test/editorActions"
 import { listSamples, readSample } from "../../test/samples"
 import { exportToGameEffect } from "./exportPlay"
-import { importAsCopyEffect, importMapFile, replaceOnImportEffect } from "./project"
+import { importAsCopyEffect, importGameMapEffect, importMapFile, replaceOnImportEffect } from "./project"
 import { saveMapFile } from "./save"
+import { refreshProject } from "./shared"
 import { keepProjectVersionEffect } from "./sync"
 
 const ballmaps = listSamples().filter((sample) => sample.kind === "ballmap")
 
 /** The game saved this one but won't reopen it, so the app doesn't write it (docs/qa/exposed-properties.md). */
 const isRefused = (sample: { readonly name: string }) => sample.name.includes("hidden probe 2")
+
+/** A disk whose game's maps folder holds `sample`, under the file name the game gives it. */
+const inGameDisk = (sample: (typeof balledits)[number]) => {
+  const name = fileNameOf(sample)
+  const inGame = `${TEST_MAPS_FOLDER}/${name}`
+  const text = readSample(sample)
+  return { name, inGame, text, disk: makeTestDisk({ [inGame]: text }) }
+}
 
 /** Imports `path` through the dialog. */
 const importFrom = (disk: TestDisk, path: string) =>
@@ -33,10 +42,7 @@ describe("import actions", () => {
   it.effect.each(balledits.filter((sample) => !isRefused(sample)).map((sample) => [sample.name, sample] as const))(
     "imports %s from the game linked to it, saves it and exports it back, byte for byte",
     ([, sample]) => {
-      const name = fileNameOf(sample)
-      const inGame = `${TEST_MAPS_FOLDER}/${name}`
-      const text = readSample(sample)
-      const disk = makeTestDisk({ [inGame]: text })
+      const { name, inGame, text, disk } = inGameDisk(sample)
       return Effect.gen(function*() {
         yield* reset
         yield* importFrom(disk, inGame)
@@ -70,6 +76,23 @@ describe("import actions", () => {
       }).pipe(Effect.provide(layerFor(disk)))
     }
   )
+
+  it.effect("lists the maps in the game's maps folder and imports one from the list, linked to it", () => {
+    const { name, inGame, text, disk } = inGameDisk(balledits[0]!)
+    return Effect.gen(function*() {
+      yield* reset
+      yield* refreshProject
+      assert.deepStrictEqual(s().gameMaps.map((map) => [map.fileName, map.inProject]), [[name, null]])
+
+      yield* importGameMapEffect(name)
+      // no dialog: the list named the file
+      assert.deepStrictEqual(disk.dialogs, [])
+      assert.deepStrictEqual(s().file, { name, path: projectFile(name) })
+      assert.isTrue(disk.files.get(projectFile(name)) === text, "the imported copy differs from the game's")
+      assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(name)?.export?.path, inGame)
+      assert.deepStrictEqual(s().gameMaps.map((map) => [map.fileName, map.inProject]), [[name, name]])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
 
   it.effect("imports a map the game won't reopen, and refuses to save it", () => {
     const sample = balledits.find(isRefused)!

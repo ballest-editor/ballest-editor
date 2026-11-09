@@ -2,14 +2,16 @@
  * The menu bar as data: what each row says, does and why it's off. `MenuBar` draws this, and Help's search lists it, so
  * the two can't drift apart (docs/DESKTOP.md § Menus).
  */
-import { type RecentProject, RELEASES_URL } from "@ballest/contracts"
-import { selectedNodes } from "../domain/groupSelection"
+import { type GameMap, type RecentProject, RELEASES_URL } from "@ballest/contracts"
+import { mapLabelOf } from "../domain/factory"
+import { counted, selectedNodes } from "../domain/groupSelection"
 import type { KeybindAction } from "../domain/Keybinds"
 import { PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { termsOf } from "../domain/outline"
 import type { SnapConfig } from "../domain/snapConfig"
 import { WORLD_PLANES } from "../domain/snapTools"
 import { annotationsOf } from "../domain/structure"
+import { formatDateTime } from "../domain/time"
 import { updateCheckBlockedBy } from "../domain/updates"
 import {
   type ViewLayout,
@@ -28,6 +30,7 @@ import {
   exportToGame,
   gridOriginToSelection,
   gridYawToSelection,
+  importGameMap,
   launchGame,
   mirrorAcrossWorld,
   openExternalLink,
@@ -113,7 +116,7 @@ export interface MenuSubmenu {
   readonly description: string
   /** Why the submenu is off; null when it's on. */
   readonly reason: string | null
-  readonly children: ReadonlyArray<MenuItem>
+  readonly children: ReadonlyArray<MenuItem | MenuSeparator>
 }
 
 export interface MenuOption {
@@ -160,6 +163,8 @@ export interface MenuState {
   readonly noTabOff: string | null
   /** Whether this is Untitled Project, which has no folder to import into yet. */
   readonly untitled: boolean
+  /** The maps in the game's maps folder that the project doesn't have yet, newest first. */
+  readonly gameMaps: ReadonlyArray<GameMap>
   /** The open map's file when there's an export to take it from. */
   readonly reimportable: string | null
   /** Whether the open map is the one Open in game put in the in-game editor, so the item is Update in game. */
@@ -223,6 +228,32 @@ const recentProjects = ({ recent, openElsewhere }: MenuState): MenuSubmenu => ({
   }))
 })
 
+/**
+ * Desktop only: the game's maps the project doesn't have yet, such as ones started in the in-game editor, by name, each
+ * copied in linked to the game's file and opened (`importGameMap`), then any file through the open dialog.
+ */
+const importMapMenu = ({ gameMaps, untitled }: MenuState): MenuSubmenu => ({
+  kind: "submenu",
+  title: "Import map",
+  description: gameMaps.length > 0
+    ? "From the game's maps folder, linked to the game's file"
+    : "The project has every map in the game's maps folder",
+  reason: untitled ? SAVE_PROJECT_FIRST : null,
+  children: [
+    ...gameMaps.map((map): MenuItem => ({
+      ...item(
+        map.displayName ?? mapLabelOf(map.fileName),
+        () => void importGameMap(map.fileName),
+        map.itemCount === null ? "Can't be read as a map." : null
+      ),
+      title: `${map.fileName}, saved ${formatDateTime(map.modifiedAt)}`,
+      ...(map.itemCount !== null && { note: counted(map.itemCount, "item") })
+    })),
+    ...(gameMaps.length > 0 ? [SEPARATOR] : []),
+    command("openMap", "From a file…")
+  ]
+})
+
 const fileMenu = (state: MenuState): ReadonlyArray<MenuNode> =>
   state.capabilities.projects
     ? [
@@ -230,6 +261,8 @@ const fileMenu = (state: MenuState): ReadonlyArray<MenuNode> =>
       item("New project…", () => openDialog({ id: "newProject" })),
       item("Open project…", () => void chooseProject()),
       recentProjects(state),
+      SEPARATOR,
+      importMapMenu(state),
       SEPARATOR,
       command("saveMap", "Save", state.saveOff),
       command("closeTab", "Close tab", state.noTabOff),
@@ -410,7 +443,6 @@ const projectMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
   const { reimportable } = state
   return [
     command("newMap", "New map"),
-    command("openMap", "Import map…", state.untitled ? SAVE_PROJECT_FIRST : null),
     command("saveMapAs", "Duplicate map…", exportOff),
     ...(canExport
       ? [
@@ -475,6 +507,7 @@ export const useMenus = (): Menus => {
   const exportOff = useEditor(exportProblemOf)
   const noTabOff = useEditor(noTabOpen) ? NO_TAB_OPEN : null
   const project = useEditor((s) => s.project)
+  const gameMaps = useEditor((s) => s.gameMaps)
   // Re-import needs an export to take the map from
   const exportedFile = useOpenProjectMap()?.map
   const reimportable = exportedFile?.link?.export != null ? exportedFile.fileName : null
@@ -505,6 +538,7 @@ export const useMenus = (): Menus => {
     exportOff,
     noTabOff,
     untitled: project?.current === null,
+    gameMaps: gameMaps.filter((map) => map.inProject === null),
     reimportable,
     openedInGame,
     recent: project?.recent ?? [],

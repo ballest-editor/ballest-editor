@@ -8,7 +8,7 @@ import { setLevelNames } from "../../domain/edits"
 import { copyNameOf, mapFileNameOf, mapLabelOf } from "../../domain/factory"
 import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
-import { Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
+import { type OpenedMap, Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
 import type { AppServices } from "../../services/runtime"
 import { blankTabs, dirtyTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
 import {
@@ -81,22 +81,17 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
   )
 })
 
-/**
- * Open… in a browser: the file input, then the map in memory. Import… on desktop: a map file from anywhere is copied
- * into the project under the game's file name for it and opened from there; nothing outside the project is edited in
- * place. A `.balledit` is copied byte for byte; a `.ballmap` (a Workshop map) is written as the `.balledit` the game
- * would make of it.
- */
-export const importMapFile = Effect.gen(function*() {
-  const platform = yield* Platform
-  if (platform.capabilities.projects && !hasProject()) {
+/** Import needs a project to copy into: refused in Untitled Project, which has no folder yet. */
+const projectToImportInto = Effect.gen(function*() {
+  if ((yield* Platform).capabilities.projects && !hasProject()) {
     return yield* new PlatformError({
       message: "There is no project to import into yet. Save the open map to name one, or open a project."
     })
   }
-  const picked = yield* platform.pickMapFile
-  if (Option.isNone(picked)) return
-  const { name, path, text } = picked.value
+})
+
+/** A picked file into the project, then its own tab: with no path (a browser's file input), only into a tab. */
+const importPicked = Effect.fn("importPicked")(function*({ name, path, text }: OpenedMap) {
   const map = yield* MapCodec.use((codec) => codec.decode(text))
   if (Option.isNone(path)) {
     yield* showMap(map, { name, path: null }, { into: "newTab" })
@@ -111,7 +106,32 @@ export const importMapFile = Effect.gen(function*() {
   yield* importInto({ source: path.value, ...pending }, false)
 })
 
+/**
+ * Open… in a browser: the file input, then the map in memory. Import… on desktop: a map file from anywhere is copied
+ * into the project under the game's file name for it and opened from there; nothing outside the project is edited in
+ * place. A `.balledit` is copied byte for byte; a `.ballmap` (a Workshop map) is written as the `.balledit` the game
+ * would make of it.
+ */
+export const importMapFile = Effect.gen(function*() {
+  const platform = yield* Platform
+  yield* projectToImportInto
+  const picked = yield* platform.pickMapFile
+  if (Option.isNone(picked)) return
+  yield* importPicked(picked.value)
+})
+
 export const importMap = () => run(importMapFile)
+
+/**
+ * Import of a map from the game's maps folder (the Project panel's In the game list): a map started in the in-game
+ * editor is copied into the project as Import… would copy it, linked to the game's file, and opened in a tab of its own.
+ */
+export const importGameMapEffect = Effect.fn("importGameMap")(function*(fileName: string) {
+  yield* projectToImportInto
+  yield* importPicked(yield* (yield* Platform).pickGameMap(fileName))
+})
+
+export const importGameMap = (fileName: string) => run(importGameMapEffect(fileName))
 
 /** A map's text into a new tab, held in memory as a browser's Open… holds it: how the app driver opens its fixtures. */
 export const openMapText = (name: string, text: string) =>

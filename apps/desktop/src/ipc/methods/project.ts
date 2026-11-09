@@ -93,6 +93,8 @@ export const projectHandlers = {
     if (Option.isNone(picked)) return null
     return yield* (yield* MapFiles).pick(picked.value)
   }),
+  listGameMaps: () => Effect.flatMap(Effect.service(MapFiles), (files) => files.listGameMaps),
+  pickGameMap: ({ fileName }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.pickGameMap(fileName)),
   importMap: (payload) => Effect.flatMap(Effect.service(MapFiles), (files) => files.importMap(payload)),
   exportMap: (payload) => Effect.flatMap(Effect.service(MapExports), (exports) => exports.exportMap(payload)),
   /** Sync detection: the exports the game changed since the last look, and the ones gone (docs/PROJECTS.md § Sync). */

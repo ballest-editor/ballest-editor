@@ -137,7 +137,7 @@ The behaviour is in [DESKTOP.md § Renderer](DESKTOP.md#renderer). These are the
 - A project opens in this window, and where it opens is asked only while this window has unsaved changes. Asking every time put a question in front of every switch, for an answer that is nearly always the same. A second window is a deliberate act instead: Shift+click on a recent project, or Open in new window on its start screen row. Always do this stops the question for good. The required chooser doesn't ask, because its window has nothing else to be.
 - Leaving an untitled window never prompts about unsaved changes, because nothing is lost: its maps go with it ([DESKTOP.md § Window](DESKTOP.md#window)).
 
-Later, the Project panel lists the maps in `UserSavedMaps` that aren't in the project yet, with an Import button each (#103's first slice).
+- File › Import map lists the maps in `UserSavedMaps` that the project doesn't have yet ([DESKTOP.md § Projects and maps](DESKTOP.md#projects-and-maps)). A map started in the in-game editor comes across in one pick, linked from the start, with no dialog to find it in. The Workshop cache browser is #103's second slice.
 
 ## Sync: edits made out of band
 

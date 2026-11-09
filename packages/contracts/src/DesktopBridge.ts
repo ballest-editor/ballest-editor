@@ -285,6 +285,26 @@ export const ImportMapResult = Schema.TaggedUnion({
 })
 export type ImportMapResult = typeof ImportMapResult.Type
 
+/**
+ * A map in the game's maps folder, for importing it (`listGameMaps`): what its file says, read once per file version.
+ * `displayName`, `creatorName` and `itemCount` are null when the file isn't a map that decodes. `inProject` is the
+ * project map it already is: one whose link names it as its export or its origin, or one of the same file name with
+ * the same bytes; null when the project hasn't got it.
+ */
+export const GameMap = Schema.Struct({
+  fileName: MapFileName,
+  modifiedAt: IsoTime,
+  displayName: Schema.NullOr(Schema.String),
+  creatorName: Schema.NullOr(Schema.String),
+  itemCount: Schema.NullOr(Schema.Finite),
+  publishedFileId: Schema.Finite,
+  inProject: Schema.NullOr(MapFileName)
+})
+export type GameMap = typeof GameMap.Type
+
+export const GameMaps = Schema.Array(GameMap)
+export type GameMaps = typeof GameMaps.Type
+
 /** `exportMap`: the project map to copy into the game's maps folder. */
 export const ExportMapPayload = Schema.Struct({
   fileName: MapFileName,
@@ -879,6 +899,13 @@ export const DesktopMethods = {
   /** The native open dialog for a map file anywhere; null when cancelled. The file may then be imported. */
   pickImport: { payload: noPayload, result: PickImportResult },
   /** Copies a picked file into the project and records where it came from (a map it replaces goes to backups). */
+  /**
+   * The maps in the game's maps folder (not its subfolders), newest first; empty when the folder isn't there. Writes
+   * nothing.
+   */
+  listGameMaps: { payload: noPayload, result: GameMaps },
+  /** Reads a map in the game's maps folder as `pickImport` would have, so it may be imported from now on. */
+  pickGameMap: { payload: MapFileNamePayload, result: OpenedMapFile },
   importMap: { payload: ImportMapPayload, result: ImportMapResult },
   /**
    * Copies a project map byte for byte into the game's maps folder and records the export in its link. The file it

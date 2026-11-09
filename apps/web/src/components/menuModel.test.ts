@@ -20,6 +20,7 @@ const state = (over: Partial<MenuState> = {}): MenuState => ({
   exportOff: null,
   noTabOff: null,
   untitled: false,
+  gameMaps: [],
   reimportable: null,
   openedInGame: false,
   recent: [],
@@ -113,6 +114,26 @@ describe("the menus", () => {
   it("list a recent project under its submenu", () => {
     const project = { path: "/projects/Canyon", name: "Canyon", exists: true, lastOpened: null }
     assert.deepStrictEqual(find("canyon", { recent: [project] }), ["File › Recent projects › Canyon"])
+  })
+
+  it("list the game's maps under File › Import map, then any file, and say why it's off in Untitled Project", () => {
+    const gameMap = (fileName: string, itemCount: number | null) => ({
+      fileName,
+      modifiedAt: "2026-11-09T10:00:00.000Z",
+      displayName: itemCount === null ? null : "Canyon Run",
+      creatorName: null,
+      itemCount,
+      publishedFileId: 0,
+      inProject: null
+    })
+    const gameMaps = [gameMap("Canyon Run_Ann.balledit", 12), gameMap("broken.balledit", null)]
+    const rows = entries({ gameMaps }).filter(({ path }) => path.join(" › ") === "File › Import map")
+    assert.deepStrictEqual(rows.map(({ label }) => label), ["Canyon Run", "broken", "From a file…"])
+    assert.deepStrictEqual(rows.map(({ reason }) => reason), [null, "Can't be read as a map.", null])
+    assert.strictEqual(rows[2]?.shortcut, "openMap")
+    const [untitled] = searchMenus(entries({ gameMaps, untitled: true }), "import map")
+    assert.deepStrictEqual([untitled?.path, untitled?.label], [["File"], "Import map"])
+    assert.include(untitled?.reason, "Save first")
   })
 
   it("turn off what a definition's tab can't do", () => {

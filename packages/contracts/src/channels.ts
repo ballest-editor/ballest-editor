@@ -26,6 +26,8 @@ export const InvokeChannels = {
   readMapThumbnail: "ballest:project:readMapThumbnail",
   writeMapThumbnail: "ballest:project:writeMapThumbnail",
   pickImport: "ballest:project:pickImport",
+  listGameMaps: "ballest:project:listGameMaps",
+  pickGameMap: "ballest:project:pickGameMap",
   importMap: "ballest:project:importMap",
   exportMap: "ballest:project:exportMap",
   checkExports: "ballest:project:checkExports",

@@ -12,6 +12,7 @@ import type {
   FoundCreator,
   GameLinkMemory,
   GameLinkResult,
+  GameMaps,
   GamePathKind,
   GamePaths,
   GameWriteProgress,
@@ -198,6 +199,10 @@ export class Platform extends Context.Service<Platform, {
   readonly renamePrefab: (payload: RenamePrefabPayload) => Effect.Effect<PrefabInfo, PlatformError>
   /** Shows a tier's folder in the file manager. */
   readonly revealPrefabs: (tier: PrefabTier) => Effect.Effect<void, PlatformError>
+  /** The maps in the game's maps folder, each with the project map it already is (desktop); none in a browser. */
+  readonly listGameMaps: Effect.Effect<GameMaps, PlatformError>
+  /** Reads a map in the game's maps folder, as `pickMapFile` would have picked it, so it may be imported. */
+  readonly pickGameMap: (fileName: string) => Effect.Effect<OpenedMap, PlatformError>
   /** Copies a picked file into the project. `Clash` (nothing written) when it has a map of that name and not `replace`. */
   readonly importMap: (payload: ImportMapPayload) => Effect.Effect<ImportMapResult, PlatformError>
   /**
@@ -432,6 +437,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     deletePrefab: (ref) => call("deletePrefab", ref),
     renamePrefab: (payload) => call("renamePrefab", payload),
     revealPrefabs: (tier) => bridgeCheck(call("revealPrefabs", { tier }), "That folder isn't there yet."),
+    listGameMaps: call("listGameMaps"),
+    pickGameMap: (fileName) => call("pickGameMap", { fileName }).pipe(Effect.map(openedMap)),
     importMap: (payload) => call("importMap", payload),
     exportMap: (fileName, options) => call("exportMap", { fileName, ...options }),
     checkExports: call("checkExports"),
@@ -615,6 +622,8 @@ const makeBrowser = (): Platform["Service"] => {
     writeSidecar: () => noProject,
     readMapThumbnail: () => Effect.succeed(null),
     writeMapThumbnail: () => Effect.void,
+    listGameMaps: Effect.succeed([]),
+    pickGameMap: () => desktopOnly,
     importMap: () => noProject,
     exportMap: () => desktopOnly,
     checkExports: Effect.succeed({ changed: [], missing: [] }),
