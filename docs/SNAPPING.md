@@ -25,6 +25,14 @@ Every snap answers three questions. Each feature below is a new answer to one of
 
 Blender's snapping is laid out this way and it is why its many snap types read as one tool. The additions here are the targets a track editor needs that a modeller doesn't: connectors, tracking and alignment.
 
+Five rules hold the answers together, and a case that breaks one is a bug in the design, not in the case:
+
+- **One surface, in the user's words.** Snapping has one place to be set, the magnet's menu in the view bar (§ The snap menu): what it snaps to is Ends, Pieces and Guides, what wins is Grid or Pieces, how near is one distance. Everything else is Advanced or a user setting (§ Settings). Less to explain beats more explaining.
+- **A join is a socket meeting a socket.** Ends meet when they show within range of each other on screen, at any depth, and a join is exact: caps coplanar, chosen spots together, ups matching, under any scale or mirror. While a piece with ends is dragged its ends are drawn, and so are the ends it could join. An end's cap belongs to the end, not to Mesh. Under J nothing but a join moves the piece.
+- **An indication is one true thing about two bodies.** One glyph per snap, both bodies' boxes outlined with only the meeting faces tinted, violet for the selection and amber for the neighbour; nothing drawn for a snap not applied this frame, nothing drawn to something out of view.
+- **A stop is a change the user can see.** A turn stops where contact begins, where faces come flush, where axes come into line, where ends meet, never on a state that already held when the drag started.
+- **Guides stay near.** Alignment is a 2D idea: in any pane a neighbour counts only within the snap distance on screen and a few selection sizes away in the world, nearer first.
+
 ### Snap base
 
 Which point of the selection is matched to a target. One choice at a time, shown in the snap menu's Advanced.
