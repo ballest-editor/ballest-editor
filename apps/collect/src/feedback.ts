@@ -10,7 +10,7 @@ import { Store } from "./Store"
 export const FEEDBACK_BODY_LIMIT = 16 * 1024
 
 /** How many submissions one client may send an hour. */
-export const FEEDBACK_PER_HOUR = 5
+export const FEEDBACK_PER_HOUR = 10
 
 /** Exactly the schema: a body with anything more is refused too. */
 const decode = Schema.decodeUnknownEffect(Schema.fromJsonString(FeedbackSubmission), { onExcessProperty: "error" })

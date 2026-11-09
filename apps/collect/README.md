@@ -8,7 +8,7 @@
 | `POST /api/events`   | `UsageBatch`, at most 256 KB                                              | 204                                        |
 
 - A body is decoded with the contract's schema, extra keys included, and anything it refuses is a 400. A larger body is a 413, another method a 405, and any other path Vercel's own 404.
-- Each client gets 5 feedback submissions and 60 usage batches an hour, then 429. A client is an HMAC of its address (`x-forwarded-for`, which Vercel sets) keyed with `IP_HASH_SALT`; the address itself is never stored.
+- Each client gets 10 feedback submissions and 60 usage batches an hour, then 429. A client is an HMAC of its address (`x-forwarded-for`, which Vercel sets) keyed with `IP_HASH_SALT`; the address itself is never stored.
 - Feedback becomes an issue in `ballest-editor/ballest-editor`, filed as the GitHub App. The title is `[Feedback]` and the message's first line, the body the message and the app's version, platform and OS version. Labels: `feedback`, plus `bug`, `enhancement` or `parity` for the kinds bug, idea and mismatch. `src/sanitise.ts` defuses mentions and issue references, and strips raw HTML and images. The Discord and creator names are stored in the database for the maintainer to reply, and never written into the issue.
 - Every usage event is one row in `usage_events`; `schema.sql` has the tables, the two roles and the views `apps/admin` reads. Raw events are kept forever for now.
 - No CORS headers: the desktop app's main process calls this, never a page.
