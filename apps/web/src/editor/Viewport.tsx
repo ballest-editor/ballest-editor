@@ -201,6 +201,15 @@ function ClickSelect() {
 
 const NO_MODIFIERS: ModifierState = { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false }
 
+/** The eyedropper (tabler's color-picker, white on a dark edge), its tip at the hotspot, while the pick chord is held. */
+const PICK_CURSOR = (() => {
+  const path = "M11 7l6 6M4 16l11.7 -11.7a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4l-11.7 11.7h-4v-4z"
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" `
+    + `stroke-linecap="round" stroke-linejoin="round"><path d="${path}" stroke="#1c1c1c" stroke-width="4"/>`
+    + `<path d="${path}" stroke="#fff" stroke-width="2"/></svg>`
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 4 20, crosshair`
+})()
+
 /**
  * The paint tool (editor/paintTarget.ts). The pointer's target is outlined and shaded (red where the game takes no
  * paint, and the status bar says why); a press on it starts a stroke that paints every target the pointer then enters
@@ -248,7 +257,8 @@ function PaintTool() {
     const show = (target: PaintTarget | undefined) => {
       hover = target
       const reason = target?.effect._tag === "Blocked" ? target.effect.reason : null
-      el.style.cursor = reason === null ? "crosshair" : "not-allowed"
+      const picking = stroke === null && holdsModifiersOf(useEditor.getState().keybinds, "pickPaint", modifiers)
+      el.style.cursor = picking ? PICK_CURSOR : reason === null ? "crosshair" : "not-allowed"
       useEditor.getState().setPaintBlockedReason(reason)
     }
     const paint = (target: PaintTarget | undefined) => {

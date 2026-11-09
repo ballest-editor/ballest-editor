@@ -1,8 +1,8 @@
-import { IconLayoutGrid } from "@tabler/icons-react"
+import { IconArrowsDiagonal, IconArrowsDiagonalMinimize2 } from "@tabler/icons-react"
 import { ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
-import { Fragment, useState } from "react"
+import { useState } from "react"
 import { lookupMaterial, type MaterialTable } from "../domain/Materials"
 import {
   choiceOf,
@@ -12,6 +12,7 @@ import {
   finishLabelOf,
   materialLabelOf,
   type PaintChoice,
+  type PaintFinish,
   type PaintPicker,
   shownFinishOf,
   swatchColor
@@ -161,39 +162,52 @@ function RowLabel({ children }: { readonly children: string }) {
   return <span className="text-body text-fg-secondary">{children}</span>
 }
 
+/** A finish's row of the grid: its label and its colours. */
+function FinishRow({ finish, choice, pick }: Parts & { readonly finish: PaintFinish }) {
+  return (
+    <>
+      <RowLabel>{finishLabelOf(finish)}</RowLabel>
+      <FinishSwatches
+        finish={finish}
+        choice={choice}
+        onPick={(color) => pick({ _tag: "Material", material: color.material })}
+        label={finishLabelOf(finish)}
+        className="flex-nowrap gap-1.5"
+        swatchProps={noFocus}
+      />
+    </>
+  )
+}
+
 /**
- * Every finish × colour at once: a row per finish in the game's order, its colours in the panel's order (the same ten
- * for all but special), then the default and the surfaces. Scrolls rather than grow past the viewport.
+ * Every finish × colour at once: a row per finish in the game's order, its colours in the panel's order. The finishes
+ * with the full set of colours make the main grid; the short ones (special), the default and the surfaces stand in a
+ * second grid beside it, where they cost no height. Scrolls rather than grow past the viewport.
  */
 function GridView(parts: Parts) {
-  const { choice, pick } = parts
   const paint = useEditor((s) => s.paint)
   const surfaces = useEditor((s) => s.surfaces.length > 0)
+  const full = Math.max(0, ...paint.map((f) => f.colors.length))
+  const main = paint.filter((f) => f.colors.length === full)
+  const side = paint.filter((f) => f.colors.length !== full)
   return (
-    <div className="grid min-h-0 grid-cols-[auto_auto] items-center gap-x-3 gap-y-1.5 overflow-auto p-1">
-      {paint.map((finish) => (
-        <Fragment key={finish.name}>
-          <RowLabel>{finishLabelOf(finish)}</RowLabel>
-          <FinishSwatches
-            finish={finish}
-            choice={choice}
-            onPick={(color) => pick({ _tag: "Material", material: color.material })}
-            label={finishLabelOf(finish)}
-            className="flex-nowrap gap-1.5"
-            swatchProps={noFocus}
-          />
-        </Fragment>
-      ))}
-      <RowLabel>{DEFAULT_LABEL}</RowLabel>
-      <div className="flex">
-        <DefaultChoice {...parts} />
+    <div className="flex min-h-0 items-start gap-x-4 overflow-auto p-1">
+      <div className="grid grid-cols-[auto_auto] items-center gap-x-3 gap-y-1.5">
+        {main.map((finish) => <FinishRow key={finish.name} finish={finish} {...parts} />)}
       </div>
-      {surfaces && (
-        <>
-          <RowLabel>Surface</RowLabel>
-          <SurfaceChoices {...parts} />
-        </>
-      )}
+      <div className="grid grid-cols-[auto_auto] items-center gap-x-3 gap-y-1.5">
+        {side.map((finish) => <FinishRow key={finish.name} finish={finish} {...parts} />)}
+        <RowLabel>{DEFAULT_LABEL}</RowLabel>
+        <div className="flex">
+          <DefaultChoice {...parts} />
+        </div>
+        {surfaces && (
+          <>
+            <RowLabel>Surface</RowLabel>
+            <SurfaceChoices {...parts} />
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -220,14 +234,15 @@ export function PaintPalette() {
   }
   const look = brushLookOf(brush, paint, surfaces, table)
   const grid = view === "grid"
+  const toggleLabel = grid ? "One finish" : "Every finish"
   const toggle = (
     <ViewTip
-      label="Every finish"
+      label={toggleLabel}
       side="top"
       render={
         <button
           type="button"
-          aria-label="Every finish"
+          aria-label={toggleLabel}
           aria-pressed={grid}
           onClick={() => void updateSettings("panels", { paintView: grid ? "row" : "grid" })}
           className={cn(SEGMENT, "size-7 shrink-0 px-0 aria-pressed:bg-pressed aria-pressed:text-foreground")}
@@ -235,7 +250,7 @@ export function PaintPalette() {
         />
       }
     >
-      <IconLayoutGrid className="size-4" />
+      {grid ? <IconArrowsDiagonalMinimize2 className="size-4" /> : <IconArrowsDiagonal className="size-4" />}
     </ViewTip>
   )
   const lookChip = (
