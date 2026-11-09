@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import { formsChord } from "./flyKeys"
 import {
   actionsFor,
   actionWhen,
@@ -243,6 +244,27 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
     keys.release("ControlLeft")
     keys.press("ControlLeft", 2000)
     expect(keys.holds("ControlLeft", 2000 + MODIFIER_HOLD_MS)).toBe(true)
+  })
+
+  it("a bound chord's own key (Ctrl+Shift+Left, align) doesn't turn the camera as the arrow it is", () => {
+    const keys = new HeldKeys()
+    keys.press("ControlLeft", 0)
+    keys.press("ShiftLeft", 5)
+    keys.press("ArrowLeft", 10, formsChord(defaultKeybinds, "Ctrl+Shift+ArrowLeft"))
+    expect(isBoundChord(defaultKeybinds, "Ctrl+Shift+ArrowLeft")).toBe(true)
+    keys.claim("ArrowLeft")
+    expect(keys.holdsAny(defaultKeybinds.lookLeft, 500)).toBe(false)
+    expect(keys.holdsAny(defaultKeybinds.moveDown, 500)).toBe(false)
+    keys.release("ArrowLeft")
+    keys.release("ControlLeft")
+    keys.release("ShiftLeft")
+    keys.press("ArrowLeft", 1000)
+    expect(keys.holdsAny(defaultKeybinds.lookLeft, 1000)).toBe(true)
+  })
+
+  it("a chord nobody bound (Shift+Left) still turns the camera", () => {
+    expect(isBoundChord(defaultKeybinds, "Shift+ArrowLeft")).toBe(false)
+    expect(isBoundChord(defaultKeybinds, "ArrowLeft")).toBe(false)
   })
 
   it("a click chord (Ctrl+click) suppresses it too", () => {

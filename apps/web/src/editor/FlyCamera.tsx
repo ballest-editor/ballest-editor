@@ -103,7 +103,11 @@ export function FlyCamera() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditorKeyEvent(e)) {
-        pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e), drag.current !== null))
+        const chord = chordOf(e)
+        const dragging = drag.current !== null
+        pressed.current.press(e.code, performance.now(), formsChord(keybinds, chord, dragging))
+        // a bound chord's key is its shortcut's, not a fly key; during a camera drag no shortcut fires, so it flies
+        if (!dragging && isBoundChord(keybinds, chord)) pressed.current.claim(e.code)
       }
     }
 

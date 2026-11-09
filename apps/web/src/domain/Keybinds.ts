@@ -746,6 +746,14 @@ export class HeldKeys {
     if (formsChord && !MODIFIER_CODES.has(code)) this.suppressModifiers()
   }
 
+  /**
+   * The key `code` was pressed as a bound chord with modifiers (`isBoundChord`): until it is released it drives no held
+   * action, so Ctrl+Shift+Left aligns and doesn't also turn the camera left.
+   */
+  claim(code: string): void {
+    if (this.downAt.has(code)) this.suppressed.add(code)
+  }
+
   /** The held modifiers are part of a chord (a key or a click): none of them drive held actions until released. */
   suppressModifiers(): void {
     for (const held of this.downAt.keys()) if (MODIFIER_CODES.has(held)) this.suppressed.add(held)
@@ -780,9 +788,8 @@ export class HeldKeys {
     if (binding.length === 0) return false
     const code = baseCodeOf(binding)
     const since = this.downAt.get(code)
-    if (since === undefined) return false
-    if (!MODIFIER_CODES.has(code)) return true
-    return !this.suppressed.has(code) && (atOnce || now - since >= MODIFIER_HOLD_MS)
+    if (since === undefined || this.suppressed.has(code)) return false
+    return !MODIFIER_CODES.has(code) || atOnce || now - since >= MODIFIER_HOLD_MS
   }
 }
 
