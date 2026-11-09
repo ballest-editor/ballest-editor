@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { cn } from "@workspace/ui/lib/utils"
 import { useShallow } from "zustand/react/shallow"
 import type { Vec3 } from "../domain/coords"
-import { soleGroupOf } from "../domain/groupSelection"
+import { canSetItemPivots, soleGroupOf } from "../domain/groupSelection"
 import type { Axis } from "../domain/groupTransform"
 import { GROUP_PIVOT_FACES, type GroupNode, type GroupPivot } from "../domain/MapSidecar"
 import { PIVOT_CHOICES, pivotBoundsOf } from "../domain/pivot"
@@ -77,6 +77,17 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
   )
 }
 
+/** A fixed pivot still has an editable world position, which moves the selection. */
+function FixedPivotSection({ point, reason }: { readonly point: Vec3 | undefined; readonly reason: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <SectionTitle>Pivot</SectionTitle>
+      <p className="text-body text-fg-tertiary">{reason}</p>
+      {point !== undefined && <PivotPosition point={point} />}
+    </div>
+  )
+}
+
 /** A group's pivot choices, in the order of a piece's: the centre of its items' box, a face of it, a member, a frozen point. */
 const GROUP_CHOICES = ["Center", ...GROUP_PIVOT_FACES, "Item", "Point"] as const
 type GroupChoice = (typeof GROUP_CHOICES)[number]
@@ -116,15 +127,12 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
   }
   if (group.prefab !== undefined || group.chain === true) {
     return (
-      <div className="flex flex-col gap-1.5">
-        <SectionTitle>Pivot</SectionTitle>
-        <p className="text-body text-fg-tertiary">
-          {group.prefab !== undefined
-            ? "An instance pivots on its definition's origin, so it stays a placement of its prefab."
-            : "A chain pivots on its first link."}
-        </p>
-        {point !== undefined && <PivotPosition point={point} />}
-      </div>
+      <FixedPivotSection
+        point={point}
+        reason={group.prefab !== undefined
+          ? "An instance pivots on its definition's origin, so it stays a placement of its prefab."
+          : "A chain pivots on its first link."}
+      />
     )
   }
   return (
@@ -192,9 +200,19 @@ export function PivotSection() {
   )
   const group = useEditor((s) => soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId))
   const point = useEditor(useShallow(shownPivotPoint))
+  const canSet = useEditor((s) => canSetItemPivots(s.doc.structure.tree, s.selectedIds, s.enteredGroupId))
   const used = new Set(choices)
   const mixed = used.size > 1
   if (group !== undefined) return <GroupPivotSection group={group} />
+  if (!canSet) {
+    return (
+      <FixedPivotSection
+        point={point}
+        reason="Enter a group to change its members' pivot presets. Position moves the selection's gizmo pivot."
+      />
+    )
+  }
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">

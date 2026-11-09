@@ -93,6 +93,10 @@ This changes behaviour for anyone who typed "90" to set every piece's yaw to 90.
 
 **What the rows show.** The unit's value, which is the active piece's, with a Mixed mark on the row when the other pieces differ on an axis. A blank Mixed field gave nothing to type a change from; the active piece's value does, and it is where the gizmo sits. The Pivot section's Position row (#225) shows the pivot point itself, the game's Location, and an edit there is the same move.
 
+Numeric fields accept arithmetic with `+`, `-`, `*`, `/`, parentheses and scientific notation. A negative number is an absolute value: replacing -100 with -200 sets -200. Relative edits use `+=50`, `-=20`, `*2` or `/2`; the existing `+50` shorthand still adds. Invalid expressions and division by zero leave the value unchanged.
+
+The displayed transform and pivot position use the same unit as the edit, including the first selected link inside a chain in Each. Item pivot presets are available only when every selected unit is an item. A whole group uses its own presets; mixed groups and pieces keep a position row and explain how to enter the group to edit its members. Chains and instances retain their fixed pivot rules. The single-piece position row appears when its pivot differs from its origin; multi-selections show the gizmo pivot.
+
 **Groups and instances.** A whole group is one unit, so it has Transform rows of its own, over its frame: its position is the pivot, editable as a move in the Pivot section's Position row (a group has no stored origin to call Location); Rotation and Scale read 0 and 1, since a group holds neither, and a value typed there is a change about the pivot, the way the game's panel treats a joined set. With an Item pivot (below) the rows read that item's values. The group's items keep their editor under "Edit all N items", without Transform rows, since the group's rows already do that job, and a pasted row there is what sets every member to one value. On an instance that editor says that an edit in it changes the instance away from its definition, which the unit rows never do: every edit of theirs is about the instance's origin.
 
 ## Showing it

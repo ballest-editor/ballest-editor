@@ -103,7 +103,9 @@ function useScrub(options: {
       active.x = e.clientX
       active.pixels += dx * scrubSpeedOf(e)
       const { step, snap, round, onScrub } = latest.current
-      active.value = round(scrubbedValue(active.startValue, active.pixels, step, snap))
+      const value = scrubbedValue(active.startValue, active.pixels, step, snap)
+      // A factor may need more digits than its display to land a dimension on the grid.
+      active.value = snap === undefined ? round(value) : value
       onScrub?.(active.value, active.startValue)
     },
     onPointerUp: () => end(true),
@@ -132,7 +134,7 @@ const TYPING_HINT: StatusHint = [{ keys: "Enter", text: "Set" }, { keys: "Escape
 
 const RELATIVE_TYPING_HINT: StatusHint = [
   ...TYPING_HINT,
-  { text: "Type +50, -20, *2 or /2 to change what's there, =-20 for a negative" }
+  { text: "Type arithmetic such as (200 + 50) / 2; use +=50, -=20, *2 or /2 for relative edits" }
 ]
 
 /** Shows the field's hint in the status bar while it is hovered or typed in. */
@@ -162,8 +164,8 @@ function useFieldHint(scrubbable: boolean) {
  * Shift ×10, Alt ×0.1) and commits once on release (`onScrubCommit`, else `onCommit`), so a
  * whole scrub is one undo step; a click selects the text to type over. With `snap`, a scrub lands on multiples of it (and
  * moves faster when the snap is coarse); typed values aren't snapped. A field that scrubs also takes relative entry:
- * `+50`, `-20`, `*2` and `/2` typed over its text act on the value and land on `digits` like a scrub, and `=-20` sets a
- * negative value. Text edited in place is always a plain number, or changing -2790 to -2795 would subtract. A null `value`
+ * `+=50`, `-=20`, `*2` and `/2` typed over its text act on the value. Negative numbers are absolute.
+ * Arithmetic with parentheses works both when replacing the text and editing it in place. A null `value`
  * is mixed (several items that disagree): the input is blank, typing sets them all, a scrub starts from 0, and a
  * relative entry is refused. `format` and `parse` replace plain decimals, for a value that reads as something else (a
  * time of day). While it's hovered or typed in, the status bar says what the mouse and keys do (`useFieldHint`).
@@ -221,7 +223,7 @@ export function NumberField(props: {
   }
   const commit = () => {
     if (draft !== null && !cancelling.current) {
-      if (scrubbable && props.parse === undefined && typedOver.current) commitEntry(draft)
+      if (props.parse === undefined) commitEntry(typedOver.current ? draft : "=" + draft)
       else commitValue(parse(draft))
     }
     cancelling.current = false

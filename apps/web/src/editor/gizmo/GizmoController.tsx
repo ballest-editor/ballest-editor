@@ -2,10 +2,12 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector, ueToScene, type UeTransform, type Vec3 } from "../../domain/coords"
+import { isDecal } from "../../domain/editTransform"
 import { selectedGroupIds } from "../../domain/groupSelection"
 import type { GroupDelta } from "../../domain/groupTransform"
+import { extentOf } from "../../domain/itemBounds"
 import { gizmoScaleOf } from "../../domain/Settings"
-import { type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
+import { scaleSnapStep, type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
 import { type ScaleStop, snappedScale, turnLanding, turnReach, type TurnStop } from "../../domain/snapRotate"
 import { quatFromAxisAngle } from "../../domain/ueMath"
 import {
@@ -13,6 +15,7 @@ import {
   leadingKeys,
   movedAlikeKeys,
   type PivotMode,
+  pivotUnitOf,
   type SelectionUnits,
   turnAccumulates
 } from "../../domain/units"
@@ -79,7 +82,9 @@ interface ActiveDrag {
   readonly stops: ReadonlyArray<ScaleStop>
   /** How far the active item's scaled face reaches from the pivot at the drag's start, in cm. */
   readonly reach: number
-  /** The active item's scale along the handle's axis at the drag's start. */
+  /** The unit's local size along the handle's axis (cm), which a size snap keeps on the grid; none for a group. */
+  readonly scaleExtent: number | undefined
+  /** The unit's scale along the handle's axis at the drag's start. */
   readonly scaleFrom: number
   /** The cm the threshold covers at the pivot. */
   readonly rangeCm: number
@@ -317,6 +322,13 @@ export function GizmoController() {
       const items = constraint === undefined
         ? snapItemsOf(s, new Set(target.transforms.keys()), config.targets.mesh.sharpAngle)
         : []
+      const unit = pivotUnitOf(target.selection, pivotMode)
+      const item = s.doc.map.items[s.doc.ids.indexOf(unit.id)]
+      const extent = item === undefined
+        ? undefined
+        : isDecal(item)
+        ? { x: 1, y: 1, z: 1 }
+        : extentOf(item, s.catalogIndex)
       drag.current = {
         id,
         pointerId: e.pointerId,
@@ -364,7 +376,8 @@ export function GizmoController() {
         },
         stops: scaleAxis === undefined ? [] : scaleStopsOf(scaleAxis, target.pivot, selection.box, items),
         reach: scaleAxis === undefined ? 0 : reachAlong(selection.box, target.pivot, scaleAxis),
-        scaleFrom: spec.axis === undefined ? target.active.scale3D.x : target.active.scale3D[spec.axis],
+        scaleFrom: unit.transform.scale3D[spec.axis ?? "x"],
+        scaleExtent: extent?.[spec.axis ?? "x"],
         rangeCm,
         keys: seedDragKeys(e, transformOf(spec)),
         lastEvent: undefined
@@ -429,7 +442,10 @@ export function GizmoController() {
       const scaled = snappedScale({
         from: active.scaleFrom,
         free: active.scaleFrom * scale.factor,
-        step: snap.step ? config.scaleStep : undefined,
+        step: (() => {
+          const step = scaleSnapStep(config, active.scaleExtent, keys.off)
+          return step === undefined ? undefined : step * 100
+        })(),
         face: snap.targets.includes("mesh") && scale.axis !== undefined && active.scaleFrom !== 0 && active.reach > 0
           ? { reach: active.reach / active.scaleFrom, range: active.rangeCm }
           : undefined,

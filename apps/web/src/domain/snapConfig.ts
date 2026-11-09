@@ -113,6 +113,8 @@ export const SnapConfig = Schema.Struct({
   rotationStep: Positive,
   /** Whether a scale snaps. */
   scaleEnabled: Schema.Boolean,
+  /** Resize dimensions to grid multiples when bounds are known. */
+  scaleToGrid: Schema.Boolean.pipe(Schema.withDecodingDefaultTypeKey(Effect.succeed(true))),
   /** Scale step in percent. */
   scaleStep: Positive,
   base: Schema.Literals(SNAP_BASES),
@@ -137,6 +139,7 @@ export const defaultSnapConfig: SnapConfig = {
   rotationEnabled: false,
   rotationStep: DEFAULT_ROTATION_STEP,
   scaleEnabled: false,
+  scaleToGrid: true,
   scaleStep: DEFAULT_SCALE_STEP,
   base: "pivot",
   threshold: 12,
@@ -358,4 +361,17 @@ export const targetSummary = (
     case "alignment":
       return `In view, ${GAP_WORDS[alignment.gapGuides]}`
   }
+}
+
+/** Scale-factor step shared by handles and fields. A known dimension uses the grid; otherwise the percent step. */
+export const scaleSnapStep = (
+  config: SnapConfig,
+  extent: number | undefined,
+  off = false
+): number | undefined => {
+  if (off || !config.enabled) return undefined
+  if (config.scaleToGrid && config.targets.grid.enabled && extent !== undefined && extent > 0) {
+    return config.gridSize / extent
+  }
+  return config.scaleEnabled ? config.scaleStep / 100 : undefined
 }

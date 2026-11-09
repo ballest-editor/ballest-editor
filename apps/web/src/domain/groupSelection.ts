@@ -226,3 +226,13 @@ export const groupTrail = (tree: ReadonlyArray<TreeNode>, groupId: string | null
   const group = groupId === null ? undefined : findGroup(tree, groupId)
   return group === undefined ? [] : [...findNode(tree, group.id)?.path ?? [], group]
 }
+
+/** Item pivot presets apply only when every selected unit is an item. Enter a group to edit its members. */
+export const canSetItemPivots = (
+  tree: ReadonlyArray<TreeNode>,
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
+): boolean => {
+  const nodes = selectedNodes(tree, selectedIds, enteredGroupId)
+  return nodes.length > 0 && nodes.every((node) => node.kind === "item")
+}

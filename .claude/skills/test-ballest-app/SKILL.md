@@ -34,6 +34,7 @@ node $B eval '__ballest.useEditor.getState().doc.map.items.length'
 node $B click '[aria-label="Settings"]'
 node $B hover 'header button'          # a real pointer, which opens tooltips
 node $B key Escape
+node $B type '-200'                      # into the focused field; then `key Enter`
 node $B drag 640 400 700 400             # a left-button drag between page pixels, for a gizmo handle
 node $B shot /tmp/after.png
 node $B stop                             # always: idle software WebGL burns about 8 cores

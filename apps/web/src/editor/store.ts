@@ -2351,7 +2351,7 @@ export const shownPivotPoint = (s: EditorState): Vec3 | undefined => {
   if (target === undefined) return undefined
   // a whole group has no origin of its own, so its pivot is its one position and always shows
   if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) return target.pivot
-  return sameVec(target.activePivot, target.active.translation) ? undefined : target.activePivot
+  return s.selectedIds.length > 1 || !sameVec(target.pivot, target.active.translation) ? target.pivot : undefined
 }
 
 /** Edit transforms as the game would take them, so a drag stops at a decal's limits as it happens. */

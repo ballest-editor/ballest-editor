@@ -15,14 +15,14 @@ describe("GroupBox", () => {
     assert.isFalse(box.visible)
   })
 
-  it("draws 12 edges just outside the items, each corner to a neighbour", () => {
+  it("draws 12 edges at the bounds of the items, each corner to a neighbour", () => {
     const box = new GroupBox()
     box.update(boxAt(), camera, 800)
     assert.isTrue(box.visible)
     const { instanceStart: from, instanceEnd: to } = box.geometry.attributes
     assert.strictEqual(from?.count, 12)
     box.geometry.computeBoundingBox()
-    assert.deepStrictEqual(box.geometry.boundingBox?.max.toArray(), [13, 13, 13])
+    assert.deepStrictEqual(box.geometry.boundingBox?.max.toArray(), [5, 5, 5])
     for (let i = 0; i < 12; i++) {
       const differ = [
         from?.getX(i) !== to?.getX(i),
@@ -37,8 +37,8 @@ describe("GroupBox", () => {
     const box = new GroupBox()
     box.update({ min: { x: 0, y: 100, z: 200 }, max: { x: 10, y: 110, z: 220 } }, camera, 800)
     box.geometry.computeBoundingBox()
-    assert.deepStrictEqual(box.geometry.boundingBox?.min.toArray(), [-8, 192, 92])
-    assert.deepStrictEqual(box.geometry.boundingBox?.max.toArray(), [18, 228, 118])
+    assert.deepStrictEqual(box.geometry.boundingBox?.min.toArray(), [0, 200, 100])
+    assert.deepStrictEqual(box.geometry.boundingBox?.max.toArray(), [10, 220, 110])
   })
 
   it("follows its items, and measures its dashes along each edge", () => {
@@ -46,10 +46,10 @@ describe("GroupBox", () => {
     box.update(boxAt(), camera, 800)
     box.update(boxAt(50), camera, 800)
     box.geometry.computeBoundingBox()
-    assert.strictEqual(box.geometry.boundingBox?.max.x, 63)
+    assert.strictEqual(box.geometry.boundingBox?.max.x, 55)
     const { instanceDistanceStart: from, instanceDistanceEnd: to } = box.geometry.attributes
     assert.strictEqual(from?.getX(0), 0)
-    assert.strictEqual(to?.getX(0), 26)
+    assert.strictEqual(to?.getX(0), 10)
   })
 
   it("keeps its dashes the same on screen as the camera backs off", () => {

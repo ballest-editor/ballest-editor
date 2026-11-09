@@ -9,14 +9,14 @@ const applied = (text: string, current: number) => {
 describe("parseNumberEntry", () => {
   it("reads an operation on the current value", () => {
     assert.deepStrictEqual(parseNumberEntry("+50"), { kind: "add", by: 50 })
-    assert.deepStrictEqual(parseNumberEntry("-20"), { kind: "add", by: -20 })
+    assert.deepStrictEqual(parseNumberEntry("-=20"), { kind: "add", by: -20 })
     assert.deepStrictEqual(parseNumberEntry("*2"), { kind: "multiply", by: 2 })
     assert.deepStrictEqual(parseNumberEntry("/2"), { kind: "multiply", by: 0.5 })
   })
 
   it("applies each operation to the current value", () => {
     assert.strictEqual(applied("+100", -2790), -2690)
-    assert.strictEqual(applied("-20", 100), 80)
+    assert.strictEqual(applied("-=20", 100), 80)
     assert.strictEqual(applied("*2", 1.5), 3)
     assert.strictEqual(applied("/2", 9), 4.5)
     assert.strictEqual(applied("*-1", 40), -40)
@@ -24,12 +24,22 @@ describe("parseNumberEntry", () => {
 
   it("takes spaces and decimals", () => {
     assert.strictEqual(applied(" + 2.5 ", 1), 3.5)
-    assert.strictEqual(applied("-.5", 1), 0.5)
+    assert.strictEqual(applied("-.5", 1), -0.5)
   })
 
   it("reads a plain number as a value, whatever the field holds", () => {
     assert.strictEqual(applied("12.5", 7), 12.5)
     assert.strictEqual(applied("0", 7), 0)
+  })
+
+  it("sets signed values and evaluates arithmetic with precedence", () => {
+    assert.strictEqual(applied("-200", -100), -200)
+    assert.strictEqual(applied("2 + 3 * 4", 7), 14)
+    assert.strictEqual(applied("(2 + 3) * -4", 7), -20)
+    assert.strictEqual(applied("1e2 / 4", 7), 25)
+    for (const text of ["1 / 0", "(2+3", "2foo", "2**3", "1e999", "1/(1/0)", "1/1e999"]) {
+      assert.isNull(parseNumberEntry(text))
+    }
   })
 
   it("sets a negative value outright with =", () => {
@@ -38,7 +48,7 @@ describe("parseNumberEntry", () => {
   })
 
   it("refuses what isn't a number, and dividing by zero", () => {
-    for (const text of ["", " ", "+", "-", "*", "/", "=", "abc", "+abc", "1+1", "/0", "*Infinity", "--"]) {
+    for (const text of ["", " ", "+", "-", "*", "/", "=", "abc", "+abc", "/0", "*Infinity", "--"]) {
       assert.isNull(parseNumberEntry(text), text)
     }
   })

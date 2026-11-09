@@ -353,6 +353,27 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     return s().selectedIds[0]!
   }
 
+  it("shows the gizmo pivot for a mixed selection with an active group", () => {
+    const { ids } = setup()
+    s().select(ids.slice(1))
+    s().groupSelection()
+    s().select(ids)
+    const target = selectionPivot(s(), (id) => shownTransform(s(), id))!
+    expectVec(shownPivotPoint(s())!, target.pivot, "displayed pivot")
+  })
+
+  it("does not change member pivots through a whole group, but allows them after entering", () => {
+    const { ids } = setup()
+    s().groupSelection()
+    const group = s().doc.structure.tree.find((node) => node.kind === "group")!
+    const before = s().doc
+    setSelectionPivot("Top")
+    assert.strictEqual(s().doc, before)
+    s().enterGroup(group.id)
+    setSelectionPivot("Top")
+    for (const id of ids) assert.strictEqual(pivotOf(s(), id).choice, "Top")
+  })
+
   it("pastes a size onto every item along its own axes, keeping flips and each pivot", () => {
     const id = cubeAt({ x: 0, y: 0, z: 5000 }, 30, "Left")
     s().transformItems(new Map([[id, { ...docTransform(id), scale3D: { x: -2, y: 1, z: 0.5 } }]]))

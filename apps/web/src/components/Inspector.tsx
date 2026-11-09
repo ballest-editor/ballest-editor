@@ -25,16 +25,17 @@ import type { UeTransform, Vec3 } from "../domain/coords"
 import { creatorChipText, mapCreatorLabel } from "../domain/creator"
 import { editTransform, isDecal } from "../domain/editTransform"
 import { mapLabelOf } from "../domain/factory"
-import { counted, exactSelectedGroup } from "../domain/groupSelection"
+import { counted, soleGroupOf } from "../domain/groupSelection"
 import { type Axis, readField, type TransformField } from "../domain/groupTransform"
 import { extentOf, sizeAt } from "../domain/itemBounds"
 import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
 import { assetNameOf } from "../domain/Materials"
-import { snapsGrid, snapsRotation } from "../domain/snapConfig"
+import { scaleSnapStep, snapsGrid, snapsRotation } from "../domain/snapConfig"
 import { pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
+import { pivotUnitOf } from "../domain/units"
 import type { MapValidation } from "../domain/validateMap"
 import {
   deleteSelection,
@@ -464,6 +465,8 @@ function TransformRow(props: {
   /** What a paste of three values does to the selection. */
   readonly onPaste: (value: Vec3) => void
   readonly perUnit: Readonly<Record<Axis, number>>
+  /** The leading item's local size (cm), which a snapped Scale scrub keeps on the grid; none for a group. */
+  readonly extent?: Vec3 | undefined
   /** The clipboard's kind of row, when it isn't the field's (a size). */
   readonly clipKey?: ClipKey
   readonly mode?: ReactNode
@@ -520,7 +523,12 @@ function TransformRow(props: {
               onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
               onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
               step={row.step}
-              snap={snap}
+              snap={field === "scale3D"
+                ? (() => {
+                  const step = scaleSnapStep(snapping, props.extent?.[axis])
+                  return step === undefined ? undefined : step / Math.abs(perUnit[axis])
+                })()
+                : snap}
               digits={row.digits}
               handleClassName={AXIS_BG_CLASSES[axis]}
               handleText={AXIS_LABELS[axis]}
@@ -692,10 +700,12 @@ const sizeRowProps = (
  * The Transform section: the selection's unit, edited as one thing. For items that is the active one with the rest
  * following; for a whole group it is the frame, with the group's items as `transforms` only to mark what differs.
  */
-function TransformSection({ of, unit, transforms, active, items = NO_ITEMS, children }: {
+function TransformSection({ of, unit, transforms, active, activeIndex = -1, items = NO_ITEMS, children }: {
   readonly of: "item" | "group"
   readonly unit: UeTransform
   readonly transforms: ReadonlyArray<UeTransform>
+  /** Which of `items` is the unit, whose size a Scale row shows; the last when absent. */
+  readonly activeIndex?: number
   /** The active item's document transform, which a copy reads; a group's copy reads the unit as shown. */
   readonly active?: UeTransform | undefined
   /** The selected items, in line with `transforms`, whose Scale row can show a size; none for a group. */
@@ -709,7 +719,7 @@ function TransformSection({ of, unit, transforms, active, items = NO_ITEMS, chil
   const perUnit = units === "m" ? 100 : 1
   // a decal's scale is its size already; a group's is a factor of nothing it holds
   const decals = items.length > 0 && items.every(isDecal)
-  const activeItem = decals ? undefined : items.at(-1)
+  const activeItem = decals ? undefined : items.at(activeIndex)
   const extent = activeItem === undefined ? undefined : extentOf(activeItem, catalog)
   return (
     <Section>
@@ -724,6 +734,7 @@ function TransformSection({ of, unit, transforms, active, items = NO_ITEMS, chil
             // a piece's paste sets every item; a group's takes the group there, as typing the three values would
             onPaste: (value: Vec3) =>
               of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value),
+            extent: extent ?? (decals ? uniform(1) : undefined),
             perUnit: uniform(row.field === "translation" ? perUnit : 1)
           }
           if (row.field !== "scale3D") return <TransformRow key={row.field} {...props} />
@@ -758,7 +769,13 @@ const EMPTY_AXES: ReadonlySet<Axis> = new Set()
  * Everything that edits the selection's items, all of them at once. A whole group's items get no Transform section:
  * the group has its own, over its frame.
  */
-function ItemEditor({ items, ids, transforms, placed, transform }: {
+function ItemEditor({ items, ids, transforms, placed, transform, unit, groupUnit, unitIndex }: {
+  /** The gizmo's unit as shown, which the Transform rows edit: a piece, a whole group, or a chain's first link. */
+  readonly unit: UeTransform | undefined
+  /** Whether that unit is a group among the selection rather than one of `items`. */
+  readonly groupUnit: boolean
+  /** The unit's index in `items`, -1 when it is a group. */
+  readonly unitIndex: number
   readonly items: ReadonlyArray<Item>
   readonly ids: ReadonlyArray<string>
   readonly transforms: ReadonlyArray<UeTransform>
@@ -773,11 +790,12 @@ function ItemEditor({ items, ids, transforms, placed, transform }: {
       {transform && (
         <>
           <TransformSection
-            of="item"
-            unit={shownActive}
+            of={groupUnit ? "group" : "item"}
+            unit={unit ?? shownActive}
             transforms={transforms}
-            active={editTransform(active)}
-            items={items}
+            active={groupUnit ? unit : editTransform(items[unitIndex] ?? active)}
+            activeIndex={unitIndex}
+            items={groupUnit ? NO_ITEMS : items}
           >
             <FlipSection items={placed} />
           </TransformSection>
@@ -817,17 +835,23 @@ export function Inspector() {
   const selectedIds = useEditor((s) => s.selectedIds)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
   const group = useMemo(
-    () => exactSelectedGroup(tree, selectedIds, enteredGroupId),
+    () => soleGroupOf(tree, selectedIds, enteredGroupId),
     [tree, selectedIds, enteredGroupId]
   )
-  // A whole group's frame as shown, which its Transform rows edit. Read from the store at the time, since the frame
-  // is built afresh from the items' shown transforms and a selector returning it would re-render without end.
-  const frame = useMemo(() => {
-    if (group === undefined) return undefined
+  // The selection's gizmo target as shown, whose unit the Transform rows edit. Read from the store at the time, since
+  // it is built afresh from the items' shown transforms and a selector returning it would re-render without end.
+  const pivotMode = useEditor((s) => s.pivotMode)
+  const doc = useEditor((s) => s.doc)
+  const previewLanding = useEditor((s) => s.previewLanding)
+  const target = useMemo(() => {
     const s = useEditor.getState()
-    return selectionPivot(s, (id) => shownTransform(s, id))?.unit
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `transforms` and `catalogIndex` are what the frame is made of
-  }, [group, transforms, catalogIndex])
+    return selectionPivot(s, (id) => shownTransform(s, id))
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the target is built from, read inside
+  }, [doc, preview, previewLanding, catalogIndex, pivotMode, selectedIds, enteredGroupId])
+  const frame = target?.unit
+  const unitKey = target === undefined ? undefined : pivotUnitOf(target.selection, pivotMode).id
+  const groupUnit = unitKey !== undefined && !ids.includes(unitKey)
+  const unitIndex = unitKey === undefined ? -1 : ids.indexOf(unitKey)
 
   const prefab = useOpenPrefab()
   const noTab = useEditor(noTabOpen)
@@ -857,7 +881,16 @@ export function Inspector() {
 
   const placed = items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) }))
   const editor = (
-    <ItemEditor items={items} ids={ids} transforms={transforms} placed={placed} transform={group === undefined} />
+    <ItemEditor
+      items={items}
+      ids={ids}
+      transforms={transforms}
+      placed={placed}
+      transform={group === undefined}
+      unit={frame}
+      groupUnit={groupUnit}
+      unitIndex={unitIndex}
+    />
   )
 
   return (

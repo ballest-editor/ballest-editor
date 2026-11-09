@@ -7,6 +7,7 @@ import {
   narrowedTo,
   priorityOf,
   rangeOf,
+  scaleSnapStep,
   SNAP_KINDS,
   SnapConfig,
   snapsGrid,
@@ -252,5 +253,17 @@ describe("snapConfig", () => {
     assert.throws(() => Schema.decodeSync(SnapConfig)(pulled(8)))
     assert.throws(() => Schema.decodeSync(SnapConfig)(pulled(0.1)))
     assert.strictEqual(Schema.decodeSync(SnapConfig)(pulled(4)).targets.connectors.weight, 4)
+  })
+})
+
+describe("scale snap units", () => {
+  it("uses the grid dimension for both size fields and handles, independently of percent snapping", () => {
+    const config = { ...defaultSnapConfig, enabled: true, gridSize: 50 }
+    assert.strictEqual(scaleSnapStep(config, 1000), 0.05)
+    assert.isUndefined(scaleSnapStep(config, undefined))
+    assert.isUndefined(scaleSnapStep(config, 1000, true))
+    assert.isUndefined(scaleSnapStep({ ...config, enabled: false }, 1000))
+    assert.isUndefined(scaleSnapStep({ ...config, scaleToGrid: false }, 1000))
+    assert.strictEqual(scaleSnapStep({ ...config, scaleToGrid: false, scaleEnabled: true, scaleStep: 10 }, 1000), 0.1)
   })
 })
