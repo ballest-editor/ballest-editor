@@ -4,6 +4,7 @@ import type { Vec3 } from "./coords"
 import type { Box } from "./itemBounds"
 import { defaultSnapConfig, type SnapConfig, type SnapTarget, withPreset, withTargetMoved } from "./snapConfig"
 import type { BasePoint, SnapFrame, SnapHit, SnapItem, TrackedPoint } from "./snapFrame"
+import { defaultSnapPrefs } from "./snapPrefs"
 import { cornersOf, shownMarks } from "./snapRelation"
 import { moveOf, resolveDrag, resolveSnap } from "./snapResolve"
 import { meshHits, nearEndsOf } from "./snapTargets"
@@ -63,6 +64,7 @@ const endWithVertex = (vertex: Vec3) => {
 
 const frameOf = (offset: Vec3, extra: Partial<SnapFrame> = {}): SnapFrame => ({
   config: on(defaultSnapConfig, "grid", "mesh"),
+  prefs: defaultSnapPrefs,
   view: topView(),
   items: [],
   constraint: { kind: "surface", normal: { x: 0, y: 0, z: 1 } },
@@ -163,6 +165,38 @@ describe("resolveSnap", () => {
     )
   })
 
+  it("joins ends of another profile by your Profiles, and offers the flip by your Flip to fit", () => {
+    const { items } = endWithVertex({ x: 0, y: 700, z: 0 })
+    const ends = on(defaultSnapConfig, "connectors")
+    const tube: BasePoint = { start: ORIGIN, label: "End", end: { ...endAlongX("own", 0, 0, 1), profile: "Tube F" } }
+    const join = (prefs: Partial<typeof defaultSnapPrefs>) =>
+      resolveSnap(
+        frameOf({ x: 304, y: 0, z: 0 }, {
+          config: ends,
+          prefs: { ...defaultSnapPrefs, ...prefs },
+          bases: [tube],
+          items
+        })
+      )
+    assert.strictEqual(join({})?.meeting?.warning, "Profiles differ: Tube F, Track")
+    assert.isUndefined(join({ profiles: "strict" }))
+    assert.isUndefined(join({ profiles: "any" })?.meeting?.warning)
+    const lefty = (hand: "left" | "right") => ({ ...endAlongX("a", 0, 300, -1), hand })
+    const handed = [cubeAt("a", { x: 300, y: 0, z: 0 }, { ends: [lefty("left")], bounds: undefined })]
+    const own: BasePoint = { start: ORIGIN, label: "End", end: { ...endAlongX("own", 0, 0, 1), hand: "left" } }
+    const flip = (flipToFit: boolean) =>
+      resolveSnap(
+        frameOf({ x: 304, y: 0, z: 0 }, {
+          config: ends,
+          prefs: { ...defaultSnapPrefs, flipToFit },
+          bases: [own],
+          items: handed
+        })
+      )?.meeting?.flipFits
+    assert.isTrue(flip(true))
+    assert.isUndefined(flip(false))
+  })
+
   it("is free past every range with the grid off", () => {
     const config = on(defaultSnapConfig, "mesh")
     assert.isUndefined(resolveSnap(frameOf({ x: 500, y: 500, z: 0 }, { config, items: [cubeAt("a", ORIGIN)] })))
@@ -206,11 +240,11 @@ describe("resolveSnap", () => {
     const shown = resolveSnap(frameOf({ x: 150, y: 50, z: 0 }, { config: base, items, occluded, surfaceAt }))
     assert.strictEqual(shown?.rank, 2)
     assert.strictEqual(shown?.item, "b")
-    const through = {
-      ...base,
-      targets: { ...base.targets, mesh: { ...base.targets.mesh, occlusion: "through" as const } }
-    }
-    assert.strictEqual(resolveSnap(frameOf({ x: 150, y: 50, z: 0 }, { config: through, items, occluded }))?.rank, 0)
+    const through = { ...defaultSnapPrefs, occlusion: "through" as const }
+    assert.strictEqual(
+      resolveSnap(frameOf({ x: 150, y: 50, z: 0 }, { config: base, prefs: through, items, occluded }))?.rank,
+      0
+    )
   })
 
   it("skips a bounds face something hides, and takes it when the setting looks through pieces", () => {
@@ -218,15 +252,12 @@ describe("resolveSnap", () => {
     const elements = Object.fromEntries(Object.keys(base.targets.mesh.elements).map((name) => [name, false]))
     const faces = { ...base.targets.mesh.elements, ...elements, boundsFaces: true }
     const front = { ...base, targets: { ...base.targets, mesh: { ...base.targets.mesh, elements: faces } } }
-    const through = {
-      ...front,
-      targets: { ...front.targets, mesh: { ...front.targets.mesh, occlusion: "through" as const } }
-    }
+    const through = { ...defaultSnapPrefs, occlusion: "through" as const }
     const items = [cubeAt("a", { x: 200, y: 0, z: 0 })]
     const occluded = () => true
     const at = { x: 200, y: 0, z: 0 }
     assert.isUndefined(resolveSnap(frameOf(at, { config: front, items, occluded })))
-    assert.strictEqual(resolveSnap(frameOf(at, { config: through, items, occluded }))?.item, "a")
+    assert.strictEqual(resolveSnap(frameOf(at, { config: front, prefs: through, items, occluded }))?.item, "a")
     assert.strictEqual(resolveSnap(frameOf(at, { config: front, items, occluded: () => false }))?.item, "a")
   })
 

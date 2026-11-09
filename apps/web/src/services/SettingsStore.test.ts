@@ -146,3 +146,53 @@ describe("snapping settings", () => {
     )
   })
 })
+
+describe("your snapping", () => {
+  it("starts on the rows' old defaults, and keeps them apart from what a new map starts on", () => {
+    assert.deepStrictEqual(defaultSettings.snapPrefs, {
+      bodyDrag: "ends",
+      showOpenEnds: "hover",
+      profiles: "warn",
+      flipToFit: true,
+      occlusion: "front",
+      trackingKeep: 6,
+      trackingHoverMs: 400,
+      trackingAcquire: "auto"
+    })
+    assert.isFalse("bodyDrag" in defaultSettings.snapping)
+  })
+
+  it("takes an older save's choices from its map defaults, where they used to be", () => {
+    const merged = mergeSettings({
+      snapping: {
+        bodyDrag: "always",
+        targets: {
+          connectors: { profiles: "strict", showOpenEnds: "always", flipToFit: false },
+          mesh: { occlusion: "through" },
+          tracking: { keep: 3, hoverMs: 200, acquire: "shift" }
+        }
+      }
+    })
+    assert.deepStrictEqual(merged.snapPrefs, {
+      bodyDrag: "always",
+      showOpenEnds: "always",
+      profiles: "strict",
+      flipToFit: false,
+      occlusion: "through",
+      trackingKeep: 3,
+      trackingHoverMs: 200,
+      trackingAcquire: "shift"
+    })
+    assert.strictEqual(
+      mergeSettings({ snapping: { bodyDrag: "always" }, snapPrefs: { bodyDrag: "never" } }).snapPrefs.bodyDrag,
+      "never"
+    )
+  })
+
+  it("keeps each row on its own, falling back for a bad one", () => {
+    const merged = mergeSettings({ snapPrefs: { trackingKeep: 0, occlusion: "through", profiles: "loose" } })
+    assert.strictEqual(merged.snapPrefs.trackingKeep, defaultSettings.snapPrefs.trackingKeep)
+    assert.strictEqual(merged.snapPrefs.occlusion, "through")
+    assert.strictEqual(merged.snapPrefs.profiles, "warn")
+  })
+})

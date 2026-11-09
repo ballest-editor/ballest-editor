@@ -2,12 +2,12 @@
 import type { CatalogIndex } from "../../domain/Catalog"
 import { endsOf, openEndsOf, type WorldEnd } from "../../domain/connectors"
 import { editTransform } from "../../domain/editTransform"
-import type { SnapConfig } from "../../domain/snapConfig"
 import type { MarkRole } from "../../domain/snapFrame"
+import type { SnapPrefs } from "../../domain/snapPrefs"
 import type { Doc } from "../../domain/structure"
 import type { EditorState } from "../store"
 
-type ShowOpenEnds = SnapConfig["targets"]["connectors"]["showOpenEnds"]
+type ShowOpenEnds = SnapPrefs["showOpenEnds"]
 
 /** Every end in the map, where the document has them. */
 export const endsInDoc = (doc: Doc, index: CatalogIndex | null): ReadonlyArray<WorldEnd> =>

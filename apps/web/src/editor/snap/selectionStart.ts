@@ -61,10 +61,11 @@ export const selectionSnapStart = (
  */
 export const bodyDrags = (s: EditorState): boolean => {
   const config = snapConfigOf(s)
-  if (config.bodyDrag === "never") return false
+  const { bodyDrag } = s.settings.snapPrefs
+  if (bodyDrag === "never") return false
   const target = dragTargetOf(s)
   if (target === undefined) return false
-  if (config.bodyDrag === "always") return true
+  if (bodyDrag === "always") return true
   if (!config.enabled || !config.targets.connectors.enabled) return false
   return selectionSnapStart(s, target.transforms, [...target.transforms.keys()]).ends.length > 0
 }

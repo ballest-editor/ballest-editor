@@ -6,6 +6,7 @@ import {
   IconPencil,
   IconSettings
 } from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
@@ -16,11 +17,14 @@ import { namedActions } from "../domain/GameKeybinds"
 import { overriddenFolders } from "../domain/gameLink"
 import { isDefaultBinding, keybindActionDescriptions } from "../domain/Keybinds"
 import { AUTO_GRID_COLORS, CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Settings"
+import { BODY_DRAG_NAMES, type SnapPrefs } from "../domain/snapPrefs"
 import {
   refreshGameLink,
   resetGamePaths,
   resetKeybinds,
+  resetSnapDefaults,
   saveSettings,
+  snapDefaultsAreFactory,
   updateSettings,
   watchGameLink
 } from "../editor/actions"
@@ -142,6 +146,7 @@ export function SettingsDialog(props: {
   const gameRows = useGameLinkSettings()
   const creator = useCreator()
   const foundCreator = useEditor((s) => s.foundCreator)
+  const snapFactory = useEditor(snapDefaultsAreFactory)
 
   // The game or the plugin manager may have been installed, run or moved since, and Steam logged in as someone else:
   // look the folders, the plugin and the creator name up each time the dialog opens.
@@ -166,6 +171,18 @@ export function SettingsDialog(props: {
       reset: () => update(section, Struct.pick(defaultSettings[section], [key]))
     }
   })
+
+  /** A row of the Editor page's Snapping group: how snapping behaves for you in every map (docs/SNAPPING.md § Settings). */
+  const snapSetting = (key: keyof SnapPrefs) => ({
+    category: "editor" as const,
+    group: "Snapping",
+    keywords: "snap snapping",
+    changes: {
+      modified: settings.snapPrefs[key] !== defaultSettings.snapPrefs[key],
+      reset: () => update("snapPrefs", Struct.pick(defaultSettings.snapPrefs, [key]))
+    }
+  })
+  const prefs = settings.snapPrefs
 
   const rows = ((): ReadonlyArray<Row> => {
     const keybindRows = namedActions(defaults).map(({ action, section, label }): Row => ({
@@ -303,6 +320,136 @@ export function SettingsDialog(props: {
             checked={settings.editor.undoSelection}
             onCheckedChange={(v) => update("editor", { undoSelection: v })}
           />
+        )
+      },
+      {
+        id: "snapBodyDrag",
+        ...snapSetting("bodyDrag"),
+        label: "Drag body",
+        description: "When dragging a piece itself moves it.",
+        info: "When dragging the piece itself, not the gizmo, moves it: only to join ends, always, or never.",
+        control: (
+          <Choice
+            value={prefs.bodyDrag}
+            items={BODY_DRAG_NAMES}
+            onChange={(v) => update("snapPrefs", { bodyDrag: v })}
+          />
+        )
+      },
+      {
+        id: "snapShowOpenEnds",
+        ...snapSetting("showOpenEnds"),
+        label: "Show open ends",
+        description: "Rings the ends of tracks with nothing joined.",
+        info: "When to mark the ends that have nothing joined to them yet.",
+        control: (
+          <Choice
+            value={prefs.showOpenEnds}
+            items={{ never: "Never", hover: "On hover", always: "Always" }}
+            onChange={(v) => update("snapPrefs", { showOpenEnds: v })}
+          />
+        )
+      },
+      {
+        id: "snapProfiles",
+        ...snapSetting("profiles"),
+        label: "Profiles",
+        description: "Whether ends of different shapes join.",
+        info:
+          "Whether ends of different shapes join: never (Strict), with a warning, or always (Any). Example: a half tube's end on a full tube's.",
+        control: (
+          <Choice
+            value={prefs.profiles}
+            items={{ strict: "Strict", warn: "Warn", any: "Any" }}
+            onChange={(v) => update("snapPrefs", { profiles: v })}
+          />
+        )
+      },
+      {
+        id: "snapFlipToFit",
+        ...snapSetting("flipToFit"),
+        label: "Flip to fit",
+        description: "Offers a piece's mirror image when that fits.",
+        info: "Offers the piece's mirror image when that one would fit where this one doesn't.",
+        control: <Switch checked={prefs.flipToFit} onCheckedChange={(v) => update("snapPrefs", { flipToFit: v })} />
+      },
+      {
+        id: "snapOcclusion",
+        ...snapSetting("occlusion"),
+        label: "Occlusion",
+        description: "Whether hidden parts of pieces snap.",
+        info:
+          "Whether parts of pieces hidden behind others can be snapped to (Through) or only what you can see (In front).",
+        control: (
+          <Choice
+            value={prefs.occlusion}
+            items={{ front: "In front only", through: "Through pieces" }}
+            onChange={(v) => update("snapPrefs", { occlusion: v })}
+          />
+        )
+      },
+      {
+        id: "snapTrackingKeep",
+        ...snapSetting("trackingKeep"),
+        label: "Points kept",
+        description: "How many points Point guides remember.",
+        info: "How many points a drag remembers to draw guides from.",
+        control: (
+          <SliderControl
+            label="Points kept"
+            unit=""
+            min={1}
+            max={20}
+            step={1}
+            value={prefs.trackingKeep}
+            onChange={(trackingKeep) => update("snapPrefs", { trackingKeep })}
+          />
+        )
+      },
+      {
+        id: "snapTrackingHover",
+        ...snapSetting("trackingHoverMs"),
+        label: "Hover time",
+        description: "How long a rest takes to remember a point.",
+        info: "How long the pointer rests on a point before it is remembered.",
+        control: (
+          <SliderControl
+            label="Hover time"
+            unit="ms"
+            min={0}
+            max={2000}
+            step={50}
+            value={prefs.trackingHoverMs}
+            onChange={(trackingHoverMs) => update("snapPrefs", { trackingHoverMs })}
+          />
+        )
+      },
+      {
+        id: "snapTrackingAcquire",
+        ...snapSetting("trackingAcquire"),
+        label: "Remember points",
+        description: "By resting the pointer, or only with Shift.",
+        info: "Whether resting on a point remembers it, or only resting on it with Shift held.",
+        control: (
+          <Choice
+            value={prefs.trackingAcquire}
+            items={{ auto: "Automatically", shift: "With Shift" }}
+            onChange={(v) => update("snapPrefs", { trackingAcquire: v })}
+          />
+        )
+      },
+      {
+        id: "snapDefaults",
+        category: "editor",
+        group: "Snapping",
+        label: "New maps' snapping",
+        description: "What the snap menu's Save as defaults keeps.",
+        info: "Reset puts back the snapping a new map started on at first. A map with snapping of its own keeps it.",
+        keywords: "snap snapping factory",
+        control: (
+          <Button variant="outline" disabled={snapFactory} onClick={() => void resetSnapDefaults()}>
+            Reset snapping defaults
+          </Button>
         )
       },
       {
@@ -488,6 +635,9 @@ export function SettingsDialog(props: {
         "appearance",
         Struct.pick(defaultSettings.appearance, ["theme", "motion", "gridCellColor", "gridSectionColor"])
       )
+    } else if (category === "editor") {
+      // The page shows your snapping too; what new maps start on has its own button.
+      void saveSettings({ ...settings, editor: defaultSettings.editor, snapPrefs: defaultSettings.snapPrefs })
     } else void saveSettings({ ...settings, [category]: defaultSettings[category] })
   }
   return (

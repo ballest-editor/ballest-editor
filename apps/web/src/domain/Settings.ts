@@ -8,6 +8,7 @@ import { movementLookModes } from "./flyKeys"
 import { PLACE_DISTANCE } from "./placement"
 import { SCENE_COLORS, shadeOf } from "./sceneGround"
 import { defaultSnapConfig, SnapConfig } from "./snapConfig"
+import { defaultSnapPrefs, SNAP_PREFS_BEFORE, SnapPrefs } from "./snapPrefs"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
 export const CUSTOM_FOV_PRESET = "Custom"
@@ -123,8 +124,10 @@ export const Settings = Schema.Struct({
   camera: CameraSettings,
   appearance: AppearanceSettings,
   lighting: LightingSettings,
-  /** What a new map starts on (docs/SNAPPING.md § Settings); a map that changes it keeps its own. */
+  /** What a new map's snapping starts on (docs/SNAPPING.md § Settings); a map that changes it keeps its own. */
   snapping: SnapConfig,
+  /** How snapping behaves for you in every map: Settings › Editor › Snapping. */
+  snapPrefs: SnapPrefs,
   panels: PanelSettings,
   gizmo: GizmoSettings
 })
@@ -154,6 +157,7 @@ export const defaultSettings: Settings = {
   },
   lighting: { mapLighting: true, skyVisible: true },
   snapping: defaultSnapConfig,
+  snapPrefs: defaultSnapPrefs,
   panels: {
     piecesView: "list",
     piecesThumbnailSize: "m",
@@ -167,10 +171,15 @@ export const defaultSettings: Settings = {
 /** The fixed grid colours older saves stored; they now mean "automatic". */
 const LEGACY_GRID_COLORS = { gridCellColor: "#3a404a", gridSectionColor: "#58606e" } as const
 
+/** The value at `path` inside `from`, if every step of the way is an object. */
+const valueAt = (from: unknown, path: ReadonlyArray<string>): unknown =>
+  path.reduce<unknown>((at, key) => Predicate.isObject(at) ? at[key] : undefined, from)
+
 /**
  * Older saves kept `undoSelection` under general (it now lives under editor), stored the
  * old fixed grid colours whether or not they were chosen (they become automatic), and stored
- * an unset creator as "" (now null: use the name found), and spelled the starred pieces `favouritePieces`.
+ * an unset creator as "" (now null: use the name found), spelled the starred pieces `favouritePieces`,
+ * and kept what is now `snapPrefs` in the map defaults (`SNAP_PREFS_BEFORE` says where).
  */
 const migrate = (stored: unknown): unknown => {
   if (!Predicate.isObject(stored)) return stored
@@ -186,6 +195,14 @@ const migrate = (stored: unknown): unknown => {
   const panels = out["panels"]
   if (Predicate.isObject(panels) && "favouritePieces" in panels && !("favoritePieces" in panels)) {
     out = { ...out, panels: { ...panels, favoritePieces: panels["favouritePieces"] } }
+  }
+  const snapping = out["snapping"]
+  if (Predicate.isObject(snapping) && !Predicate.isObject(out["snapPrefs"])) {
+    const before = Object.entries(SNAP_PREFS_BEFORE).flatMap(([key, path]) => {
+      const value = valueAt(snapping, path)
+      return value === undefined ? [] : [[key, value] as const]
+    })
+    if (before.length > 0) out = { ...out, snapPrefs: Object.fromEntries(before) }
   }
   const appearance = out["appearance"]
   if (Predicate.isObject(appearance)) {

@@ -1796,7 +1796,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       set((s) => {
         if (s.tracked.some(({ at }) => isSamePoint(at, point.at))) return s
         const acquired = item === undefined ? point : trackedOn(s.doc, point, item)
-        return { tracked: [...s.tracked, acquired].slice(-snapConfigOf(s).targets.tracking.keep) }
+        return { tracked: [...s.tracked, acquired].slice(-s.settings.snapPrefs.trackingKeep) }
       }),
     clearTracked: () => set({ tracked: [] }),
     setSnapFeedback: (snapFeedback) => set({ snapFeedback }),

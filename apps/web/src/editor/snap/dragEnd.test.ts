@@ -5,6 +5,7 @@ import * as THREE from "three"
 import { vi } from "vitest"
 import { identityTransform } from "../../domain/factory"
 import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
+import { defaultSnapPrefs, type SnapPrefs } from "../../domain/snapPrefs"
 import { annotationsOf } from "../../domain/structure"
 import { ORIGIN } from "../../domain/ueMath"
 import { reactRootPerTest } from "../../test/reactRoot"
@@ -42,8 +43,8 @@ vi.mock("./pickTarget", async (importActual) => ({
 
 const CENTRE = DOWN_PANE_SIZE / 2
 const ACQUIRED = { at: { x: 900, y: 900, z: 0 }, label: "Corner of Kicker" }
-const TRACKING = { ...defaultSnapConfig.targets.tracking, enabled: true, acquire: "auto" } as const
-const REST_MS = TRACKING.hoverMs + 1
+const TRACKING = { enabled: true } as const
+const REST_MS = defaultSnapPrefs.trackingHoverMs + 1
 
 /** Puts an item in the scene for the pointer to press. */
 const place = (key: string) => {
@@ -104,12 +105,13 @@ let atCommit: Array<number> = []
 let stopWatching = () => {}
 
 /** A map of one piece of the catalog's `piece` at the origin, selected, with a point acquired, under both controllers. */
-const setUp = (snap: Partial<SnapConfig> = {}, piece = 0) => {
+const setUp = (snap: Partial<SnapConfig> = {}, piece = 0, prefs: Partial<SnapPrefs> = {}) => {
   vi.useFakeTimers()
   vi.spyOn(scene.canvas, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, DOWN_PANE_SIZE, DOWN_PANE_SIZE))
   // jsdom has no pointer capture
   scene.canvas.hasPointerCapture = () => false
   const [key = ""] = loadPieces([{ x: 0, y: 0, z: 0 }], piece)
+  useEditor.setState((st) => ({ settings: { ...st.settings, snapPrefs: { ...st.settings.snapPrefs, ...prefs } } }))
   const s = useEditor.getState()
   s.setTabSnap({
     ...defaultSnapConfig,
@@ -229,7 +231,7 @@ describe("a press and drag on an item's body", () => {
       ["never", "a piece with ends", 0, false]
     ] as const
   )("with %s, on %s, moves it: %s", (setting, _piece, piece, moves) => {
-    setUp({ bodyDrag: setting }, piece)
+    setUp({}, piece, { bodyDrag: setting })
     assert.strictEqual(bodyDrag(), moves)
     assert.lengthOf(atCommit, moves ? 1 : 0)
   })

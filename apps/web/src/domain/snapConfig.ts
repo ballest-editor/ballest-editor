@@ -1,7 +1,7 @@
 /**
- * What snapping is set to (docs/SNAPPING.md): the base, what it affects, the steps, each target's toggle and parameters,
- * and the priority order. Settings holds the set a new map starts on, and a map that changes it keeps its own in its
- * sidecar. No renderer here.
+ * What a map's snapping is set to (docs/SNAPPING.md): the base, what it affects, the steps, each target's toggle and
+ * parameters, and the priority order. Settings holds the set a new map starts on, and a map that changes it keeps its
+ * own in its sidecar. How snapping behaves for the user, whatever the map, is `SnapPrefs`. No renderer here.
  */
 import { Effect, Schema } from "effect"
 import type { Vec3 } from "./coords"
@@ -12,15 +12,6 @@ export const SNAP_TARGETS = ["grid", "connectors", "mesh", "construction", "trac
 export type SnapTarget = (typeof SNAP_TARGETS)[number]
 
 export const SNAP_BASES = ["pivot", "closest", "centre"] as const
-
-/** When a press on the selection's body drags it: to join ends (with Connectors on and ends to join), always, or never. */
-export const BODY_DRAGS = ["ends", "always", "never"] as const
-
-export const BODY_DRAG_NAMES: Readonly<Record<(typeof BODY_DRAGS)[number], string>> = {
-  ends: "To join",
-  always: "Always",
-  never: "Never"
-}
 
 export const SNAP_PRESETS = {
   gridFirst: ["grid", "connectors", "mesh", "construction", "tracking", "alignment"],
@@ -74,10 +65,6 @@ const ConnectorsTarget = Schema.Struct({
   range: Schema.NullOr(Positive),
   /** The piece turns so the ends face each other and their up directions agree. */
   matchRotation: Schema.Boolean,
-  profiles: Schema.Literals(["strict", "warn", "any"]),
-  showOpenEnds: Schema.Literals(["never", "hover", "always"]),
-  /** Offers the mirrored twin when it would fit and the piece itself wouldn't. */
-  flipToFit: Schema.Boolean,
   /**
    * How hard ends pull against Grid and Mesh (docs/SNAPPING.md § Priority): their range is multiplied by it, and above 1
    * they are asked ahead of both. Settings from before it read as 1.
@@ -101,7 +88,6 @@ const MeshTarget = Schema.Struct({
   }),
   /** An edge counts when its two faces meet at more than this, in degrees. */
   sharpAngle: Schema.Finite,
-  occlusion: Schema.Literals(["front", "through"]),
   rotateToFace: Schema.Literals(["keep", "upright", "align"]),
   /** How far from a face the base lands, in cm along its normal. */
   offset: Schema.Finite
@@ -109,14 +95,7 @@ const MeshTarget = Schema.Struct({
 
 const ConstructionTarget = Schema.Struct({ enabled: Schema.Boolean })
 
-const TrackingTarget = Schema.Struct({
-  enabled: Schema.Boolean,
-  /** How many acquired points are kept. */
-  keep: Schema.Int.check(Schema.isGreaterThan(0)),
-  /** How long a hover takes to acquire, in ms. */
-  hoverMs: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
-  acquire: Schema.Literals(["auto", "shift"])
-})
+const TrackingTarget = Schema.Struct({ enabled: Schema.Boolean })
 
 const AlignmentTarget = Schema.Struct({
   enabled: Schema.Boolean,
@@ -137,7 +116,6 @@ export const SnapConfig = Schema.Struct({
   /** Scale step in percent. */
   scaleStep: Positive,
   base: Schema.Literals(SNAP_BASES),
-  bodyDrag: Schema.Literals(BODY_DRAGS).pipe(Schema.withDecodingDefaultKey(Effect.succeed("ends" as const))),
   /** The pixels every target shares, unless it has a range of its own. */
   threshold: Positive,
   /** The targets, highest priority first. */
@@ -161,7 +139,6 @@ export const defaultSnapConfig: SnapConfig = {
   scaleEnabled: false,
   scaleStep: DEFAULT_SCALE_STEP,
   base: "pivot",
-  bodyDrag: "ends",
   threshold: 12,
   order: SNAP_PRESETS.gridFirst,
   targets: {
@@ -170,9 +147,6 @@ export const defaultSnapConfig: SnapConfig = {
       enabled: true,
       range: null,
       matchRotation: true,
-      profiles: "warn",
-      showOpenEnds: "hover",
-      flipToFit: true,
       weight: 1
     },
     mesh: {
@@ -188,12 +162,11 @@ export const defaultSnapConfig: SnapConfig = {
         faces: true
       },
       sharpAngle: 30,
-      occlusion: "front",
       rotateToFace: "keep",
       offset: 0
     },
     construction: { enabled: true },
-    tracking: { enabled: true, keep: 6, hoverMs: 400, acquire: "auto" },
+    tracking: { enabled: true },
     alignment: { enabled: true, gapGuides: "ortho" }
   }
 }
@@ -350,8 +323,6 @@ export const rangeOf = (config: SnapConfig, target: SnapTarget): number => {
 
 const isWorldOrigin = ({ x, y, z }: Vec3) => x === 0 && y === 0 && z === 0
 
-const PROFILE_WORDS = { strict: "Strict", warn: "Warn", any: "Any" } as const
-const OPEN_END_WORDS = { never: "hide open ends", hover: "show on hover", always: "show always" } as const
 const FACE_WORDS = { keep: "keep rotation", upright: "upright", align: "align to face" } as const
 const GAP_WORDS = { ortho: "gaps in ortho", always: "gaps always", never: "no gaps" } as const
 
@@ -362,7 +333,7 @@ export const targetSummary = (
   units: "cm" | "m",
   counts?: { readonly construction: number }
 ): string => {
-  const { alignment, connectors, grid, mesh, tracking } = config.targets
+  const { alignment, connectors, grid, mesh } = config.targets
   switch (target) {
     case "grid":
       return [
@@ -372,8 +343,8 @@ export const targetSummary = (
       ].join(", ")
     case "connectors":
       return [
-        PROFILE_WORDS[connectors.profiles],
-        OPEN_END_WORDS[connectors.showOpenEnds],
+        `${connectors.range ?? config.threshold} px`,
+        connectors.matchRotation ? "match rotation" : "keep rotation",
         ...(connectors.weight === 1 ? [] : [`pull ${formatWeight(connectors.weight)}`])
       ].join(", ")
     case "mesh": {
@@ -383,7 +354,7 @@ export const targetSummary = (
     case "construction":
       return counts === undefined ? "Planes and axes" : `${counts.construction} planes and axes`
     case "tracking":
-      return `Keeps ${tracking.keep}, ${tracking.acquire === "auto" ? "automatic" : "on Shift"}`
+      return "From remembered points"
     case "alignment":
       return `In view, ${GAP_WORDS[alignment.gapGuides]}`
   }

@@ -138,7 +138,7 @@ const bestOf = (frame: SnapFrame, hits: ReadonlyArray<SnapHit>): SnapHit | undef
     a.rank - b.rank || a.distance - b.distance || depthOf(frame, a) - depthOf(frame, b)
   )
   const { occluded } = frame
-  const mustShow = occluded !== undefined && frame.config.targets.mesh.occlusion === "front"
+  const mustShow = occluded !== undefined && frame.prefs.occlusion === "front"
   if (!mustShow) return ordered[0]
   let tries = 0
   return ordered.find((hit) => {

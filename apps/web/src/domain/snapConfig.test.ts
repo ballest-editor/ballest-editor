@@ -129,7 +129,7 @@ describe("snapConfig", () => {
 
   it("summarises each target in one line", () => {
     assert.strictEqual(targetSummary(defaultSnapConfig, "grid", "cm"), "10 cm, world origin")
-    assert.strictEqual(targetSummary(defaultSnapConfig, "connectors", "cm"), "Warn, show on hover")
+    assert.strictEqual(targetSummary(defaultSnapConfig, "connectors", "cm"), "12 px, match rotation")
     const moved = {
       ...defaultSnapConfig,
       targets: {
@@ -140,7 +140,11 @@ describe("snapConfig", () => {
     assert.strictEqual(targetSummary(moved, "grid", "cm"), "10 cm, own origin, 30°")
     assert.strictEqual(
       targetSummary(withConnectors(defaultSnapConfig, { weight: 2 }), "connectors", "cm"),
-      "Warn, show on hover, pull ×2"
+      "12 px, match rotation, pull ×2"
+    )
+    assert.strictEqual(
+      targetSummary(withConnectors(defaultSnapConfig, { range: 30, matchRotation: false }), "connectors", "cm"),
+      "30 px, keep rotation"
     )
   })
 
@@ -211,10 +215,20 @@ describe("snapConfig", () => {
     assert.deepStrictEqual(turnSnapOf(on, "scale", ["connectors"], false), { step: true, targets: ["mesh"] })
   })
 
-  it("drags by the body only to join ends, unless a config from before says otherwise", () => {
-    assert.strictEqual(defaultSnapConfig.bodyDrag, "ends")
-    const { bodyDrag: _, ...before } = Schema.encodeSync(SnapConfig)(defaultSnapConfig)
-    assert.strictEqual(Schema.decodeSync(SnapConfig)(before).bodyDrag, "ends")
+  it("reads a config from before your snapping moved to Settings, and drops what moved", () => {
+    const encoded = Schema.encodeSync(SnapConfig)(defaultSnapConfig)
+    const { connectors, mesh, tracking } = encoded.targets
+    const before = {
+      ...encoded,
+      bodyDrag: "always",
+      targets: {
+        ...encoded.targets,
+        connectors: { ...connectors, profiles: "strict", showOpenEnds: "always", flipToFit: false },
+        mesh: { ...mesh, occlusion: "through" },
+        tracking: { ...tracking, keep: 3, hoverMs: 200, acquire: "shift" }
+      }
+    }
+    assert.deepStrictEqual(Schema.decodeSync(SnapConfig)(before), defaultSnapConfig)
   })
 
   it("round-trips through its schema", () => {

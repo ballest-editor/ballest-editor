@@ -174,6 +174,7 @@ export class MoveSession {
     const stepAxes = this.lock === undefined ? start.stepAxes : undefined
     return {
       config,
+      prefs: s.settings.snapPrefs,
       view: this.view,
       items: this.items,
       constraint,

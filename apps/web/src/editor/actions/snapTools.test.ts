@@ -3,7 +3,8 @@ import { indexCatalog } from "../../domain/Catalog"
 import { editTransform } from "../../domain/editTransform"
 import { MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "../../domain/mirror"
 import { defaultSettings } from "../../domain/Settings"
-import { SNAP_PRESETS, withTargetMoved } from "../../domain/snapConfig"
+import { defaultSnapConfig, SNAP_PRESETS, withTargetMoved } from "../../domain/snapConfig"
+import { defaultSnapPrefs } from "../../domain/snapPrefs"
 import { annotationsOf, findGroup } from "../../domain/structure"
 import { catalogWithEnds, endAlongX, grouped, loadPieces } from "../../test/snapFixtures"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
@@ -18,11 +19,13 @@ import {
   mirrorSelection,
   pickGridSize,
   preferSnap,
+  resetSnapDefaults,
   resetSnapToDefaults,
   saveSnapDefaults,
   selectConnected,
   setFlushOptions,
   setSnapTargets,
+  snapDefaultsAreFactory,
   snapIsDefault,
   snapPreferenceOf,
   startAxisFromPoints,
@@ -97,7 +100,6 @@ describe("snap settings", () => {
     assert.isFalse(config().targets.alignment.enabled)
     assert.isFalse(config().targets.tracking.enabled)
     assert.isTrue(config().targets.mesh.enabled)
-    assert.strictEqual(config().targets.tracking.keep, defaultSettings.snapping.targets.tracking.keep)
     setSnapTargets(["alignment", "tracking"], true)
     assert.isTrue(config().targets.alignment.enabled && config().targets.tracking.enabled)
   })
@@ -130,6 +132,21 @@ describe("snap settings", () => {
     assert.strictEqual(snapConfigOf(s()).targets.mesh.offset, defaultSettings.snapping.targets.mesh.offset)
     assert.strictEqual(snapConfigOf(s()).gridSize, 37, "back to the saved defaults")
     assert.isTrue(snapIsDefault(s()))
+    void saveSettings(defaultSettings)
+  })
+
+  it("puts what new maps start on back to the factory's, and leaves your snapping as it is", () => {
+    const s = () => useEditor.getState()
+    void saveSettings({
+      ...defaultSettings,
+      snapping: { ...defaultSnapConfig, gridSize: 37 },
+      snapPrefs: { ...defaultSnapPrefs, bodyDrag: "never" }
+    })
+    assert.isFalse(snapDefaultsAreFactory(s()))
+    void resetSnapDefaults()
+    assert.deepStrictEqual(s().settings.snapping, defaultSnapConfig)
+    assert.isTrue(snapDefaultsAreFactory(s()))
+    assert.strictEqual(s().settings.snapPrefs.bodyDrag, "never")
     void saveSettings(defaultSettings)
   })
 })

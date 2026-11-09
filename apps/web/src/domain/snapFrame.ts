@@ -10,6 +10,7 @@ import type { Box } from "./itemBounds"
 import type { Construction, EndRef, Measurement } from "./MapSidecar"
 import type { MeshFace, WorldMesh } from "./meshElements"
 import type { SnapConfig, SnapTarget } from "./snapConfig"
+import type { SnapPrefs } from "./snapPrefs"
 import { vecAdd, vecCross, vecDot, vecLength, vecNormalize, vecScale, vecSub } from "./ueMath"
 
 export interface ScreenPoint {
@@ -182,6 +183,8 @@ export interface TrackedPoint {
 
 export interface SnapFrame {
   readonly config: SnapConfig
+  /** How snapping behaves for the user, whatever the map: the settings' `snapPrefs`. */
+  readonly prefs: SnapPrefs
   readonly view: SnapView
   readonly items: ReadonlyArray<SnapItem>
   readonly constraint: Constraint

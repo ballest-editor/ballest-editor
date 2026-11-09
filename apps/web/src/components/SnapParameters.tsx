@@ -272,7 +272,7 @@ function PullSlider({ weight, onChange }: { readonly weight: number; readonly on
 }
 
 function ConnectorParameters({ config }: { readonly config: SnapConfig }) {
-  const { flipToFit, matchRotation, profiles, range, showOpenEnds, weight } = config.targets.connectors
+  const { matchRotation, range, weight } = config.targets.connectors
   const update = (patch: Partial<SnapConfig["targets"]["connectors"]>) => updateSnapTarget("connectors", patch)
   return (
     <>
@@ -303,26 +303,6 @@ function ConnectorParameters({ config }: { readonly config: SnapConfig }) {
         checked={matchRotation}
         onChange={(on) => update({ matchRotation: on })}
       />
-      <ChoiceRow
-        label="Profiles"
-        help="Whether ends of different shapes join: never (Strict), with a warning, or always (Any). Example: a half tube's end on a full tube's."
-        value={profiles}
-        items={{ strict: "Strict", warn: "Warn", any: "Any" }}
-        onChange={(next) => update({ profiles: next })}
-      />
-      <ChoiceRow
-        label="Open ends"
-        help="When to mark the ends that have nothing joined to them yet."
-        value={showOpenEnds}
-        items={{ never: "Never", hover: "Hover", always: "Always" }}
-        onChange={(next) => update({ showOpenEnds: next })}
-      />
-      <SwitchRow
-        label="Flip to fit"
-        help="Offers the piece's mirror image when that one would fit where this one doesn't."
-        checked={flipToFit}
-        onChange={(on) => update({ flipToFit: on })}
-      />
     </>
   )
 }
@@ -340,7 +320,7 @@ const ELEMENT_HELP: Readonly<Record<MeshElement, string>> = {
 }
 
 function MeshParameters({ config }: { readonly config: SnapConfig }) {
-  const { elements, occlusion, offset, rotateToFace, sharpAngle } = config.targets.mesh
+  const { elements, offset, rotateToFace, sharpAngle } = config.targets.mesh
   const update = (patch: Partial<SnapConfig["targets"]["mesh"]>) => updateSnapTarget("mesh", patch)
   return (
     <>
@@ -362,13 +342,6 @@ function MeshParameters({ config }: { readonly config: SnapConfig }) {
         onChange={(next) => update({ sharpAngle: next })}
       />
       <ChoiceRow
-        label="Occlusion"
-        help="Whether parts of pieces hidden behind others can be snapped to (Through) or only what you can see (In front)."
-        value={occlusion}
-        items={{ front: "In front", through: "Through" }}
-        onChange={(next) => update({ occlusion: next })}
-      />
-      <ChoiceRow
         label="Rotate to face"
         help="What a piece does when it lands on a face: keeps its turn, stands upright on it, or turns square to it. Example: a lamp on a wall, Upright."
         value={rotateToFace}
@@ -386,40 +359,6 @@ function MeshParameters({ config }: { readonly config: SnapConfig }) {
   )
 }
 
-function TrackingParameters({ config }: { readonly config: SnapConfig }) {
-  const { acquire, hoverMs, keep } = config.targets.tracking
-  const update = (patch: Partial<SnapConfig["targets"]["tracking"]>) => updateSnapTarget("tracking", patch)
-  return (
-    <>
-      <NumberRow
-        label="Points kept"
-        help="How many points a drag remembers to draw guides from."
-        value={keep}
-        digits={0}
-        unit=""
-        min={1}
-        onChange={(next) => update({ keep: Math.round(next) })}
-      />
-      <NumberRow
-        label="Hover time"
-        help="How long the pointer rests on a point before it is remembered."
-        value={hoverMs}
-        digits={0}
-        unit="ms"
-        min={0}
-        onChange={(next) => update({ hoverMs: next })}
-      />
-      <ChoiceRow
-        label="Acquire"
-        help="Whether resting on a point remembers it, or only resting on it with Shift held."
-        value={acquire}
-        items={{ auto: "Automatically", shift: "With Shift" }}
-        onChange={(next) => update({ acquire: next })}
-      />
-    </>
-  )
-}
-
 /** A target's parameters that are plain values. */
 export function ValueParameters({ config, target }: { readonly config: SnapConfig; readonly target: SnapTarget }) {
   switch (target) {
@@ -427,8 +366,6 @@ export function ValueParameters({ config, target }: { readonly config: SnapConfi
       return <ConnectorParameters config={config} />
     case "mesh":
       return <MeshParameters config={config} />
-    case "tracking":
-      return <TrackingParameters config={config} />
     case "alignment":
       return (
         <ChoiceRow
@@ -441,6 +378,7 @@ export function ValueParameters({ config, target }: { readonly config: SnapConfi
       )
     case "grid":
     case "construction":
+    case "tracking":
       return null
   }
 }
