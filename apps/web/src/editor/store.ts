@@ -2343,14 +2343,25 @@ export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => {
     : pivotDotsOf(selection, pivotModeFor(s, selection), unitContext(s, transformOf).boxOf)
 }
 
+/** Where a selected chain starts, and whether the gizmo sits on that point too. */
+export interface ChainStartSpec {
+  readonly at: Vec3
+  readonly gizmo: boolean
+}
+
 /**
  * Where the selected chain starts, as shown: its first link's pivot, which a bend, spread or stretch runs from and Reverse
- * swaps for the other end. For one whole chain, or links selected inside an entered one; undefined otherwise.
+ * swaps for the other end. For one whole chain, or links selected inside an entered one; undefined otherwise. `gizmo`
+ * says a transform tool's gizmo is on it, as it is for a whole chain, so its mark goes under the gizmo.
  */
-export const shownChainStart = (s: EditorState): Vec3 | undefined => {
+export const shownChainStart = (s: EditorState): ChainStartSpec | undefined => {
   const selection = selectionUnits(s, (id) => shownTransform(s, id))
   if (selection === undefined || !isChainSelection(selection)) return undefined
-  return (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot
+  const at = (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot
+  if (at === undefined) return undefined
+  const pivot = pivotUnitOf(selection, pivotModeFor(s, selection)).pivot
+  const transforming = s.tool === "translate" || s.tool === "rotate" || s.tool === "scale"
+  return { at, gizmo: transforming && Math.hypot(pivot.x - at.x, pivot.y - at.y, pivot.z - at.z) < 1 }
 }
 
 /**

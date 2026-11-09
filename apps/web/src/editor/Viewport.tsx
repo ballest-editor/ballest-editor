@@ -22,7 +22,7 @@ import { firesHere, holdsModifiersOf, type ModifierState, mouseChordOf, resolveC
 import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
-import { gridColorsOf } from "../domain/Settings"
+import { gizmoScaleOf, gridColorsOf } from "../domain/Settings"
 import { snapsGrid } from "../domain/snapConfig"
 import { holdsDrop, placeAt, placePrefab } from "./actions"
 import { ChainStart } from "./chainStart"
@@ -684,12 +684,13 @@ function ChainStartMarker() {
   const marker = useMemo(() => new ChainStart(), [])
   useEffect(() => () => marker.dispose(), [marker])
   useBeforePaneDraw((pane) => {
-    const start = shownChainStart(useEditor.getState())
+    const s = useEditor.getState()
+    const start = shownChainStart(s)
     marker.visible = start !== undefined
     if (start === undefined) return
-    const w = ueToThreeVector(start)
+    const w = ueToThreeVector(start.at)
     const origin = new THREE.Vector3(w.x, w.y, w.z)
-    marker.update(origin, pane.worldPerPixelAt(origin))
+    marker.update(origin, pane.worldPerPixelAt(origin), start.gizmo ? gizmoScaleOf(s.settings.gizmo.size) : undefined)
   })
   return <primitive object={marker} />
 }
