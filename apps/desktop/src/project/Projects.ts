@@ -1,4 +1,5 @@
 import {
+  CHARACTERS_PER_FILE,
   type CreateProjectPayload,
   isMapFileName,
   isProjectName,
@@ -80,7 +81,7 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
       case "extension":
         return `${this.path} isn't a map file (${MAP_EXTENSIONS.join(", ")}).`
       case "tooLarge":
-        return `${this.path} is too large to be a map.`
+        return `${this.path} has more characters than the game loads (${CHARACTERS_PER_FILE}), so it can't be a map.`
       case "read":
         return `Couldn't read ${this.path}.`
       case "write":

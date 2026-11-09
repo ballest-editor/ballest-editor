@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import type { InvokeChannels, PushChannels } from "./channels"
 import { ERROR_TEXT_LIMIT, FeedbackForm, FeedbackReceipt } from "./collect"
+import { CHARACTERS_PER_FILE } from "./limits"
 import { isMapFileName, isPrefabName, PREFAB_NAME_RULE } from "./names"
 
 /** Runtime versions of the desktop app, for bug reports and the about dialog. */
@@ -24,9 +25,9 @@ const FilePath = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(409
 
 /**
  * A map's, a sidecar's or a prefab's text, exactly as written to disk: the page encodes and decodes it, main only moves
- * it. The game's own largest maps are a few MB.
+ * it. As long as the game loads, and the BOM main keeps on the game's own bytes.
  */
-const FileText = Schema.String.check(Schema.isMaxLength(64 * 1024 * 1024))
+const FileText = Schema.String.check(Schema.isMaxLength(CHARACTERS_PER_FILE + 1))
 
 /** A map file on disk: where it is and its name (the path's last segment). */
 const MapFileRef = Schema.Struct({

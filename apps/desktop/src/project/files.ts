@@ -1,9 +1,6 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import { createHash } from "node:crypto"
 
-/** The game's largest maps are a few MB; anything this size isn't a map. */
-export const MAX_MAP_BYTES = 64 * 1024 * 1024
-
 /** The SHA-256 of `bytes` as lowercase hex: what a link record keeps of a file. */
 export const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 

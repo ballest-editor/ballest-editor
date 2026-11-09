@@ -110,6 +110,10 @@ describe("game load rules", () => {
       fileTextProblems(" ".repeat(LIMITS.charactersPerFile + 1))[0]!,
       /67108865 characters \(maximum 67108864\).*blank map/
     )
+    // The game counts UTF-16 code units: a character outside the BMP is two (docs/qa/limits-validation.md).
+    const astral = "\u{1F600}"
+    assert.deepStrictEqual(fileTextProblems(astral + " ".repeat(LIMITS.charactersPerFile - 2)), [])
+    assert.lengthOf(fileTextProblems(astral + " ".repeat(LIMITS.charactersPerFile - 1)), 1)
   })
 
   it("stops at the game's JSON value limit, long before its item limit", () => {
