@@ -688,7 +688,7 @@ export interface EditorState extends TabState {
   readonly picker: PickerRequest | null
   /** The offer the last connector snap left in its chip. */
   readonly flipOffer: FlipOffer | null
-  /** The item under the pointer, while Show open ends is On hover. */
+  /** The item under the pointer: what the hover outlines, and whose open ends show while Show open ends is On hover. */
   readonly hoveredItem: string | null
   /** Flush and tangent's panel: which, and how far the faces stand apart in cm. */
   readonly flushMode: FaceMeeting

@@ -1,4 +1,4 @@
-import { app, count, input, rect, scene, states, store } from "@ballest/app-driver/state"
+import { app, count, input, rect, scene, settle, states, store } from "@ballest/app-driver/state"
 
 export default states({
   "editor/start": {
@@ -65,6 +65,21 @@ export default states({
       mode: store("chainMode")
     },
     checks: [{ metric: "chains", equals: 1 }, { metric: "bend", equals: 1 }, { metric: "mode", equals: "links" }]
+  },
+  "editor/hover": {
+    views: ["viewport:single"],
+    fixture: "map:simple",
+    // once the meshes are in, the pointer on an unselected piece outlines what a click would select, in cyan
+    reach: [app.select(""), settle(), input.hover([700, 615])],
+    measure: { hovered: store("hoveredItem") }
+  },
+  "editor/entered-group": {
+    views: ["viewport:single"],
+    fixture: "map:simple",
+    // three items grouped, then entered (Enter): the group's whole box, faint, around nothing selected
+    reach: [app.select("", 3), input.key("g", "KeyG", 2), input.key("Enter", "Enter")],
+    measure: { entered: store("enteredGroupId"), selected: store("selectedIds") },
+    checks: [{ metric: "selected", equals: 0 }]
   },
   "editor/columns": { views: ["viewport:columns"], fixture: "map:simple", reach: [app.panes("columns")] },
   "editor/rows": { views: ["viewport:rows"], fixture: "map:simple", reach: [app.panes("rows")] },

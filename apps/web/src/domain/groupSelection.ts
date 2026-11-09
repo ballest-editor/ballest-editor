@@ -52,6 +52,22 @@ export const clickLevelOf = (
 }
 
 /**
+ * What the hover outlines with `key` under the pointer: what a click on it would select (its click level's items), less
+ * what is selected already, which has its own outline.
+ */
+export const hoverKeysOf = (
+  tree: ReadonlyArray<TreeNode>,
+  key: string | null,
+  enteredGroupId: string | null,
+  selectedIds: ReadonlyArray<string>
+): ReadonlyArray<string> => {
+  if (key === null) return []
+  const selected = new Set(selectedIds)
+  const reached = nodeKeys(tree, clickLevelOf(tree, key, enteredGroupId).nodeId)
+  return (reached.length === 0 ? [key] : reached).filter((k) => !selected.has(k))
+}
+
+/**
  * A double-click on an item: enters the group a click on it reaches, and lands on that group's child on the way to the
  * item. Undefined when a click reaches the item itself, so there's no group left to enter.
  */

@@ -3,8 +3,7 @@ import * as THREE from "three"
 import { ORTHO_GROUND, SCENE_COLORS, shadeOf } from "../domain/sceneGround"
 import { AUTO_GRID_COLORS } from "../domain/Settings"
 import { AXIS_BG_CLASSES, sceneAxisColors } from "./axisColors"
-import { sceneBackgroundClass } from "./sceneColors"
-import { OUTLINE_COLORS } from "./selectionOutline"
+import { SCENE_ROLES, sceneBackgroundClass } from "./sceneColors"
 import { WATER_LOOKS } from "./water"
 
 const luminance = (hex: string) => {
@@ -36,7 +35,7 @@ describe("what's drawn over the scene", () => {
   for (const dark of [true, false]) {
     const theme = dark ? "dark" : "light"
     it(`reads against the ${theme} theme's background`, () => {
-      const colors = [...Object.values(sceneAxisColors(dark)), ...Object.values(OUTLINE_COLORS[theme])]
+      const colors = [...Object.values(sceneAxisColors(dark)), ...Object.values(SCENE_ROLES[theme])]
       for (const color of colors) {
         assert.isAtLeast(contrast(color, SCENE_COLORS[theme]), READABLE, color)
         assert.isAtLeast(contrast(color, ORTHO_GROUND[theme]), READABLE, `${color} in an orthographic pane`)
@@ -60,6 +59,13 @@ describe("what's drawn over the scene", () => {
     const water = shadeOf(SCENE_COLORS.light, color, opacity)
     assert.isBelow(luminance(ORTHO_GROUND.light), luminance(SCENE_COLORS.light))
     assert.isAbove(luminance(ORTHO_GROUND.light), luminance(water))
+  })
+
+  it("gives each role its own colour in each theme", () => {
+    for (const theme of ["dark", "light"] as const) {
+      const colors = Object.values(SCENE_ROLES[theme])
+      assert.lengthOf(new Set(colors), colors.length, theme)
+    }
   })
 
   it("spells the axes out for Tailwind as they are", () => {

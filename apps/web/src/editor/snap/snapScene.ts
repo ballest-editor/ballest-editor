@@ -20,6 +20,7 @@ import { pivotBoundsOf } from "../../domain/pivot"
 import type { SnapItem, SnapView, SurfaceHit } from "../../domain/snapFrame"
 import type { PaneCamera } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
+import { isOutlinePart } from "../selectionOutline"
 import { type EditorState, nodeNamesOf, shownOf } from "../store"
 import { isMesh } from "../threeGuards"
 import { toGame, toThree } from "./snapView"
@@ -53,11 +54,11 @@ const elementsOf = (geometry: THREE.BufferGeometry, sharpAngle: number): MeshEle
   return elements
 }
 
-/** Every visible mesh under an item's object. */
+/** Every visible mesh under an item's object, not the outlines drawn over it. */
 const meshesOf = (key: string): ReadonlyArray<THREE.Mesh> => {
   const out: Array<THREE.Mesh> = []
   sceneRegistry.objects.get(key)?.traverseVisible((object) => {
-    if (isMesh(object)) out.push(object)
+    if (isMesh(object) && !isOutlinePart(object)) out.push(object)
   })
   return out
 }

@@ -17,7 +17,7 @@ import {
 import * as THREE from "three"
 import type { CatalogPiece } from "../domain/Catalog"
 import { threeToUeVector, toTuple3, ueToThreeVector } from "../domain/coords"
-import { counted, groupBoxTargets } from "../domain/groupSelection"
+import { counted, groupBoxTargets, hoverKeysOf } from "../domain/groupSelection"
 import { firesHere, holdsModifiersOf, type ModifierState, mouseChordOf, resolveChord } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
@@ -51,7 +51,7 @@ import { draggedPiece, isPieceDrag } from "./pieceDrag"
 import { PivotDot } from "./pivotDot"
 import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
 import { originLabelTexture, PrefabOrigin } from "./prefabOrigin"
-import { GROUP_BOX_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { sceneBackgroundClass, sceneRoles } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
@@ -663,17 +663,59 @@ function SelectedOutlines() {
   return selectedIds.map((id) => <SelectedOutline key={id} id={id} active={id === active} />)
 }
 
-/** A whole group's box (see groupBox.ts), following its items. */
+/**
+ * What a click would select, outlined in the pointer's colour while the pointer is on it (selectionOutline.ts): the
+ * item, or every item of the group a click reaches. Not in the paint tool, which has its own, nor while a drag, a box
+ * or a pick is under way, nor over a gizmo handle, where a click takes the handle, nor on a locked item, which a click
+ * goes through.
+ */
+function HoveredOutline({ id }: { readonly id: string }) {
+  const outline = useMemo(() => new SelectionOutline(), [])
+  useFrame(() => {
+    const object = sceneRegistry.objects.get(id)
+    const busy = sceneRegistry.gizmoActive() || sceneRegistry.lookDragActive() || sceneRegistry.flyKeysActive()
+      || sceneRegistry.bodyDragActive() || sceneRegistry.areaDragActive()
+    if (object === undefined || busy) {
+      outline.removeFromParent()
+      return
+    }
+    if (outline.parent !== object) object.add(outline)
+    outline.updateHover(object)
+  })
+  useEffect(() => () => void outline.removeFromParent(), [outline])
+  return null
+}
+
+function HoveredOutlines() {
+  const hovered = useEditor((s) =>
+    s.tool === "paint" || s.picker !== null || s.hoveredItem === null || !pickableOf(s)(s.hoveredItem)
+      ? null
+      : s.hoveredItem
+  )
+  const tree = useEditor((s) => s.doc.structure.tree)
+  const enteredGroupId = useEditor((s) => s.enteredGroupId)
+  const selectedIds = useEditor((s) => s.selectedIds)
+  const keys = useMemo(
+    () => hoverKeysOf(tree, hovered, enteredGroupId, selectedIds),
+    [tree, hovered, enteredGroupId, selectedIds]
+  )
+  return keys.map((id) => <HoveredOutline key={id} id={id} />)
+}
+
+/** A whole group's box (see groupBox.ts), following its items: the selection's colour, or no hue when entered. */
 function GroupBoxView({ keys, entered }: { readonly keys: ReadonlyArray<string>; readonly entered: boolean }) {
   const box = useMemo(() => new GroupBox(), [])
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
-  useEffect(() => box.setLook(dark ? GROUP_BOX_COLORS.dark : GROUP_BOX_COLORS.light, entered), [box, dark, entered])
+  useEffect(() => {
+    const roles = sceneRoles(dark)
+    box.setLook(entered ? roles.context : roles.selected, entered)
+  }, [box, dark, entered])
   useEffect(() => () => box.dispose(), [box])
   const doc = useEditor((s) => s.doc)
   const preview = useEditor((s) => s.preview)
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const bounds = useMemo(() => groupBoxOf({ doc, preview, catalogIndex }, keys), [doc, preview, catalogIndex, keys])
-  useFrame(({ camera, size }) => box.update(bounds, camera, size.height))
+  useEffect(() => box.update(bounds), [box, bounds])
   return <primitive object={box} />
 }
 
@@ -816,6 +858,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <Water />
         <MapItems />
         <SelectedOutlines />
+        <HoveredOutlines />
         <GroupBoxes />
         <PrefabOriginMarker />
         <PivotDots />

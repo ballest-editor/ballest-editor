@@ -11,6 +11,7 @@ import {
   groupPathOf,
   groupSelectionStates,
   groupTrail,
+  hoverKeysOf,
   nodeKeys,
   selectedGroupIds,
   selectionNodeIds,
@@ -51,6 +52,23 @@ describe("clickLevelOf", () => {
     assert.deepStrictEqual(clickLevelOf(tree, "c", "inner"), { nodeId: "c", enteredGroupId: "outer" })
     assert.deepStrictEqual(clickLevelOf(tree, "d", "inner"), { nodeId: "d", enteredGroupId: null })
     assert.deepStrictEqual(clickLevelOf(tree, "e", "inner"), { nodeId: "solo", enteredGroupId: null })
+  })
+})
+
+describe("hoverKeysOf", () => {
+  it("is what a click would select: the outermost group with nothing entered, the entered group's child inside it", () => {
+    assert.deepStrictEqual(hoverKeysOf(tree, "a", null, []), ["a", "b", "c"])
+    assert.deepStrictEqual(hoverKeysOf(tree, "a", "outer", []), ["a", "b"])
+    assert.deepStrictEqual(hoverKeysOf(tree, "d", null, []), ["d"])
+  })
+
+  it("leaves out what is already selected, which has its own outline", () => {
+    assert.deepStrictEqual(hoverKeysOf(tree, "a", null, ["c"]), ["a", "b"])
+    assert.deepStrictEqual(hoverKeysOf(tree, "d", null, ["d"]), [])
+  })
+
+  it("is nothing with nothing under the pointer", () => {
+    assert.deepStrictEqual(hoverKeysOf(tree, null, null, []), [])
   })
 })
 

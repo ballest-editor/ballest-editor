@@ -35,8 +35,8 @@ const DRAG_SLOP_PX = 4
 /** How far a resting pointer can wander and still be hovering. */
 const HOVER_SLOP_PX = 4
 
-/** How long the pointer pauses before the item under it counts as hovered. */
-const HOVERED_ITEM_MS = 80
+/** How often, at most, the item under a moving pointer is asked again. */
+const HOVERED_ITEM_MS = 50
 
 interface Pressed {
   readonly x: number
@@ -110,6 +110,7 @@ export function SnapInput() {
     let drag: BodyDrag | null = null
     let hoverTimer: ReturnType<typeof setTimeout> | undefined
     let itemTimer: ReturnType<typeof setTimeout> | undefined
+    let itemAskedAt = -Infinity
     let hoverAt: { x: number; y: number } | undefined
 
     sceneRegistry.bodyDragActive = () => drag !== null
@@ -228,15 +229,28 @@ export function SnapInput() {
       }, hoverMs)
     }
 
-    /** Which item shows its open ends: asked once the pointer pauses, as a raycast per move costs a large map too much. */
+    /**
+     * The item under the pointer, for the hover's outline and its open ends: asked at most once per `HOVERED_ITEM_MS`
+     * while the pointer moves, and once more where it stops, as a raycast per move costs a large map too much.
+     */
     const followHover = (e: PointerEvent) => {
       clearTimeout(itemTimer)
-      if (useEditor.getState().settings.snapPrefs.showOpenEnds !== "hover" || e.buttons !== 0) return
-      itemTimer = setTimeout(() => {
+      if (e.buttons !== 0) return
+      const ask = () => {
+        itemAskedAt = performance.now()
         const s = useEditor.getState()
         const key = itemUnder(el, e, raycaster)
         if (key !== s.hoveredItem) s.setHoveredItem(key)
-      }, HOVERED_ITEM_MS)
+      }
+      const wait = itemAskedAt + HOVERED_ITEM_MS - performance.now()
+      if (wait <= 0) ask()
+      else itemTimer = setTimeout(ask, wait)
+    }
+    const leave = () => {
+      stopHover()
+      clearTimeout(itemTimer)
+      const s = useEditor.getState()
+      if (s.hoveredItem !== null) s.setHoveredItem(null)
     }
 
     const showPick = (picker: PickerRequest, e: PointerEvent) => {
@@ -370,7 +384,7 @@ export function SnapInput() {
     el.addEventListener("pointerup", onPointerUp, { capture: true, signal })
     el.addEventListener("pointercancel", onPointerLost, { signal })
     el.addEventListener("lostpointercapture", onPointerLost, { signal })
-    el.addEventListener("pointerleave", stopHover, { signal })
+    el.addEventListener("pointerleave", leave, { signal })
     window.addEventListener("keydown", onKeyDown, { capture: true, signal })
     window.addEventListener("keyup", onKeyUp, { capture: true, signal })
     return () => {
