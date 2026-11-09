@@ -97,7 +97,7 @@ This changes behaviour for anyone who typed "90" to set every piece's yaw to 90.
 
 ## Showing it
 
-In Each the gizmo sits on the active unit's pivot with the active unit's axes, so the drag reads as it does for a single piece. Every other unit's pivot gets a dot. That dot is #82: a disc in perspective at the pivot, dotted when it is inside the selection's box. Build it once for the selection pivot, then draw it at every unit pivot in Each. The dots don't show axes; a short three-axis tick at each pivot in Local Each is a possible later addition, not part of this.
+In Each the gizmo sits on the active unit's pivot with the active unit's axes, so the drag reads as it does for a single piece. Inside an entered chain it sits on the first selected link instead, since every edit in Each runs down the chain from there and takes the drag as that link does (`pivotUnitOf`). Every other unit's pivot gets a dot. That dot is #82: a disc in perspective at the pivot, dotted when it is inside the selection's box. Build it once for the selection pivot, then draw it at every unit pivot in Each. The dots don't show axes; a short three-axis tick at each pivot in Local Each is a possible later addition, not part of this.
 
 The numbers for the gizmo's point are the Pivot section's Position row from #225, and in Each they stay the active unit's. For a group with an Item or Point pivot, `shownPivotPoint` returns that pivot rather than nothing, and "Set pivot here" sits beside the row.
 

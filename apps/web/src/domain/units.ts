@@ -230,11 +230,23 @@ export const reachableKeys = (
   return entered?.chain === true ? [...new Set([...selectedIds, ...treeKeys([entered])])] : selectedIds
 }
 
-/** The unit an edit by `mode` is measured on, and the gizmo sits on: the active unit in Each, the game's rule in Together. */
-export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit =>
-  effectivePivotMode(mode, selection) === "each" || selection.units.length === 1
-    ? selection.active
-    : selection.activeItem
+/**
+ * The first link an edit in Each runs from inside an entered chain: the first selected. The pass takes the edit as that
+ * link does, so the gizmo sits on it.
+ */
+const passHeadOf = ({ chain, units }: SelectionUnits): Unit | undefined => {
+  const selected = new Set(units.map((unit) => unit.id))
+  return chain?.find((link) => selected.has(link.id))
+}
+
+/**
+ * The unit an edit by `mode` is measured on, and the gizmo sits on: the active unit in Each, or inside an entered chain
+ * the first selected link, which the pass runs from; the game's rule in Together.
+ */
+export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit => {
+  if (effectivePivotMode(mode, selection) === "each") return passHeadOf(selection) ?? selection.active
+  return selection.units.length === 1 ? selection.active : selection.activeItem
+}
 
 /**
  * The effective mode: Each needs two or more units, or one chain of two or more links, which bends; else a selection is
@@ -355,7 +367,8 @@ export type ChainShape =
 
 /**
  * Where a helix starts: the straight chain's axes tipped toward `axis` until a step of `length` along `direction`
- * climbs `rise`. A rise at or past the length stands the chain along the axis.
+ * climbs `rise`. `length` is the chain's mean step, so links of one length climb it exactly. A rise at or past the
+ * length stands the chain along the axis.
  */
 const tippedToward = (axes: Quat4, direction: Vec3, length: number, axis: Vec3, rise: number): Quat4 => {
   const flat = vecSub(direction, vecScale(axis, vecDot(direction, axis)))
@@ -455,7 +468,8 @@ const keepJoints = (
     const own = link === undefined ? undefined : placed(link)
     const now = next === undefined ? undefined : placed(next)
     if (link === undefined || next === undefined || own === undefined || now === undefined) return
-    const axes = link.transform.rotation
+    // in the axes of the item the scale ratio is read off, which a group link's own axes needn't be
+    const axes = own.before.rotation
     const step = rotateVec(quatConjugate(axes), vecSub(next.pivot, link.pivot))
     const joint = vecAdd(at, rotateVec(axes, vecMul(step, scaleRatio(own.before, own.after))))
     const shift = vecSub(joint, now.pivot)
@@ -643,9 +657,7 @@ const leaderOf = (unit: Unit): ReadonlyArray<string> => unit.links?.[0]?.keys ??
  */
 export const leadingKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> => {
   if (effectivePivotMode(mode, selection) !== "each") return selection.units.flatMap((unit) => unit.keys)
-  if (selection.chain === undefined) return leaderOf(selection.active)
-  const selected = new Set(selection.units.map((unit) => unit.id))
-  return selection.chain.find((link) => selected.has(link.id))?.keys ?? selection.active.keys
+  return passHeadOf(selection)?.keys ?? leaderOf(selection.active)
 }
 
 /**

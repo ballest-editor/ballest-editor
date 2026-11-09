@@ -395,6 +395,26 @@ describe("chains", () => {
     }
   })
 
+  it("keeps a group link's joints where its items grow, not along the group's own axes", () => {
+    // each link a group of one item turned a quarter, so the items' X runs along the world's Y
+    const keys = ["g1", "g2", "g3"]
+    const turned = new Map(keys.map((key, i) => [`${key}i`, at(i * 1000, 0, 0, 90)]))
+    const tree = [group("chain", keys.map((key) => group(key, [item(`${key}i`)])), { chain: true })]
+    const sel = selectionUnitsOf(keys.map((key) => `${key}i`), null, contextOf(tree, turned))!
+    const out = applyUnitEdit(sel, "each", turned, deltaEdit({ kind: "scale", factor: 2, axis: "x" }))
+    keys.forEach((key, i) => {
+      assert.closeTo(out.get(`${key}i`)!.scale3D.x, 2, 1e-9, key)
+      assertVec(out.get(`${key}i`)!.translation, { x: i * 1000, y: 0, z: 0 }, `${key} stays: nothing grew along X`)
+    })
+  })
+
+  it("sits the gizmo in Each inside an entered chain on the first selected link, which the pass runs from", () => {
+    const sel = selectionUnitsOf(["l3", "l5"], "chain", contextOf([chain], transforms))!
+    assert.strictEqual(pivotUnitOf(sel, "each").id, "l3")
+    assert.strictEqual(pivotUnitOf(sel, "together").id, "l5", "Together keeps the game's rule")
+    assert.deepStrictEqual(leadingKeys(sel, "each"), ["l3"])
+  })
+
   it("carries the links after a link moved or turned in Together, and pushes them after a scale", () => {
     const sel = selectionUnitsOf(["l3"], "chain", contextOf([chain], transforms))!
     const move: GroupDelta = { kind: "translate", offset: { x: 0, y: 5, z: 0 } }
