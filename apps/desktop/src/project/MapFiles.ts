@@ -1,5 +1,7 @@
 import {
   type BackupRef,
+  type GameMap,
+  type GameMaps,
   type ImportMapPayload,
   type ImportMapResult,
   isMapFileName,
@@ -32,34 +34,58 @@ import {
   thumbnailsFolderIn
 } from "./Projects"
 
-/** Only the field Export looks at in a map file; everything else is ignored. */
-export const PublishedId = Schema.fromJsonString(Schema.Struct({
+const PublishedIdFields = Schema.Struct({
   worldSettings: Schema.Struct({ levelData: Schema.Struct({ levelPublishedFileId: Schema.Finite }) })
-}))
+})
 
-/** A map file's `levelPublishedFileId`; -1 (never published) when it has none or doesn't decode. */
-const publishedIdOf = (text: string): number =>
-  Schema.decodeOption(PublishedId)(text).pipe(
-    Option.map((map) => map.worldSettings.levelData.levelPublishedFileId),
-    Option.getOrElse(() => -1)
-  )
+/** Only the field Export looks at in a map file; everything else is ignored. */
+export const PublishedId = Schema.fromJsonString(PublishedIdFields)
+
+/** What the game's maps list shows of a map file besides its published id; everything else is ignored. */
+const MapHeading = Schema.Struct({
+  worldSettings: Schema.Struct({
+    levelData: Schema.Struct({ levelDisplayName: Schema.String, creatorName: Schema.String })
+  }),
+  items: Schema.Array(Schema.Unknown)
+})
+
+/**
+ * What a map file's text says (`MapContents` less its hash): its `levelPublishedFileId`, -1 (never published) when it
+ * has none or doesn't decode, and its name, creator and item count, null when they don't.
+ */
+const contentsOfText = (text: string): Omit<MapContents, "hash"> => {
+  const json = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown))(text)
+  const heading = Option.flatMap(json, Schema.decodeUnknownOption(MapHeading))
+  return {
+    publishedFileId: Option.flatMap(json, Schema.decodeUnknownOption(PublishedIdFields)).pipe(
+      Option.map((map) => map.worldSettings.levelData.levelPublishedFileId),
+      Option.getOrElse(() => -1)
+    ),
+    displayName: Option.getOrNull(Option.map(heading, (map) => map.worldSettings.levelData.levelDisplayName)),
+    creatorName: Option.getOrNull(Option.map(heading, (map) => map.worldSettings.levelData.creatorName)),
+    itemCount: Option.getOrNull(Option.map(heading, (map) => map.items.length))
+  }
+}
 
 const PNG_DATA_URL = "data:image/png;base64,"
 
 /** A thumbnail's file: the hash of the map's bytes it shows. Nothing else in the folder is ours to remove. */
 const THUMBNAIL_FILE = /^[0-9a-f]{64}\.png$/
 
-/** What `listMaps` reports of a map's bytes. */
+/** What `listMaps` and `listGameMaps` report of a map's bytes. */
 interface MapContents {
   readonly hash: string
   readonly publishedFileId: number
+  readonly displayName: string | null
+  readonly creatorName: string | null
+  readonly itemCount: number | null
 }
 
 type MapFilesEffect<A> = Effect.Effect<A, ProjectError | MapLinkError | BackupError>
 
 /**
  * The maps in the project in use (docs/PROJECTS.md § The files): its `maps/` folder, the files picked in the Import
- * dialog (read only), and the backups, the project's and the exports' (`<userData>/backups/`). Maps are named by file
+ * dialog or the game's maps list (read only), the game's maps folder's list, and the backups, the project's and the exports' (`<userData>/backups/`). Maps are named by file
  * name, never by path. Every write over a map goes through `Backups.overwrite`. What a map's bytes say is cached by
  * the file's time, size and inode. A map's sidecar is the page's text to main: it is kept beside the map, goes where the
  * map goes, and is backed up the way the map is.
@@ -83,6 +109,10 @@ export class MapFiles extends Context.Service<MapFiles, {
   readonly sidecarOf: (project: string, fileName: string) => Effect.Effect<string | null, ProjectError>
   /** Reads a file the user picked in the Import dialog; it may be imported from now on. */
   readonly pick: (file: string) => Effect.Effect<OpenedMapFile, ProjectError>
+  /** The maps in the game's maps folder, newest first, each with the project map it already is. */
+  readonly listGameMaps: Effect.Effect<GameMaps, ProjectError>
+  /** Reads a map in the game's maps folder as `pick` does; it may be imported from now on. */
+  readonly pickGameMap: (fileName: string) => Effect.Effect<OpenedMapFile, ProjectError>
   readonly importMap: (payload: ImportMapPayload) => MapFilesEffect<ImportMapResult>
   /** The current project's backups and the exports', newest first. */
   readonly backups: Effect.Effect<MapBackups>
@@ -121,7 +151,7 @@ export class MapFiles extends Context.Service<MapFiles, {
       const known = contents.get(file)
       if (known?.stamp === stamp) return known
       const bytes = yield* fs.readFile(file).pipe(Effect.mapError(projectError("read", file)))
-      const read = { stamp, hash: sha256(bytes), publishedFileId: publishedIdOf(new TextDecoder().decode(bytes)) }
+      const read = { stamp, hash: sha256(bytes), ...contentsOfText(new TextDecoder().decode(bytes)) }
       contents.set(file, read)
       return read
     })
@@ -285,6 +315,47 @@ export class MapFiles extends Context.Service<MapFiles, {
       return { path: file, name: path.basename(file), text } satisfies OpenedMapFile
     })
 
+    /** The game's maps folder as found or chosen; it may not be there yet. */
+    const gameMapsFolder = Effect.map(game.get, ({ mapsFolder }) => Option.fromNullOr(mapsFolder.path))
+
+    const listGameMaps = Effect.gen(function*() {
+      const folder = yield* gameMapsFolder
+      if (Option.isNone(folder)) return []
+      const names = yield* fs.readDirectory(folder.value).pipe(Effect.orElseSucceed(() => []))
+      const inProject = yield* list
+      /** The project map the game's `file` already is, by its link or by its bytes under the same name. */
+      const projectMapOf = (file: string, fileName: string, hash: string) =>
+        inProject.find((map) =>
+          [map.link?.export?.path, map.link?.origin?.path].some((linked) => linked != null && same(linked, file)) ||
+          (map.fileName === fileName && map.hash === hash)
+        )?.fileName ?? null
+      const gameMapOf = Effect.fnUntraced(function*(fileName: string) {
+        const file = path.join(folder.value, fileName)
+        const stat = yield* fs.stat(file)
+        if (stat.type !== "File" || Number(stat.size) > MAX_MAP_BYTES) return Option.none<GameMap>()
+        const { hash, ...summary } = yield* cached(file, stampOf(stat))
+        return Option.some<GameMap>({
+          fileName,
+          modifiedAt: Option.getOrElse(stat.mtime, () => new Date(0)).toISOString(),
+          ...summary,
+          inProject: projectMapOf(file, fileName, hash)
+        })
+      })
+      // a file that went, or can't be read just now, is left out until the next look
+      const maps = yield* Effect.forEach(
+        names.filter(isMapFileName),
+        (name) => gameMapOf(name).pipe(Effect.orElseSucceed(() => Option.none<GameMap>()))
+      )
+      return maps.flatMap(Option.toArray).sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
+    }).pipe(Effect.withSpan("MapFiles.listGameMaps"))
+
+    const pickGameMap = Effect.fn("MapFiles.pickGameMap")(function*(fileName: string) {
+      if (!isMapFileName(fileName)) return yield* projectError("fileName", fileName)()
+      const folder = yield* gameMapsFolder
+      if (Option.isNone(folder)) return yield* projectError("notFound", fileName)()
+      return yield* pick(path.join(folder.value, fileName))
+    })
+
     const importMap = Effect.fn("MapFiles.importMap")(
       function*({ source: raw, fileName, text, replace }: ImportMapPayload) {
         const source = path.resolve(raw)
@@ -378,6 +449,8 @@ export class MapFiles extends Context.Service<MapFiles, {
       writeThumbnail,
       sidecarOf,
       pick,
+      listGameMaps,
+      pickGameMap,
       importMap,
       backups,
       readBackup,

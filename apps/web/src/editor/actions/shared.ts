@@ -33,6 +33,8 @@ export const refreshProject = Effect.gen(function*() {
   const platform = yield* Platform
   if (!platform.capabilities.projects) return
   useEditor.getState().setProject(yield* platform.projectState, yield* platform.listMaps)
+  // the game's maps are only offered for importing: a folder that can't be listed just now offers none
+  useEditor.getState().setGameMaps(yield* platform.listGameMaps.pipe(Effect.orElseSucceed(() => [])))
 })
 
 export const fileOf = (map: ProjectMap): OpenFile => ({ name: map.fileName, path: map.path })

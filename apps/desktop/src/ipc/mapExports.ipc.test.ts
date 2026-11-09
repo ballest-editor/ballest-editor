@@ -2,10 +2,12 @@ import {
   CHARACTERS_PER_FILE,
   ExportChecks,
   ExportMapResult,
+  GameMaps,
   ImportMapResult,
   InvokeChannels,
   MapBackupFile,
   MapBackups,
+  OpenedMapFile,
   ProjectMapFile,
   ProjectMaps
 } from "@ballest/contracts"
@@ -132,6 +134,68 @@ describe("MapExports over IPC", () => {
         assert.strictEqual(link?.lastSeenHash, exportedHash)
         assert.deepInclude(link?.origin, { path: inGame, hash })
         assert.strictEqual(yield* fs.readFileString(inGame), "{\"v\":2}")
+      })
+    ))
+
+  it.effect("lists the game's maps with the project map each already is, and imports one picked from the list", () =>
+    withHandlers(({ fake, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const mapText = (name: string, items: number, publishedId = -1) =>
+          JSON.stringify({
+            worldSettings: {
+              levelData: { levelDisplayName: name, creatorName: "me", levelPublishedFileId: publishedId }
+            },
+            items: Array.from({ length: items }, () => ({}))
+          })
+        // No maps folder yet: nothing to list.
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.listGameMaps), [])
+
+        const started = "Map_LevelEditorMain&Started_me.balledit"
+        const published = "Map_LevelEditorMain&Shared_me.balledit"
+        const broken = "Map_LevelEditorMain&Broken_me.balledit"
+        yield* fs.makeDirectory(path.join(steam.maps, "Sub"), { recursive: true })
+        yield* fs.writeFileString(path.join(steam.maps, started), mapText("Started", 3))
+        yield* fs.writeFileString(path.join(steam.maps, published), mapText("Shared", 1, 42))
+        yield* fs.writeFileString(path.join(steam.maps, broken), "{")
+        yield* fs.writeFileString(path.join(steam.maps, "notes.txt"), "not a map")
+        yield* fs.writeFileString(path.join(steam.maps, "Sub", "Map_LevelEditorMain&Deep_me.balledit"), "{}")
+
+        const listed = yield* fake.invokeAs(GameMaps, InvokeChannels.listGameMaps)
+        const byName = new Map(listed.map((map) => [map.fileName, map]))
+        assert.sameMembers([...byName.keys()], [started, published, broken])
+        assert.deepInclude(byName.get(started), {
+          displayName: "Started",
+          creatorName: "me",
+          itemCount: 3,
+          publishedFileId: -1,
+          inProject: null
+        })
+        assert.deepInclude(byName.get(published), { publishedFileId: 42, itemCount: 1 })
+        assert.deepInclude(byName.get(broken), { displayName: null, itemCount: null, publishedFileId: -1 })
+
+        // Picked from the list, it imports linked to the game's file, and the list says so.
+        const picked = yield* fake.invokeAs(OpenedMapFile, InvokeChannels.pickGameMap, { fileName: started })
+        assert.strictEqual(picked.path, path.join(steam.maps, started))
+        const imported = expectTag(
+          yield* fake.invokeAs(ImportMapResult, InvokeChannels.importMap, {
+            source: picked.path,
+            fileName: started,
+            text: picked.text,
+            replace: false
+          }),
+          "Imported"
+        )
+        assert.strictEqual(imported.map.link?.export?.path, picked.path)
+        const after = yield* fake.invokeAs(GameMaps, InvokeChannels.listGameMaps)
+        assert.strictEqual(after.find((map) => map.fileName === started)?.inProject, started)
+
+        // A name that leaves the folder is refused before main looks.
+        const escape = { fileName: "../Map_LevelEditorMain&Started_me.balledit" }
+        yield* Effect.flip(fake.invoke(InvokeChannels.pickGameMap, escape))
+        const gone = { fileName: "Map_LevelEditorMain&Gone_me.balledit" }
+        yield* Effect.flip(fake.invoke(InvokeChannels.pickGameMap, gone))
       })
     ))
 

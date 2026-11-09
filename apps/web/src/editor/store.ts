@@ -5,6 +5,7 @@
  */
 import {
   type DesktopVersions,
+  type GameMaps,
   NOTIFICATION_LIMIT,
   type PrefabInfos,
   type PrefabRef,
@@ -569,6 +570,8 @@ export interface EditorState extends TabState {
   readonly project: ProjectState | null
   /** The project's maps, most recently changed first (desktop). */
   readonly projectMaps: ReadonlyArray<ProjectMap>
+  /** The maps in the game's maps folder, most recently changed first, as last listed with the project's (desktop). */
+  readonly gameMaps: GameMaps
   /** The project maps' thumbnails seen so far, as PNG data URLs, by the hash of the file each shows. */
   readonly mapThumbnails: ReadonlyMap<string, string>
   /** Every prefab of both tiers, as last listed. */
@@ -718,6 +721,7 @@ export interface EditorState extends TabState {
   readonly markPrefabSaved: (tabId: string, from: Doc, document: PrefabDocument, file: OpenFile) => void
   readonly setPrefabs: (prefabs: PrefabInfos) => void
   readonly setProject: (project: ProjectState, maps: ReadonlyArray<ProjectMap>) => void
+  readonly setGameMaps: (gameMaps: GameMaps) => void
   /** Keeps a thumbnail, and lets go of those no project map has any more. */
   readonly setMapThumbnail: (hash: string, png: string) => void
   /**
@@ -1228,6 +1232,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     parkedTabs: new Map(),
     project: null,
     projectMaps: [],
+    gameMaps: [],
     mapThumbnails: new Map(),
     prefabs: [],
     capabilities: {
@@ -1380,6 +1385,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       updateTab(tabId, (tab) => ({ document, savedDoc: from, dirty: tab.doc !== from, file })),
     setPrefabs: (prefabs) => set({ prefabs }),
     setProject: (project, projectMaps) => set({ project, projectMaps }),
+    setGameMaps: (gameMaps) => set({ gameMaps }),
     setMapThumbnail: (hash, png) =>
       set((s) => {
         const kept = new Set(s.projectMaps.map((map) => map.hash))

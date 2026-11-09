@@ -5,6 +5,7 @@ import type {
   FeedbackForm,
   FoundCreator,
   GameLinkResult,
+  GameMap,
   GamePaths,
   GameWriteProgress,
   MapBackupFile,
@@ -265,6 +266,13 @@ const publishedIdOf = (text: string): number =>
     onNone: () => -1,
     onSome: (file) => file.worldSettings.levelData.levelPublishedFileId
   })
+
+const MapHeading = Schema.fromJsonString(Schema.Struct({
+  worldSettings: Schema.Struct({
+    levelData: Schema.Struct({ levelDisplayName: Schema.String, creatorName: Schema.String })
+  }),
+  items: Schema.Array(Schema.Unknown)
+}))
 
 /** Stands in for SHA-256: 64 hex digits that differ when the text does. */
 export const testHash = (text: string): string => {
@@ -549,6 +557,38 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const text = disk.files.get(path)
       if (text === undefined) return fail(`${path} doesn't exist any more.`)
       return Promise.resolve({ path, name: nameOf(path), text } satisfies OpenedMapFile)
+    },
+    listGameMaps: () => {
+      const folder = disk.game.paths.mapsFolder.path
+      if (folder === null) return Promise.resolve([])
+      const prefix = `${folder}/`
+      return Promise.resolve(
+        [...disk.files].filter(([file]) => file.startsWith(prefix) && isMapFileName(file.slice(prefix.length))).map(
+          ([file, text]): GameMap => {
+            const fileName = nameOf(file)
+            const heading = Option.getOrNull(Schema.decodeOption(MapHeading)(text))
+            const linked = [...linksOf(current())].find(([, link]) =>
+              link.export?.path === file || link.origin?.path === file
+            )?.[0]
+            return {
+              fileName,
+              modifiedAt: TIME,
+              displayName: heading?.worldSettings.levelData.levelDisplayName ?? null,
+              creatorName: heading?.worldSettings.levelData.creatorName ?? null,
+              itemCount: heading?.items.length ?? null,
+              publishedFileId: publishedIdOf(text),
+              inProject: linked ?? (disk.files.get(projectFile(fileName, current())) === text ? fileName : null)
+            }
+          }
+        )
+      )
+    },
+    pickGameMap: ({ fileName }) => {
+      const path = `${disk.game.paths.mapsFolder.path}/${fileName}`
+      const text = disk.files.get(path)
+      return text === undefined
+        ? fail(`${path} doesn't exist any more.`)
+        : Promise.resolve({ path, name: fileName, text } satisfies OpenedMapFile)
     },
     importMap: async ({ source, fileName, text, replace }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
