@@ -123,6 +123,12 @@ export const GizmoSettings = Schema.Struct({
   showForGroups: Schema.Boolean
 })
 
+/** Features still taking shape, off until turned on in Settings › Beta. */
+export const BetaSettings = Schema.Struct({
+  /** Lay along in a chain's Inspector section: Straight and Helix (docs/design/pivot-modes-and-chains.md). */
+  chainLay: Schema.Boolean
+})
+
 export const Settings = Schema.Struct({
   general: GeneralSettings,
   editor: EditorSettings,
@@ -134,7 +140,8 @@ export const Settings = Schema.Struct({
   /** How snapping behaves for you in every map: Settings › Editor › Snapping. */
   snapPrefs: SnapPrefs,
   panels: PanelSettings,
-  gizmo: GizmoSettings
+  gizmo: GizmoSettings,
+  beta: BetaSettings
 })
 export type Settings = typeof Settings.Type
 
@@ -171,7 +178,8 @@ export const defaultSettings: Settings = {
     inspectorScale: "factor",
     paintView: "row"
   },
-  gizmo: { size: "m", showForGroups: true }
+  gizmo: { size: "m", showForGroups: true },
+  beta: { chainLay: false }
 }
 
 /** The fixed grid colours older saves stored; they now mean "automatic". */

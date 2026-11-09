@@ -1,6 +1,7 @@
 import {
   IconCamera,
   IconDeviceGamepad2,
+  IconFlask,
   IconKeyboard,
   IconPalette,
   IconPencil,
@@ -57,7 +58,8 @@ const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
   { id: "editor", label: "Editor", icon: IconPencil },
   { id: "camera", label: "Camera", icon: IconCamera },
   { id: "keybinds", label: "Keybinds", icon: IconKeyboard },
-  { id: "appearance", label: "Appearance", icon: IconPalette }
+  { id: "appearance", label: "Appearance", icon: IconPalette },
+  { id: "beta", label: "Beta", icon: IconFlask }
 ]
 
 /** Desktop only: the Game link's home. */
@@ -469,6 +471,20 @@ export function SettingsDialog(props: {
           <Button variant="outline" disabled={snapFactory} onClick={() => void resetSnapDefaults()}>
             Reset snapping defaults
           </Button>
+        )
+      },
+      {
+        id: "chainLay",
+        ...setting("beta", "chainLay"),
+        label: "Lay chains along a shape",
+        description: "Adds Lay along to a chain's section in the Inspector: Straight and Helix.",
+        info: "Still taking shape: it may change or go away.",
+        keywords: "chain helix straight beta",
+        control: (
+          <Switch
+            checked={settings.beta.chainLay}
+            onCheckedChange={(v) => update("beta", { chainLay: v })}
+          />
         )
       },
       {

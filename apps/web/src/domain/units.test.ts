@@ -16,15 +16,30 @@ import type { Box } from "./itemBounds"
 import type { ChainGrowth, GroupNode, TreeNode } from "./MapSidecar"
 import { localToWorld } from "./pivot"
 import type { Structure } from "./structure"
-import { ORIGIN, quatConjugate, quatDot, quatMul, quatToRotator, rotateVec, rotatorToQuat, vecSub } from "./ueMath"
+import {
+  ORIGIN,
+  quatConjugate,
+  quatDot,
+  quatFromAxisAngle,
+  quatMul,
+  quatToRotator,
+  rotateVec,
+  rotatorToQuat,
+  vecDot,
+  vecLength,
+  vecSub
+} from "./ueMath"
 import {
   applyDelta,
   applyUnitEdit,
   applyUnitOffsets,
   carriedKeys,
+  type ChainShape,
   deltaEdit,
   effectivePivotMode,
+  layChain,
   leadingKeys,
+  movedAlikeKeys,
   pathOrder,
   pivotDotsOf,
   pivotUnitOf,
@@ -33,6 +48,7 @@ import {
   turnAccumulates,
   type UnitContext,
   type UnitEdit,
+  unitOf,
   withCarriedPoints
 } from "./units"
 
@@ -298,25 +314,96 @@ describe("chains", () => {
     assert.closeTo(yawOf(out.get("l5")!), 90, 1e-6, "carried rigidly, so turned with it")
   })
 
-  it("moves the carried links by the offset once, and keeps a scale with its link", () => {
-    const sel = selectionUnitsOf(["l2", "l4"], "chain", contextOf([chain], transforms))!
-    const move: GroupDelta = { kind: "translate", offset: { x: 0, y: 100, z: 0 } }
-    const moved = applyUnitEdit(sel, "each", transforms, deltaEdit(move))
-    assert.isUndefined(moved.get("l1"))
-    for (const key of ["l2", "l3", "l4", "l5"]) assert.strictEqual(moved.get(key)!.translation.y, 100, key)
-    const scaled = applyUnitEdit(sel, "each", transforms, deltaEdit({ kind: "scale", factor: 2, axis: "x" }))
-    assert.strictEqual(scaled.get("l2")!.scale3D.x, 2)
-    assert.isUndefined(scaled.get("l3"), "the next link is left alone")
-    assert.strictEqual(scaled.get("l4")!.scale3D.x, 2)
+  const xs = (out: ReadonlyMap<string, UeTransform>) => links.map((key) => out.get(key)?.translation.x)
+
+  it("moves each link in Each by the move from the one before, from the first selected link to the end", () => {
+    // l2 to the end: l1 stays where the chain starts
+    const sel = selectionUnitsOf(["l2", "l3", "l4", "l5"], "chain", contextOf([chain], transforms))!
+    const along = applyUnitEdit(
+      sel,
+      "each",
+      transforms,
+      deltaEdit({ kind: "translate", offset: { x: 50, y: 0, z: 0 } })
+    )
+    assert.deepStrictEqual(xs(along), [undefined, 1050, 2100, 3150, 4200], "every joint opens 50")
+    const across = applyUnitEdit(
+      sel,
+      "each",
+      transforms,
+      deltaEdit({ kind: "translate", offset: { x: 0, y: 100, z: 0 } })
+    )
+    assert.deepStrictEqual(links.map((key) => across.get(key)?.translation.y), [undefined, 100, 200, 300, 400])
+    // grown: linear 100% moves them 50, 100, 150, 200, 250 more than the one before
+    const grown = group("chain", links.map(item), { chain: true, growth: { curve: "linear", percent: 100 } })
+    const whole = selectionUnitsOf(links, null, contextOf([grown], transforms))!
+    const spaced = applyUnitEdit(
+      whole,
+      "each",
+      transforms,
+      deltaEdit({ kind: "translate", offset: { x: 50, y: 0, z: 0 } })
+    )
+    assert.deepStrictEqual(xs(spaced), [50, 1150, 2300, 3500, 4750])
   })
 
-  it("carries the links after a link moved or turned in Together, and never a scale", () => {
+  it("opens every joint of a curve along itself when the drag is along the first link", () => {
+    const sel = (t: ReadonlyMap<string, UeTransform>) => selectionUnitsOf(links, null, contextOf([chain], t))!
+    const arc = new Map([...transforms, ...applyUnitEdit(sel(transforms), "each", transforms, deltaEdit(turn(40)))])
+    // along the first link's own X, as the gizmo in Local shows it
+    const offset = rotateVec(arc.get("l1")!.rotation, { x: 50, y: 0, z: 0 })
+    const out = applyUnitEdit(sel(arc), "each", arc, deltaEdit({ kind: "translate", offset }))
+    for (const [from, to] of [["l1", "l2"], ["l2", "l3"], ["l3", "l4"], ["l4", "l5"]] as const) {
+      const step = vecSub(out.get(to)!.translation, out.get(from)!.translation)
+      const before = vecSub(arc.get(to)!.translation, arc.get(from)!.translation)
+      assert.closeTo(vecLength(step), 1050, 1e-6, `${from} to ${to}`)
+      assert.closeTo(vecDot(step, before) / (vecLength(step) * vecLength(before)), 1, 1e-9, "along itself")
+    }
+  })
+
+  it("stacks links piled on one pivot along the drag", () => {
+    const pile = new Map(links.map((key) => [key, at(0)]))
+    const sel = selectionUnitsOf(links, null, contextOf([chain], pile))!
+    const up = applyUnitEdit(sel, "each", pile, deltaEdit({ kind: "translate", offset: { x: 0, y: 0, z: 100 } }))
+    assert.deepStrictEqual(links.map((key) => up.get(key)!.translation.z), [100, 200, 300, 400, 500])
+    assert.deepStrictEqual(links.map((key) => up.get(key)!.translation.x), [0, 0, 0, 0, 0])
+  })
+
+  it("resizes a chain scaled in Each and keeps its joints meeting, and tapers it with growth", () => {
+    const whole = (growth?: ChainGrowth) =>
+      selectionUnitsOf(
+        links,
+        null,
+        contextOf(
+          [group("chain", links.map(item), { chain: true, ...(growth !== undefined && { growth }) })],
+          transforms
+        )
+      )!
+    const double = deltaEdit({ kind: "scale", factor: 2, axis: "x" })
+    const even = applyUnitEdit(whole(), "each", transforms, double)
+    assert.deepStrictEqual(links.map((key) => even.get(key)!.scale3D.x), [2, 2, 2, 2, 2])
+    assert.deepStrictEqual(xs(even), [0, 2000, 4000, 6000, 8000])
+    assert.strictEqual(even.get("l3")!.scale3D.y, 1, "along the axis dragged only")
+    // linear 100%: the links take 2, 4, 8, 16, 32, and each step grows with the link it leaves
+    const tapered = applyUnitEdit(whole({ curve: "linear", percent: 100 }), "each", transforms, double)
+    assert.deepStrictEqual(links.map((key) => tapered.get(key)!.scale3D.x), [2, 4, 8, 16, 32])
+    assert.deepStrictEqual(xs(tapered), [0, 2000, 6000, 14000, 30000])
+    // across a bent chain, each step grows along its own link
+    const arc = new Map([...transforms, ...applyUnitEdit(whole(), "each", transforms, deltaEdit(turn(90)))])
+    const bent = applyUnitEdit(selectionUnitsOf(links, null, contextOf([chain], arc))!, "each", arc, double)
+    for (const [from, to] of [["l1", "l2"], ["l2", "l3"]] as const) {
+      const step = vecSub(bent.get(to)!.translation, bent.get(from)!.translation)
+      assert.closeTo(vecLength(step), 2000, 1e-6, `${from} to ${to}`)
+    }
+  })
+
+  it("carries the links after a link moved or turned in Together, and pushes them after a scale", () => {
     const sel = selectionUnitsOf(["l3"], "chain", contextOf([chain], transforms))!
     const move: GroupDelta = { kind: "translate", offset: { x: 0, y: 5, z: 0 } }
     const moved = applyUnitEdit(sel, "together", transforms, deltaEdit(move))
     assert.deepStrictEqual([...moved.keys()], ["l3", "l4", "l5"])
     const scaled = applyUnitEdit(sel, "together", transforms, deltaEdit({ kind: "scale", factor: 2 }))
-    assert.deepStrictEqual([...scaled.keys()], ["l3"])
+    assert.strictEqual(scaled.get("l3")!.scale3D.x, 2)
+    assert.deepStrictEqual(xs(scaled), [undefined, undefined, 2000, 4000, 5000], "the next joint meets")
+    assert.strictEqual(scaled.get("l4")!.scale3D.x, 1, "and the links after keep their size")
   })
 
   it("moves each unit whole by its own offset, a selected link's being its own and passing to the links after it", () => {
@@ -401,6 +488,78 @@ describe("chains", () => {
   })
 })
 
+describe("laying a chain", () => {
+  /** Five cubes in a row, 1000 apart, a chain in that order. */
+  const links = ["l1", "l2", "l3", "l4", "l5"]
+  const row = new Map(links.map((key, i) => [key, at(i * 1000)]))
+  const Y: Vec3 = { x: 0, y: 1, z: 0 }
+  const helix = (degrees: number, rise: number): ChainShape => ({ kind: "helix", axis: Y, turn: degrees, rise })
+  const laid = (transforms: ReadonlyMap<string, UeTransform>, shape: ChainShape, growth?: ChainGrowth) => {
+    const chain = group("chain", links.map(item), { chain: true, ...(growth !== undefined && { growth }) })
+    const unit = unitOf(chain, contextOf([chain], transforms))!
+    const out = layChain(unit.links!, shape, transforms, growth)
+    return links.map((key) => out.get(key)!)
+  }
+  /** Each joint as the world sees it: how the next link turns from this one, and the step between their pivots. */
+  const joints = (out: ReadonlyArray<UeTransform>) =>
+    out.slice(1).map((next, i) => ({
+      spin: quatMul(next.rotation, quatConjugate(out[i]!.rotation)),
+      step: vecSub(next.translation, out[i]!.translation)
+    }))
+  const assertTurn = (q: Quat4, expected: Quat4, message: string) =>
+    assert.closeTo(Math.abs(quatDot(q, expected)), 1, 1e-9, message)
+
+  it("turns every joint about the world axis and climbs the rise, keeping the first link's pivot and the steps", () => {
+    const out = laid(row, helix(72, 100))
+    assertVec(out[0]!.translation, ORIGIN, "the first link stays")
+    joints(out).forEach(({ spin, step }, i) => {
+      assertTurn(spin, quatFromAxisAngle(Y, 72 * Math.PI / 180), `joint ${i} turns about Y`)
+      assert.closeTo(vecDot(step, Y), 100, 1e-6, `joint ${i} climbs`)
+      assert.closeTo(vecLength(step), 1000, 1e-6, `joint ${i} keeps its length`)
+    })
+  })
+
+  it("lays a bent chain into the same helix, and a flat ring with no rise", () => {
+    const bent = new Map([
+      ...row,
+      ...applyUnitEdit(
+        selectionUnitsOf(links, null, contextOf([group("chain", links.map(item), { chain: true })], row))!,
+        "each",
+        row,
+        deltaEdit({ kind: "rotate", rotation: rotatorToQuat({ roll: 20, pitch: 10, yaw: 30 }) })
+      )
+    ])
+    // straightened from the first link the way it points now, so the same helix as from the row
+    const out = laid(bent, helix(40, 250))
+    assertVec(out[0]!.translation, ORIGIN, "the first link stays")
+    joints(out).forEach(({ spin, step }, i) => {
+      assertTurn(spin, quatFromAxisAngle(Y, 40 * Math.PI / 180), `joint ${i} turns about Y`)
+      assert.closeTo(vecDot(step, Y), 250, 1e-6, `joint ${i} climbs`)
+      assert.closeTo(vecLength(step), 1000, 1e-6, `joint ${i} keeps its length`)
+    })
+    for (const { step } of joints(laid(bent, helix(40, 0)))) assert.closeTo(vecDot(step, Y), 0, 1e-6)
+  })
+
+  it("grows each joint's turn by the chain's growth, and stays at the most a step can climb", () => {
+    const grown = joints(laid(row, helix(10, 0), { curve: "linear", percent: 100 }))
+    grown.forEach(({ spin }, i) => assertTurn(spin, quatFromAxisAngle(Y, 10 * (i + 1) * Math.PI / 180), `joint ${i}`))
+    // a rise past the step's length stands the chain on the axis
+    for (const { step } of joints(laid(row, helix(0, 5000)))) {
+      assertVec(step, { x: 0, y: 1000, z: 0 }, "straight up the axis")
+    }
+  })
+
+  it("straightens a bent chain along the way its first link points", () => {
+    const sel = selectionUnitsOf(links, null, contextOf([group("chain", links.map(item), { chain: true })], row))!
+    const bent = new Map([...row, ...applyUnitEdit(sel, "each", row, deltaEdit(turn(25)))])
+    const out = laid(bent, { kind: "straight" })
+    links.forEach((key, i) => {
+      assertVec(out[i]!.translation, swung({ x: i * 1000, y: 0, z: 0 }, ORIGIN, 25), key)
+      assert.closeTo(yawOf(out[i]!), 25, 1e-6, key)
+    })
+  })
+})
+
 describe("a chain's order along its pieces", () => {
   const xs = (...x: ReadonlyArray<number>): ReadonlyArray<Vec3> => x.map((v) => ({ x: v, y: 0, z: 0 }))
 
@@ -468,6 +627,16 @@ describe("a snapped drag under the setting", () => {
 
   it("isn't led by the links a selected one carries", () => {
     assert.deepStrictEqual(leadingKeys(selectionUnitsOf(["l2"], "chain", chainContext)!, "together"), ["l2"])
+  })
+
+  it("is led in Each by a chain's first link, the one link that takes the edit as dragged", () => {
+    const whole = selectionUnitsOf(["x", ...links], null, chainContext)!
+    assert.deepStrictEqual(leadingKeys(whole, "each"), ["l1"], "the active unit is the chain")
+    assert.deepStrictEqual(movedAlikeKeys(whole, "each"), ["l1", "x"], "a loose piece moves as dragged too")
+    assert.deepStrictEqual(movedAlikeKeys(whole, "together"), [...links, "x"])
+    const entered = selectionUnitsOf(["l3", "l2"], "chain", chainContext)!
+    assert.deepStrictEqual(leadingKeys(entered, "each"), ["l2"], "the first selected inside the chain")
+    assert.deepStrictEqual(movedAlikeKeys(entered, "each"), ["l2"])
   })
 
   it("knows when a turn goes past the angle dragged: only as it runs down a chain in Each", () => {

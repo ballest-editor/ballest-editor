@@ -1,6 +1,7 @@
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { type ReactNode, useMemo, useState } from "react"
@@ -144,9 +145,10 @@ function ChainGrowthField({ group }: { readonly group: GroupNode }) {
       <div className="flex items-center justify-between gap-2">
         <span className="text-body text-fg-secondary">Growth</span>
         <InfoHint>
-          How much more each link turns than the one before when the chain bends. Linear adds a share of the first
-          link's turn at every link, so the curve tightens steadily; Compound multiplies it, so the curve winds into a
-          spiral. A negative growth opens the curve out instead.
+          How much more each link takes than the one before when the chain bends, spaces or scales. Linear adds a share
+          of the first link's turn at every link, so the curve tightens steadily; Compound multiplies it, so the curve
+          winds into a spiral. A negative growth opens the curve out instead. A scale grows as a power, so Linear 100%
+          tapers the chain.
         </InfoHint>
       </div>
       <ToggleGroup
@@ -189,6 +191,100 @@ function ChainGrowthField({ group }: { readonly group: GroupNode }) {
   )
 }
 
+const HELIX_AXES = { X: { x: 1, y: 0, z: 0 }, Y: { x: 0, y: 1, z: 0 }, Z: { x: 0, y: 0, z: 1 } } as const
+type HelixAxis = keyof typeof HELIX_AXES
+const HELIX_AXIS_NAMES: ReadonlyArray<HelixAxis> = ["X", "Y", "Z"]
+/** The shapes a chain can be laid along, as the picker names them. */
+const LAY_SHAPES = { helix: "Helix", straight: "Straight" } as const
+type LayShape = keyof typeof LAY_SHAPES
+const isLayShape = (value: unknown): value is LayShape => value === "helix" || value === "straight"
+
+/** A helix's fields: the world axis it winds about, and each link's turn about it and climb along it. */
+function HelixFields({ axis, turn, rise, onAxis, onTurn, onRise }: {
+  readonly axis: HelixAxis
+  readonly turn: number
+  readonly rise: number
+  readonly onAxis: (axis: HelixAxis) => void
+  readonly onTurn: (turn: number) => void
+  readonly onRise: (rise: number) => void
+}) {
+  return (
+    <>
+      <ToggleGroup
+        aria-label="Helix axis"
+        value={[axis]}
+        onValueChange={(value) => {
+          const next = HELIX_AXIS_NAMES.find((a) => value.includes(a))
+          if (next !== undefined) onAxis(next)
+        }}
+        className="grid w-full grid-cols-3"
+      >
+        {HELIX_AXIS_NAMES.map((a) => <ToggleGroupItem key={a} value={a} className="min-w-0 px-1">{a}</ToggleGroupItem>)}
+      </ToggleGroup>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-body text-fg-tertiary">Turn per link</span>
+          <NumberField label="Turn per link" value={turn} digits={1} handle={false} unit="°" onCommit={onTurn} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-body text-fg-tertiary">Rise per link</span>
+          <NumberField label="Rise per link" value={rise} digits={1} handle={false} unit="cm" onCommit={onRise} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+/**
+ * Lays a chain along a shape from its first link (`layChain`), applied when the button is pressed, so the chain stays
+ * free to bend after. A shape's fields show under the picker.
+ */
+function ChainLayField({ group }: { readonly group: GroupNode }) {
+  const layChain = useEditor((s) => s.layChain)
+  const [shape, setShape] = useState<LayShape>("helix")
+  const [axis, setAxis] = useState<HelixAxis>("Z")
+  const [turn, setTurn] = useState(30)
+  const [rise, setRise] = useState(100)
+  const apply = () =>
+    layChain(
+      group.id,
+      shape === "straight" ? { kind: "straight" } : { kind: "helix", axis: HELIX_AXES[axis], turn, rise }
+    )
+  return (
+    <div className="flex @container flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-body text-fg-secondary">Lay along</span>
+        <InfoHint>
+          Lays the chain out from its first link along a shape, as one step; the chain stays free to bend after. A bent
+          chain is straightened first. Straight lines it up the way its first link points. Helix winds it about a world
+          axis: every link turns about the axis from the one before and climbs along it, with no rise a flat ring, and
+          growth tightens the turn link by link.
+        </InfoHint>
+      </div>
+      <Select value={shape} items={LAY_SHAPES} onValueChange={(next) => isLayShape(next) && setShape(next)}>
+        <SelectTrigger className="w-full" aria-label="Chain shape">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(LAY_SHAPES).map(([value, label]) => <SelectItem key={value} value={value}>{label}
+          </SelectItem>)}
+        </SelectContent>
+      </Select>
+      {shape === "helix" && (
+        <HelixFields
+          axis={axis}
+          turn={turn}
+          rise={rise}
+          onAxis={setAxis}
+          onTurn={setTurn}
+          onRise={setRise}
+        />
+      )}
+      <Button variant="outline" size="sm" disabled={group.children.length < 2} onClick={apply}>Lay chain</Button>
+    </div>
+  )
+}
+
 /**
  * A chain (docs/design/pivot-modes-and-chains.md § Chains): its links in outline order, each hanging off the one before,
  * so a turn in Each bends it. Here: how many links, how a bend grows down them, and the chain actions the Outline's menu
@@ -197,6 +293,7 @@ function ChainGrowthField({ group }: { readonly group: GroupNode }) {
 export function ChainSection({ group }: { readonly group: GroupNode }) {
   const setChain = useEditor((s) => s.setChain)
   const reverseChain = useEditor((s) => s.reverseChain)
+  const chainLay = useEditor((s) => s.settings.beta.chainLay)
   const links = group.children.length
   if (group.prefab !== undefined) return null
   if (group.chain !== true) {
@@ -221,13 +318,15 @@ export function ChainSection({ group }: { readonly group: GroupNode }) {
       <div className="flex items-center justify-between gap-2">
         <SectionTitle>Chain</SectionTitle>
         <InfoHint>
-          The links hang off one another in outline order: a turn in Each bends the chain, each link turning on its own
-          axes and carrying the links after it; a move carries the links after the moved one, and a scale stays with its
+          The links hang off one another in outline order, each from its pivot. In Each, every link takes the edit from
+          the one before, so it adds up down the chain: a turn bends it, a move spaces it out or stacks a pile, and a
+          scale resizes every link and keeps the joints meeting. Together moves it whole. Growth grows all three link by
           link.
         </InfoHint>
       </div>
       <p className="text-body text-fg-tertiary">{counted(links, "link")} in outline order.</p>
       <ChainGrowthField group={group} />
+      {chainLay && <ChainLayField group={group} />}
       <div className="flex flex-wrap gap-1">
         <Button variant="outline" size="sm" disabled={links < 2} onClick={() => reverseChain(group.id)}>
           Reverse
