@@ -28,6 +28,7 @@ import { mirrorScaleOf } from "../domain/mirror"
 import { isShown } from "../domain/visibility"
 import { LaserBeam } from "./LaserBeam"
 import { applySlotMaterials } from "./materials"
+import { batchMeshesOf } from "./meshBatches"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
 import { glbUrl, type Visual, VISUAL_KEY, visualsOf } from "./visuals"
@@ -74,6 +75,13 @@ function LoadingHint({ bounds }: { readonly bounds: Bounds | undefined }) {
   )
 }
 
+/** The stand-ins' one box and two materials, shared so that a map of unknown meshes draws them in a batch. */
+const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1)
+const STAND_IN = {
+  warn: new THREE.MeshStandardMaterial({ color: "#c9803a", roughness: 0.8 }),
+  plain: new THREE.MeshStandardMaterial({ color: "#8b93a1", roughness: 0.8 })
+}
+
 /** Solid stand-in for a mesh that failed to load or that the catalog doesn't know. */
 function BoundsBox(
   { bounds, warn, visualKey }: {
@@ -84,11 +92,17 @@ function BoundsBox(
 ) {
   const b = bounds ?? DEFAULT_BOUNDS
   const { size, center } = ueBoundsToScene(b.min, b.max)
+  const mesh = useRef<THREE.Mesh>(null)
+  useLayoutEffect(() => (mesh.current === null ? undefined : batchMeshesOf(mesh.current)), [])
   return (
-    <mesh position={center} userData={visualKey === undefined ? {} : { [VISUAL_KEY]: visualKey }}>
-      <boxGeometry args={boxSize(size)} />
-      <meshStandardMaterial color={warn ? "#c9803a" : "#8b93a1"} roughness={0.8} />
-    </mesh>
+    <mesh
+      ref={mesh}
+      geometry={UNIT_BOX}
+      material={warn ? STAND_IN.warn : STAND_IN.plain}
+      position={center}
+      scale={boxSize(size)}
+      userData={visualKey === undefined ? {} : { [VISUAL_KEY]: visualKey }}
+    />
   )
 }
 
@@ -117,6 +131,7 @@ function GlbMesh(
     return root
   }, [gltf])
   useLayoutEffect(() => applySlotMaterials(object, table, slotMaterials), [object, table, slotMaterials])
+  useLayoutEffect(() => batchMeshesOf(object), [object])
   useLayoutEffect(() => {
     object.userData[VISUAL_KEY] = visualKey
   }, [object, visualKey])
@@ -214,7 +229,8 @@ export const ItemObject = memo(function ItemObjectView(props: {
   )
 })
 
-function ItemVisuals({ visuals }: { readonly visuals: ReadonlyArray<Visual> }) {
+/** Memoised: a drag re-renders the item for its place, and what it is made of stays as it was. */
+const ItemVisuals = memo(function ItemVisuals({ visuals }: { readonly visuals: ReadonlyArray<Visual> }) {
   return (
     <>
       {visuals.length === 0 && <BoundsBox bounds={undefined} warn />}
@@ -234,4 +250,4 @@ function ItemVisuals({ visuals }: { readonly visuals: ReadonlyArray<Visual> }) {
       )}
     </>
   )
-}
+})

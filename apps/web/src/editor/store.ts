@@ -105,6 +105,7 @@ import {
   freshKey,
   freshKeys,
   groupNames,
+  indexOfKey,
   itemNames,
   type NumberedName,
   sameStrings,
@@ -1528,7 +1529,10 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     paintSlots: (edits) => {
       const { doc } = get()
-      const next = setSlotMaterials(doc.map, edits.map(({ id, ...edit }) => ({ ...edit, index: doc.ids.indexOf(id) })))
+      const next = setSlotMaterials(
+        doc.map,
+        edits.map(({ id, ...edit }) => ({ ...edit, index: indexOfKey(doc.ids, id) }))
+      )
       if (Option.isNone(next)) {
         get().notify("error", "Those items no longer have that material slot.")
         return false
@@ -1539,7 +1543,7 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     paintSurface: (ids, value) => {
       const { doc, notify } = get()
-      const indices = ids.map((id) => doc.ids.indexOf(id))
+      const indices = ids.map((id) => indexOfKey(doc.ids, id))
       const property = { list: "intProperties", name: SURFACE_PROPERTY, type: "Integer" } as const
       const next = indices.includes(-1) ? Option.none() : setProperties(doc.map, indices, [{ property, value }])
       if (Option.isNone(next)) {
@@ -1602,7 +1606,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setItemPivots: (pivots) => {
       const { doc } = get()
       const entries = [...pivots].flatMap(([id, pivot]) => {
-        const index = doc.ids.indexOf(id)
+        const index = indexOfKey(doc.ids, id)
         return index < 0 || samePivot(pivotAt(doc.map, index), pivot) ? [] : [[index, pivot] as const]
       })
       if (entries.length > 0) commit({ ...doc, map: setPivots(doc.map, entries) })
@@ -1639,7 +1643,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         }))
         const map = setTransforms(
           next.doc.map,
-          [...transforms].map(([id, t]) => [next.doc.ids.indexOf(id), t] as const)
+          [...transforms].map(([id, t]) => [indexOfKey(next.doc.ids, id), t] as const)
         )
         if (Option.isNone(map)) {
           s.notify("error", INVALID_TRANSFORM)
@@ -1694,7 +1698,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       const { doc } = get()
       const next = transforms === null
         ? Option.none()
-        : setTransforms(doc.map, [...transforms].map(([id, t]) => [doc.ids.indexOf(id), t] as const))
+        : setTransforms(doc.map, [...transforms].map(([id, t]) => [indexOfKey(doc.ids, id), t] as const))
       if (Option.isNone(next)) {
         set({ doc: before.doc, selectedIds: before.selectedIds })
         if (transforms !== null) get().notify("error", INVALID_TRANSFORM)
@@ -1732,9 +1736,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setTags: (target, tags) => commitStructure(withTags(get().doc.structure, target, tags)),
     setConnectAt: (key, end, spot) => {
       const s = get()
-      const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
-      const connector = item === undefined ? undefined : s.catalogIndex?.pieceByClass.get(item.actorToSpawn)
-        ?.connectors?.[end]
+      const connector = connectorAt(s, key, end)
       if (connector === undefined) return
       const structure = withConnectAt(s.doc.structure, key, end, spot === defaultSpotOf(connector) ? undefined : spot)
       if (structure === undefined) return
@@ -2303,20 +2305,6 @@ export const nextSelection = (current: Selection, ids: ReadonlyArray<string>, mo
 export const areaCandidates = (s: Pick<EditorState, "doc" | "enteredGroupId" | "isolation">): ReadonlyArray<string> =>
   selectableKeys(s.doc.structure.tree, s.enteredGroupId).filter(pickableOf(s))
 
-/** Each key's place in `ids`, kept per array: a group's selection can be thousands of items. */
-const keyIndices = new WeakMap<ReadonlyArray<string>, ReadonlyMap<string, number>>()
-
-const keyIndicesOf = (ids: ReadonlyArray<string>): ReadonlyMap<string, number> => {
-  const known = keyIndices.get(ids)
-  if (known !== undefined) return known
-  const indices = new Map(ids.map((id, i) => [id, i] as const))
-  keyIndices.set(ids, indices)
-  return indices
-}
-
-/** An item's place in `ids`; -1 for a key that isn't there. */
-export const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
-
 /** The box around the items at `keys` where they show, which is ahead of the document during a continuous edit. */
 export const groupBoxOf = (
   { catalogIndex, doc, preview }: Pick<EditorState, "catalogIndex" | "doc" | "preview">,
@@ -2331,7 +2319,7 @@ export const groupBoxOf = (
   )
 
 /** Document indices of the selected items, in selection order. */
-export const selectedIndices = (s: EditorState): Array<number> =>
+export const selectedIndices = (s: Pick<EditorState, "doc" | "selectedIds">): Array<number> =>
   s.selectedIds.map((id) => indexOfKey(s.doc.ids, id)).filter((i) => i >= 0)
 
 /** The names of the map's items and groups, by key and id, with their ordinals apart so they can be styled. */
@@ -2350,6 +2338,12 @@ export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? 
 
 /** An item's pivot (Default when it has none, or isn't in the document). */
 export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, indexOfKey(s.doc.ids, id))
+
+/** The connector at `end` of the item at `key`, where its piece has one. */
+export const connectorAt = (s: Pick<EditorState, "doc" | "catalogIndex">, key: string, end: number) => {
+  const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
+  return item === undefined ? undefined : s.catalogIndex?.pieceByClass.get(item.actorToSpawn)?.connectors?.[end]
+}
 
 /** An item's edit transform (see domain/editTransform.ts) in the document. */
 export const docTransformOf = (s: EditorState, id: string): UeTransform | undefined => {
@@ -2473,14 +2467,28 @@ export const shownPivotMode = (s: EditorState): PivotMode => {
 }
 
 /** The pivot dots to draw for the selection as shown (`pivotDotsOf`). */
-export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => {
-  if (areaDragging()) return []
+/**
+ * `derive` of the store's state, worked out again only for a new state: every change makes one, so the panes, which
+ * read these each frame, read them free in a frame that changed nothing.
+ */
+const perState = <T>(derive: (s: EditorState) => T): (s: EditorState) => T => {
+  let last: { readonly s: EditorState; readonly value: T } | undefined
+  return (s) => {
+    if (last?.s !== s) last = { s, value: derive(s) }
+    return last.value
+  }
+}
+
+/** None while a box or lasso is dragged, which keeps the editor's state as it was: the selection may change. */
+export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => areaDragging() ? [] : pivotDotsFor(s)
+
+const pivotDotsFor = perState((s): ReadonlyArray<PivotDotSpec> => {
   const transformOf = (id: string) => shownTransform(s, id)
   const selection = selectionUnits(s, transformOf)
   return selection === undefined
     ? []
     : pivotDotsOf(selection, pivotModeFor(s, selection), unitContext(s, transformOf).boxOf)
-}
+})
 
 /** Where a selected chain starts, and whether the gizmo sits on that point too. */
 export interface ChainStartSpec {
@@ -2493,8 +2501,10 @@ export interface ChainStartSpec {
  * swaps for the other end. For one whole chain, or links selected inside an entered one; undefined otherwise. `gizmo`
  * says a transform tool's gizmo is on it, as it is for a whole chain, so its mark goes under the gizmo.
  */
-export const shownChainStart = (s: EditorState): ChainStartSpec | undefined => {
-  if (areaDragging()) return undefined
+export const shownChainStart = (s: EditorState): ChainStartSpec | undefined =>
+  areaDragging() ? undefined : chainStartFor(s)
+
+const chainStartFor = perState((s): ChainStartSpec | undefined => {
   const selection = selectionUnits(s, (id) => shownTransform(s, id))
   if (selection === undefined || !isChainSelection(selection)) return undefined
   const at = (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot
@@ -2502,7 +2512,7 @@ export const shownChainStart = (s: EditorState): ChainStartSpec | undefined => {
   const pivot = pivotUnitOf(selection, pivotModeFor(s, selection)).pivot
   const transforming = s.tool === "translate" || s.tool === "rotate" || s.tool === "scale"
   return { at, gizmo: transforming && Math.hypot(pivot.x - at.x, pivot.y - at.y, pivot.z - at.z) < 1 }
-}
+})
 
 /**
  * Where a selection pivots, given how to read an item's transform: the active unit's pivot point and axes. For an item

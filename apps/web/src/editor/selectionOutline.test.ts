@@ -166,6 +166,41 @@ describe("selection outline", () => {
     expect(segments(line)).toEqual(segments(expected))
   })
 
+  it("lands on the mesh through the scene's own update, which forces nothing, however it comes and goes", () => {
+    // The viewport works out world matrices once a frame, where they changed (PaneRenderer), and items keep theirs fixed
+    // (FixedGroup in ItemObject.tsx), so nothing above an outline forces it. A mesh at its item's origin places a line
+    // where a new line already stands.
+    const scene = new THREE.Scene()
+    scene.matrixAutoUpdate = false // as PaneRenderer keeps it
+    const fixedItem = (x: number) => {
+      const item = new THREE.Group()
+      item.position.set(x, 20, -30)
+      item.updateMatrix()
+      item.matrixAutoUpdate = false
+      const mesh = new THREE.Mesh(wedge())
+      mesh.matrixAutoUpdate = false
+      item.add(mesh)
+      scene.add(item)
+      return { item, mesh }
+    }
+    const { item, mesh } = fixedItem(100)
+    const other = fixedItem(-500).item
+    scene.updateMatrixWorld(true)
+    const expected = new THREE.Mesh(outlineOf(mesh.geometry))
+    expected.matrixWorld.copy(mesh.matrixWorld)
+    const outline = new SelectionOutline()
+    const shownOn = (under: THREE.Object3D) => {
+      under.add(outline)
+      outline.update(under)
+      scene.updateMatrixWorld()
+      return segments(firstLine(outline))
+    }
+    expect(shownOn(item)).toEqual(segments(expected))
+    // moved to another item and back, as the paint tool's hover goes from item to item
+    shownOn(other)
+    expect(shownOn(item)).toEqual(segments(expected))
+  })
+
   it("follows meshes as they load and leave, and is never raycast", () => {
     const { item, mesh } = makeItem(wedge())
     const outline = new SelectionOutline()

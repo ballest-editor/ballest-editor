@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Option } from "effect"
-import { type ReactNode, useId, useState } from "react"
+import { memo, type ReactNode, useId, useState } from "react"
 import { hexToLinear, linearToHex, type Rgb } from "../domain/color"
 import {
   clampToRange,
@@ -285,16 +285,18 @@ function PropertyRowView({ row }: { readonly row: PropertyRow }) {
  * The selection's item properties (the typed lists in the map file): the ones every
  * selected item has, each set on all of them at once.
  */
-export function ItemProperties({ properties }: { readonly properties: ReadonlyArray<ItemProperty> }) {
-  if (properties.length === 0) return null
-  return (
-    <Section id="properties" title="Properties">
-      <div className="flex @container flex-col gap-2">
-        {propertyRows(properties).map((row) => {
-          const first = row._tag === "Color" ? row.color.channels[0] : row.property
-          return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />
-        })}
-      </div>
-    </Section>
-  )
-}
+export const ItemProperties = memo(
+  function ItemProperties({ properties }: { readonly properties: ReadonlyArray<ItemProperty> }) {
+    if (properties.length === 0) return null
+    return (
+      <Section id="properties" title="Properties">
+        <div className="flex @container flex-col gap-2">
+          {propertyRows(properties).map((row) => {
+            const first = row._tag === "Color" ? row.color.channels[0] : row.property
+            return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />
+          })}
+        </div>
+      </Section>
+    )
+  }
+)

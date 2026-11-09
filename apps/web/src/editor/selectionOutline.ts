@@ -50,13 +50,6 @@ const ORTHO_DEPTH_PULL = 4
 const crease = Math.cos(THREE.MathUtils.degToRad(CREASE_DEG))
 const coplanar = Math.cos(THREE.MathUtils.degToRad(COPLANAR_DEG))
 
-interface Edge {
-  readonly from: THREE.Vector3
-  readonly to: THREE.Vector3
-  /** Normals of the faces sharing the edge: one on an open border, three or more where non-manifold. */
-  readonly faces: Array<THREE.Vector3>
-}
-
 const outlineCache = new WeakMap<THREE.BufferGeometry, LineSegmentsGeometry>()
 
 /**
@@ -71,54 +64,101 @@ export const outlineOf = (geometry: THREE.BufferGeometry): LineSegmentsGeometry 
   const position = geometry.getAttribute("position")
   const index = geometry.getIndex()
   const count = index === null ? position.count : index.count
-  const key = (v: THREE.Vector3) => `${Math.round(v.x / WELD)},${Math.round(v.y / WELD)},${Math.round(v.z / WELD)}`
+  const vertexAt = (j: number) => index === null ? j : index.getX(j)
 
-  const corner = (j: number) => new THREE.Vector3().fromBufferAttribute(position, index === null ? j : index.getX(j))
-
-  const edges = new Map<string, Edge>()
-  const addEdge = (from: THREE.Vector3, to: THREE.Vector3, normal: THREE.Vector3) => {
-    const [kf, kt] = [key(from), key(to)]
-    if (kf === kt) return
-    const id = kf < kt ? `${kf}|${kt}` : `${kt}|${kf}`
-    const edge = edges.get(id)
-    if (edge === undefined) edges.set(id, { from, to, faces: [normal] })
-    else edge.faces.push(normal)
+  // Each vertex's corner, welded once per vertex rather than once per edge end.
+  const cornerIds = new Map<string, number>()
+  const corners = new Int32Array(position.count)
+  for (let v = 0; v < position.count; v++) {
+    const key = `${Math.round(position.getX(v) / WELD)},${Math.round(position.getY(v) / WELD)},${
+      Math.round(position.getZ(v) / WELD)
+    }`
+    let id = cornerIds.get(key)
+    if (id === undefined) {
+      id = cornerIds.size
+      cornerIds.set(key, id)
+    }
+    corners[v] = id
   }
-  const ab = new THREE.Vector3()
-  const ac = new THREE.Vector3()
+  const span = cornerIds.size
+
+  // The edges in the order first seen: the vertex each runs from and to, its first two faces and how many share it.
+  const normals = new Float64Array(count)
+  const slots = new Map<number, number>()
+  const from = new Int32Array(count)
+  const to = new Int32Array(count)
+  const firstFace = new Int32Array(count)
+  const secondFace = new Int32Array(count)
+  const faceCount = new Int32Array(count)
+  const addEdge = (start: number, end: number, face: number) => {
+    const [cs, ce] = [corners[start] ?? 0, corners[end] ?? 0]
+    if (cs === ce) return
+    const id = cs < ce ? cs * span + ce : ce * span + cs
+    const slot = slots.get(id)
+    if (slot === undefined) {
+      const next = slots.size
+      slots.set(id, next)
+      from[next] = start
+      to[next] = end
+      firstFace[next] = face
+      faceCount[next] = 1
+      return
+    }
+    if (faceCount[slot] === 1) secondFace[slot] = face
+    faceCount[slot] = (faceCount[slot] ?? 0) + 1
+  }
+  const a = new THREE.Vector3()
+  const b = new THREE.Vector3()
+  const c = new THREE.Vector3()
   for (let i = 0; i + 2 < count; i += 3) {
-    const [a, b, c] = [corner(i), corner(i + 1), corner(i + 2)]
-    const normal = ab.subVectors(b, a).cross(ac.subVectors(c, a)).clone()
+    const [va, vb, vc] = [vertexAt(i), vertexAt(i + 1), vertexAt(i + 2)]
+    a.fromBufferAttribute(position, va)
+    b.fromBufferAttribute(position, vb)
+    c.fromBufferAttribute(position, vc)
+    const normal = b.sub(a).cross(c.sub(a))
     if (normal.lengthSq() === 0) continue // degenerate triangle
     normal.normalize()
-    addEdge(a, b, normal)
-    addEdge(b, c, normal)
-    addEdge(c, a, normal)
+    normals[i] = normal.x
+    normals[i + 1] = normal.y
+    normals[i + 2] = normal.z
+    addEdge(va, vb, i)
+    addEdge(vb, vc, i)
+    addEdge(vc, va, i)
   }
 
-  const ends: Array<number> = []
-  const normalsA: Array<number> = []
-  const normalsB: Array<number> = []
-  const always: Array<number> = []
-  for (const { faces: [first, second, ...more], from, to } of edges.values()) {
-    if (first === undefined) continue
+  // A face is the offset of its normal in `normals`.
+  const dot = (f: number, g: number) =>
+    (normals[f] ?? 0) * (normals[g] ?? 0) + (normals[f + 1] ?? 0) * (normals[g + 1] ?? 0) +
+    (normals[f + 2] ?? 0) * (normals[g + 2] ?? 0)
+  const edgeCount = slots.size
+  const ends = new Float32Array(edgeCount * 6)
+  const normalsA = new Float32Array(edgeCount * 3)
+  const normalsB = new Float32Array(edgeCount * 3)
+  const always = new Float32Array(edgeCount)
+  let kept = 0
+  for (let slot = 0; slot < edgeCount; slot++) {
+    const first = firstFace[slot] ?? 0
+    // an open edge has the one face twice; creases, open and non-manifold edges always draw
+    const second = (faceCount[slot] ?? 0) > 1 ? secondFace[slot] ?? 0 : first
     let smooth = false
-    if (second !== undefined && more.length === 0) {
-      const cos = first.dot(second)
+    if (faceCount[slot] === 2) {
+      const cos = dot(first, second)
       if (cos > coplanar) continue
       smooth = cos > crease
     }
-    ends.push(...from.toArray(), ...to.toArray())
-    normalsA.push(...first.toArray())
-    normalsB.push(...(second ?? first).toArray())
-    always.push(smooth ? 0 : 1)
+    a.fromBufferAttribute(position, from[slot] ?? 0).toArray(ends, kept * 6)
+    a.fromBufferAttribute(position, to[slot] ?? 0).toArray(ends, kept * 6 + 3)
+    normalsA.set(normals.subarray(first, first + 3), kept * 3)
+    normalsB.set(normals.subarray(second, second + 3), kept * 3)
+    always[kept] = smooth ? 0 : 1
+    kept++
   }
   const outline = new LineSegmentsGeometry()
-  if (ends.length > 0) outline.setPositions(ends)
-  outline.setAttribute("faceNormalA", new THREE.InstancedBufferAttribute(new Float32Array(normalsA), 3))
-  outline.setAttribute("faceNormalB", new THREE.InstancedBufferAttribute(new Float32Array(normalsB), 3))
-  outline.setAttribute("edgeAlways", new THREE.InstancedBufferAttribute(new Float32Array(always), 1))
-  outline.instanceCount = always.length
+  if (kept > 0) outline.setPositions(ends.slice(0, kept * 6))
+  outline.setAttribute("faceNormalA", new THREE.InstancedBufferAttribute(normalsA.slice(0, kept * 3), 3))
+  outline.setAttribute("faceNormalB", new THREE.InstancedBufferAttribute(normalsB.slice(0, kept * 3), 3))
+  outline.setAttribute("edgeAlways", new THREE.InstancedBufferAttribute(always.slice(0, kept), 1))
+  outline.instanceCount = kept
   outlineCache.set(geometry, outline)
   geometry.addEventListener("dispose", () => {
     outlineCache.delete(geometry)
@@ -265,7 +305,27 @@ const outlineParts = new WeakSet<THREE.Object3D>()
 /** Whether `object` is an outline's line or fill: drawn under an item, but no part of it. Its lines are meshes too. */
 export const isOutlinePart = (object: THREE.Object3D): boolean => outlineParts.has(object)
 
-const inverse = new THREE.Matrix4()
+/**
+ * `mesh`'s place in `item`'s frame, into `out`: the local matrices from the mesh up to the item. Up to date without
+ * working out the item's world matrices, which a gizmo drag changes ahead of the frame's update.
+ */
+const placeIn = (item: THREE.Object3D, mesh: THREE.Object3D, out: THREE.Matrix4): void => {
+  out.identity()
+  for (let o: THREE.Object3D | null = mesh; o !== null && o !== item; o = o.parent) {
+    if (o.matrixAutoUpdate) o.updateMatrix()
+    out.premultiply(o.matrix)
+  }
+}
+
+const placed = new THREE.Matrix4()
+
+/** Puts `part` where `mesh` is in `item`, and has its world matrix worked out again only when that moved it. */
+const placeAt = (item: THREE.Object3D, mesh: THREE.Object3D, part: THREE.Object3D): void => {
+  placeIn(item, mesh, placed)
+  if (part.matrix.equals(placed)) return
+  part.matrix.copy(placed)
+  part.matrixWorldNeedsUpdate = true
+}
 
 /** How one item is outlined: the line material, the hidden part's (none: not shown through), and the faces' fill. */
 interface Look {
@@ -279,6 +339,12 @@ export class SelectionOutline extends THREE.Group {
   private readonly lines: Array<LineSegments2> = []
   private readonly hiddenLines: Array<LineSegments2> = []
   private readonly fills: Array<THREE.Mesh> = []
+
+  constructor() {
+    super()
+    // where its item is: its world matrix follows the item's, and its parts' their own when `place` moves them
+    this.matrixAutoUpdate = false
+  }
 
   /**
    * Matches the lines to the meshes under `item` (not the fills of any outline) and places each in `item`'s local
@@ -307,9 +373,14 @@ export class SelectionOutline extends THREE.Group {
     })
   }
 
+  /** The item it was last drawn under: under another, its world matrix has to be worked out again. */
+  private drawnUnder: THREE.Object3D | null = null
+
   private draw(item: THREE.Object3D, shows: (mesh: THREE.Mesh) => boolean, look: Look): void {
-    item.updateMatrixWorld(true)
-    inverse.copy(item.matrixWorld).invert()
+    if (this.drawnUnder !== this.parent) {
+      this.drawnUnder = this.parent
+      this.matrixWorldNeedsUpdate = true
+    }
     const shown: Array<THREE.Mesh> = []
     item.traverse((object) => {
       if (isMesh(object) && !outlineParts.has(object) && shows(object)) shown.push(object)
@@ -323,8 +394,8 @@ export class SelectionOutline extends THREE.Group {
       shown.slice(0, count).forEach((mesh, i) => {
         const part = parts[i] ?? this.kept(parts, make())
         dress(part, mesh)
-        part.matrix.multiplyMatrices(inverse, mesh.matrixWorld)
-        if (part.parent !== this) this.add(part)
+        placeAt(item, mesh, part)
+        if (part.parent !== this) this.attachPart(part)
       })
       for (const extra of parts.slice(count)) extra.removeFromParent()
     }
@@ -341,6 +412,12 @@ export class SelectionOutline extends THREE.Group {
       if (fill !== undefined) face.material = fillFor(fill, mesh)
     })
     this.visible = shown.length > 0
+  }
+
+  /** A line or fill shown again, its world matrix worked out with the next frame's. */
+  private attachPart(part: THREE.Object3D): void {
+    this.add(part)
+    part.matrixWorldNeedsUpdate = true
   }
 
   /** A new line or fill, kept for reuse: placed by the matrix it is given, never raycast, and never outlined. */

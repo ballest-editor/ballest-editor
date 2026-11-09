@@ -2,6 +2,7 @@
 import { endsOf, type WorldEnd } from "../../domain/connectors"
 import type { UeTransform } from "../../domain/coords"
 import { type Box, placedBoxOf } from "../../domain/itemBounds"
+import { indexOfKey } from "../../domain/structure"
 import { sceneRegistry } from "../sceneRegistry"
 import {
   editedKeys,
@@ -43,7 +44,7 @@ export const selectionSnapStart = (
   keys: ReadonlyArray<string>
 ): SelectionSnapStart => {
   const placed = keys.flatMap((key) => {
-    const item = doc.map.items[doc.ids.indexOf(key)]
+    const item = doc.map.items[indexOfKey(doc.ids, key)]
     const transform = transforms.get(key)
     return item === undefined || transform === undefined ? [] : [{ key, item, transform }]
   })

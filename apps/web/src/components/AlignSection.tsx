@@ -15,7 +15,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ReactElement, useEffect, useMemo } from "react"
+import { memo, type ReactElement, useEffect, useMemo } from "react"
 import type { Vec3 } from "../domain/coords"
 import type { KeybindAction } from "../domain/Keybinds"
 import type { ArrangeOp, BoxAxis, BoxSide, Distribution } from "../domain/snapTools"
@@ -227,7 +227,7 @@ function SpacingRow() {
 }
 
 /** The section, with two or more units selected; nothing otherwise. */
-export function AlignSection() {
+export const AlignSection = memo(function AlignSection() {
   const doc = useEditor((s) => s.doc)
   const selectedIds = useEditor((s) => s.selectedIds)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
@@ -295,4 +295,4 @@ export function AlignSection() {
       <SpacingRow />
     </Section>
   )
-}
+})

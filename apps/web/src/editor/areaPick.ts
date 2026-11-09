@@ -9,6 +9,7 @@
  */
 import * as THREE from "three"
 import type { AreaMode, AreaRegion, Point2 } from "../domain/areaSelect"
+import { traverseShown } from "./meshBatches"
 import { isOutlinePart } from "./selectionOutline"
 import { isMesh } from "./threeGuards"
 
@@ -70,9 +71,10 @@ interface Piece {
   readonly meshes: ReadonlyArray<THREE.Mesh>
 }
 
+/** A piece's shown meshes, those its batch draws among them, and not the outlines over it. */
 const meshesOf = (object: THREE.Object3D): ReadonlyArray<THREE.Mesh> => {
   const meshes: Array<THREE.Mesh> = []
-  object.traverseVisible((child) => {
+  traverseShown(object, (child) => {
     if (isMesh(child) && !isOutlinePart(child)) meshes.push(child)
   })
   for (const mesh of meshes) if (mesh.geometry.boundingBox === null) mesh.geometry.computeBoundingBox()

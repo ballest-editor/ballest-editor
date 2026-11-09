@@ -1,7 +1,7 @@
 import { ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ComponentProps, useState } from "react"
+import { type ComponentProps, memo, useState } from "react"
 import type { Item } from "../domain/MapFile"
 import { lookupMaterial } from "../domain/Materials"
 import {
@@ -287,37 +287,39 @@ const paintStatusOf = (
  * lists (see `paintTargets`). Items of the same piece are edited together; an edit is one undo step. A selection that
  * can't be painted is only the header, saying why.
  */
-export function PaintSection({ selected }: { readonly selected: ReadonlyArray<SelectedItem> }) {
-  const loaded = useEditor((s) => s.paint.length > 0)
-  const catalogIndex = useEditor((s) => s.catalogIndex)
-  const { items, surfaceLocked } = paintTargets(selected, catalogIndex)
-  const status = paintStatusOf({
-    surfaceLocked,
-    noItems: items.length === 0,
-    noSlots: items.length > 0 && panelSlotsOf(items.map((m) => m.item), catalogIndex, undefined).length === 0,
-    loaded
-  })
-  if (status !== undefined) {
+export const PaintSection = memo(
+  function PaintSection({ selected }: { readonly selected: ReadonlyArray<SelectedItem> }) {
+    const loaded = useEditor((s) => s.paint.length > 0)
+    const catalogIndex = useEditor((s) => s.catalogIndex)
+    const { items, surfaceLocked } = paintTargets(selected, catalogIndex)
+    const status = paintStatusOf({
+      surfaceLocked,
+      noItems: items.length === 0,
+      noSlots: items.length > 0 && panelSlotsOf(items.map((m) => m.item), catalogIndex, undefined).length === 0,
+      loaded
+    })
+    if (status !== undefined) {
+      return (
+        <Section
+          id="paint"
+          title="Paint"
+          actions={
+            <>
+              {status.short}
+              <InfoHint>{status.long}</InfoHint>
+            </>
+          }
+        />
+      )
+    }
     return (
-      <Section
-        id="paint"
-        title="Paint"
-        actions={
-          <>
-            {status.short}
-            <InfoHint>{status.long}</InfoHint>
-          </>
-        }
-      />
+      <Section id="paint" title="Paint">
+        <div className="flex flex-col divide-y divide-border *:py-4 *:first:pt-0 *:last:pb-0">
+          {paintGroups(items).map((members) => (
+            <PaintGroup key={members.map((m) => m.id).join(",")} members={members} showName={items.length > 1} />
+          ))}
+        </div>
+      </Section>
     )
   }
-  return (
-    <Section id="paint" title="Paint">
-      <div className="flex flex-col divide-y divide-border *:py-4 *:first:pt-0 *:last:pb-0">
-        {paintGroups(items).map((members) => (
-          <PaintGroup key={members.map((m) => m.id).join(",")} members={members} showName={items.length > 1} />
-        ))}
-      </div>
-    </Section>
-  )
-}
+)

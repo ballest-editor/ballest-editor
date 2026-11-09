@@ -24,7 +24,7 @@ import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type MouseEvent, useMemo, useState } from "react"
+import { memo, type MouseEvent, useMemo, useState } from "react"
 import {
   type CatalogIndex,
   type CatalogPiece,
@@ -201,15 +201,28 @@ function FavoriteStar({ favorite, tileCorner, onToggle }: {
   )
 }
 
-function PieceButton(
+/**
+ * A click on a tile places its piece. Only a real pointer click places: keyboard activation (Space or Enter on a focused
+ * button) is a click with a `detail` of 0. Focus then moves to the viewport, so the editor's keybinds apply straight away.
+ */
+const placeFromTile = (piece: CatalogPiece, e: MouseEvent<HTMLButtonElement>) => {
+  if (e.detail === 0) return
+  placeAtCamera(piece)
+  e.currentTarget.blur()
+  focusViewport()
+}
+
+/**
+ * Memoised, with nothing in its props made afresh: a placed piece goes under Recent, which renders the panel again, and
+ * every tile (a tooltip, a button and a picture) rendering with it held up each placement.
+ */
+const PieceButton = memo(function PieceButton(
   {
     listing: { category, fill, piece },
     view,
     layout,
     favorite,
-    onPlace,
-    onHover,
-    onToggleFavorite,
+    index,
     unavailable,
     unverified
   }: {
@@ -217,15 +230,19 @@ function PieceButton(
     readonly view: PiecesView
     readonly layout: PieceLayout
     readonly favorite: boolean
-    readonly onPlace: (e: MouseEvent<HTMLButtonElement>) => void
-    readonly onHover: () => void
-    readonly onToggleFavorite: () => void
+    /** What a hover preloads the piece's meshes from. */
+    readonly index: CatalogIndex | null
     /** Set for pieces that can't be placed; shown disabled, with this in the tooltip. */
     readonly unavailable: string | undefined
     /** Hidden piece nobody has loaded in-game yet: placeable, but flagged. */
     readonly unverified: boolean
   }
 ) {
+  const onPlace = (e: MouseEvent<HTMLButtonElement>) => {
+    if (unavailable === undefined) placeFromTile(piece, e)
+  }
+  const onHover = () => index !== null && preloadPiece(piece, index)
+  const onToggleFavorite = () => void toggleFavoritePiece(piece)
   const { name, size } = pieceDisplayName(piece)
   const grid = view === "grid"
   const disabled = unavailable !== undefined
@@ -320,7 +337,7 @@ function PieceButton(
       )}
     </div>
   )
-}
+})
 
 /** The panel's one thumbnail size, for both views. A menu, as a segmented control would crowd out the search field. */
 function ThumbnailSizeMenu({ size }: { readonly size: ThumbnailSize }) {
@@ -391,14 +408,6 @@ export function Palette() {
 
   const unavailableReason = (piece: CatalogPiece) =>
     catalog === null || index === null ? undefined : unavailableReasonOf(index, piece, catalog.verified)
-  // Only a real pointer click places: keyboard activation (Space or Enter on a focused button) is a click with a `detail`
-  // of 0. Focus then moves to the viewport, so the editor's keybinds apply straight away.
-  const place = (piece: CatalogPiece, unavailable: string | undefined) => (e: MouseEvent<HTMLButtonElement>) => {
-    if (e.detail === 0 || unavailable !== undefined) return
-    placeAtCamera(piece)
-    e.currentTarget.blur()
-    focusViewport()
-  }
 
   const toggleAll = () => {
     const next = !allCollapsed
@@ -505,9 +514,7 @@ export function Palette() {
                               view={view}
                               layout={layout}
                               favorite={favorites.includes(id)}
-                              onPlace={place(piece, unavailable)}
-                              onHover={() => index !== null && preloadPiece(piece, index)}
-                              onToggleFavorite={() => void toggleFavoritePiece(piece)}
+                              index={index}
                               unavailable={unavailable}
                               unverified={catalog !== null && verificationOf(piece, catalog.verified) === "unverified"}
                             />

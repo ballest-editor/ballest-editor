@@ -2,7 +2,7 @@
 
 Status: built, apart from what § Still to come lists. This page is the feature: what the user sees and does, and the decisions behind it. The engine is `domain/snap*.ts`, `domain/connectors.ts` and `domain/joints.ts`, and its meeting with the scene `editor/snap/`. #84, #87, #88, #89, #92 and #99 are the issues this page took over.
 
-The names here follow [AGENTS.md](../AGENTS.md) § Terms: a piece is a kind of thing in the catalog, an item is one placed in a map, a pane is one camera's view, the active pane is the last one hovered or clicked.
+The names here follow [AGENTS.md](../AGENTS.md) § Terms: a piece is a kind of thing in the catalog, an item is one placed in a map, a pane is one camera's view, the active pane is the last one pressed in.
 
 ## Why
 

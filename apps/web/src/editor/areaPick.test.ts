@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { AreaRegion, type AreaShape } from "../domain/areaSelect"
 import { AreaPicker, type PickView } from "./areaPick"
+import { batchMeshesOf, MeshBatches } from "./meshBatches"
 
 /** A 200 x 200 px pane looking straight down, one world unit to a pixel, the world's origin at its centre. */
 const topView = (): PickView => {
@@ -72,6 +73,20 @@ describe("AreaPicker", () => {
     // the diamond's screen box reaches (72, 72), but the diamond itself doesn't reach that corner
     assert.isFalse(pick.caught("diamond", view, box(70, 70, 78, 78), "touching"))
     assert.isTrue(pick.caught("diamond", view, box(70, 96, 78, 104), "touching"))
+  })
+
+  it("reads a piece's meshes where its batch draws them, though they are hidden for it", () => {
+    const world = new THREE.Scene()
+    const diamond = piece(0, 0, 40, Math.PI / 4)
+    world.add(diamond)
+    const release = batchMeshesOf(diamond)
+    const batches = new MeshBatches()
+    batches.sync({ compileAsync: () => new Promise<THREE.Object3D>(() => {}) }, world, view.camera)
+    const pick = new AreaPicker((key) => key === "diamond" ? diamond : undefined)
+    // a box clear of its origin, over its corner: only its triangles can say it's touched
+    assert.isTrue(pick.caught("diamond", view, box(70, 96, 78, 104), "touching"))
+    release()
+    batches.dispose()
   })
 
   it("a perspective pane leaves out what is behind the camera", () => {

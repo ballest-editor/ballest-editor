@@ -21,6 +21,7 @@ import type { Item } from "../../domain/MapFile"
 import type { FlipAxis } from "../../domain/mirror"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
 import type { RepeatOptions } from "../../domain/repeat"
+import { indexOfKey } from "../../domain/structure"
 import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
 import { applyUnitEdit, pivotModeFor, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
 import { pickableSelection } from "../../domain/visibility"
@@ -63,7 +64,7 @@ export const selectAll = () => {
 /** An item's edit transform in the document: never the live preview. */
 const docTransform = (id: string): UeTransform | undefined => {
   const { doc } = useEditor.getState()
-  const item = doc.map.items[doc.ids.indexOf(id)]
+  const item = doc.map.items[indexOfKey(doc.ids, id)]
   return item === undefined ? undefined : editTransform(item)
 }
 
@@ -79,7 +80,7 @@ const withSelectionEdit = (
     s,
     new Map(
       s.selectedIds.flatMap((id) => {
-        const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+        const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
         return item === undefined ? [] : [[id, edit(editTransform(item), localPivotOf(id), item)] as const]
       })
     )
@@ -199,7 +200,7 @@ export const setSelectionPivot = (choice: PivotChoice): void => {
   if (!canSetItemPivots(doc.structure.tree, selectedIds, enteredGroupId)) return
   setItemPivots(
     new Map(selectedIds.flatMap((id) => {
-      const item = doc.map.items[doc.ids.indexOf(id)]
+      const item = doc.map.items[indexOfKey(doc.ids, id)]
       const pivot = item === undefined ? undefined : pivotFor(item, catalogIndex, choice)
       return pivot === undefined ? [] : [[id, pivot] as const]
     }))

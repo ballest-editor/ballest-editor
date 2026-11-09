@@ -119,10 +119,11 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
           })
         handleShortcuts(window)
 
-        window.once("ready-to-show", () => {
-          if (Option.isSome(restored) && restored.value.maximized) window.maximize()
-          window.show()
-        })
+        // Shown at once, in the page's starting background: a new window is another copy of the app, and waiting for the
+        // page's first paint kept it out of sight while that page's code loaded. The page's first paint is the editor's
+        // frame (index.html), ahead of its code.
+        if (Option.isSome(restored) && restored.value.maximized) window.maximize()
+        window.show()
 
         // A window never opens another in this process (a new window is a new copy, WindowLauncher) or navigates away from
         // itself: links go to the browser. The one exception is a panel popped out into a window of its own, which stays

@@ -4,7 +4,7 @@ import { endsOf, openEndsOf, type WorldEnd } from "../../domain/connectors"
 import { editTransform } from "../../domain/editTransform"
 import type { MarkRole } from "../../domain/snapFrame"
 import type { SnapPrefs } from "../../domain/snapPrefs"
-import type { Doc } from "../../domain/structure"
+import { type Doc, indexOfKey } from "../../domain/structure"
 import { type EditorState, shownOf } from "../store"
 
 type ShowOpenEnds = SnapPrefs["showOpenEnds"]
@@ -25,7 +25,7 @@ const shownEnds = (
 ): ReadonlyArray<WorldEnd> => {
   if (preview === null || preview.size === 0) return docEnds
   const moved = [...preview].flatMap(([key, transform]) => {
-    const item = doc.map.items[doc.ids.indexOf(key)]
+    const item = doc.map.items[indexOfKey(doc.ids, key)]
     return item === undefined ? [] : endsOf(key, item, transform, catalogIndex, doc.structure.items.get(key)?.connectAt)
   })
   return [...docEnds.filter(({ ref }) => !preview.has(ref.item)), ...moved]

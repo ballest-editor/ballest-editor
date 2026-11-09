@@ -293,6 +293,19 @@ const stageOf = (size: number): Stage => {
   return stage
 }
 
+/** How long a render waits for the page to be idle before it goes ahead anyway. */
+const IDLE_WAIT_MS = 1000
+
+/**
+ * Resolves when the page has a moment to spare: a render uploads textures and draws on the page's thread, which a click
+ * that asked for a picture (a piece placed, a selection) is still busy showing in the viewport and the panels.
+ */
+const whenIdle = (): Promise<void> =>
+  new Promise((resolve) => {
+    if (typeof requestIdleCallback === "function") requestIdleCallback(() => resolve(), { timeout: IDLE_WAIT_MS })
+    else setTimeout(resolve)
+  })
+
 /**
  * `object` at `size` px through the camera `aim` sets up for it, as a PNG data URL; undefined when there is nothing to
  * draw. Its shaders compile first, off the page's thread: left to the render, a map's many materials would hold the page
@@ -305,6 +318,7 @@ const shoot = async (
 ): Promise<string | undefined> => {
   if (object === undefined) return undefined
   await whenTexturesReady(texturesOf(object), TEXTURE_WAIT_MS)
+  await whenIdle()
   object.updateMatrixWorld(true)
   const shown = stageOf(size)
   const { renderer, scene } = shown

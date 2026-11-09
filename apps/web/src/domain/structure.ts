@@ -37,6 +37,20 @@ export interface Doc {
   readonly structure: Structure
 }
 
+/** Each key's place in `ids`, kept per array: a selection, an edit or a drag can be of thousands of items. */
+const keyIndices = new WeakMap<ReadonlyArray<string>, ReadonlyMap<string, number>>()
+
+const keyIndicesOf = (ids: ReadonlyArray<string>): ReadonlyMap<string, number> => {
+  const known = keyIndices.get(ids)
+  if (known !== undefined) return known
+  const indices = new Map(ids.map((id, i) => [id, i] as const))
+  keyIndices.set(ids, indices)
+  return indices
+}
+
+/** An item's place in `ids`; -1 for a key that isn't there. */
+export const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
+
 /** 72 random bits, as 12 URL-safe characters. */
 export const freshKey = (): string =>
   btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(9)))).replaceAll("+", "-").replaceAll("/", "_")

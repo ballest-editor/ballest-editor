@@ -43,6 +43,7 @@ import { annotationsOf } from "../../domain/structure"
 import { ORIGIN, vecAdd } from "../../domain/ueMath"
 import type { PaneCamera } from "../paneCameras"
 import {
+  connectorAt,
   type DragSnap,
   type EditorState,
   type FlipOffer,
@@ -282,9 +283,7 @@ export const joinHintOf = (
   s: Pick<EditorState, "doc" | "catalogIndex">,
   { end, item: key }: EndRef
 ): string | undefined => {
-  const item = s.doc.map.items[s.doc.ids.indexOf(key)]
-  const connector = item === undefined ? undefined : s.catalogIndex?.pieceByClass.get(item.actorToSpawn)
-    ?.connectors?.[end]
+  const connector = connectorAt(s, key, end)
   if (connector?.cap === undefined) return undefined
   const spot = s.doc.structure.items.get(key)?.connectAt?.[String(end)] ?? defaultSpotOf(connector)
   return spot === undefined ? undefined : `By its ${SPOT_NAMES[spot].toLowerCase()} · Inspector › Connects at`

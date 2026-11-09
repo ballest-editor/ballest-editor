@@ -166,25 +166,35 @@ export const endsFit = (
 /** A cell a little wider than `MEET_CM`: two ends that meet are in one cell or two next to each other. */
 const CELL_CM = 1
 
-const cellKey = ({ x, y, z }: Vec3, dx = 0, dy = 0, dz = 0) =>
-  `${Math.floor(x / CELL_CM) + dx},${Math.floor(y / CELL_CM) + dy},${Math.floor(z / CELL_CM) + dz}`
+const cellOf = (cm: number) => Math.floor(cm / CELL_CM)
 
 const NEAR = [-1, 0, 1]
 
-/** The ends no other end meets: "where does the track still need a piece". */
+/**
+ * The ends no other end meets: "where does the track still need a piece". Cells are found by number, x then y then z:
+ * a drag asks this of the whole map's ends every frame.
+ */
 export const openEndsOf = (ends: ReadonlyArray<WorldEnd>): ReadonlyArray<WorldEnd> => {
-  const cells = new Map<string, Array<WorldEnd>>()
+  const cells = new Map<number, Map<number, Map<number, Array<WorldEnd>>>>()
   for (const end of ends) {
-    const key = cellKey(end.position)
-    const cell = cells.get(key)
-    if (cell === undefined) cells.set(key, [end])
+    const { x, y, z } = end.position
+    const byY = cells.get(cellOf(x)) ?? new Map<number, Map<number, Array<WorldEnd>>>()
+    cells.set(cellOf(x), byY)
+    const byZ = byY.get(cellOf(y)) ?? new Map<number, Array<WorldEnd>>()
+    byY.set(cellOf(y), byZ)
+    const cell = byZ.get(cellOf(z))
+    if (cell === undefined) byZ.set(cellOf(z), [end])
     else cell.push(end)
   }
-  return ends.filter((end) =>
-    !NEAR.some((dx) =>
-      NEAR.some((dy) =>
-        NEAR.some((dz) => cells.get(cellKey(end.position, dx, dy, dz))?.some((other) => endsMeet(end, other)) === true)
-      )
-    )
-  )
+  const meetsAny = (end: WorldEnd): boolean => {
+    const [cx, cy, cz] = [cellOf(end.position.x), cellOf(end.position.y), cellOf(end.position.z)]
+    return NEAR.some((dx) => {
+      const byY = cells.get(cx + dx)
+      return byY !== undefined && NEAR.some((dy) => {
+        const byZ = byY.get(cy + dy)
+        return byZ !== undefined && NEAR.some((dz) => byZ.get(cz + dz)?.some((other) => endsMeet(end, other)) === true)
+      })
+    })
+  }
+  return ends.filter((end) => !meetsAny(end))
 }

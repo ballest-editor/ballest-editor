@@ -22,6 +22,7 @@ import {
   wouldLandOn
 } from "../../domain/placement"
 import { withFavoriteToggled, withRecentPiece } from "../../domain/recentPieces"
+import { indexOfKey } from "../../domain/structure"
 import { ORIGIN, sameVec, vecAdd, vecSub } from "../../domain/ueMath"
 import { sceneRegistry } from "../sceneRegistry"
 import { type EditorState, NO_TAB_OPEN, noTabOpen, snapConfigOf, type TransformOptions, useEditor } from "../store"
@@ -108,7 +109,7 @@ export const placeAtCamera = (piece: CatalogPiece) =>
 /** Whether a drop can stand on the item `id`. Not on the Player Start: a piece there hides where the map starts. */
 export const holdsDrop = (id: string): boolean => {
   const { doc } = useEditor.getState()
-  const item = doc.map.items[doc.ids.indexOf(id)]
+  const item = doc.map.items[indexOfKey(doc.ids, id)]
   return item !== undefined && !isPlayerStart(item)
 }
 

@@ -44,7 +44,15 @@ import { type DragTarget, dragTargetOf, selectionSnapStart } from "../snap/selec
 import { ownSnapItemsOf, snapItemsOf } from "../snap/snapScene"
 import { gameRayOf, snapViewOf, toThree } from "../snap/snapView"
 import { allTurnStopsOf, reachAlong, scaleStopsOf, turnStopsFrom } from "../snap/turnScale"
-import { fitTransforms, selectionUnits, shownGizmoSpace, snapConfigOf, unitExtentOf, useEditor } from "../store"
+import {
+  type EditorState,
+  fitTransforms,
+  selectionUnits,
+  shownGizmoSpace,
+  snapConfigOf,
+  unitExtentOf,
+  useEditor
+} from "../store"
 import { useDarkTheme } from "../theme"
 import {
   constraintOf,
@@ -121,22 +129,29 @@ const applyToObjects = (transforms: ReadonlyMap<string, UeTransform>) => {
   }
 }
 
+/** The last target worked out, and from what: the store's state and how many items were in the scene. */
+let lastTarget:
+  | { readonly s: EditorState; readonly inScene: number; readonly target: DragTarget | undefined }
+  | undefined
+
 /**
  * What the gizmo acts on: the selected items that are in the scene, at the selection's pivot
- * like the game's editor.
+ * like the game's editor. Asked every frame, and worked out again only when the store or the items in the scene changed:
+ * a selection of thousands takes a while.
  */
 const currentTarget = (): DragTarget | undefined => {
   const s = useEditor.getState()
   // a box or lasso drag is about to change the selection: the gizmo would sit on what it may drop
   if (areaDragging()) return undefined
+  const inScene = sceneRegistry.objects.size
+  if (lastTarget?.s === s && lastTarget.inScene === inScene) return lastTarget.target
   // Settings › Display can keep the gizmo off a whole group, which is moved from the outline instead.
-  if (
-    !s.settings.gizmo.showForGroups &&
-    selectedGroupIds(s.doc.structure.tree, s.selectedIds, s.enteredGroupId).length > 0
-  ) {
-    return undefined
-  }
-  return dragTargetOf(s)
+  const target = !s.settings.gizmo.showForGroups &&
+      selectedGroupIds(s.doc.structure.tree, s.selectedIds, s.enteredGroupId).length > 0
+    ? undefined
+    : dragTargetOf(s)
+  lastTarget = { s, inScene, target }
+  return target
 }
 
 /** A drag's start transforms re-keyed from each source id to its copy's. */

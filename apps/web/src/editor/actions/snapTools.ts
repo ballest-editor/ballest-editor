@@ -48,7 +48,7 @@ import {
   WORLD_NORMALS,
   type WorldPlane
 } from "../../domain/snapTools"
-import { annotationsOf, freshKey } from "../../domain/structure"
+import { annotationsOf, freshKey, indexOfKey } from "../../domain/structure"
 import { IDENTITY_QUAT, ORIGIN, rotateVec, vecDot, vecSub } from "../../domain/ueMath"
 import {
   applyDelta,
@@ -66,7 +66,6 @@ import {
   editedKeys,
   type EditorState,
   fitTransforms,
-  indexOfKey,
   type PickedTarget,
   type PickerRequest,
   selectionPivot,
@@ -442,7 +441,7 @@ export const mirrorSelection = (plane: MirrorPlane) => {
   const selection = selectionUnits(s, (key) => shownTransform(s, key))
   if (selection === undefined) return
   const placed = carriedKeys(selection).flatMap((key) => {
-    const item = s.doc.map.items[s.doc.ids.indexOf(key)]
+    const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
     const t = shownTransform(s, key)
     return item === undefined || t === undefined ? [] : [{ key, item, t }]
   })
@@ -519,7 +518,7 @@ export const selectConnected = () => {
 
 /** An end of the map, with its item as `item` would stand there. */
 const endOf = (s: EditorState, { end, item: key }: EndRef, item?: Item) => {
-  const index = s.doc.ids.indexOf(key)
+  const index = indexOfKey(s.doc.ids, key)
   const of = item ?? s.doc.map.items[index]
   const placed = s.doc.map.items[index]
   return of === undefined || placed === undefined
@@ -536,7 +535,7 @@ export const applyFlipOffer = () => {
   const offer = s.flipOffer
   s.setFlipOffer(null)
   if (offer === null) return
-  const source = s.doc.map.items[s.doc.ids.indexOf(offer.own.item)]
+  const source = s.doc.map.items[indexOfKey(s.doc.ids, offer.own.item)]
   const piece = source === undefined ? undefined : s.catalogIndex?.pieceByClass.get(source.actorToSpawn)
   const flipped = source === undefined
     ? undefined
@@ -636,7 +635,7 @@ export const showConnectSpot = (key: string, end: number, spot: SpotId | null) =
     return
   }
   const s = useEditor.getState()
-  const item = s.doc.map.items[s.doc.ids.indexOf(key)]
+  const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
   const transform = shownTransform(s, key)
   const at = item === undefined || transform === undefined
     ? undefined

@@ -24,6 +24,7 @@ import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gizmoScaleOf, gridColorsOf } from "../domain/Settings"
 import { snapsGrid } from "../domain/snapConfig"
+import { indexOfKey } from "../domain/structure"
 import { isLocked } from "../domain/visibility"
 import { holdsDrop, placeAt, placePrefab } from "./actions"
 import { useAreaDrag } from "./areaDrag"
@@ -36,6 +37,7 @@ import { GroupBox } from "./groupBox"
 import { ItemObject } from "./ItemObject"
 import { keyContextOf } from "./keyContext"
 import { advanceGameTime } from "./materials"
+import { meshBatches } from "./meshBatches"
 import { OrthoGrid } from "./OrthoGrid"
 import {
   lockedPaintTarget,
@@ -65,7 +67,6 @@ import { SnapOverlay } from "./snap/SnapOverlay"
 import {
   currentBrush,
   groupBoxOf,
-  indexOfKey,
   noTabOpen,
   pickableOf,
   type SelectMode,
@@ -113,8 +114,19 @@ function CachedGlb({ url }: { readonly url: string }) {
   return null
 }
 
-function OnCommit({ run }: { readonly run: () => void }) {
-  useEffect(run, [run])
+/**
+ * Calls `run` once the meshes on screen have their shaders: the items mounting with them hand their meshes to the batches
+ * over the next frames, and each new batch compiles off the page's thread before it shows (editor/meshBatches.ts).
+ */
+function WhenCompiled({ run }: { readonly run: () => void }) {
+  const frames = useRef(0)
+  useFrame(() => {
+    if (frames.current < 0) return
+    frames.current++
+    if (frames.current < 3 || meshBatches.pending) return
+    frames.current = -1
+    run()
+  })
   return null
 }
 
@@ -136,7 +148,7 @@ class SettleOnError
 
 /**
  * Calls `onSettled` once the startup loads are done and every mesh of the map on screen at
- * that point is in the cache. Until then the viewport keeps the scene hidden, so it appears
+ * that point is in the cache and has its shaders. Until then the viewport keeps the scene hidden, so it appears
  * once, complete, instead of stepping through stand-in boxes and loading wireframes. Later
  * loads (imports, placed pieces) show their loading hints as usual.
  */
@@ -156,7 +168,7 @@ function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
     <SettleOnError onSettled={onSettled}>
       <Suspense fallback={null}>
         {urls.map((url) => <CachedGlb key={url} url={url} />)}
-        <OnCommit run={onSettled} />
+        <WhenCompiled run={onSettled} />
       </Suspense>
     </SettleOnError>
   )

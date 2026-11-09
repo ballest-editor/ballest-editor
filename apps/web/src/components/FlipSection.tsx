@@ -1,6 +1,7 @@
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
+import { memo } from "react"
 import { type PlacedItem, selectionFlip } from "../domain/itemProperties"
 import type { FlipAxis } from "../domain/mirror"
 import { flipSelection } from "../editor/actions"
@@ -19,7 +20,7 @@ const FLIPS: ReadonlyArray<{ readonly axis: FlipAxis; readonly label: string; re
  * shows no state, these show what's flipped. A selection that can't flip at all (the player
  * start, the goal, the checkpoints) has no row, as in the game.
  */
-export function FlipSection({ items }: { readonly items: ReadonlyArray<PlacedItem> }) {
+export const FlipSection = memo(function FlipSection({ items }: { readonly items: ReadonlyArray<PlacedItem> }) {
   const flips = FLIPS.map((flip) => ({ ...flip, state: selectionFlip(items, flip.axis) }))
   if (flips.every(({ state }) => state === "unavailable")) return null
   return (
@@ -58,4 +59,4 @@ export function FlipSection({ items }: { readonly items: ReadonlyArray<PlacedIte
       </ToggleGroup>
     </FieldRow>
   )
-}
+})
