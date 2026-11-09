@@ -3,22 +3,25 @@ import {
   IconAlertTriangle,
   IconChevronRight,
   IconCircleCheck,
+  IconClick,
   IconCopy,
+  IconFocusCentered,
   IconFolderOpen,
+  IconMap,
   IconPercentage,
   IconRuler2,
   IconSettings,
+  IconStack2,
   IconTrash,
   IconUserCircle
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
-import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { Fragment, type ReactNode, useMemo, useState } from "react"
+import { createElement, Fragment, type ReactNode, useMemo } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { CatalogIndex } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
@@ -63,21 +66,32 @@ import {
 import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { ConnectsAtSection } from "./ConnectsAtSection"
-import { Disclosure } from "./Disclosure"
 import { Fact, Facts } from "./Facts"
 import { FlipSection } from "./FlipSection"
 import { HintBadge } from "./HintBadge"
 import { InfoHint } from "./InfoHint"
+import {
+  FIELD_LABEL,
+  Identity,
+  IDENTITY_TILE,
+  IdentityBlock,
+  IdentityName,
+  InlineName,
+  Section,
+  SectionStack
+} from "./InspectorLayout"
 import { ItemProperties } from "./ItemProperties"
 import { LightingSettings } from "./LightingSettings"
 import { NumberField } from "./NumberField"
+import { hasOwnGlyph, itemGlyphOf } from "./outlineGlyphs"
+import { ItemIcon } from "./OutlineRow"
 import { PaintSection } from "./PaintSection"
 import { PathAction, PathText } from "./PathText"
+import { PieceThumbnail } from "./PieceThumbnail"
 import { PivotSection } from "./PivotSection"
 import { PrefabSettings } from "./PrefabSettings"
 import { type ClipKey, RowClipboard } from "./RowClipboard"
-import { Section, SectionHeader, SectionTitle } from "./SectionTitle"
-import { ChainSection, GroupSection, InstanceSection, ItemTags, LabelledField } from "./StructureSection"
+import { ChainSection, GroupIdentity, InstanceSection, ItemTags } from "./StructureSection"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
 
@@ -234,34 +248,49 @@ function StatusFact({ validated }: { readonly validated: boolean }) {
   )
 }
 
-function MapSettings() {
+/** An open map with nothing selected: its name, edited in place, and the map's settings. */
+function MapIdentity() {
+  const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
+  const hasEditorState = useEditor((s) => s.doc.map.editorState !== undefined)
+  const renameLevel = useEditor((s) => s.renameLevel)
+  const openDialog = useEditor((s) => s.openDialog)
+  return (
+    <IdentityBlock>
+      <Identity
+        tile={
+          <span className={IDENTITY_TILE}>
+            <IconMap className="size-5" />
+          </span>
+        }
+        title={
+          <InlineName
+            label="Map name"
+            value={levelData.levelDisplayName}
+            onCommit={(name) => renameLevel(name, levelData.creatorName)}
+          />
+        }
+        subtitle={hasEditorState ? "Map · Draft" : "Map · Published"}
+        actions={
+          <PathAction
+            label="Map settings"
+            icon={IconSettings}
+            onClick={() => openDialog({ id: "mapSettings" })}
+          />
+        }
+      />
+    </IdentityBlock>
+  )
+}
+
+/** The map's facts: who made it, how big it is, when, whether it's valid and where it's kept. */
+function MapInfo() {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
   const itemCount = useEditor((s) => s.doc.map.items.length)
   const hasEditorState = useEditor((s) => s.doc.map.editorState !== undefined)
   const file = useEditor((s) => s.file)
   const projects = useEditor((s) => s.capabilities.projects)
-  const renameLevel = useEditor((s) => s.renameLevel)
-  const openDialog = useEditor((s) => s.openDialog)
-  // An edit in progress; otherwise the input shows the map's name.
-  const [draft, setDraft] = useState<string | null>(null)
-  const name = draft ?? levelData.levelDisplayName
-  const commit = () => {
-    if (name !== levelData.levelDisplayName) renameLevel(name, levelData.creatorName)
-    setDraft(null)
-  }
   return (
-    <div className="flex flex-col gap-3">
-      <SectionHeader title="Map">
-        <PathAction label="Map settings" icon={IconSettings} onClick={() => openDialog({ id: "mapSettings" })} />
-      </SectionHeader>
-      <LabelledField id="map-name" label="Name">
-        <Input
-          id="map-name"
-          value={name}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-        />
-      </LabelledField>
+    <Section id="mapInfo" title="Details">
       <Facts>
         <Fact label="Creator">
           {levelData.creatorName === ""
@@ -302,7 +331,7 @@ function MapSettings() {
           )}
         </Fact>
       </Facts>
-    </div>
+    </Section>
   )
 }
 
@@ -482,10 +511,10 @@ function TransformRow(props: {
     : undefined
   return (
     <div className="flex flex-col gap-0.5">
-      <div className="flex h-5 items-center justify-between gap-2">
+      <div className="flex h-6 items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <Tooltip>
-            <TooltipTrigger render={<span className="text-body text-fg-secondary" />}>
+            <TooltipTrigger render={<span className={FIELD_LABEL} />}>
               {row.label}
               {row.unit !== "" && <span className="text-caption text-fg-tertiary">{` ${row.unit}`}</span>}
             </TooltipTrigger>
@@ -540,12 +569,14 @@ function TransformRow(props: {
   )
 }
 
-/** Duplicate and Delete as icon buttons, for a section's header; both also have a shortcut and the context menu. */
+/** Frame, Duplicate and Delete as icon buttons, for the identity at the top; each also has a shortcut. */
 function SelectionActions() {
   const keybinds = useEditor((s) => s.keybinds)
+  const requestFocus = useEditor((s) => s.requestFocus)
   const shortcut = (action: KeybindAction) => `${keybindActionLabels[action]} (${formatBindings(keybinds[action])})`
   return (
     <>
+      <PathAction label={shortcut("focusSelection")} icon={IconFocusCentered} onClick={requestFocus} />
       <PathAction label={shortcut("duplicateSelection")} icon={IconCopy} onClick={duplicateSelection} />
       <PathAction
         label={shortcut("deleteSelection")}
@@ -557,23 +588,42 @@ function SelectionActions() {
   )
 }
 
-/** The pieces in a selection, by name, with how many of each. */
-function PieceCounts({ items }: { readonly items: ReadonlyArray<Item> }) {
+/** The pieces in a selection, by name, with how many of each, most first. */
+function ContentsSection({ items }: { readonly items: ReadonlyArray<Item> }) {
   const catalogIndex = useEditor((s) => s.catalogIndex)
-  const counts = new Map<string, number>()
+  const counts = new Map<string, { readonly actorClass: string; n: number }>()
   for (const item of items) {
     const name = pieceNameOf(item, catalogIndex)
-    counts.set(name, (counts.get(name) ?? 0) + 1)
+    const entry = counts.get(name)
+    if (entry === undefined) counts.set(name, { actorClass: item.actorToSpawn, n: 1 })
+    else entry.n += 1
   }
+  const rows = [...counts].toSorted(([, a], [, b]) => b.n - a.n)
   return (
-    <ul className="flex flex-col gap-0.5 text-body">
-      {[...counts].map(([name, n]) => (
-        <li key={name} className="break-words">
-          {name}
-          {n > 1 && <span className="ml-1 text-fg-tertiary">× {n}</span>}
-        </li>
-      ))}
-    </ul>
+    <Section id="contents" title="Contents" className="gap-0">
+      <ul className="flex flex-col">
+        {rows.map(([name, { actorClass, n }]) => (
+          <li key={name} className="flex h-6 min-w-0 items-center gap-1 text-body">
+            <ItemIcon actorClass={actorClass} />
+            <span className="min-w-0 flex-1 truncate" title={name}>{name}</span>
+            <span className="shrink-0 text-caption text-fg-tertiary">{n}</span>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  )
+}
+
+/** An item's picture on the identity's tile: its piece's thumbnail, or its glyph where it has one of its own. */
+function ItemTile({ item }: { readonly item: Item }) {
+  const piece = useEditor((s) => s.catalogIndex?.pieceByClass.get(item.actorToSpawn))
+  const glyph = createElement(itemGlyphOf(item.actorToSpawn, piece), { className: "size-5" })
+  return (
+    <span className={IDENTITY_TILE}>
+      {piece === undefined || hasOwnGlyph(item.actorToSpawn, piece)
+        ? glyph
+        : <PieceThumbnail key={piece.className} piece={piece} className="size-9 object-contain" placeholder={glyph} />}
+    </span>
   )
 }
 
@@ -596,32 +646,69 @@ function MeshWarning({ item }: { readonly item: Item }) {
 const PLAYER_START_HINT =
   "A map has exactly one player start. Copy, Cut and Duplicate leave it out, and if you delete it, Save and Export refuse the map until Undo brings it back."
 
-/** What's selected: one item's piece, under its category, or a count with the pieces involved. */
-function SelectionHeader(
+/**
+ * What's selected, at the top: one item, by its own name (edited in place; cleared, it takes its piece's) over its piece
+ * and category, or how many items; then anything about it that needs a look, and one item's tags.
+ */
+function SelectionIdentity(
   { items, itemKey }: { readonly items: ReadonlyArray<Item>; readonly itemKey: string | undefined }
 ) {
   const catalogIndex = useEditor((s) => s.catalogIndex)
+  const renameItem = useEditor((s) => s.renameItem)
   const ownName = useEditor((s) => itemKey === undefined ? undefined : s.doc.structure.items.get(itemKey)?.name)
   const only = items.length === 1 ? items[0] : undefined
-  const category = only === undefined ? undefined : catalogIndex?.pieceByClass.get(only.actorToSpawn)?.category
+  const kinds = new Set(items.map((item) => item.actorToSpawn)).size
+  const identity = only === undefined || itemKey === undefined
+    ? (
+      <Identity
+        tile={
+          <span className={IDENTITY_TILE}>
+            <IconStack2 className="size-5" />
+          </span>
+        }
+        title={<IdentityName>{`${items.length} items`}</IdentityName>}
+        subtitle={kinds === 1 ? "All one piece" : `${kinds} kinds of piece`}
+        actions={<SelectionActions />}
+      />
+    )
+    : (
+      <Identity
+        tile={<ItemTile item={only} />}
+        title={
+          <InlineName
+            label="Item name"
+            value={ownName ?? ""}
+            placeholder={pieceNameOf(only, catalogIndex)}
+            onCommit={(name) => renameItem(itemKey, name === "" ? null : name)}
+          />
+        }
+        subtitle={[
+          ownName === undefined ? undefined : pieceNameOf(only, catalogIndex),
+          catalogIndex?.pieceByClass.get(only.actorToSpawn)?.category || "Piece"
+        ].filter((part) => part !== undefined).join(" · ")}
+        actions={<SelectionActions />}
+      />
+    )
+  const playerStart = items.some(isPlayerStart)
+  const meshWarning = only === undefined ? null : <MeshWarning item={only} />
   return (
-    <>
-      <SectionHeader title={only === undefined ? `${items.length} items selected` : category || "Piece"}>
-        <SelectionActions />
-      </SectionHeader>
-      {only === undefined
-        ? <PieceCounts items={items} />
-        : <div className="text-body-strong break-words">{ownName ?? pieceNameOf(only, catalogIndex)}</div>}
-      {items.some(isPlayerStart) && <HintBadge label="Player start (required)">{PLAYER_START_HINT}</HintBadge>}
-      {only !== undefined && <MeshWarning item={only} />}
-    </>
+    <IdentityBlock>
+      {identity}
+      {(playerStart || meshWarning !== null) && (
+        <div className="flex flex-wrap gap-1 empty:hidden">
+          {playerStart && <HintBadge label="Player start (required)">{PLAYER_START_HINT}</HintBadge>}
+          {meshWarning}
+        </div>
+      )}
+      {only !== undefined && itemKey !== undefined && <ItemTags itemKey={itemKey} />}
+    </IdentityBlock>
   )
 }
 
 /** The identifiers behind a single item, for when something needs looking up. Closed unless asked for. */
 function ItemDetails({ item, index }: { readonly item: Item; readonly index: number }) {
   return (
-    <Disclosure title="Details">
+    <Section id="details" title="Details" defaultOpen={false}>
       <Facts>
         <Fact label="Class">
           <span className="min-w-0 break-all">{classNameOf(item.actorToSpawn)}</span>
@@ -650,7 +737,7 @@ function ItemDetails({ item, index }: { readonly item: Item; readonly index: num
           </Fragment>
         ))}
       </Facts>
-    </Disclosure>
+    </Section>
   )
 }
 
@@ -722,41 +809,38 @@ function TransformSection({ of, unit, transforms, active, activeIndex = -1, item
   const activeItem = decals ? undefined : items.at(activeIndex)
   const extent = activeItem === undefined ? undefined : extentOf(activeItem, catalog)
   return (
-    <Section>
-      <SectionTitle>Transform</SectionTitle>
-      <div className="flex @container flex-col gap-2">
-        {transformRows(units, of).map((row) => {
-          const props = {
-            row,
-            unit,
-            mixed: of === "item" ? mixedAxes(unit, transforms, row.field) : EMPTY_AXES,
-            copyValue: readField(active ?? unit, row.field),
-            // a piece's paste sets every item; a group's takes the group there, as typing the three values would
-            onPaste: (value: Vec3) =>
-              of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value),
-            extent: extent ?? (decals ? uniform(1) : undefined),
-            perUnit: uniform(row.field === "translation" ? perUnit : 1)
-          }
-          if (row.field !== "scale3D") return <TransformRow key={row.field} {...props} />
-          if (decals) return <TransformRow key={row.field} {...props} row={DECAL_SIZE_ROW} />
-          if (activeItem === undefined) return <TransformRow key={row.field} {...props} />
-          const mode = <ScaleModeToggle units={units} sizeKnown={extent !== undefined} />
-          if (extent === undefined || scaleMode === "factor") {
-            // the toggle says it's a factor
-            return <TransformRow key={row.field} {...props} row={{ ...row, unit: "" }} mode={mode} />
-          }
-          return (
-            <TransformRow
-              key={row.field}
-              {...props}
-              {...sizeRowProps({ unit, active: active ?? unit, extent, items, transforms, catalog, perUnit })}
-              row={sizeRow(units)}
-              mode={mode}
-            />
-          )
-        })}
-        {children}
-      </div>
+    <Section id="transform" title="Transform" className="@container gap-2">
+      {transformRows(units, of).map((row) => {
+        const props = {
+          row,
+          unit,
+          mixed: of === "item" ? mixedAxes(unit, transforms, row.field) : EMPTY_AXES,
+          copyValue: readField(active ?? unit, row.field),
+          // a piece's paste sets every item; a group's takes the group there, as typing the three values would
+          onPaste: (value: Vec3) =>
+            of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value),
+          extent: extent ?? (decals ? uniform(1) : undefined),
+          perUnit: uniform(row.field === "translation" ? perUnit : 1)
+        }
+        if (row.field !== "scale3D") return <TransformRow key={row.field} {...props} />
+        if (decals) return <TransformRow key={row.field} {...props} row={DECAL_SIZE_ROW} />
+        if (activeItem === undefined) return <TransformRow key={row.field} {...props} />
+        const mode = <ScaleModeToggle units={units} sizeKnown={extent !== undefined} />
+        if (extent === undefined || scaleMode === "factor") {
+          // the toggle says it's a factor
+          return <TransformRow key={row.field} {...props} row={{ ...row, unit: "" }} mode={mode} />
+        }
+        return (
+          <TransformRow
+            key={row.field}
+            {...props}
+            {...sizeRowProps({ unit, active: active ?? unit, extent, items, transforms, catalog, perUnit })}
+            row={sizeRow(units)}
+            mode={mode}
+          />
+        )
+      })}
+      {children}
     </Section>
   )
 }
@@ -803,10 +887,7 @@ function ItemEditor({ items, ids, transforms, placed, transform, unit, groupUnit
           {items.length === 1 && ids[0] !== undefined && <ConnectsAtSection itemKey={ids[0]} />}
         </>
       )}
-      <Section>
-        <SectionTitle>Paint</SectionTitle>
-        <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
-      </Section>
+      <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
       <ItemProperties properties={selectionProperties(placed)} />
     </>
   )
@@ -860,24 +941,29 @@ export function Inspector() {
   const noTab = useEditor(noTabOpen)
   const first = items[0]
   if (noTab) {
-    return <div className="flex h-full items-center justify-center bg-card p-4 text-fg-tertiary">Nothing selected</div>
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 bg-card p-4 text-center text-fg-tertiary">
+        <IconClick className="size-6" />
+        <span>Open a map to see what's in it here</span>
+      </div>
+    )
   }
   if (first === undefined) {
     return (
       <ScrollArea className="h-full bg-card">
-        <div className="flex flex-col gap-5 p-3">
+        <SectionStack>
           {prefab === null
             ? (
               <>
-                <MapSettings />
-                <Section>
-                  <SectionTitle>Lighting</SectionTitle>
+                <MapIdentity />
+                <MapInfo />
+                <Section id="lighting" title="Lighting">
                   <LightingSettings />
                 </Section>
               </>
             )
             : <PrefabSettings prefab={prefab} />}
-        </div>
+        </SectionStack>
       </ScrollArea>
     )
   }
@@ -898,14 +984,12 @@ export function Inspector() {
 
   return (
     <ScrollArea className="h-full bg-card">
-      <div className="flex flex-col gap-5 p-3">
+      <SectionStack>
         {group === undefined
           ? (
             <>
-              <Section>
-                <SelectionHeader items={items} itemKey={items.length === 1 ? ids[0] : undefined} />
-                {items.length === 1 && ids[0] !== undefined && <ItemTags itemKey={ids[0]} />}
-              </Section>
+              <SelectionIdentity items={items} itemKey={items.length === 1 ? ids[0] : undefined} />
+              {items.length > 1 && <ContentsSection items={items} />}
               {editor}
               {items.length === 1 && <ItemDetails item={first} index={indices[0] ?? -1} />}
             </>
@@ -913,15 +997,14 @@ export function Inspector() {
           : (
             // A group is one thing with a name, so it's summed up; its items stay a click away, edited all at once.
             <>
-              <GroupSection
+              <GroupIdentity
                 key={group.id}
                 group={group}
                 items={items}
                 transforms={transforms}
                 actions={<SelectionActions />}
-              >
-                <PieceCounts items={items} />
-              </GroupSection>
+              />
+              <ContentsSection items={items} />
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
               {frame !== undefined && (
                 <TransformSection of="group" unit={frame} transforms={transforms}>
@@ -930,20 +1013,21 @@ export function Inspector() {
               )}
               <PivotSection />
               <ChainSection group={group} />
-              <Disclosure
-                key={`${group.id}/items`}
+              <Section
+                id="groupItems"
                 title={items.length === 1 ? "Edit its item" : `Edit all ${items.length} items`}
+                defaultOpen={false}
               >
                 {group.prefab !== undefined && (
                   <p className="text-body text-fg-tertiary">
                     An edit in here changes the instance, so it no longer follows its definition.
                   </p>
                 )}
-                {editor}
-              </Disclosure>
+                <SectionStack>{editor}</SectionStack>
+              </Section>
             </>
           )}
-      </div>
+      </SectionStack>
     </ScrollArea>
   )
 }

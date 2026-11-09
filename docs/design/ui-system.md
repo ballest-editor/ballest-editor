@@ -12,7 +12,7 @@ The rules every view follows. The tokens live in `packages/ui/src/styles/globals
 | `text-body-strong` | 13/20, 500      | Buttons, segments, tabs, row titles, selected object names |
 | `text-title`       | 14/20, 600      | Dialog titles, panel headers. Tracked -0.005em             |
 
-Each class sets size, line height and weight together, so don't add `font-*`, and don't use `text-xs`, `text-sm` or arbitrary sizes. 500 is a label, 400 is a value, and 600 is for titles alone. An eyebrow is `text-caption uppercase tracking-wider`; `SectionTitle` is the shared one, and `EYEBROW` is its type for a control. In dark, `SectionTitle` goes up to `text-foreground`, so a block's title stands above the field labels under it, which are `text-fg-secondary` too.
+Each class sets size, line height and weight together, so don't add `font-*`, and don't use `text-xs`, `text-sm` or arbitrary sizes. 500 is a label, 400 is a value, and 600 is for titles alone. An eyebrow is `text-caption uppercase tracking-wider`; `SectionTitle` is the shared one, and `EYEBROW` is its type for a control. The Inspector's sections don't use it (§ Inspector). In dark, `SectionTitle` goes up to `text-foreground`, so a block's title stands above the field labels under it, which are `text-fg-secondary` too.
 
 The font is the system's (`--font-sans`), so the type is never where the personality comes from. `body` sets tabular numbers. `font-mono` is Geist Mono, bundled, and is for numbers in editable fields and About's build info, never sentences, file names or paths.
 
@@ -103,6 +103,16 @@ A dock tab takes the inset ring on dockview's own focus line (`dock.css`). On th
 A raised card is `ring-edge not-dark:ring-1`: in light its tone is too near the panel's to show where it ends, and in dark the tone is enough. The start screen's and the project overview's cards stand alone (`START_CARD`), so in light they also take `shadow-md`, and in dark they keep a `border-border` hairline.
 
 A button pressed scales to 0.97 and drops its shadow, except one that opens a popup, which holds still under it.
+
+## Inspector
+
+The Inspector is built from `components/InspectorLayout.tsx`, and nothing in it lays itself out another way.
+
+- **Identity.** At the top, and never closed: a 40px tile (the piece's thumbnail, or its glyph on `THUMBNAIL_TILE`), the name in `text-title`, what kind of thing it is in `text-caption text-fg-tertiary`, and the selection's icon buttons at the right (Frame, Duplicate, Delete; a map's settings). The name of an item, a group or a map edits in place: it reads as a title until pointed at. One item's or group's tags sit under it.
+- **Sections.** A `SectionStack` of `Section`s, with a `border-border` line across the panel between each, because a panel this long can't be held apart by space alone. A section's header is 36px: its title in `text-body-strong` with a chevron after it, and its hint, status or buttons at the right. The header opens and closes it, and the choice is kept in settings (`panels.inspectorSections`); Details and a group's "Edit all items" start closed. A section with nothing to edit is only its header, saying why at the right (Paint: "Not paintable"). A stack inside a section takes the same line, inside the section's padding.
+- **Rows.** A value with a label is a `FieldRow`: the label in `text-label text-fg-secondary` in a 6rem column, the control in the rest, 28px tall. Facts and Lighting use the same column, so labels line up down the panel. A row that resets has the reset in a trailing column, and every row of its section has one. An X, Y, Z row is the exception: its label and clipboard button sit over its three fields, which need the width.
+
+So the order of weight is identity name, section title, then label and value, each a step down in size, weight or grey.
 
 ## Glass
 

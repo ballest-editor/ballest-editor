@@ -15,9 +15,9 @@ import { editSelectionAxis, moveSelectionBy, previewSelectionAxis, setSelectionP
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { pivotOf, shownPivotPoint, snapConfigOf, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
+import { FIELD_LABEL, Section } from "./InspectorLayout"
 import { NumberField } from "./NumberField"
 import { RowClipboard } from "./RowClipboard"
-import { SectionTitle } from "./SectionTitle"
 
 /** A toggle that's on for only part of a mixed selection (`data-in-use`): a step lighter than its track, short of pressed. */
 export const IN_USE_CLASSES = "data-[in-use]:bg-foreground/10 data-[in-use]:text-foreground"
@@ -38,9 +38,9 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
   const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
   return (
     <div className="flex @container flex-col gap-0.5">
-      <div className="flex h-5 items-center justify-between gap-2">
+      <div className="flex h-6 items-center justify-between gap-2">
         <Tooltip>
-          <TooltipTrigger render={<span className="text-body text-fg-secondary" />}>
+          <TooltipTrigger render={<span className={FIELD_LABEL} />}>
             Position <span className="text-caption text-fg-tertiary">{units}</span>
           </TooltipTrigger>
           <TooltipContent side="left">Where the pivot is: the gizmo's point, and the game's Location</TooltipContent>
@@ -80,11 +80,10 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
 /** A fixed pivot still has an editable world position, which moves the selection. */
 function FixedPivotSection({ point, reason }: { readonly point: Vec3 | undefined; readonly reason: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <SectionTitle>Pivot</SectionTitle>
+    <Section id="pivot" title="Pivot" className="gap-1.5">
       <p className="text-body text-fg-tertiary">{reason}</p>
       {point !== undefined && <PivotPosition point={point} />}
-    </div>
+    </Section>
   )
 }
 
@@ -136,14 +135,17 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
     )
   }
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <SectionTitle>Pivot</SectionTitle>
+    <Section
+      id="pivot"
+      title="Pivot"
+      actions={
         <InfoHint>
           Where the group turns and scales, and where the gizmo sits in the game. Point freezes it where it is now, so a
           turn no longer moves it.
         </InfoHint>
-      </div>
+      }
+      className="gap-1.5"
+    >
       <ToggleGroup
         aria-label="Group pivot"
         value={[choice]}
@@ -179,7 +181,7 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
         </p>
       )}
       {point !== undefined && <PivotPosition point={point} />}
-    </div>
+    </Section>
   )
 }
 
@@ -214,12 +216,19 @@ export function PivotSection() {
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <SectionTitle>Pivot</SectionTitle>
-        {mixed && <div className="text-caption text-fg-tertiary">Mixed</div>}
-        {!allBounded && <InfoHint>This piece's bounds are unknown, so only Default is available.</InfoHint>}
-      </div>
+    <Section
+      id="pivot"
+      title="Pivot"
+      actions={mixed || !allBounded
+        ? (
+          <>
+            {mixed && <span className="text-caption text-fg-tertiary">Mixed</span>}
+            {!allBounded && <InfoHint>This piece's bounds are unknown, so only Default is available.</InfoHint>}
+          </>
+        )
+        : undefined}
+      className="gap-1.5"
+    >
       <ToggleGroup
         aria-label="Pivot"
         value={mixed ? [] : choices.slice(0, 1)}
@@ -242,6 +251,6 @@ export function PivotSection() {
         ))}
       </ToggleGroup>
       {point !== undefined && <PivotPosition point={point} />}
-    </div>
+    </Section>
   )
 }

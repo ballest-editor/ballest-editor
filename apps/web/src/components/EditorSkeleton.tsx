@@ -8,7 +8,6 @@ import { Input } from "@workspace/ui/components/input"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 import { sceneBackgroundClass } from "../editor/sceneColors"
-import { SectionTitle } from "./SectionTitle"
 import { TopBar } from "./TopBar"
 import { ViewportControls } from "./ViewControls"
 
@@ -83,15 +82,24 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
         style={{ width: dockSide("right", 300) }}
       >
         <div className="h-7 border-b" />
-        <div className="flex flex-col gap-3 p-3">
-          <SectionTitle>Map</SectionTitle>
-          <div className="flex flex-col gap-1">
-            <Skeleton className="h-3 w-10 rounded-control" />
-            <Skeleton className="h-7 w-full" />
+        {/* The map's identity and its Details, as the Inspector draws them (InspectorLayout.tsx). */}
+        <div className="flex items-center gap-3 px-3 pt-3 pb-4">
+          <Skeleton className="size-10 shrink-0 rounded-surface" />
+          <div className="flex flex-1 flex-col gap-1.5">
+            <Skeleton className="h-3.5 w-1/2 rounded-control" />
+            <Skeleton className="h-2.5 w-1/4 rounded-control" />
           </div>
-          <div className="flex flex-col gap-1">
+        </div>
+        <div className="flex flex-col border-t px-3 pb-4">
+          <div className="flex h-9 items-center">
+            <span className="text-body-strong">Details</span>
+          </div>
+          <div className="flex flex-col gap-3 pt-1">
             {LABEL_WIDTHS.slice(0, 5).map((w) => (
-              <Skeleton key={w} className="my-0.5 h-3 rounded-control" style={{ width: w }} />
+              <div key={w} className="grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-2">
+                <Skeleton className="h-2.5 w-14 rounded-control" />
+                <Skeleton className="h-3 rounded-control" style={{ width: w }} />
+              </div>
             ))}
           </div>
         </div>

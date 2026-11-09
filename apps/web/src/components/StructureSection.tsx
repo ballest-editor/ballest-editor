@@ -1,10 +1,10 @@
+import { IconBoxMultiple, IconFolder, IconLink } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
-import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { type ReactNode, useMemo, useState } from "react"
+import type { CatalogIndex } from "../domain/Catalog"
 import type { UeTransform } from "../domain/coords"
 import { counted } from "../domain/groupSelection"
 import { formatBoxSize, placedBoxOf } from "../domain/itemBounds"
@@ -17,25 +17,11 @@ import { growthOf } from "../domain/units"
 import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
+import { FIELD_LABEL, FieldRow, Identity, IDENTITY_TILE, IdentityBlock, InlineName, Section } from "./InspectorLayout"
 import { NumberField } from "./NumberField"
-import { SectionHeader, SectionTitle } from "./SectionTitle"
 import { TagInput } from "./TagInput"
 
-/** A field with its label over it. */
-export function LabelledField({ id, label, children }: {
-  readonly id: string
-  readonly label: string
-  readonly children: ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <Label htmlFor={id} className="text-fg-secondary">{label}</Label>
-      {children}
-    </div>
-  )
-}
-
-/** The tags of `owner`, a group or an item. */
+/** The tags of `owner`, a group or an item, as a row of its identity. */
 function TagsField({ id, owner, tags }: {
   readonly id: string
   readonly owner: string
@@ -43,75 +29,65 @@ function TagsField({ id, owner, tags }: {
 }) {
   const setTags = useEditor((s) => s.setTags)
   return (
-    <LabelledField id={id} label="Tags">
+    <FieldRow label="Tags" htmlFor={id} align="start">
       <TagInput id={id} tags={tags} onChange={(next) => setTags(owner, next)} />
-    </LabelledField>
+    </FieldRow>
   )
 }
 
-/** How many items a group holds and how much room they take, as shown (live during a drag), and Frame. */
-function GroupCard({ items, transforms }: {
-  readonly items: ReadonlyArray<Item>
-  readonly transforms: ReadonlyArray<UeTransform>
-}) {
-  const catalogIndex = useEditor((s) => s.catalogIndex)
-  const requestFocus = useEditor((s) => s.requestFocus)
-  const box = useMemo(
-    () =>
-      placedBoxOf(
-        items.flatMap((item, i) => {
-          const transform = transforms[i]
-          return transform === undefined ? [] : [{ item, transform }]
-        }),
-        catalogIndex
-      ),
-    [items, transforms, catalogIndex]
+/** How many items a group holds and how much room they take, as shown (live during a drag). */
+function groupSummaryOf(
+  items: ReadonlyArray<Item>,
+  transforms: ReadonlyArray<UeTransform>,
+  catalogIndex: CatalogIndex | null
+): string {
+  const box = placedBoxOf(
+    items.flatMap((item, i) => {
+      const transform = transforms[i]
+      return transform === undefined ? [] : [{ item, transform }]
+    }),
+    catalogIndex
   )
   const count = itemCountOf(items.length)
+  return box === undefined ? count : `${count} · ${formatBoxSize(box)}`
+}
+
+/** A group's glyph on its identity's tile, as its Outline row draws it. */
+function GroupTile({ group }: { readonly group: GroupNode }) {
+  const className = "size-5"
   return (
-    <div className="flex items-center justify-between gap-2 rounded-surface bg-muted/40 py-1 pr-1 pl-3 ring-edge not-dark:ring-1">
-      <span className="min-w-0 text-body">{box === undefined ? count : `${count} · ${formatBoxSize(box)}`}</span>
-      <Button variant="secondary" size="sm" className="shrink-0" onClick={requestFocus}>Frame</Button>
-    </div>
+    <span className={IDENTITY_TILE}>
+      {group.prefab !== undefined
+        ? <IconBoxMultiple className={className} />
+        : group.chain === true
+        ? <IconLink className={className} />
+        : <IconFolder className={className} />}
+    </span>
   )
 }
 
-/** A selection that is exactly one group: its card, its name and tags, then the summary it's given. */
-export function GroupSection({ group, items, transforms, actions, children }: {
+/** A selection that is exactly one group: its name, edited in place, what it holds and how big, and its tags. */
+export function GroupIdentity({ group, items, transforms, actions }: {
   readonly group: GroupNode
   /** The group's items, with their transforms as shown. */
   readonly items: ReadonlyArray<Item>
   readonly transforms: ReadonlyArray<UeTransform>
-  /** The selection's icon buttons, at the section's header. */
+  /** The selection's icon buttons. */
   readonly actions: ReactNode
-  readonly children: ReactNode
 }) {
   const renameGroup = useEditor((s) => s.renameGroup)
-  // An edit in progress; otherwise the input shows the group's name.
-  const [draft, setDraft] = useState<string | null>(null)
-  const commit = () => {
-    if (draft !== null) renameGroup(group.id, draft)
-    setDraft(null)
-  }
+  const catalogIndex = useEditor((s) => s.catalogIndex)
+  const summary = useMemo(() => groupSummaryOf(items, transforms, catalogIndex), [items, transforms, catalogIndex])
   return (
-    <div className="flex flex-col gap-3">
-      <SectionHeader title="Group">{actions}</SectionHeader>
-      <GroupCard items={items} transforms={transforms} />
-      <LabelledField id="group-name" label="Name">
-        <Input
-          id="group-name"
-          value={draft ?? group.name}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit()
-            if (e.key === "Escape") setDraft(null)
-          }}
-        />
-      </LabelledField>
+    <IdentityBlock>
+      <Identity
+        tile={<GroupTile group={group} />}
+        title={<InlineName label="Group name" value={group.name} onCommit={(name) => renameGroup(group.id, name)} />}
+        subtitle={summary}
+        actions={actions}
+      />
       <TagsField id="group-tags" owner={group.id} tags={group.tags} />
-      {children}
-    </div>
+    </IdentityBlock>
   )
 }
 
@@ -160,7 +136,7 @@ function ChainJointsField({ group, links }: { readonly group: GroupNode; readonl
   return (
     <div className="flex @container flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-body text-fg-secondary">Joints</span>
+        <span className={FIELD_LABEL}>Joints</span>
         <InfoHint>
           How each joint compares with the one before when the chain bends, spreads or stretches. Even: every joint the
           same, so the chain curves evenly. Linear: each joint takes a little more, so the curve tightens steadily.
@@ -245,11 +221,11 @@ function HelixFields({ axis, turn, rise, onAxis, onTurn, onRise }: {
       </ToggleGroup>
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1">
-          <span className="text-body text-fg-tertiary">Turn per link</span>
+          <span className={FIELD_LABEL}>Turn per link</span>
           <NumberField label="Turn per link" value={turn} digits={1} handle={false} unit="°" onCommit={onTurn} />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-body text-fg-tertiary">Rise per link</span>
+          <span className={FIELD_LABEL}>Rise per link</span>
           <NumberField label="Rise per link" value={rise} digits={1} handle={false} unit="cm" onCommit={onRise} />
         </div>
       </div>
@@ -275,7 +251,7 @@ function ChainLayField({ group }: { readonly group: GroupNode }) {
   return (
     <div className="flex @container flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-body text-fg-secondary">Lay along</span>
+        <span className={FIELD_LABEL}>Lay along</span>
         <InfoHint>
           Lays the chain out from its first link along a shape, as one step; the chain stays free to bend after. A bent
           chain is straightened first. Straight lines it up the way its first link points. Helix winds it about a world
@@ -320,31 +296,32 @@ export function ChainSection({ group }: { readonly group: GroupNode }) {
   if (group.prefab !== undefined) return null
   if (group.chain !== true) {
     return (
-      <div className="flex items-center justify-center gap-1">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full max-w-56"
-          onClick={() => setChain(group.id, true)}
-        >
-          Make chain
-        </Button>
-        <InfoHint>
-          In a chain each piece follows the one before, so a turn bends the whole row, link by link.
-        </InfoHint>
-      </div>
+      <Section
+        id="chain"
+        title="Chain"
+        actions={
+          <InfoHint>
+            In a chain each piece follows the one before, so a turn bends the whole row, link by link.
+          </InfoHint>
+        }
+        className="items-start"
+      >
+        <Button variant="outline" size="sm" onClick={() => setChain(group.id, true)}>Make chain</Button>
+      </Section>
     )
   }
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <SectionTitle>Chain</SectionTitle>
+    <Section
+      id="chain"
+      title="Chain"
+      actions={
         <InfoHint>
           Each link follows the one before, from link 1. Link by link (the period key), a turn bends the chain, a move
           spreads it or stacks a pile, and a scale stretches it with every joint kept closed. Rigid moves it as one
           piece. Joints sets how much each joint takes compared with the one before.
         </InfoHint>
-      </div>
+      }
+    >
       <p className="text-body text-fg-tertiary">{counted(links, "link")}. Link 1, marked in the view, stays put.</p>
       <ChainJointsField group={group} links={links} />
       {chainLay && <ChainLayField group={group} />}
@@ -360,7 +337,7 @@ export function ChainSection({ group }: { readonly group: GroupNode }) {
         </Button>
         <Button variant="outline" size="sm" onClick={() => setChain(group.id, false)}>Unchain</Button>
       </div>
-    </div>
+    </Section>
   )
 }
 
@@ -378,11 +355,11 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
   const found = definition !== undefined
   const current = definition?.hash === link.hash
   return (
-    <div className="flex flex-col gap-2">
-      <SectionTitle>
-        Instance of <span className="tracking-normal normal-case">{link.name}</span>
-      </SectionTitle>
-      <p className="text-body text-fg-tertiary">{instanceStatusOf(found, current, unmodified)}</p>
+    <Section id="instance" title="Instance">
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-body-strong" title={link.name}>{link.name}</span>
+        <span className="text-body text-fg-tertiary">{instanceStatusOf(found, current, unmodified)}</span>
+      </div>
       <div className="flex flex-wrap gap-1">
         <Button
           variant="outline"
@@ -402,7 +379,7 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
           Open definition
         </Button>
       </div>
-    </div>
+    </Section>
   )
 }
 

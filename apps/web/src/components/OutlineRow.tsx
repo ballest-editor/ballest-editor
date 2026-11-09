@@ -91,7 +91,7 @@ function PieceIcon({ piece, glyph }: { readonly piece: CatalogPiece; readonly gl
 }
 
 /** An item's picture. The player start, the goal, lights and anything the catalog doesn't know have only a glyph. */
-function ItemIcon({ actorClass }: { readonly actorClass: string }) {
+export function ItemIcon({ actorClass }: { readonly actorClass: string }) {
   const piece = useEditor((s) => s.catalogIndex?.pieceByClass.get(actorClass))
   const glyph = itemGlyphOf(actorClass, piece)
   return piece === undefined || hasOwnGlyph(actorClass, piece)

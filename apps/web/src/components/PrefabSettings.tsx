@@ -1,5 +1,6 @@
 import { prefabFileNameOf } from "@ballest/contracts"
-import { IconFolderOpen } from "@tabler/icons-react"
+import { IconBoxMultiple, IconFolderOpen } from "@tabler/icons-react"
+import { cn } from "@workspace/ui/lib/utils"
 import { useEffect, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { mapLabelOf } from "../domain/factory"
@@ -7,8 +8,16 @@ import { prefabTierLabel } from "../domain/prefab"
 import { openProjectMap, projectMapsUsingPrefab, revealPrefabs, tabsUsingPrefab } from "../editor/actions"
 import { type PrefabDocument, saveProblemOf, tabWithFile, useEditor, useTabSummary } from "../editor/store"
 import { Fact, Facts } from "./Facts"
+import {
+  FIELD_LABEL,
+  Identity,
+  IDENTITY_TILE,
+  IdentityBlock,
+  IdentityName,
+  Section,
+  SectionStack
+} from "./InspectorLayout"
 import { PathAction, PathName } from "./PathText"
-import { SectionTitle } from "./SectionTitle"
 import { TextLink } from "./TextLink"
 
 function OpenMapLink({ tabId }: { readonly tabId: string }) {
@@ -48,7 +57,10 @@ function UsedIn({ prefab: { name, tier } }: { readonly prefab: PrefabDocument })
   )
 }
 
-/** A definition's tab with nothing selected: what it is. Its name and where it is stored change in the Prefabs panel. */
+/**
+ * A definition's tab with nothing selected: what it is, then its facts. Its name and where it is stored change in the
+ * Prefabs panel.
+ */
 export function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) {
   const itemCount = useEditor((s) => s.doc.map.items.length)
   const hasFile = useEditor((s) => s.file !== null)
@@ -56,33 +68,41 @@ export function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) 
   const projects = useEditor((s) => s.capabilities.projects)
   const saveProblem = useEditor(saveProblemOf)
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex min-w-0 flex-col">
-        <SectionTitle>Prefab</SectionTitle>
-        <span className="truncate text-body-strong">{prefab.name}</span>
-      </div>
-      <Facts>
-        <Fact dense label="Stored in">{prefabTierLabel(prefab.tier, projects)}</Fact>
-        <Fact dense label="Items">{itemCount}</Fact>
-        <Fact dense label="File">
-          {hasFile
-            ? <PathName name={prefabFileNameOf(prefab.name)} path={path} className="min-w-0 truncate" />
-            : <span className="text-fg-tertiary">Not saved yet</span>}
-          {projects && path !== null && (
-            <PathAction
-              label="Reveal in folder"
-              icon={IconFolderOpen}
-              onClick={() => void revealPrefabs(prefab.tier)}
-              className="ml-auto"
-            />
-          )}
-        </Fact>
-        <dt className="self-start text-fg-secondary">Used in</dt>
-        <dd className="min-w-0">
-          <UsedIn prefab={prefab} />
-        </dd>
-      </Facts>
-      {saveProblem !== null && <p className="text-fg-tertiary">{saveProblem}</p>}
-    </div>
+    <SectionStack>
+      <IdentityBlock>
+        <Identity
+          tile={
+            <span className={IDENTITY_TILE}>
+              <IconBoxMultiple className="size-5" />
+            </span>
+          }
+          title={<IdentityName>{prefab.name}</IdentityName>}
+          subtitle={`Prefab · ${prefabTierLabel(prefab.tier, projects)}`}
+        />
+      </IdentityBlock>
+      <Section id="prefabInfo" title="Details">
+        <Facts>
+          <Fact dense label="Items">{itemCount}</Fact>
+          <Fact dense label="File">
+            {hasFile
+              ? <PathName name={prefabFileNameOf(prefab.name)} path={path} className="min-w-0 truncate" />
+              : <span className="text-fg-tertiary">Not saved yet</span>}
+            {projects && path !== null && (
+              <PathAction
+                label="Reveal in folder"
+                icon={IconFolderOpen}
+                onClick={() => void revealPrefabs(prefab.tier)}
+                className="ml-auto"
+              />
+            )}
+          </Fact>
+          <dt className={cn(FIELD_LABEL, "self-start")}>Used in</dt>
+          <dd className="min-w-0">
+            <UsedIn prefab={prefab} />
+          </dd>
+        </Facts>
+        {saveProblem !== null && <p className="text-fg-tertiary">{saveProblem}</p>}
+      </Section>
+    </SectionStack>
   )
 }
