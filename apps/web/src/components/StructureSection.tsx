@@ -13,6 +13,7 @@ import type { Item } from "../domain/MapFile"
 import type { ChainGrowth, GroupNode, PrefabLink } from "../domain/MapSidecar"
 import { isSamePrefab } from "../domain/prefab"
 import { checkInstance } from "../domain/prefabInstance"
+import { growthOf } from "../domain/units"
 import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
@@ -114,7 +115,7 @@ export function GroupSection({ group, items, transforms, actions, children }: {
   )
 }
 
-const GROWTH_CURVES = ["Even", "Linear", "Compound"] as const
+const GROWTH_CURVES = ["Even", "Linear", "Exponential"] as const
 type GrowthCurve = (typeof GROWTH_CURVES)[number]
 /** The slider's reach; the field takes any value, short of a compound shrink to nothing. */
 const GROWTH_RANGE = { min: -50, max: 100 }
@@ -128,11 +129,27 @@ const growthFor = (curve: GrowthCurve, percent: number): ChainGrowth | undefined
     ? { curve: "linear", percent }
     : { curve: "compound", percent: Math.max(-99, percent) }
 
-/** How much more each link of a chain turns than the one before when it bends (`ChainGrowth`). */
-function ChainGrowthField({ group }: { readonly group: GroupNode }) {
+/** How many times `x` is, to one decimal place at most. */
+const formatTimes = (x: number) => `${Number(x.toFixed(x >= 10 ? 0 : 1))}×`
+
+/**
+ * What a growth does to the chain's last link, counted in pieces rather than joints: the joints add up, so even joints
+ * already take the last link `links` times as far as the first.
+ */
+const growthReadout = (growth: ChainGrowth | undefined, links: number): string => {
+  let total = 0
+  for (let i = 0; i < links; i++) total += growthOf(growth, i)
+  return `Link ${links} turns or moves ${formatTimes(total)} as much as link 1.`
+}
+
+/**
+ * How each joint of a chain compares with the one before when it bends, spreads or stretches (`ChainGrowth`), and what
+ * that makes of the last link.
+ */
+function ChainJointsField({ group, links }: { readonly group: GroupNode; readonly links: number }) {
   const setChainGrowth = useEditor((s) => s.setChainGrowth)
   const { growth } = group
-  const curve: GrowthCurve = growth === undefined ? "Even" : growth.curve === "linear" ? "Linear" : "Compound"
+  const curve: GrowthCurve = growth === undefined ? "Even" : growth.curve === "linear" ? "Linear" : "Exponential"
   // the slider's value while it's dragged; the chain takes it when it's let go
   const [dragged, setDragged] = useState<number | null>(null)
   const percent = dragged ?? growth?.percent ?? DEFAULT_GROWTH_PERCENT
@@ -143,16 +160,16 @@ function ChainGrowthField({ group }: { readonly group: GroupNode }) {
   return (
     <div className="flex @container flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-body text-fg-secondary">Growth</span>
+        <span className="text-body text-fg-secondary">Joints</span>
         <InfoHint>
-          How much more each link takes than the one before when the chain bends, spaces or scales. Linear adds a share
-          of the first link's turn at every link, so the curve tightens steadily; Compound multiplies it, so the curve
-          winds into a spiral. A negative growth opens the curve out instead. A scale grows as a power, so Linear 100%
-          tapers the chain.
+          How each joint compares with the one before when the chain bends, spreads or stretches. Even: every joint the
+          same, so the chain curves evenly. Linear: each joint takes a little more, so the curve tightens steadily.
+          Exponential: each joint multiplies, so the curve winds into a spiral. A negative change opens the curve out.
+          Under Stretch every link's scale grows by the same rule, so Linear 100% tapers the chain.
         </InfoHint>
       </div>
       <ToggleGroup
-        aria-label="Chain growth"
+        aria-label="Chain joints"
         value={[curve]}
         onValueChange={(value) => {
           const next = GROWTH_CURVES.find((c) => value.includes(c))
@@ -165,7 +182,7 @@ function ChainGrowthField({ group }: { readonly group: GroupNode }) {
       {curve !== "Even" && (
         <div className="grid grid-cols-[minmax(0,1fr)_4.75rem] items-center gap-2">
           <Slider
-            aria-label="Growth per link"
+            aria-label="Change per joint"
             min={GROWTH_RANGE.min}
             max={GROWTH_RANGE.max}
             step={1}
@@ -178,7 +195,7 @@ function ChainGrowthField({ group }: { readonly group: GroupNode }) {
             }}
           />
           <NumberField
-            label="Growth per link"
+            label="Change per joint"
             value={percent}
             digits={1}
             handle={false}
@@ -186,6 +203,11 @@ function ChainGrowthField({ group }: { readonly group: GroupNode }) {
             onCommit={(v) => commit(curve, v)}
           />
         </div>
+      )}
+      {links >= 2 && (
+        <p className="text-body text-fg-tertiary">
+          {growthReadout(dragged === null ? growth : growthFor(curve, dragged), links)}
+        </p>
       )}
     </div>
   )
@@ -286,9 +308,9 @@ function ChainLayField({ group }: { readonly group: GroupNode }) {
 }
 
 /**
- * A chain (docs/design/pivot-modes-and-chains.md § Chains): its links in outline order, each hanging off the one before,
- * so a turn in Each bends it. Here: how many links, how a bend grows down them, and the chain actions the Outline's menu
- * has.
+ * A chain (docs/design/pivot-modes-and-chains.md § Chains): its links in order, each following the one before, so link
+ * by link a turn bends it. Here: how many links, how the joints compare down them, and the chain actions the Outline's
+ * menu has.
  */
 export function ChainSection({ group }: { readonly group: GroupNode }) {
   const setChain = useEditor((s) => s.setChain)
@@ -305,10 +327,10 @@ export function ChainSection({ group }: { readonly group: GroupNode }) {
           className="w-full max-w-56"
           onClick={() => setChain(group.id, true)}
         >
-          Convert to chain
+          Make chain
         </Button>
         <InfoHint>
-          A chain's children hang off one another in outline order, so a turn in Each runs down them, link by link.
+          In a chain each piece follows the one before, so a turn bends the whole row, link by link.
         </InfoHint>
       </div>
     )
@@ -318,17 +340,22 @@ export function ChainSection({ group }: { readonly group: GroupNode }) {
       <div className="flex items-center justify-between gap-2">
         <SectionTitle>Chain</SectionTitle>
         <InfoHint>
-          The links hang off one another in outline order, each from its pivot. In Each, every link takes the edit from
-          the one before, so it adds up down the chain: a turn bends it, a move spaces it out or stacks a pile, and a
-          scale resizes every link and keeps the joints meeting. Together moves it whole. Growth grows all three link by
-          link.
+          Each link follows the one before, from link 1. Link by link (the period key), a turn bends the chain, a move
+          spreads it or stacks a pile, and a scale stretches it with every joint kept closed. Rigid moves it as one
+          piece. Joints sets how much each joint takes compared with the one before.
         </InfoHint>
       </div>
-      <p className="text-body text-fg-tertiary">{counted(links, "link")} in outline order.</p>
-      <ChainGrowthField group={group} />
+      <p className="text-body text-fg-tertiary">{counted(links, "link")}. Link 1, marked in the view, stays put.</p>
+      <ChainJointsField group={group} links={links} />
       {chainLay && <ChainLayField group={group} />}
       <div className="flex flex-wrap gap-1">
-        <Button variant="outline" size="sm" disabled={links < 2} onClick={() => reverseChain(group.id)}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={links < 2}
+          title="Start from the other end"
+          onClick={() => reverseChain(group.id)}
+        >
           Reverse
         </Button>
         <Button variant="outline" size="sm" onClick={() => setChain(group.id, false)}>Unchain</Button>

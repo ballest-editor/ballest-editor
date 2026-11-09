@@ -47,7 +47,14 @@ import {
 } from "../../domain/snapTools"
 import { annotationsOf, freshKey } from "../../domain/structure"
 import { ORIGIN, rotateVec, vecSub } from "../../domain/ueMath"
-import { applyDelta, applyUnitOffsets, carriedKeys, type SelectionUnits, type Unit } from "../../domain/units"
+import {
+  applyDelta,
+  applyUnitOffsets,
+  carriedKeys,
+  pivotModeFor,
+  type SelectionUnits,
+  type Unit
+} from "../../domain/units"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { snapMarks } from "../snap/snapMarks"
 import {
@@ -168,7 +175,7 @@ const movedBy = (s: EditorState, keys: ReadonlyArray<string>, delta: RigidDelta)
   const start = editTransformsOf(s, selection === undefined ? keys : editedKeys(s))
   return selection === undefined
     ? new Map([...start].map(([key, t]) => [key, applyGroupDelta(t, t.translation, delta)] as const))
-    : applyDelta(selection, s.pivotMode, start, delta)
+    : applyDelta(selection, pivotModeFor(s, selection), start, delta)
 }
 
 /** `delta` on the items `keys`, as one undo step called `description`. */

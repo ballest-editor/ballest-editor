@@ -226,18 +226,26 @@ describe("Each in the Inspector", () => {
     s().togglePivotMode()
   })
 
-  it("carries the links after a link edited inside an entered chain", () => {
+  it("carries the links after a link edited inside an entered chain, rigidly in Rigid and adding up link by link", () => {
     const { ids } = setup()
-    const [l1 = "", l2 = "", l3 = ""] = ids
+    const [, l2 = ""] = ids
     s().chainSelection()
     const chain = s().doc.structure.tree.find((n) => n.kind === "group")
     s().enterGroup(chain?.kind === "group" ? chain.id : null)
     s().select([l2])
     const before = new Map(ids.map((id) => [id, docTransform(id)]))
-    editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
-    assert.deepStrictEqual(docTransform(l1), before.get(l1), "the link before stays")
-    assert.strictEqual(docTransform(l2).translation.y, before.get(l2)!.translation.y + 40)
-    assert.strictEqual(docTransform(l3).translation.y, before.get(l3)!.translation.y + 40, "carried")
+    // how far each link moves for a y move of 40 on link 2; the link before stays
+    const movesOf = () => {
+      editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
+      const moves = ids.map((id) => docTransform(id).translation.y - before.get(id)!.translation.y)
+      s().undo()
+      return moves
+    }
+    assert.deepStrictEqual(movesOf(), [0, 40, 80], "a new chain goes link by link: the moves add up from link 2")
+    s().togglePivotMode()
+    assert.strictEqual(s().chainMode, "rigid")
+    assert.deepStrictEqual(movesOf(), [0, 40, 40], "Rigid: link 3 is carried")
+    s().togglePivotMode()
     s().enterGroup(null)
   })
 

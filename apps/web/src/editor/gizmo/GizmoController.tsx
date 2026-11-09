@@ -13,6 +13,7 @@ import {
   leadingKeys,
   movedAlikeKeys,
   type PivotMode,
+  pivotModeFor,
   type SelectionUnits,
   turnAccumulates
 } from "../../domain/units"
@@ -301,7 +302,7 @@ export function GizmoController() {
       const { settings } = s
       const duplicate = e.altKey && settings.general.altDragDuplicates && isTranslate(spec) ? "pending" : undefined
       const config = snapConfigOf(s)
-      const { pivotMode } = s
+      const pivotMode = pivotModeFor(s, target.selection)
       const frame = localFrameOf(start)
       // a move along world axes is the same for every unit that takes it as dragged, so any of them can lead it
       const leads = isTranslate(spec) && frame === undefined

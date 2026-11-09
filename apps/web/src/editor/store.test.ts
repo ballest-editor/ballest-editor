@@ -26,6 +26,7 @@ import {
   exportProblemOf,
   gameMapOf,
   initialMap,
+  isShownChain,
   nextSelection,
   NO_TAB_OPEN,
   nodeNamesOf,
@@ -34,6 +35,7 @@ import {
   PREFAB_TAB_STAYS_HERE,
   saveProblemOf,
   selectionPivot,
+  shownChainStart,
   shownGizmoSpace,
   shownLighting,
   shownPivotMode,
@@ -1709,13 +1711,13 @@ describe("groups and the selection", () => {
     state().groupSelection()
     const { id } = state().doc.structure.tree.find((n) => n.kind === "group")!
     state().setChain(id, true)
-    assert.deepStrictEqual(linksOf(id), [a, d, b, c], "Convert to chain")
+    assert.deepStrictEqual(linksOf(id), [a, d, b, c], "Make chain on a group")
     state().undo()
     state().undo()
     state().select([c, a, d, b])
     state().chainSelection()
     const chain = state().doc.structure.tree.find((n) => n.kind === "group")!
-    assert.deepStrictEqual(linksOf(chain.id), [c, b, d, a], "Group as chain")
+    assert.deepStrictEqual(linksOf(chain.id), [c, b, d, a], "Make chain on a selection")
   })
 
   it("lays a chain along a shape as one undo step, and nothing that isn't a chain", () => {
@@ -1736,15 +1738,30 @@ describe("groups and the selection", () => {
     assert.isFalse(state().layChain(a, { kind: "straight" }))
   })
 
-  it("chains one whole group selected in place, and bends it in Each without entering it", () => {
-    const { a, b, c, outer } = nestedMap()
+  it("chains one whole group selected in place, and bends it link by link at once, without entering it", () => {
+    const { a, b, c, d, outer } = nestedMap()
     state().select([a, b, c])
     state().chainSelection()
     assert.strictEqual(findGroup(state().doc.structure.tree, outer)?.chain, true, "the group itself")
     assert.strictEqual(state().enteredGroupId, null)
-    assert.strictEqual(shownPivotMode(state()), "together")
+    assert.isTrue(isShownChain(state()))
+    assert.strictEqual(shownPivotMode(state()), "each", "a new chain goes link by link, so a turn bends it")
+    assert.deepStrictEqual(shownChainStart(state()), selectionPivot(state(), transformOf)?.pivot, "link 1, its pivot")
+    // the period key flips the chain's setting, and leaves the pivot setting alone
     state().togglePivotMode()
-    assert.strictEqual(shownPivotMode(state()), "each", "a chain alone bends")
+    assert.strictEqual(state().chainMode, "rigid")
+    assert.strictEqual(state().pivotMode, "together")
+    assert.strictEqual(shownPivotMode(state()), "together", "Rigid")
+    state().togglePivotMode()
+    // a chain among other units follows the pivot setting, and has no start to mark
+    state().select([a, b, c, d])
+    assert.isFalse(isShownChain(state()))
+    assert.strictEqual(shownPivotMode(state()), "together")
+    assert.isUndefined(shownChainStart(state()))
+    state().togglePivotMode()
+    assert.strictEqual(state().chainMode, "links")
+    assert.strictEqual(shownPivotMode(state()), "each")
+    state().togglePivotMode()
   })
 
   it("pivots a prefab instance on its origin, and follows a live move", () => {
