@@ -7,6 +7,9 @@
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo } from "react"
 import * as THREE from "three"
+import type { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { Vec3 } from "../../domain/coords"
 import type { Construction, Measurement } from "../../domain/MapSidecar"
 import type { SnapMark, SnapRelation, TrackedPoint } from "../../domain/snapFrame"
@@ -16,6 +19,7 @@ import { vecAdd, vecCross, vecLerp, vecScale } from "../../domain/ueMath"
 import { sceneAxisColors } from "../axisColors"
 import { LABEL_HEIGHT, labelTexture } from "../labelTexture"
 import { useBeforePaneDraw } from "../PaneRenderer"
+import { hiddenLineMaterial, LINE_WIDTH, lineMaterial, screenDashes } from "../screenLines"
 import { useEditor } from "../store"
 import { useDarkTheme } from "../theme"
 import { isLine, isMesh } from "../threeGuards"
@@ -34,7 +38,6 @@ const RING = 16
 const SOURCE_POINT = 16
 const SOURCE_END = 25
 const PLUS = 7
-const DASH = 7
 /** An edge's end ticks. */
 const TICK = 9
 /** The glyph's badge, its offset up and right of the landing, and the glyph in it. */
@@ -44,8 +47,7 @@ const GLYPH = 15
 
 /** A snapping face's tint, light enough to see the piece through. */
 const FACE_TINT = 0.16
-/** A box's edges where the scene in front hides them, and where it doesn't. */
-const BOX_HIDDEN = 0.3
+/** A box's edges where the scene in front doesn't hide them; where it does, they are the scene's hidden dash. */
 const BOX_SHOWN = 0.85
 
 /** A box's twelve edges, as pairs of the corners `cornersOf` lists: those that differ along one axis. */
@@ -60,6 +62,9 @@ const ABOVE = { target: 0, source: 1, badge: 2, glyph: 3 } as const
 const look = { depthTest: false, depthWrite: false, transparent: true, toneMapped: false } as const
 
 const pointGeometry = (points: ReadonlyArray<Vec3>) => new THREE.BufferGeometry().setFromPoints(points.map(toThree))
+/** The scene's fat lines (screenLines.ts) between `points`, taken in pairs. */
+const fatLines = (points: ReadonlyArray<Vec3>, material: LineMaterial) =>
+  new LineSegments2(new LineSegmentsGeometry().setPositions(points.flatMap((p) => toThree(p).toArray())), material)
 
 const flatGeometry = (points: ReadonlyArray<readonly [number, number]>) =>
   new THREE.BufferGeometry().setFromPoints(points.map(([x, y]) => new THREE.Vector3(x, y, 0)))
@@ -132,7 +137,6 @@ const disposeMark = (object: THREE.Object3D) => {
 /** One layer of marks, rebuilt only when what it shows changes. */
 export class MarkLayer extends THREE.Group {
   private sized: Array<Sized> = []
-  private dashed: Array<THREE.LineDashedMaterial> = []
 
   private put<T extends THREE.Object3D>(object: T, above = 0, into: THREE.Object3D = this): T {
     object.renderOrder = RENDER_ORDER + above
@@ -145,7 +149,6 @@ export class MarkLayer extends THREE.Group {
     for (const child of this.children) child.traverse(disposeMark)
     this.clear()
     this.sized = []
-    this.dashed = []
   }
 
   dot(at: Vec3, color: string, size = DOT): void {
@@ -188,16 +191,15 @@ export class MarkLayer extends THREE.Group {
   }
 
   /**
-   * A side's whole box, by its eight corners in `cornersOf`'s order: thin and grey, and faint where the scene in front
+   * A side's whole box, by its eight corners in `cornersOf`'s order: thin and grey, and dashed where the scene in front
    * hides it, so it reads through the pieces as the gizmo does and still shows what is in front of what.
    */
   box(corners: ReadonlyArray<Vec3>, color: string): void {
     const edges = BOX_EDGES.flatMap(([a, b]) => [corners[a], corners[b]].flatMap((corner) => corner ?? []))
     if (edges.length !== BOX_EDGES.length * 2) return
-    const geometry = pointGeometry(edges)
-    this.put(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ ...look, color, opacity: BOX_HIDDEN })))
+    this.put(fatLines(edges, hiddenLineMaterial(color, LINE_WIDTH.hairline)))
     const shown = { ...look, depthTest: true, color, opacity: BOX_SHOWN }
-    this.put(new THREE.LineSegments(geometry.clone(), new THREE.LineBasicMaterial(shown)))
+    this.put(new THREE.LineSegments(pointGeometry(edges), new THREE.LineBasicMaterial(shown)))
   }
 
   /** The glyph of a snap's kind, white on a dark badge up and right of `at`. */
@@ -224,11 +226,9 @@ export class MarkLayer extends THREE.Group {
     this.sized.push({ object: badge, size: 1 })
   }
 
+  /** A guide: the scene's dash, light, over everything. */
   dashedLine(from: Vec3, to: Vec3, color: string): void {
-    const material = new THREE.LineDashedMaterial({ ...look, color, dashSize: DASH, gapSize: DASH })
-    const lines = this.put(new THREE.LineSegments(pointGeometry([from, to]), material))
-    lines.computeLineDistances()
-    this.dashed.push(material)
+    this.put(fatLines([from, to], lineMaterial({ ...look, color, linewidth: LINE_WIDTH.light }, [screenDashes()])))
   }
 
   face(corners: ReadonlyArray<Vec3>, color: string, opacity = FACE_TINT, above = 0): void {
@@ -267,11 +267,6 @@ export class MarkLayer extends THREE.Group {
         object.scale.set(perPixel * size[0], perPixel * size[1], 1)
       }
       object.updateMatrixWorld(true)
-    }
-    const perPixel = worldPerPixelAt(this.children[0]?.position ?? new THREE.Vector3())
-    for (const material of this.dashed) {
-      material.dashSize = DASH * perPixel
-      material.gapSize = DASH * perPixel
     }
   }
 }
@@ -358,6 +353,7 @@ export function SnapOverlay() {
   const hovered = useEditor((s) => s.hoveredItem)
   const preview = useEditor((s) => s.preview)
   const dragSnap = useEditor((s) => s.dragSnap)
+  const isolation = useEditor((s) => s.isolation)
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   const persistent = useMemo(() => new MarkLayer(), [])
   /** The open ends, apart: a drag moves them on every event. */
@@ -366,8 +362,9 @@ export function SnapOverlay() {
 
   const docEnds = useMemo(() => showOpen === "never" ? [] : endsInDoc(doc, index), [doc, index, showOpen])
   const open = useMemo(
-    () => ringedEnds({ doc, catalogIndex: index, preview, hoveredItem: hovered, dragSnap }, showOpen, docEnds),
-    [doc, index, preview, hovered, dragSnap, showOpen, docEnds]
+    () =>
+      ringedEnds({ doc, catalogIndex: index, preview, hoveredItem: hovered, dragSnap, isolation }, showOpen, docEnds),
+    [doc, index, preview, hovered, dragSnap, isolation, showOpen, docEnds]
   )
   const inputs: Inputs = useMemo(() => {
     const { construction, measurements } = annotationsOf(doc.structure)

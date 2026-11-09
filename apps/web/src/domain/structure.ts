@@ -15,6 +15,10 @@ export interface ItemMeta {
   readonly tags?: ReadonlyArray<string>
   /** Where its ends connect, when not where they were measured (docs/SNAPPING.md § Connectors). */
   readonly connectAt?: ConnectAt
+  /** Hidden: not drawn, picked or snapped to (docs/DESKTOP.md § Hide, isolate and lock). */
+  readonly hidden?: true
+  /** Locked: drawn and snapped to, but not picked in the viewport. */
+  readonly locked?: true
 }
 
 export interface Structure {
@@ -32,6 +36,20 @@ export interface Doc {
   /** The groups and each item's name and tags, by those keys (docs/PROJECTS.md § Source of truth). */
   readonly structure: Structure
 }
+
+/** Each key's place in `ids`, kept per array: a selection, an edit or a drag can be of thousands of items. */
+const keyIndices = new WeakMap<ReadonlyArray<string>, ReadonlyMap<string, number>>()
+
+const keyIndicesOf = (ids: ReadonlyArray<string>): ReadonlyMap<string, number> => {
+  const known = keyIndices.get(ids)
+  if (known !== undefined) return known
+  const indices = new Map(ids.map((id, i) => [id, i] as const))
+  keyIndices.set(ids, indices)
+  return indices
+}
+
+/** An item's place in `ids`; -1 for a key that isn't there. */
+export const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
 
 /** 72 random bits, as 12 URL-safe characters. */
 export const freshKey = (): string =>
@@ -129,9 +147,9 @@ export const withoutKeys = (structure: Structure, keys: ReadonlySet<string>): St
   items: new Map([...structure.items].filter(([key]) => !keys.has(key)))
 })
 
-const withMeta = (structure: Structure, key: string, meta: ItemMeta): Structure => {
+export const withMeta = (structure: Structure, key: string, meta: ItemMeta): Structure => {
   const items = new Map(structure.items)
-  if (meta.name === undefined && meta.tags === undefined && meta.connectAt === undefined) items.delete(key)
+  if (Object.values(meta).every((value) => value === undefined)) items.delete(key)
   else items.set(key, meta)
   return { ...structure, items }
 }

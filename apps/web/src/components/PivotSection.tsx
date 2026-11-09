@@ -2,6 +2,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
+import { memo } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { Vec3 } from "../domain/coords"
 import { canSetItemPivots, soleGroupOf } from "../domain/groupSelection"
@@ -9,7 +10,7 @@ import type { Axis } from "../domain/groupTransform"
 import { GROUP_PIVOT_FACES, type GroupNode, type GroupPivot } from "../domain/MapSidecar"
 import { PIVOT_CHOICES, pivotBoundsOf } from "../domain/pivot"
 import { snapsGrid } from "../domain/snapConfig"
-import { pieceNameOf, treeKeys } from "../domain/structure"
+import { indexOfKey, pieceNameOf, treeKeys } from "../domain/structure"
 import { vecSub } from "../domain/ueMath"
 import { editSelectionAxis, moveSelectionBy, previewSelectionAxis, setSelectionPivot } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
@@ -175,7 +176,7 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
   const members = useEditor(useShallow((s) => treeKeys([group]).filter((key) => s.doc.ids.includes(key))))
   const memberLabels = useEditor(useShallow((s) =>
     Object.fromEntries(members.map((key) => {
-      const item = s.doc.map.items[s.doc.ids.indexOf(key)]
+      const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
       return [key, names.get(key)?.name ?? (item === undefined ? key : pieceNameOf(item, catalogIndex))]
     }))
   ))
@@ -252,11 +253,11 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
  * Default need the piece's bounds, so they're off for pieces without them. A whole group has
  * choices of its own (`GroupPivotSection`).
  */
-export function PivotSection() {
+export const PivotSection = memo(function PivotSection() {
   const choices = useEditor(useShallow((s) => s.selectedIds.map((id) => pivotOf(s, id).choice)))
   const allBounded = useEditor((s) =>
     s.selectedIds.every((id) => {
-      const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+      const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
       return item !== undefined && pivotBoundsOf(item, s.catalogIndex) !== undefined
     })
   )
@@ -307,4 +308,4 @@ export function PivotSection() {
       {point !== undefined && <PivotPosition point={point} />}
     </Section>
   )
-}
+})

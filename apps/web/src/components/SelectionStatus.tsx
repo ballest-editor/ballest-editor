@@ -9,10 +9,11 @@ export function SelectionStatus() {
   const selectedIds = useEditor((s) => s.selectedIds)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
   const catalog = useEditor((s) => s.catalogIndex)
+  // the names change with the map, not the selection: a click doesn't name every item again
+  const names = useMemo(() => nodeNamesOf({ doc, catalogIndex: catalog }), [doc, catalog])
   const summary = useMemo(
-    () =>
-      selectionSummaryOf(doc.structure.tree, selectedIds, enteredGroupId, nodeNamesOf({ doc, catalogIndex: catalog })),
-    [doc, selectedIds, enteredGroupId, catalog]
+    () => selectionSummaryOf(doc.structure.tree, selectedIds, enteredGroupId, names),
+    [doc, selectedIds, enteredGroupId, names]
   )
   if (summary === null) return null
   return (

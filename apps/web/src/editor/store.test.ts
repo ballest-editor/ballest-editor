@@ -19,8 +19,10 @@ import { lightingOf } from "../domain/sunlight"
 import { surfaceOf } from "../domain/surface"
 import { defaultViewLayout } from "../domain/viewLayout"
 import type { ProjectState } from "../services/Platform"
+import { selectAll } from "./actions/selection"
 import { paintTargetOf, pickedBrushOf } from "./paintTarget"
 import {
+  areaCandidates,
   currentBrush,
   editedAtOf,
   exportProblemOf,
@@ -31,6 +33,7 @@ import {
   NO_TAB_OPEN,
   nodeNamesOf,
   noTabOpen,
+  pickableOf,
   pivotOf,
   PREFAB_TAB_STAYS_HERE,
   saveProblemOf,
@@ -38,6 +41,7 @@ import {
   shownChainStart,
   shownGizmoSpace,
   shownLighting,
+  shownOf,
   shownPivotMode,
   shownTransform,
   shownValidation,
@@ -652,13 +656,17 @@ describe("editor store", () => {
       return { ids, steps: s().past.length }
     }
 
-    it("selects with replace, add and toggle clicks", () => {
+    it("selects with replace, add, toggle and remove clicks", () => {
       assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "replace"), ["c"])
       assert.deepStrictEqual(nextSelection(["a", "b"], [], "replace"), [])
       assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "add"), ["a", "b", "c"])
       assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "add"), ["b", "a"]) // re-adding makes it active
       assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "toggle"), ["b"])
       assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "toggle"), ["a", "b", "c"])
+      // remove never adds, and leaves the selection as it was when the item wasn't in it
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "remove"), ["b"])
+      const ab = ["a", "b"]
+      assert.strictEqual(nextSelection(ab, ["c"], "remove"), ab)
       // a modifier click on empty space keeps the selection
       assert.deepStrictEqual(nextSelection(["a", "b"], [], "add"), ["a", "b"])
       assert.deepStrictEqual(nextSelection(["a", "b"], [], "toggle"), ["a", "b"])
@@ -2091,5 +2099,105 @@ describe("the Validate result", () => {
     assert.isUndefined(shownValidation(state()))
     state().activateTab(tabId)
     assert.isDefined(shownValidation(state()))
+  })
+})
+
+describe("hide, isolate and lock", () => {
+  /** Three cubes, the first two grouped; answers their keys. */
+  const threeCubes = () => {
+    useEditor.setState({ tabIds: [state().tabId], parkedTabs: new Map() })
+    mapWithCubes(0, 200, 400)
+    const [a = "", b = "", c = ""] = state().doc.ids.slice(1)
+    state().select([a, b])
+    state().groupSelection()
+    return { a, b, c }
+  }
+  const hidden = () => state().doc.ids.filter((key) => state().doc.structure.items.get(key)?.hidden === true)
+
+  it("hides the selection as one undo step that takes it out of the selection, and undo brings both back", () => {
+    const { a, b, c } = threeCubes()
+    state().select([a, b, c])
+    state().toggleSelectionFlag("hidden")
+    assert.deepStrictEqual(hidden(), [a, b, c])
+    assert.deepStrictEqual(state().selectedIds, [])
+    assert.isTrue(state().dirty)
+    assert.strictEqual(state().past.at(-1)?.description, "Hide")
+    state().undo()
+    assert.deepStrictEqual(hidden(), [])
+    assert.deepStrictEqual(state().selectedIds, [a, b, c])
+  })
+
+  it("shows a selection that is all hidden, as one picked in the Outline is", () => {
+    const { c } = threeCubes()
+    state().setItemFlag([c], "hidden", true)
+    state().select([c])
+    state().toggleSelectionFlag("hidden")
+    assert.deepStrictEqual(hidden(), [])
+    assert.deepStrictEqual(state().selectedIds, [c])
+  })
+
+  it("shows every hidden item and selects them", () => {
+    const { a, c } = threeCubes()
+    state().setItemFlag([a, c], "hidden", true)
+    state().select([])
+    state().clearFlag("hidden")
+    assert.deepStrictEqual(hidden(), [])
+    assert.deepStrictEqual(state().selectedIds, [a, c])
+    const steps = state().past.length
+    state().clearFlag("hidden")
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("lets a click, a box and Select all reach neither a hidden nor a locked item, but a group comes whole", () => {
+    const { a, b, c } = threeCubes()
+    const start = state().doc.ids[0]!
+    state().setItemFlag([a], "hidden", true)
+    state().setItemFlag([c], "locked", true)
+    const pickable = pickableOf(state())
+    assert.deepStrictEqual([a, b, c].map(pickable), [false, true, false])
+    assert.deepStrictEqual([a, b, c].map(shownOf(state())), [false, true, true])
+    assert.deepStrictEqual(areaCandidates(state()), [start, b])
+    selectAll()
+    // b still reaches its group, a with it; c is locked
+    assert.sameMembers([...state().selectedIds], [start, a, b])
+  })
+
+  it("isolates the selection in the tab's panes, outside the history, and shows what is placed meanwhile", () => {
+    const { a, b, c } = threeCubes()
+    state().select([c])
+    const steps = state().past.length
+    const doc = state().doc
+    state().toggleIsolation()
+    assert.deepStrictEqual([a, b, c].map(shownOf(state())), [false, false, true])
+    assert.strictEqual(state().past.length, steps)
+    assert.strictEqual(state().doc, doc)
+    state().placePiece(cube, placementTransform(cube, { x: 600, y: 0, z: 0 }))
+    const placed = state().doc.ids.at(-1)!
+    assert.isTrue(shownOf(state())(placed))
+    // a hide inside the isolation is the document's, and outlasts it
+    state().select([placed])
+    state().toggleSelectionFlag("hidden")
+    state().toggleIsolation()
+    assert.deepStrictEqual([a, b, c, placed].map(shownOf(state())), [true, true, true, false])
+  })
+
+  it("keeps an isolation with its tab, and a newly loaded map starts without one", () => {
+    const { c } = threeCubes()
+    const first = state().tabId
+    state().select([c])
+    state().toggleIsolation()
+    state().loadMap(startOnlyMap(), { name: "other.balledit", path: null }, undefined, { into: "addedTab" })
+    assert.isNull(state().isolation)
+    state().activateTab(first)
+    assert.strictEqual(state().isolation?.outside.size, state().doc.ids.length - 1)
+    state().loadMap(startOnlyMap(), null)
+    assert.isNull(state().isolation)
+  })
+
+  it("does nothing to isolate with nothing selected", () => {
+    threeCubes()
+    state().select([])
+    state().toggleIsolation()
+    assert.isNull(state().isolation)
   })
 })

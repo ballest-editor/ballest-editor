@@ -13,6 +13,7 @@ import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { String as Str, Struct } from "effect"
 import { useEffect } from "react"
+import { AREA_RULE_NAMES } from "../domain/areaSelect"
 import { movementLookModes } from "../domain/flyKeys"
 import { namedActions } from "../domain/GameKeybinds"
 import { overriddenFolders } from "../domain/gameLink"
@@ -343,6 +344,21 @@ export function SettingsDialog(props: {
           <Switch
             checked={settings.editor.undoSelection}
             onCheckedChange={(v) => update("editor", { undoSelection: v })}
+          />
+        )
+      },
+      {
+        id: "areaSelect",
+        ...setting("editor", "areaSelect"),
+        label: "Box selects",
+        description: "What a box or lasso takes: by the drag's direction, or always one rule.",
+        info:
+          "By direction: dragged left to right, a box takes what is wholly inside it; right to left, anything it touches. Touching and Wholly inside fix one rule whichever way it is dragged.",
+        control: (
+          <Choice
+            value={settings.editor.areaSelect}
+            items={AREA_RULE_NAMES}
+            onChange={(v) => update("editor", { areaSelect: v })}
           />
         )
       },

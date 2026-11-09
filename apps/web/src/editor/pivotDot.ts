@@ -5,6 +5,7 @@
  * it. Each draws one per unit; Together one, at the selection's pivot (docs/design/pivot-modes-and-chains.md § Showing it).
  */
 import * as THREE from "three"
+import { SCENE_ROLES } from "./sceneColors"
 
 /** On screen, in pixels. */
 const RADIUS = 4.5
@@ -12,8 +13,6 @@ const RING_RADIUS = 5
 const RING_DASHES = 8
 /** Over the scene, outlines and group boxes, under the gizmo. */
 const RENDER_ORDER = 900
-
-const COLORS = { dark: "#ffffff", light: "#1f2430" } as const
 
 const dashedRing = (): THREE.BufferGeometry => {
   const points: Array<number> = []
@@ -51,7 +50,7 @@ export class PivotDot extends THREE.Group {
   }
 
   setDark(dark: boolean): void {
-    const color = COLORS[dark ? "dark" : "light"]
+    const color = SCENE_ROLES[dark ? "dark" : "light"].context
     this.disc.material.color.set(color)
     this.ring.material.color.set(color)
   }

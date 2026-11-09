@@ -13,7 +13,7 @@ import { applyDelta, movedAlikeKeys, type PivotMode, pivotModeFor, type Selectio
 import { transformSelection } from "../actions"
 import { type PaneCamera, panePointer } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
-import { fitTransforms, type PickerRequest, snapConfigOf, useEditor } from "../store"
+import { fitTransforms, pickableOf, type PickerRequest, shownOf, snapConfigOf, useEditor } from "../store"
 import { cancelsDrag, type DragKeyState, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import {
   dragKeysOf,
@@ -35,8 +35,8 @@ const DRAG_SLOP_PX = 4
 /** How far a resting pointer can wander and still be hovering. */
 const HOVER_SLOP_PX = 4
 
-/** How long the pointer pauses before the item under it counts as hovered. */
-const HOVERED_ITEM_MS = 80
+/** How often, at most, the item under a moving pointer is asked again. */
+const HOVERED_ITEM_MS = 50
 
 interface Pressed {
   readonly x: number
@@ -71,11 +71,15 @@ const surfaceOf = (pane: PaneCamera): Constraint => ({
     : toGame(pane.camera.getWorldDirection(new THREE.Vector3()).normalize())
 })
 
-/** The item under the pointer and where on it the pointer is, in the game's frame. */
+/**
+ * The item under the pointer that `accepts` takes, and where on it the pointer is, in the game's frame. What it doesn't
+ * take, it looks through, as a click does a hidden or locked piece.
+ */
 const pressedOn = (
   el: HTMLElement,
   e: PointerEvent,
   raycaster: THREE.Raycaster,
+  accepts: (key: string) => boolean,
   slot?: number
 ): { readonly key: string; readonly at: Vec3 } | null => {
   const { ndc, pane } = panePointer(el, e, slot)
@@ -84,14 +88,18 @@ const pressedOn = (
   for (const hit of root === null ? [] : raycaster.intersectObject(root, true)) {
     for (let at: THREE.Object3D | null = hit.object; at !== null; at = at.parent) {
       const id: unknown = at.userData["itemId"]
-      if (typeof id === "string") return { key: id, at: toGame(hit.point) }
+      if (typeof id === "string") {
+        if (accepts(id)) return { key: id, at: toGame(hit.point) }
+        break
+      }
     }
   }
   return null
 }
 
-const itemUnder = (el: HTMLElement, e: PointerEvent, raycaster: THREE.Raycaster, slot?: number): string | null =>
-  pressedOn(el, e, raycaster, slot)?.key ?? null
+/** The drawn item under the pointer: a locked one shows its open ends too, as it is still snapped to. */
+const itemUnder = (el: HTMLElement, e: PointerEvent, raycaster: THREE.Raycaster): string | null =>
+  pressedOn(el, e, raycaster, shownOf(useEditor.getState()))?.key ?? null
 
 export function SnapInput() {
   const gl = useThree((s) => s.gl)
@@ -102,9 +110,11 @@ export function SnapInput() {
     let drag: BodyDrag | null = null
     let hoverTimer: ReturnType<typeof setTimeout> | undefined
     let itemTimer: ReturnType<typeof setTimeout> | undefined
+    let itemAskedAt = -Infinity
     let hoverAt: { x: number; y: number } | undefined
 
     sceneRegistry.bodyDragActive = () => drag !== null
+    sceneRegistry.bodyDragPending = () => pressed !== null || drag !== null
 
     const end = () => {
       drag = null
@@ -219,15 +229,28 @@ export function SnapInput() {
       }, hoverMs)
     }
 
-    /** Which item shows its open ends: asked once the pointer pauses, as a raycast per move costs a large map too much. */
+    /**
+     * The item under the pointer, for the hover's outline and its open ends: asked at most once per `HOVERED_ITEM_MS`
+     * while the pointer moves, and once more where it stops, as a raycast per move costs a large map too much.
+     */
     const followHover = (e: PointerEvent) => {
       clearTimeout(itemTimer)
-      if (useEditor.getState().settings.snapPrefs.showOpenEnds !== "hover" || e.buttons !== 0) return
-      itemTimer = setTimeout(() => {
+      if (e.buttons !== 0) return
+      const ask = () => {
+        itemAskedAt = performance.now()
         const s = useEditor.getState()
         const key = itemUnder(el, e, raycaster)
         if (key !== s.hoveredItem) s.setHoveredItem(key)
-      }, HOVERED_ITEM_MS)
+      }
+      const wait = itemAskedAt + HOVERED_ITEM_MS - performance.now()
+      if (wait <= 0) ask()
+      else itemTimer = setTimeout(ask, wait)
+    }
+    const leave = () => {
+      stopHover()
+      clearTimeout(itemTimer)
+      const s = useEditor.getState()
+      if (s.hoveredItem !== null) s.setHoveredItem(null)
     }
 
     const showPick = (picker: PickerRequest, e: PointerEvent) => {
@@ -263,7 +286,8 @@ export function SnapInput() {
       if (s.tool !== "select" && s.tool !== "translate") return
       if (sceneRegistry.isNavigationChord(mouseChordOf(e)) || e.ctrlKey || e.shiftKey || e.altKey) return
       const slot = panePointer(el, e).slot
-      const under = pressedOn(el, e, raycaster, slot)
+      // a body drag starts where a click would pick
+      const under = pressedOn(el, e, raycaster, pickableOf(s), slot)
       if (under === null || !s.selectedIds.includes(under.key) || !bodyDrags(s)) return
       pressed = { x: e.clientX, y: e.clientY, pointerId: e.pointerId, slot, e, at: under.at, keys: seedDragKeys(e) }
     }
@@ -360,7 +384,7 @@ export function SnapInput() {
     el.addEventListener("pointerup", onPointerUp, { capture: true, signal })
     el.addEventListener("pointercancel", onPointerLost, { signal })
     el.addEventListener("lostpointercapture", onPointerLost, { signal })
-    el.addEventListener("pointerleave", stopHover, { signal })
+    el.addEventListener("pointerleave", leave, { signal })
     window.addEventListener("keydown", onKeyDown, { capture: true, signal })
     window.addEventListener("keyup", onKeyUp, { capture: true, signal })
     return () => {
@@ -368,6 +392,7 @@ export function SnapInput() {
       stopHover()
       clearTimeout(itemTimer)
       sceneRegistry.bodyDragActive = () => false
+      sceneRegistry.bodyDragPending = () => false
       if (pressed !== null) letGo()
       if (drag !== null) cancel()
     }

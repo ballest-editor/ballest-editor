@@ -87,7 +87,9 @@ describe("three materials", () => {
     assert.include(shader.fragmentShader, "texture2D( map, ballestUv( uBaseColorTiling ) )")
     assert.notInclude(shader.fragmentShader, "#include <map_fragment>")
     assert.include(shader.vertexShader, "vBallestScale")
-    assert.include(shader.vertexShader, "transpose( inverse( mat3( modelMatrix ) ) ) * objectNormal")
+    assert.include(shader.vertexShader, "transpose( inverse( mat3( ballestModel ) ) ) * objectNormal")
+    // a batched mesh's place is its instance matrix's too
+    assert.include(shader.vertexShader, "mat4 ballestModel = modelMatrix * instanceMatrix;")
   })
 
   it("takes a subsurface material's normal strength and light from its spec, and leaves the others on the defaults", () => {

@@ -15,6 +15,7 @@ import { type Effect, Option } from "effect"
 import { useMemo } from "react"
 import { create } from "zustand"
 import { useShallow } from "zustand/react/shallow"
+import type { AreaOp } from "../domain/areaSelect"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
 import { endsOf } from "../domain/connectors"
 import type { WorldEnd } from "../domain/connectors"
@@ -48,6 +49,7 @@ import {
   enteredLevelOf,
   groupPathOf,
   nodeKeys,
+  selectableKeys,
   selectedGroupIds,
   selectionNodeIds,
   soleGroupOf
@@ -103,6 +105,7 @@ import {
   freshKey,
   freshKeys,
   groupNames,
+  indexOfKey,
   itemNames,
   type NumberedName,
   sameStrings,
@@ -145,6 +148,16 @@ import {
   withoutMaximised,
   withPaneChange
 } from "../domain/viewLayout"
+import {
+  type Isolation,
+  isolationOf,
+  isPickable,
+  isShown,
+  type ItemFlag,
+  keysWith,
+  toggledFlag,
+  withFlag
+} from "../domain/visibility"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
   GamePathKind,
@@ -180,6 +193,7 @@ import {
   unitOf,
   withCarriedPoints
 } from "../domain/units"
+import { areaDragging } from "./areaDrag"
 import type { GizmoSpace } from "./gizmo/handles"
 import type { Brush } from "./paintTarget"
 
@@ -216,8 +230,8 @@ export interface DocClip extends Clip {
  */
 export type Selection = ReadonlyArray<string>
 
-/** How a click changes the selection: plain click, add-to-selection, or toggle. */
-export type SelectMode = "replace" | "add" | "toggle"
+/** How a click or a box changes the selection: plain, add-to-selection, toggle, or remove. */
+export type SelectMode = AreaOp
 
 /**
  * One undo/redo step, seen from the side it restores: the document and the selection that
@@ -250,8 +264,8 @@ export interface TransformOptions {
  * the selection's body to the drag's end, and only when a key changes, so a pointer move doesn't render the bar.
  */
 export interface DragKeysShown {
-  /** What the drag does, which says which keys mean something to it. */
-  readonly transform: SnapTransform
+  /** What the drag does, which says which keys mean something to it: a transform, or a box or lasso. */
+  readonly transform: SnapTransform | "area"
   /** The codes down now, in the order they went down. */
   readonly pressed: ReadonlyArray<string>
   /** The move's lock, while one is set. */
@@ -532,6 +546,12 @@ export interface TabState {
   readonly enteredGroupId: string | null
   /** The groups the Outline shows closed. Outside the document and its history, so undo doesn't touch them. */
   readonly collapsedGroups: ReadonlySet<string>
+  /**
+   * What the tab's panes leave out while the selection is isolated; null when nothing is. A view of the tab, like
+   * `collapsedGroups`: outside the document and its history, and gone with the tab (docs/DESKTOP.md § Hide, isolate
+   * and lock).
+   */
+  readonly isolation: Isolation | null
   /** How the tab divides its view into panes; kept per map in MapPrefsStore. */
   readonly viewLayout: ViewLayout
   /** The slot of the active pane: what the fly keys, Focus selection and Frame all act on. */
@@ -669,7 +689,7 @@ export interface EditorState extends TabState {
   readonly picker: PickerRequest | null
   /** The offer the last connector snap left in its chip. */
   readonly flipOffer: FlipOffer | null
-  /** The item under the pointer, while Show open ends is On hover. */
+  /** The item under the pointer: what the hover outlines, and whose open ends show while Show open ends is On hover. */
   readonly hoveredItem: string | null
   /** Flush and tangent's panel: which, and how far the faces stand apart in cm. */
   readonly flushMode: FaceMeeting
@@ -868,6 +888,17 @@ export interface EditorState extends TabState {
   /** Checks the document against the game's format; `shownValidation` has the result until the next edit. */
   readonly validateDoc: () => void
   readonly setGroupCollapsed: (groupId: string, collapsed: boolean) => void
+  /**
+   * Hides or locks the items `keys` (`on`), or shows or unlocks them, as one undo step. What becomes hidden or locked
+   * leaves the selection, as the viewport can no longer pick it.
+   */
+  readonly setItemFlag: (keys: ReadonlyArray<string>, flag: ItemFlag, on: boolean) => void
+  /** Hides the selection, or shows it when all of it is hidden already (as it can be, picked in the Outline). */
+  readonly toggleSelectionFlag: (flag: ItemFlag) => void
+  /** Shows every hidden item, or unlocks every locked one, as one undo step, and selects them, as Blender's Alt+H. */
+  readonly clearFlag: (flag: ItemFlag) => void
+  /** Isolates the selection in the tab's panes, or ends the isolation; nothing with neither. */
+  readonly toggleIsolation: () => void
   readonly expandGroups: (groupIds: ReadonlyArray<string>) => void
   readonly setTool: (tool: Tool) => void
   readonly setBrush: (brush: Brush) => void
@@ -973,6 +1004,7 @@ const freshTabState = (
     savedSnap: snap,
     enteredGroupId: null,
     collapsedGroups: new Set(),
+    isolation: null,
     viewLayout,
     activePane: maximisedSlotOf(viewLayout) ?? 0,
     validation: null
@@ -1004,6 +1036,7 @@ const activeTabOf = (s: EditorState): TabState => ({
   savedSnap: s.savedSnap,
   enteredGroupId: s.enteredGroupId,
   collapsedGroups: s.collapsedGroups,
+  isolation: s.isolation,
   viewLayout: s.viewLayout,
   activePane: s.activePane,
   validation: s.validation
@@ -1082,6 +1115,12 @@ const withMovedItems = (
     options?.connected === true,
     catalog
   )
+}
+
+/** What Undo names each hide and lock step: setting the flag, clearing it, and clearing it everywhere. */
+const FLAG_STEPS: Readonly<Record<ItemFlag, readonly [string, string, string]>> = {
+  hidden: ["Hide", "Show", "Show all"],
+  locked: ["Lock", "Unlock", "Unlock all"]
 }
 
 export const useEditor = create<EditorState>()((set, get) => {
@@ -1490,7 +1529,10 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     paintSlots: (edits) => {
       const { doc } = get()
-      const next = setSlotMaterials(doc.map, edits.map(({ id, ...edit }) => ({ ...edit, index: doc.ids.indexOf(id) })))
+      const next = setSlotMaterials(
+        doc.map,
+        edits.map(({ id, ...edit }) => ({ ...edit, index: indexOfKey(doc.ids, id) }))
+      )
       if (Option.isNone(next)) {
         get().notify("error", "Those items no longer have that material slot.")
         return false
@@ -1501,7 +1543,7 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     paintSurface: (ids, value) => {
       const { doc, notify } = get()
-      const indices = ids.map((id) => doc.ids.indexOf(id))
+      const indices = ids.map((id) => indexOfKey(doc.ids, id))
       const property = { list: "intProperties", name: SURFACE_PROPERTY, type: "Integer" } as const
       const next = indices.includes(-1) ? Option.none() : setProperties(doc.map, indices, [{ property, value }])
       if (Option.isNone(next)) {
@@ -1564,7 +1606,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setItemPivots: (pivots) => {
       const { doc } = get()
       const entries = [...pivots].flatMap(([id, pivot]) => {
-        const index = doc.ids.indexOf(id)
+        const index = indexOfKey(doc.ids, id)
         return index < 0 || samePivot(pivotAt(doc.map, index), pivot) ? [] : [[index, pivot] as const]
       })
       if (entries.length > 0) commit({ ...doc, map: setPivots(doc.map, entries) })
@@ -1601,7 +1643,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         }))
         const map = setTransforms(
           next.doc.map,
-          [...transforms].map(([id, t]) => [next.doc.ids.indexOf(id), t] as const)
+          [...transforms].map(([id, t]) => [indexOfKey(next.doc.ids, id), t] as const)
         )
         if (Option.isNone(map)) {
           s.notify("error", INVALID_TRANSFORM)
@@ -1656,7 +1698,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       const { doc } = get()
       const next = transforms === null
         ? Option.none()
-        : setTransforms(doc.map, [...transforms].map(([id, t]) => [doc.ids.indexOf(id), t] as const))
+        : setTransforms(doc.map, [...transforms].map(([id, t]) => [indexOfKey(doc.ids, id), t] as const))
       if (Option.isNone(next)) {
         set({ doc: before.doc, selectedIds: before.selectedIds })
         if (transforms !== null) get().notify("error", INVALID_TRANSFORM)
@@ -1694,9 +1736,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setTags: (target, tags) => commitStructure(withTags(get().doc.structure, target, tags)),
     setConnectAt: (key, end, spot) => {
       const s = get()
-      const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
-      const connector = item === undefined ? undefined : s.catalogIndex?.pieceByClass.get(item.actorToSpawn)
-        ?.connectors?.[end]
+      const connector = connectorAt(s, key, end)
       if (connector === undefined) return
       const structure = withConnectAt(s.doc.structure, key, end, spot === defaultSpotOf(connector) ? undefined : spot)
       if (structure === undefined) return
@@ -1822,6 +1862,35 @@ export const useEditor = create<EditorState>()((set, get) => {
       set(({ doc, catalogIndex }) => ({
         validation: { doc, result: validateMap(gameMapOf(doc, catalogIndex), catalogIndex) }
       })),
+    setItemFlag: (keys, flag, on) => {
+      const { doc, selectedIds } = get()
+      const structure = withFlag(doc.structure, keys, flag, on)
+      if (structure === undefined) return
+      const gone = new Set(on ? keys : [])
+      commit(
+        { ...doc, structure },
+        { selectedIds: selectedIds.filter((id) => !gone.has(id)) },
+        undefined,
+        FLAG_STEPS[flag][on ? 0 : 1]
+      )
+    },
+    toggleSelectionFlag: (flag) => {
+      const { doc, selectedIds, setItemFlag } = get()
+      if (selectedIds.length > 0) setItemFlag(selectedIds, flag, toggledFlag(doc.structure, selectedIds, flag))
+    },
+    clearFlag: (flag) => {
+      const { doc } = get()
+      const keys = keysWith(doc.structure, flag)
+      const structure = withFlag(doc.structure, keys, flag, false)
+      if (structure !== undefined) commit({ ...doc, structure }, { selectedIds: keys }, undefined, FLAG_STEPS[flag][2])
+    },
+    toggleIsolation: () =>
+      set((s) => {
+        if (noTabOpen(s)) return s
+        if (s.isolation !== null) return { isolation: null }
+        const isolation = isolationOf(s.doc.ids, s.selectedIds)
+        return isolation === undefined ? s : { isolation }
+      }),
     setGroupCollapsed: (groupId, collapsed) =>
       set((s) => {
         if (s.collapsedGroups.has(groupId) === collapsed) return s
@@ -2012,6 +2081,17 @@ export const useEditor = create<EditorState>()((set, get) => {
 })
 
 /** Tab `tabId`'s state, wherever it is; undefined when no tab has that id. */
+/** Whether the active tab draws item `key` (`isShown`): what the viewport shows and snapping lands on. */
+export const shownOf = (s: Pick<TabState, "doc" | "isolation">) => (key: string): boolean =>
+  isShown(s.doc.structure, s.isolation, key)
+
+/**
+ * Whether the viewport can pick item `key` in the active tab (`isPickable`): drawn and not locked. Clicks, Select all
+ * and box and lasso select (#85) all ask this.
+ */
+export const pickableOf = (s: Pick<TabState, "doc" | "isolation">) => (key: string): boolean =>
+  isPickable(s.doc.structure, s.isolation, key)
+
 export const tabStateOf = (s: EditorState, tabId: string): TabState | undefined => {
   if (noTabOpen(s)) return undefined
   return tabId === s.tabId ? activeTabOf(s) : s.parkedTabs.get(tabId)
@@ -2213,22 +2293,17 @@ export const nextSelection = (current: Selection, ids: ReadonlyArray<string>, mo
   if (ids.length === 0) return current
   const clicked = new Set(ids)
   const rest = current.filter((x) => !clicked.has(x))
+  if (mode === "remove") return rest.length === current.length ? current : rest
   return mode === "toggle" && rest.length === current.length - clicked.size ? rest : [...rest, ...ids]
 }
 
-/** Each key's place in `ids`, kept per array: a group's selection can be thousands of items. */
-const keyIndices = new WeakMap<ReadonlyArray<string>, ReadonlyMap<string, number>>()
-
-const keyIndicesOf = (ids: ReadonlyArray<string>): ReadonlyMap<string, number> => {
-  const known = keyIndices.get(ids)
-  if (known !== undefined) return known
-  const indices = new Map(ids.map((id, i) => [id, i] as const))
-  keyIndices.set(ids, indices)
-  return indices
-}
-
-/** An item's place in `ids`; -1 for a key that isn't there. */
-export const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
+/**
+ * What a box or lasso can catch, in Outline order: the map's items or the entered group's that the viewport can pick
+ * (`pickableOf`), so hidden and locked items leave a box as they leave a click. A caught unit still brings its hidden
+ * and locked members (`caughtUnitsOf`), as a click on a group does.
+ */
+export const areaCandidates = (s: Pick<EditorState, "doc" | "enteredGroupId" | "isolation">): ReadonlyArray<string> =>
+  selectableKeys(s.doc.structure.tree, s.enteredGroupId).filter(pickableOf(s))
 
 /** The box around the items at `keys` where they show, which is ahead of the document during a continuous edit. */
 export const groupBoxOf = (
@@ -2244,7 +2319,7 @@ export const groupBoxOf = (
   )
 
 /** Document indices of the selected items, in selection order. */
-export const selectedIndices = (s: EditorState): Array<number> =>
+export const selectedIndices = (s: Pick<EditorState, "doc" | "selectedIds">): Array<number> =>
   s.selectedIds.map((id) => indexOfKey(s.doc.ids, id)).filter((i) => i >= 0)
 
 /** The names of the map's items and groups, by key and id, with their ordinals apart so they can be styled. */
@@ -2264,8 +2339,14 @@ export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? 
 /** An item's pivot (Default when it has none, or isn't in the document). */
 export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, indexOfKey(s.doc.ids, id))
 
+/** The connector at `end` of the item at `key`, where its piece has one. */
+export const connectorAt = (s: Pick<EditorState, "doc" | "catalogIndex">, key: string, end: number) => {
+  const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
+  return item === undefined ? undefined : s.catalogIndex?.pieceByClass.get(item.actorToSpawn)?.connectors?.[end]
+}
+
 /** An item's edit transform (see domain/editTransform.ts) in the document. */
-const docTransformOf = (s: EditorState, id: string): UeTransform | undefined => {
+export const docTransformOf = (s: EditorState, id: string): UeTransform | undefined => {
   const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
   return item === undefined ? undefined : editTransform(item)
 }
@@ -2386,13 +2467,28 @@ export const shownPivotMode = (s: EditorState): PivotMode => {
 }
 
 /** The pivot dots to draw for the selection as shown (`pivotDotsOf`). */
-export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => {
+/**
+ * `derive` of the store's state, worked out again only for a new state: every change makes one, so the panes, which
+ * read these each frame, read them free in a frame that changed nothing.
+ */
+const perState = <T>(derive: (s: EditorState) => T): (s: EditorState) => T => {
+  let last: { readonly s: EditorState; readonly value: T } | undefined
+  return (s) => {
+    if (last?.s !== s) last = { s, value: derive(s) }
+    return last.value
+  }
+}
+
+/** None while a box or lasso is dragged, which keeps the editor's state as it was: the selection may change. */
+export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => areaDragging() ? [] : pivotDotsFor(s)
+
+const pivotDotsFor = perState((s): ReadonlyArray<PivotDotSpec> => {
   const transformOf = (id: string) => shownTransform(s, id)
   const selection = selectionUnits(s, transformOf)
   return selection === undefined
     ? []
     : pivotDotsOf(selection, pivotModeFor(s, selection), unitContext(s, transformOf).boxOf)
-}
+})
 
 /** Where a selected chain starts, and whether the gizmo sits on that point too. */
 export interface ChainStartSpec {
@@ -2405,7 +2501,10 @@ export interface ChainStartSpec {
  * swaps for the other end. For one whole chain, or links selected inside an entered one; undefined otherwise. `gizmo`
  * says a transform tool's gizmo is on it, as it is for a whole chain, so its mark goes under the gizmo.
  */
-export const shownChainStart = (s: EditorState): ChainStartSpec | undefined => {
+export const shownChainStart = (s: EditorState): ChainStartSpec | undefined =>
+  areaDragging() ? undefined : chainStartFor(s)
+
+const chainStartFor = perState((s): ChainStartSpec | undefined => {
   const selection = selectionUnits(s, (id) => shownTransform(s, id))
   if (selection === undefined || !isChainSelection(selection)) return undefined
   const at = (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot
@@ -2413,7 +2512,7 @@ export const shownChainStart = (s: EditorState): ChainStartSpec | undefined => {
   const pivot = pivotUnitOf(selection, pivotModeFor(s, selection)).pivot
   const transforming = s.tool === "translate" || s.tool === "rotate" || s.tool === "scale"
   return { at, gizmo: transforming && Math.hypot(pivot.x - at.x, pivot.y - at.y, pivot.z - at.z) < 1 }
-}
+})
 
 /**
  * Where a selection pivots, given how to read an item's transform: the active unit's pivot point and axes. For an item

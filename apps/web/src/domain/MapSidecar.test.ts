@@ -9,9 +9,14 @@ const sidecar = {
   formatVersion: 1,
   mapHash: "a".repeat(64),
   items: {
-    "k-1": { index: 0, fingerprint: "BP_Prim_Cube|0,0,0|0,0,0,1|1,1,1" },
+    "k-1": { index: 0, fingerprint: "BP_Prim_Cube|0,0,0|0,0,0,1|1,1,1", locked: true },
     k_2: { index: 1, fingerprint: "BP_Prim_Cube|1,0,0|0,0,0,1|1,1,1", name: "Left ramp", tags: ["start", "hard"] },
-    k3: { index: 2, fingerprint: "BP_Prim_Cube|2,0,0|0,0,0,1|1,1,1", connectAt: { "0": "topLeft", "1": "centre" } }
+    k3: {
+      index: 2,
+      fingerprint: "BP_Prim_Cube|2,0,0|0,0,0,1|1,1,1",
+      connectAt: { "0": "topLeft", "1": "centre" },
+      hidden: true
+    }
   },
   tree: [
     { kind: "item", key: "k-1" },
@@ -38,7 +43,17 @@ describe("MapSidecar", () => {
     assert.deepStrictEqual(decoded({ front: "top" }), Option.some({}))
   })
 
-  it("round-trips nested groups, names, tags and connection spots", () => {
+  it("refuses hidden or locked written as anything but true", () => {
+    const decodes = (extra: Record<string, unknown>) =>
+      Option.isSome(
+        Schema.decodeUnknownOption(MapSidecar)({ ...sidecar, items: { k3: { index: 2, fingerprint: "x", ...extra } } })
+      )
+    assert.isTrue(decodes({ hidden: true, locked: true }))
+    assert.isFalse(decodes({ hidden: false }))
+    assert.isFalse(decodes({ locked: "yes" }))
+  })
+
+  it("round-trips nested groups, names, tags, connection spots and hidden and locked items", () => {
     const text = JSON.stringify(sidecar)
     const decoded = Schema.decodeSync(Codec)(text)
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(decoded)), sidecar)

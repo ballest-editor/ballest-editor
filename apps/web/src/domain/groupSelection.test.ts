@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
+import { group, item, nestedTree } from "../test/trees"
 import {
   activeNodeOf,
   canGroupSelection,
@@ -10,30 +11,15 @@ import {
   groupPathOf,
   groupSelectionStates,
   groupTrail,
+  hoverKeysOf,
   nodeKeys,
-  selectableKeys,
   selectedGroupIds,
   selectionNodeIds,
   selectionSummaryOf,
   unitSummaryOf
 } from "./groupSelection"
-import type { TreeNode } from "./MapSidecar"
 
-const item = (key: string): TreeNode => ({ kind: "item", key })
-const group = (id: string, ...children: ReadonlyArray<TreeNode>): TreeNode => ({
-  kind: "group",
-  id,
-  name: id,
-  tags: [],
-  children
-})
-
-/** outer > (inner > (a, b), c); d loose; solo > only > e */
-const tree: ReadonlyArray<TreeNode> = [
-  group("outer", group("inner", item("a"), item("b")), item("c")),
-  item("d"),
-  group("solo", group("only", item("e")))
-]
+const tree = nestedTree
 
 describe("groupPathOf and nodeKeys", () => {
   it("gives the groups around a node, outermost first", () => {
@@ -66,6 +52,23 @@ describe("clickLevelOf", () => {
     assert.deepStrictEqual(clickLevelOf(tree, "c", "inner"), { nodeId: "c", enteredGroupId: "outer" })
     assert.deepStrictEqual(clickLevelOf(tree, "d", "inner"), { nodeId: "d", enteredGroupId: null })
     assert.deepStrictEqual(clickLevelOf(tree, "e", "inner"), { nodeId: "solo", enteredGroupId: null })
+  })
+})
+
+describe("hoverKeysOf", () => {
+  it("is what a click would select: the outermost group with nothing entered, the entered group's child inside it", () => {
+    assert.deepStrictEqual(hoverKeysOf(tree, "a", null, []), ["a", "b", "c"])
+    assert.deepStrictEqual(hoverKeysOf(tree, "a", "outer", []), ["a", "b"])
+    assert.deepStrictEqual(hoverKeysOf(tree, "d", null, []), ["d"])
+  })
+
+  it("leaves out what is already selected, which has its own outline", () => {
+    assert.deepStrictEqual(hoverKeysOf(tree, "a", null, ["c"]), ["a", "b"])
+    assert.deepStrictEqual(hoverKeysOf(tree, "d", null, ["d"]), [])
+  })
+
+  it("is nothing with nothing under the pointer", () => {
+    assert.deepStrictEqual(hoverKeysOf(tree, null, null, []), [])
   })
 })
 
@@ -107,17 +110,6 @@ describe("what a selection makes up", () => {
     assert.isTrue(canGroupSelection(tree, ["a", "b", "d"], null))
     assert.isFalse(canGroupSelection(tree, ["a", "b"], null))
     assert.isFalse(canGroupSelection(tree, [], null))
-  })
-})
-
-describe("selectableKeys", () => {
-  it("is every item in the map, in or out of a group", () => {
-    assert.deepStrictEqual(selectableKeys(tree, null), ["a", "b", "c", "d", "e"])
-  })
-
-  it("is the entered group's items, nested ones too", () => {
-    assert.deepStrictEqual(selectableKeys(tree, "outer"), ["a", "b", "c"])
-    assert.deepStrictEqual(selectableKeys(tree, "inner"), ["a", "b"])
   })
 })
 

@@ -32,7 +32,19 @@ const NORMAL_STRENGTH = 1.6
 /** The exponent that makes an additive glow's sum on the display-encoded framebuffer read like the game's HDR one. */
 const ADDITIVE_CURVE = 1.75
 
-const textureLoader = new THREE.TextureLoader()
+/**
+ * Decodes off the page's thread. An `<img>` is decoded again, on the page's thread, when WebGL uploads it without the
+ * browser's colour conversion: a map's 2048 px AVIFs held up its first draw for seconds that way. A bitmap is decoded
+ * once, as it will be uploaded: rows as stored (the `flipY` convention below), alpha straight, colours untouched (as a
+ * data map wants, and a no-op for the sRGB colour maps).
+ */
+const bitmapLoader = typeof createImageBitmap === "function"
+  ? new THREE.ImageBitmapLoader().setOptions({
+    imageOrientation: "from-image",
+    premultiplyAlpha: "none",
+    colorSpaceConversion: "none"
+  })
+  : undefined
 const textures = new Map<string, THREE.Texture>()
 const materials = new Map<string, THREE.MeshStandardMaterial>()
 /** Settles (never rejects) once the texture's image has loaded or its load has failed. */
@@ -51,19 +63,24 @@ const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => 
   const key = `${colorSpace}|${path}`
   const cached = textures.get(key)
   if (cached !== undefined) return cached
-  // Without a DOM (unit tests) there's no image loader; keep an empty texture.
-  let texture: THREE.Texture
-  if (typeof document === "undefined") {
-    texture = new THREE.Texture()
-  } else {
-    let settle = (): void => {}
-    const load = new Promise<void>((resolve) => {
-      settle = resolve
-    })
-    texture = textureLoader.load(textureUrl(path), settle, undefined, () => {
-      textures.delete(key)
-      onError()
-      settle()
+  // Without image decoding (unit tests) the texture stays empty.
+  const texture = new THREE.Texture()
+  if (bitmapLoader !== undefined) {
+    const load = new Promise<void>((settle) => {
+      bitmapLoader.load(
+        textureUrl(path),
+        (bitmap) => {
+          texture.image = bitmap
+          texture.needsUpdate = true
+          settle()
+        },
+        undefined,
+        () => {
+          textures.delete(key)
+          onError()
+          settle()
+        }
+      )
     })
     loads.set(texture, load)
   }
@@ -251,19 +268,27 @@ varying vec3 vBallestWorldNormal;
 varying vec3 vBallestLocal;
 `
 const VERTEX_BODY = /* glsl */ `
-vBallestScale = vec3( length( modelMatrix[ 0 ].xyz ), length( modelMatrix[ 1 ].xyz ), length( modelMatrix[ 2 ].xyz ) );
+// A batched mesh (editor/meshBatches.ts) stands where its instance matrix puts it.
+#ifdef USE_INSTANCING
+  mat4 ballestModel = modelMatrix * instanceMatrix;
+  mat3 ballestNormalMatrix = transpose( inverse( mat3( viewMatrix * ballestModel ) ) );
+#else
+  mat4 ballestModel = modelMatrix;
+  mat3 ballestNormalMatrix = normalMatrix;
+#endif
+vBallestScale = vec3( length( ballestModel[ 0 ].xyz ), length( ballestModel[ 1 ].xyz ), length( ballestModel[ 2 ].xyz ) );
 // Normals take the inverse transpose: the model matrix itself would tilt them on a piece scaled unevenly, the meshes'
 // quantised normals by as much as 30 times their error on a thin slab.
-vec3 ballestWorldNormal = normalize( transpose( inverse( mat3( modelMatrix ) ) ) * objectNormal ).xzy;
+vec3 ballestWorldNormal = normalize( transpose( inverse( mat3( ballestModel ) ) ) * objectNormal ).xzy;
 #ifdef BALLEST_WORLD
-  vBallestPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xzy;
+  vBallestPos = ( ballestModel * vec4( transformed, 1.0 ) ).xzy;
   vBallestNormal = ballestWorldNormal;
 #else
   vBallestPos = transformed * vBallestScale;
   vBallestNormal = objectNormal;
 #endif
 vBallestUv = uv;
-vBallestNormalMatrix = normalMatrix;
+vBallestNormalMatrix = ballestNormalMatrix;
 // The world normal in UE's frame (three's y is UE's z); the beams fade their end caps by its z.
 vBallestWorldNormal = ballestWorldNormal;
 vBallestUp = abs( vBallestWorldNormal.z );
@@ -586,6 +611,10 @@ const build = (
     material.transparent = true
     material.opacity = spec.opacity
     material.depthWrite = false
+    // One pass with both faces, as the game draws a two-sided translucent mesh. three would otherwise draw the back
+    // faces and then the front, flipping `side` and marking the material changed for each, so every frame it worked out
+    // every vent's and checkpoint's program again: a fifth of a map's frame.
+    material.forceSinglePass = true
     if (spec.additive) {
       material.blending = THREE.AdditiveBlending
       material.toneMapped = false

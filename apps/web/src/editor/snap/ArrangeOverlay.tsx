@@ -1,7 +1,7 @@
 /**
  * The preview of the Align or Distribute button under the pointer (docs/SNAPPING.md § Align and distribute), in snapping's
- * colours (§ Snap indications): what moves in the source's violet, where each unit lands as a filled box with the face
- * that lines up, and that face where it starts; what they line up on in the target's amber, the active unit's face; and
+ * colours (§ Snap indications): what moves in the source's amber, where each unit lands as a filled box with the face
+ * that lines up, and that face where it starts; what they line up on in the target's cyan, the active unit's face; and
  * the plane they meet on and the gaps Distribute makes equal as guides. Nothing moves until the button is pressed.
  */
 import { useEffect, useMemo } from "react"

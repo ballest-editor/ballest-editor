@@ -1,8 +1,11 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import type { SnapMark } from "../../domain/snapFrame"
 import { cornersOf } from "../../domain/snapRelation"
 import { ORIGIN } from "../../domain/ueMath"
+import { SCENE_ROLES } from "../sceneColors"
 import { isLine, isMesh } from "../threeGuards"
 import { GLYPHS, glyphSegments, RELATION_NAMES, SNAP_COLORS } from "./snapGlyphs"
 import { drawMark, MarkLayer } from "./SnapOverlay"
@@ -18,7 +21,10 @@ const drawn = (mark: SnapMark) => {
   layer.traverse((object) => {
     if (!isMesh(object) && !isLine(object)) return
     const { material } = object
-    if (material instanceof THREE.MeshBasicMaterial || material instanceof THREE.LineBasicMaterial) {
+    if (
+      material instanceof THREE.MeshBasicMaterial || material instanceof THREE.LineBasicMaterial
+      || material instanceof LineMaterial
+    ) {
       colours.push(`#${material.color.getHexString()}`)
     }
   })
@@ -43,22 +49,24 @@ describe("the snap overlay's marks", () => {
     assert.lengthOf(drawn({ kind: "face", role: "target", corners: square }).colours, 2)
   })
 
-  it("draws a side's box as its twelve edges in grey, plain in front of the scene and faint through it", () => {
+  it("draws a side's box as its twelve edges in grey, solid in front of the scene and dashed through it", () => {
     const corners = cornersOf({ min: ORIGIN, max: { x: 100, y: 100, z: 100 } })
     for (const role of ["source", "target"] as const) {
       const { colours, layer } = drawn({ kind: "box", role, corners })
       assert.deepStrictEqual(colours, [SNAP_COLORS.box, SNAP_COLORS.box])
-      const lines: Array<THREE.Line> = []
+      const shown: Array<THREE.Line> = []
+      const hidden: Array<LineSegments2> = []
       layer.traverse((object) => {
-        if (isLine(object)) lines.push(object)
+        if (isLine(object)) shown.push(object)
+        if (object instanceof LineSegments2) hidden.push(object)
       })
-      assert.deepStrictEqual(lines.map(({ geometry }) => geometry.getAttribute("position").count), [24, 24])
-      const looks = lines.flatMap(({ material }) =>
-        material instanceof THREE.LineBasicMaterial ? [{ depth: material.depthTest, opacity: material.opacity }] : []
-      )
-      const through = looks.find(({ depth }) => !depth)?.opacity ?? 1
-      const shown = looks.find(({ depth }) => depth)?.opacity ?? 0
-      assert.isBelow(through, shown)
+      assert.deepStrictEqual(shown.map(({ geometry }) => geometry.getAttribute("position").count), [24])
+      assert.deepStrictEqual(hidden.map(({ geometry }) => geometry.getAttribute("instanceStart").count), [12])
+      // the hidden part is the scene's: where the scene stands in front, dashed (the shader's edit is under test in
+      // screenLines.test.ts)
+      assert.strictEqual(hidden[0]?.material.depthFunc, THREE.GreaterDepth)
+      assert.strictEqual(hidden[0]?.material.customProgramCacheKey(), "scene-line-hidden")
+      assert.isTrue(shown[0]?.material instanceof THREE.LineBasicMaterial && shown[0].material.depthTest)
     }
   })
 
@@ -91,7 +99,13 @@ describe("the glyphs", () => {
     assert.sameMembers(Object.keys(RELATION_NAMES), Object.keys(GLYPHS))
   })
 
-  it("keep the source and target colours apart from each other and from the rest of what snapping draws", () => {
-    assert.lengthOf(new Set(Object.values(SNAP_COLORS)), Object.keys(SNAP_COLORS).length)
+  it("draw each side in its scene role, apart from each other and from the rest of what snapping draws", () => {
+    assert.strictEqual(SNAP_COLORS.source, SCENE_ROLES.dark.selected)
+    assert.strictEqual(SNAP_COLORS.target, SCENE_ROLES.dark.pointer)
+    const { source, target, ...rest } = SNAP_COLORS
+    for (const other of Object.values(rest)) {
+      assert.notInclude([source, target], other)
+    }
+    assert.notStrictEqual(source, target)
   })
 })

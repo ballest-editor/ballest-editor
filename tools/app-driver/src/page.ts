@@ -56,6 +56,18 @@ export const sizeOf = (window: Axes["window"]) => {
 
 const MOUSE_BUTTONS = { left: 1, right: 2 } as const
 
+/** The modifier bit a key code holds down, in DevTools' terms. */
+const MODIFIER_BITS: Readonly<Record<string, number>> = {
+  AltLeft: 1,
+  AltRight: 1,
+  ControlLeft: 2,
+  ControlRight: 2,
+  MetaLeft: 4,
+  MetaRight: 4,
+  ShiftLeft: 8,
+  ShiftRight: 8
+}
+
 export class Page {
   /** Uncaught exceptions and console errors since the page opened. */
   readonly errors: Array<string> = []
@@ -205,18 +217,31 @@ export class Page {
       case "drag": {
         const from = await this.pointOf(step.from)
         const to = await this.pointOf(step.to)
-        const press = { button: "left", buttons: 1, clickCount: 1 }
-        await this.mouse("mouseMoved", from)
+        const modifiers = step.modifiers ?? 0
+        const press = { button: "left", buttons: 1, clickCount: 1, modifiers }
+        await this.mouse("mouseMoved", from, { modifiers })
         await this.mouse("mousePressed", from, press)
         const steps = step.steps ?? 8
-        for (let i = 1; i <= steps; i++) {
-          const t = i / steps
-          await this.mouse("mouseMoved", [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t], {
-            button: "left",
-            buttons: 1
-          })
+        const legs = [from, ...step.through ?? [], to]
+        let held = modifiers
+        for (let leg = 1; leg < legs.length; leg++) {
+          const [a, b] = [legs[leg - 1] ?? from, legs[leg] ?? to]
+          for (let i = 1; i <= steps; i++) {
+            const t = i / steps
+            await this.mouse("mouseMoved", [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], {
+              button: "left",
+              buttons: 1,
+              modifiers: held
+            })
+            if (step.key !== undefined && leg === 1 && i === 1) {
+              held |= MODIFIER_BITS[step.key.code] ?? 0
+              await this.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...step.key, modifiers: held })
+            }
+          }
         }
-        await this.mouse("mouseReleased", to, press)
+        if (step.hold === true) return
+        await this.mouse("mouseReleased", to, { ...press, modifiers: held })
+        if (step.key !== undefined) await this.send("Input.dispatchKeyEvent", { type: "keyUp", ...step.key, modifiers })
         return
       }
       case "key": {

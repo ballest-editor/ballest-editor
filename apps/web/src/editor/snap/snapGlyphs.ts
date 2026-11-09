@@ -4,20 +4,27 @@
  * the strokes here, in a 24-unit box with y down as an icon's.
  */
 import type { MarkRole, SnapRelation } from "../../domain/snapFrame"
+import { SCENE_ROLES } from "../sceneColors"
 
-/** What snapping draws in the scene, by what each thing is. */
+/**
+ * What snapping draws in the scene, by what each thing is, in the scene's roles (`SCENE_ROLES`, sceneColors.ts): the
+ * selection's side in its amber, what it lands on in the pointer's cyan, what it is measured by in violet.
+ */
 export const SNAP_COLORS = {
   /** What the selection landed on. */
-  target: "#ffc940",
+  target: SCENE_ROLES.dark.pointer,
   /** The part of the selection that landed. */
-  source: "#c79bff",
+  source: SCENE_ROLES.dark.selected,
   /** The base, while nothing is in range. */
   base: "#ffffff",
   /** A side's whole box, about the faces of it that snapped. */
   box: "#b4bac2",
-  guide: "#ff5fa8",
-  construction: "#6aa6ff",
-  measurement: "#ffe08a"
+  /** A plane or line inferred from the scene: alignment, a tracking line off the axes. */
+  guide: SCENE_ROLES.dark.reference,
+  /** The map's own construction planes and lines. */
+  construction: SCENE_ROLES.dark.reference,
+  /** A measured length, a dimension's line. */
+  measurement: "#ffffff"
 } as const
 
 export const roleColor = (role: MarkRole): string => SNAP_COLORS[role]

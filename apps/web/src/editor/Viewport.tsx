@@ -17,14 +17,18 @@ import {
 import * as THREE from "three"
 import type { CatalogPiece } from "../domain/Catalog"
 import { threeToUeVector, toTuple3, ueToThreeVector } from "../domain/coords"
-import { counted, groupBoxTargets } from "../domain/groupSelection"
+import { counted, groupBoxTargets, hoverKeysOf } from "../domain/groupSelection"
 import { firesHere, holdsModifiersOf, type ModifierState, mouseChordOf, resolveChord } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gizmoScaleOf, gridColorsOf } from "../domain/Settings"
 import { snapsGrid } from "../domain/snapConfig"
+import { indexOfKey } from "../domain/structure"
+import { isLocked } from "../domain/visibility"
 import { holdsDrop, placeAt, placePrefab } from "./actions"
+import { useAreaDrag } from "./areaDrag"
+import { AreaOverlay, AreaSelect } from "./AreaSelect"
 import { ChainStart } from "./chainStart"
 import { fadeFineLines, gridReach } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
@@ -33,15 +37,23 @@ import { GroupBox } from "./groupBox"
 import { ItemObject } from "./ItemObject"
 import { keyContextOf } from "./keyContext"
 import { advanceGameTime } from "./materials"
+import { meshBatches } from "./meshBatches"
 import { OrthoGrid } from "./OrthoGrid"
-import { paintSpotOf, type PaintTarget, paintTargetOf, pickedBrushOf, showsTarget } from "./paintTarget"
+import {
+  lockedPaintTarget,
+  paintSpotOf,
+  type PaintTarget,
+  paintTargetOf,
+  pickedBrushOf,
+  showsTarget
+} from "./paintTarget"
 import { floorGridOnly, panePointer } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
 import { draggedPiece, isPieceDrag } from "./pieceDrag"
 import { PivotDot } from "./pivotDot"
 import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
 import { originLabelTexture, PrefabOrigin } from "./prefabOrigin"
-import { GROUP_BOX_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { sceneBackgroundClass, sceneRoles } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
@@ -55,10 +67,11 @@ import { SnapOverlay } from "./snap/SnapOverlay"
 import {
   currentBrush,
   groupBoxOf,
-  indexOfKey,
   noTabOpen,
+  pickableOf,
   type SelectMode,
   shownChainStart,
+  shownOf,
   shownPivotDots,
   snapConfigOf,
   useEditor,
@@ -101,8 +114,19 @@ function CachedGlb({ url }: { readonly url: string }) {
   return null
 }
 
-function OnCommit({ run }: { readonly run: () => void }) {
-  useEffect(run, [run])
+/**
+ * Calls `run` once the meshes on screen have their shaders: the items mounting with them hand their meshes to the batches
+ * over the next frames, and each new batch compiles off the page's thread before it shows (editor/meshBatches.ts).
+ */
+function WhenCompiled({ run }: { readonly run: () => void }) {
+  const frames = useRef(0)
+  useFrame(() => {
+    if (frames.current < 0) return
+    frames.current++
+    if (frames.current < 3 || meshBatches.pending) return
+    frames.current = -1
+    run()
+  })
   return null
 }
 
@@ -124,7 +148,7 @@ class SettleOnError
 
 /**
  * Calls `onSettled` once the startup loads are done and every mesh of the map on screen at
- * that point is in the cache. Until then the viewport keeps the scene hidden, so it appears
+ * that point is in the cache and has its shaders. Until then the viewport keeps the scene hidden, so it appears
  * once, complete, instead of stepping through stand-in boxes and loading wireframes. Later
  * loads (imports, placed pieces) show their loading hints as usual.
  */
@@ -144,14 +168,14 @@ function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
     <SettleOnError onSettled={onSettled}>
       <Suspense fallback={null}>
         {urls.map((url) => <CachedGlb key={url} url={url} />)}
-        <OnCommit run={onSettled} />
+        <WhenCompiled run={onSettled} />
       </Suspense>
     </SettleOnError>
   )
 }
 
 /**
- * How a left click selects, from its chord: the add/toggle selection bindings where they work (not in the paint tool),
+ * How a left click or box selects, from its chord: the add, toggle and remove bindings where they work (not in the paint tool),
  * else a plain click. Null when the chord drives the camera instead (Alt+LMB orbit), or paints (PaintTool).
  */
 const selectModeOf = (e: MouseEvent): SelectMode | null => {
@@ -160,6 +184,7 @@ const selectModeOf = (e: MouseEvent): SelectMode | null => {
   const ctx = keyContextOf()
   const chord = mouseChordOf(e)
   const actions = resolveChord(keybinds, ctx, chord)
+  if (actions.includes("removeFromSelection")) return "remove"
   if (actions.includes("toggleSelection")) return "toggle"
   if (actions.includes("addToSelection")) return "add"
   // the paint tool's plain click paints
@@ -182,7 +207,8 @@ function ClickSelect() {
       const { ndc, pane } = panePointer(el, e, slot)
       raycaster.setFromCamera(ndc, pane.camera)
       const root = sceneRegistry.itemsRoot
-      return hitItemId(root === null ? [] : raycaster.intersectObject(root, true))
+      // a locked or hidden item lets the click through to what's behind it
+      return hitItemId(root === null ? [] : raycaster.intersectObject(root, true), pickableOf(useEditor.getState()))
     }
     const onDown = (e: PointerEvent) => {
       const mode = selectModeOf(e)
@@ -255,7 +281,9 @@ function PaintTool() {
       const { ndc, pane } = panePointer(el, at, slot)
       raycaster.setFromCamera(ndc, pane.camera)
       const root = sceneRegistry.itemsRoot
-      return paintSpotOf(root === null ? [] : raycaster.intersectObject(root, true))
+      return paintSpotOf(
+        hitsOn(root === null ? [] : raycaster.intersectObject(root, true), shownOf(useEditor.getState()))
+      )
     }
     const itemOf = (id: string) => {
       const { doc } = useEditor.getState()
@@ -268,7 +296,9 @@ function PaintTool() {
       const brush = currentBrush(s)
       if (spot === undefined || item === undefined || brush === undefined) return undefined
       const whole = stroke?.whole ?? holdsModifiersOf(s.keybinds, "paintWholePiece", modifiers)
-      return paintTargetOf(spot, item, s.catalogIndex, brush, whole)
+      return isLocked(s.doc.structure, spot.itemId)
+        ? lockedPaintTarget(spot, whole)
+        : paintTargetOf(spot, item, s.catalogIndex, brush, whole)
     }
     const show = (target: PaintTarget | undefined) => {
       hover = target
@@ -414,18 +444,25 @@ function PaintTool() {
   return null
 }
 
-/** The item under the nearest hit, if any. */
-const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
-  for (const hit of hits) {
-    let o: THREE.Object3D | null = hit.object
-    while (o !== null && o.userData["itemId"] === undefined) o = o.parent
-    if (o !== null) {
-      const itemId: unknown = o.userData["itemId"]
-      return typeof itemId === "string" ? itemId : null
-    }
+/** The item an object is part of, if any. */
+const itemAbove = (object: THREE.Object3D): string | null => {
+  for (let o: THREE.Object3D | null = object; o !== null; o = o.parent) {
+    const itemId: unknown = o.userData["itemId"]
+    if (itemId !== undefined) return typeof itemId === "string" ? itemId : null
   }
   return null
 }
+
+/** The hits on items `accepts` takes. A hidden item is still in the scene, and three's raycasts don't skip it. */
+const hitsOn = (hits: ReadonlyArray<THREE.Intersection>, accepts: (key: string) => boolean) =>
+  hits.filter((hit) => {
+    const id = itemAbove(hit.object)
+    return id !== null && accepts(id)
+  })
+
+/** The item under the nearest hit that `accepts` takes, if any. */
+const hitItemId = (hits: ReadonlyArray<THREE.Intersection>, accepts: (key: string) => boolean): string | null =>
+  hitsOn(hits, accepts).map((hit) => itemAbove(hit.object))[0] ?? null
 
 /**
  * What's under a pointer dragging `piece`: the item it is over, else the floor, or in an orthographic view the plane a
@@ -433,14 +470,15 @@ const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
  */
 const dropTarget = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: number; clientY: number }) => {
   const { ndc, pane, px, slot } = panePointer(canvas, e)
-  const { floorHeight, settings } = useEditor.getState()
+  const s = useEditor.getState()
+  const { floorHeight, settings } = s
   const raycaster = new THREE.Raycaster()
   raycaster.setFromCamera(ndc, pane.camera)
   const { ray } = raycaster
   const root = sceneRegistry.itemsRoot
   const surface = (root === null ? [] : raycaster.intersectObject(root, true)).flatMap((hit) => {
-    const id = isMesh(hit.object) ? hitItemId([hit]) : null
-    return id !== null && holdsDrop(id) ? [{ id, point: hit.point }] : []
+    const id = isMesh(hit.object) ? itemAbove(hit.object) : null
+    return id !== null && shownOf(s)(id) && holdsDrop(id) ? [{ id, point: hit.point }] : []
   })[0]
   const point = surface !== undefined
     ? threeToUeVector(surface.point)
@@ -623,25 +661,73 @@ function SelectedOutline({ id, active }: { readonly id: string; readonly active:
   return null
 }
 
+/** What the viewport outlines: the selection, or during a box or lasso drag, what its release would select. */
+const useShownSelection = (): ReadonlyArray<string> => {
+  const selected = useEditor((s) => s.selectedIds)
+  return useAreaDrag((s) => s.drag?.result) ?? selected
+}
+
 function SelectedOutlines() {
-  const selectedIds = useEditor((s) => s.selectedIds)
+  const selectedIds = useShownSelection()
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => setOutlineTheme(dark), [dark])
   const active = selectedIds.at(-1)
   return selectedIds.map((id) => <SelectedOutline key={id} id={id} active={id === active} />)
 }
 
-/** A whole group's box (see groupBox.ts), following its items. */
+/**
+ * What a click would select, outlined in the pointer's colour while the pointer is on it (selectionOutline.ts): the
+ * item, or every item of the group a click reaches. Not in the paint tool, which has its own, nor while a drag, a box
+ * or a pick is under way, nor over a gizmo handle, where a click takes the handle, nor on a locked item, which a click
+ * goes through.
+ */
+function HoveredOutline({ id }: { readonly id: string }) {
+  const outline = useMemo(() => new SelectionOutline(), [])
+  useFrame(() => {
+    const object = sceneRegistry.objects.get(id)
+    const busy = sceneRegistry.gizmoActive() || sceneRegistry.lookDragActive() || sceneRegistry.flyKeysActive()
+      || sceneRegistry.bodyDragActive() || sceneRegistry.areaDragActive()
+    if (object === undefined || busy) {
+      outline.removeFromParent()
+      return
+    }
+    if (outline.parent !== object) object.add(outline)
+    outline.updateHover(object)
+  })
+  useEffect(() => () => void outline.removeFromParent(), [outline])
+  return null
+}
+
+function HoveredOutlines() {
+  const hovered = useEditor((s) =>
+    s.tool === "paint" || s.picker !== null || s.hoveredItem === null || !pickableOf(s)(s.hoveredItem)
+      ? null
+      : s.hoveredItem
+  )
+  const tree = useEditor((s) => s.doc.structure.tree)
+  const enteredGroupId = useEditor((s) => s.enteredGroupId)
+  const selectedIds = useEditor((s) => s.selectedIds)
+  const keys = useMemo(
+    () => hoverKeysOf(tree, hovered, enteredGroupId, selectedIds),
+    [tree, hovered, enteredGroupId, selectedIds]
+  )
+  return keys.map((id) => <HoveredOutline key={id} id={id} />)
+}
+
+/** A whole group's box (see groupBox.ts), following its items: the selection's colour, or no hue when entered. */
 function GroupBoxView({ keys, entered }: { readonly keys: ReadonlyArray<string>; readonly entered: boolean }) {
   const box = useMemo(() => new GroupBox(), [])
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
-  useEffect(() => box.setLook(dark ? GROUP_BOX_COLORS.dark : GROUP_BOX_COLORS.light, entered), [box, dark, entered])
+  useEffect(() => {
+    const roles = sceneRoles(dark)
+    box.setLook(entered ? roles.context : roles.selected, entered)
+  }, [box, dark, entered])
   useEffect(() => () => box.dispose(), [box])
   const doc = useEditor((s) => s.doc)
   const preview = useEditor((s) => s.preview)
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const bounds = useMemo(() => groupBoxOf({ doc, preview, catalogIndex }, keys), [doc, preview, catalogIndex, keys])
-  useFrame(({ camera, size }) => box.update(bounds, camera, size.height))
+  useEffect(() => box.update(bounds), [box, bounds])
   return <primitive object={box} />
 }
 
@@ -698,7 +784,7 @@ function ChainStartMarker() {
 
 function GroupBoxes() {
   const tree = useEditor((s) => s.doc.structure.tree)
-  const selectedIds = useEditor((s) => s.selectedIds)
+  const selectedIds = useShownSelection()
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
   const targets = useMemo(() => groupBoxTargets(tree, selectedIds, enteredGroupId), [tree, selectedIds, enteredGroupId])
   return targets.map(({ id, keys, entered }) => <GroupBoxView key={id} keys={keys} entered={entered} />)
@@ -784,6 +870,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <Water />
         <MapItems />
         <SelectedOutlines />
+        <HoveredOutlines />
         <GroupBoxes />
         <PrefabOriginMarker />
         <PivotDots />
@@ -792,6 +879,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <ArrangeOverlay />
         <GizmoController />
         <SnapInput />
+        <AreaSelect opOf={selectModeOf} />
         <ClickSelect />
         <PaintTool />
         <FlyCamera />
@@ -799,6 +887,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
+      <AreaOverlay />
       <Controls disabled={!revealed} />
     </div>
   )

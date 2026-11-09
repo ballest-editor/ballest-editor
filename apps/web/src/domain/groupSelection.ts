@@ -21,7 +21,7 @@ export const enteredScopeOf = (
   enteredGroupId: string | null
 ): ReadonlyArray<string> => enteredGroupId === null ? [] : [...groupPathOf(tree, enteredGroupId), enteredGroupId]
 
-/** What Select all selects: every item in the tree, or in the entered group. */
+/** Every item in the tree, or in the entered group: what a box or lasso looks at, before hidden and locked ones leave. */
 export const selectableKeys = (
   tree: ReadonlyArray<TreeNode>,
   enteredGroupId: string | null
@@ -49,6 +49,22 @@ export const clickLevelOf = (
   let depth = 0
   while (depth < scope.length && path[depth] === scope[depth]) depth++
   return { nodeId: path[depth] ?? key, enteredGroupId: path[depth - 1] ?? null }
+}
+
+/**
+ * What the hover outlines with `key` under the pointer: what a click on it would select (its click level's items), less
+ * what is selected already, which has its own outline.
+ */
+export const hoverKeysOf = (
+  tree: ReadonlyArray<TreeNode>,
+  key: string | null,
+  enteredGroupId: string | null,
+  selectedIds: ReadonlyArray<string>
+): ReadonlyArray<string> => {
+  if (key === null) return []
+  const selected = new Set(selectedIds)
+  const reached = nodeKeys(tree, clickLevelOf(tree, key, enteredGroupId).nodeId)
+  return (reached.length === 0 ? [key] : reached).filter((k) => !selected.has(k))
 }
 
 /**

@@ -1,9 +1,10 @@
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { useEffect } from "react"
+import { memo, useEffect } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { Connector } from "../domain/Catalog"
 import { defaultSpotOf, SPOT_IDS, SPOT_NAMES, type SpotId, spotsOf } from "../domain/connectorSpots"
+import { indexOfKey } from "../domain/structure"
 import { showConnectSpot } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
@@ -74,9 +75,9 @@ function EndSpots({ itemKey, end, connector, chosen }: {
  * or the centre of its cap, as seen looking out of the end. Hovering a spot rings it in the viewport. Shown for one
  * selected item whose piece has ends with caps.
  */
-export function ConnectsAtSection({ itemKey }: { readonly itemKey: string }) {
+export const ConnectsAtSection = memo(function ConnectsAtSection({ itemKey }: { readonly itemKey: string }) {
   const connectors = useEditor((s) => {
-    const item = s.doc.map.items[s.doc.ids.indexOf(itemKey)]
+    const item = s.doc.map.items[indexOfKey(s.doc.ids, itemKey)]
     return item === undefined
       ? NO_CONNECTORS
       : s.catalogIndex?.pieceByClass.get(item.actorToSpawn)?.connectors ?? NO_CONNECTORS
@@ -104,4 +105,4 @@ export function ConnectsAtSection({ itemKey }: { readonly itemKey: string }) {
       ))}
     </Section>
   )
-}
+})

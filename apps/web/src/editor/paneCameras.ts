@@ -28,7 +28,7 @@ import {
   type ViewProjection
 } from "../domain/viewLayout"
 import { gameDirToWorld, type Px, worldPerPixel } from "./gizmo/math"
-import { useEditor } from "./store"
+import { shownOf, useEditor } from "./store"
 
 const layerOf = (layer: number): THREE.Layers => {
   const layers = new THREE.Layers()
@@ -408,13 +408,19 @@ export const paneCameraAt = (slot: number): PaneCamera => {
 export const activePaneCamera = (): PaneCamera => paneCameraAt(useEditor.getState().activePane)
 
 /**
- * The whole map, from item translations so it works before meshes load. With no items, a stretch of floor at the default
+ * The whole map as drawn, from item translations so it works before meshes load. With no items, a stretch of floor at the default
  * start, where a definition's frame is: what a new prefab's first pieces go down around.
  */
 export const mapBox = (): THREE.Box3 => {
-  const { doc, floorHeight } = useEditor.getState()
+  const s = useEditor.getState()
+  const { doc, floorHeight } = s
+  const shown = shownOf(s)
+  // what is drawn, as Blender's View All; a map with nothing drawn frames all of it, so the view isn't left nowhere
+  const framed = doc.map.items.filter((_, i) => shown(doc.ids[i] ?? ""))
   const box = new THREE.Box3()
-  for (const item of doc.map.items) box.expandByPoint(toVector(ueToThreeVector(item.itemTransform.translation)))
+  for (const item of framed.length > 0 ? framed : doc.map.items) {
+    box.expandByPoint(toVector(ueToThreeVector(item.itemTransform.translation)))
+  }
   if (box.isEmpty()) {
     box.setFromCenterAndSize(
       toVector(ueToThreeVector({ ...DEFAULT_PLAYER_START, z: floorHeight })),

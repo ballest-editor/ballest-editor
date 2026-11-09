@@ -56,6 +56,32 @@ A piece's thumbnail is rendered in the app on a transparent background (`editor/
 
 `--destructive` is red, used as `text-destructive` on `bg-destructive/12`.
 
+## Scene colours
+
+What the editor draws over the map has one hue per meaning, so a colour says the same thing on an outline, a box, a snap mark or an open end. The roles are `SCENE_ROLES` in `editor/sceneColors.ts`, each in a dark and a light value, and each reads at 3:1 on the ground in both themes (`sceneColors.test.ts`).
+
+| Role        | Dark      | Light     | Means                                                | Drawn on                                                                                                 |
+| ----------- | --------- | --------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `selected`  | `#ffb020` | `#c2500a` | What an edit acts on                                 | Selected items' outlines, a selected group's corners, a snap's source, what an Align or Distribute moves |
+| `active`    | `#ffe08a` | `#7a2e05` | The active item, what the gizmo and Inspector follow | Its outline: lighter than the rest in dark, darker in light                                              |
+| `pointer`   | `#5ce1ff` | `#0a6f94` | What a click or a drop would act on                  | The hover, the paint tool's target, a snap's target, the open ends a drag could join                     |
+| `blocked`   | `#ff5a5f` | `#c0182a` | Where the pointer's action won't go                  | The paint tool's hover on what takes no paint                                                            |
+| `reference` | `#b69cff` | `#6236c9` | Drawn to measure by, not part of the map             | Alignment planes and guides, construction planes and lines                                               |
+| `context`   | white     | `#1f2430` | Frames the work and isn't a choice                   | The entered group's box, the pivot dot                                                                   |
+
+The selection is amber because the game's own editor, Unreal, Unity and Blender all draw it so, and it stands off the blue ground and the default blue pieces. The chrome's selection stays the `--primary` wash: the chrome's cyan means "interactive", and the scene's pointer role is that same cyan, so what the pointer would act on looks the same on a row and in the viewport. Pink and magenta aren't roles: they read as errors on a blue scene and fight the game's own paints.
+
+Shape carries what the hue can't, in one line language (`editor/screenLines.ts`):
+
+- **Weight.** Lines are fat lines with a width in pixels, round where two meet: 2px for what is chosen (the selection's outline, a group's corners, the paint tool's target), 1.5px for what only would be acted on or is behind something (the hover, a hidden part, a guide), 1px for a snap's whole box.
+- **Solid** is what is there and in view.
+- **Dashed** means hidden, and nothing else: one dash, 6px on and 4px off, measured along the line on screen, so it is the same size near and far. A straight edge fits a whole number of dashes, so it starts and ends on one and two edges meet at a corner on dashes, and the dashes stay on the line as the camera moves; a curve's dashes run on from one short edge to the next. A selected item's outline shows through what stands in front of it this way, on its side toward the camera only (`selectionOutline.ts`), the same colour at 80%, so it keeps its hue on any piece; so does a snap box's far side, and the pivot dot inside its unit is a dashed ring. A guide is dashed for the same reason a hidden line is: it isn't a thing in the map.
+- **Corners** mark a group: brackets at its box's corners, so its box doesn't cross the items around it (`groupBox.ts`). A selected group's are in the selection's colour; the entered group's are thinner, faint and in no hue. A whole box would read as a piece, and a dashed one as hidden.
+- **Fill** is the paint tool's alone in the scene, because it picks a slot and not a piece. The hover is the outline alone, with no see-through and no fill.
+- **The box or lasso region** is the one dashed line that isn't hidden: it is drawn on the pane, not in the scene, in the pointer's colour (the chrome's `--primary`), 1.5px with the same 6/4 dash, solid while it takes what is wholly inside and dashed while it takes what it touches, as 3ds Max and AutoCAD draw them (`AreaSelect.tsx`, [DESKTOP.md § Box and lasso select](../DESKTOP.md#box-and-lasso-select)). While it is dragged the outlines show what a release would select, and the hover hides.
+
+The axes keep their own colours (`axisColors.ts`), and a hovered gizmo handle leans to a pale yellow, as in Unreal and Unity.
+
 ## Hover and press
 
 Everything a pointer can act on answers the same way: rows, menu items, tabs, chips, segmented items, icon buttons.

@@ -21,7 +21,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { createElement, Fragment, type ReactNode, useMemo } from "react"
+import { createElement, Fragment, memo, type ReactNode, useEffect, useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { CatalogIndex } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
@@ -603,7 +603,7 @@ function SelectionActions() {
 }
 
 /** The pieces in a selection, by name, with how many of each, most first. */
-function ContentsSection({ items }: { readonly items: ReadonlyArray<Item> }) {
+const ContentsSection = memo(function ContentsSection({ items }: { readonly items: ReadonlyArray<Item> }) {
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const counts = new Map<string, { readonly actorClass: string; n: number }>()
   for (const item of items) {
@@ -626,7 +626,7 @@ function ContentsSection({ items }: { readonly items: ReadonlyArray<Item> }) {
       </ul>
     </Section>
   )
-}
+})
 
 /** An item's picture on the identity's tile: its piece's thumbnail, or its glyph where it has one of its own. */
 function ItemTile({ item }: { readonly item: Item }) {
@@ -674,7 +674,7 @@ const PLAYER_START_HINT =
  * What's selected, at the top: one item, by its own name (edited in place; cleared, it takes its piece's) over its piece
  * and category, or how many items; then anything about it that needs a look, and one item's tags.
  */
-function SelectionIdentity(
+const SelectionIdentity = memo(function SelectionIdentity(
   { items, itemKey }: { readonly items: ReadonlyArray<Item>; readonly itemKey: string | undefined }
 ) {
   const catalogIndex = useEditor((s) => s.catalogIndex)
@@ -731,10 +731,10 @@ function SelectionIdentity(
       {only !== undefined && itemKey !== undefined && <ItemTags itemKey={itemKey} />}
     </IdentityBlock>
   )
-}
+})
 
 /** The identifiers behind a single item, for when something needs looking up. Closed unless asked for. */
-function ItemDetails({ item, index }: { readonly item: Item; readonly index: number }) {
+const ItemDetails = memo(function ItemDetails({ item, index }: { readonly item: Item; readonly index: number }) {
   return (
     <Section id="details" title="Details" defaultOpen={false}>
       <Facts>
@@ -767,7 +767,7 @@ function ItemDetails({ item, index }: { readonly item: Item; readonly index: num
       </Facts>
     </Section>
   )
-}
+})
 
 /** The axes on which any of `values` differs from `reference`. */
 const differingAxes = (reference: Vec3, values: ReadonlyArray<Vec3>, tolerance = 1e-6): Set<Axis> =>
@@ -914,6 +914,8 @@ function ItemEditor({ items, ids, transforms, placed, transform, unit, extent, g
 }) {
   const active = items.at(-1)
   const shownActive = transforms.at(-1)
+  const painted = useMemo(() => items.map((item, i) => ({ item, id: ids[i] ?? "" })), [items, ids])
+  const properties = useMemo(() => selectionProperties(placed), [placed])
   if (active === undefined || shownActive === undefined) return null
   return (
     <>
@@ -934,23 +936,57 @@ function ItemEditor({ items, ids, transforms, placed, transform, unit, extent, g
           {items.length === 1 && ids[0] !== undefined && <ConnectsAtSection itemKey={ids[0]} />}
         </>
       )}
-      <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
-      <ItemProperties properties={selectionProperties(placed)} />
+      <PaintSection selected={painted} />
+      <ItemProperties properties={properties} />
     </>
   )
 }
 
-export function Inspector() {
-  // Selected items in selection order, with their shown transforms (live while the gizmo
-  // drags or a field scrubs; committed on release).
-  const items = useEditor(useShallow((s) =>
-    selectedIndices(s).flatMap((index) => {
-      const item = s.doc.map.items[index]
-      return item === undefined ? [] : [item]
+/** The array as it is: through `useShallow`, the last one while they hold the same values. */
+function sameArray<T>(values: ReadonlyArray<T>): ReadonlyArray<T> {
+  return values
+}
+
+/** How long a change waits for a frame to be painted before it shows anyway: a window out of sight paints none. */
+const PAINT_WAIT_MS = 100
+
+/**
+ * `value`, once the frame after it changed has been painted: what this shows waits for the viewport to show the change,
+ * then renders at once. React's own deferral would share the time with the viewport's frames, and take twice as long.
+ */
+function useAfterPaint<T>(value: T): T {
+  const [shown, setShown] = useState(() => value)
+  useEffect(() => {
+    if (Object.is(shown, value)) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const show = () => {
+      clearTimeout(fallback)
+      setShown(() => value)
+    }
+    const fallback = setTimeout(show, PAINT_WAIT_MS)
+    // a frame's callbacks run before it paints: the timeout after one runs once it has
+    const frame = requestAnimationFrame(() => {
+      timer = setTimeout(show)
     })
-  ))
-  const indices = useEditor(useShallow(selectedIndices))
-  const ids = useEditor(useShallow((s) => selectedIndices(s).map((i) => s.doc.ids[i] ?? "")))
+    return () => {
+      cancelAnimationFrame(frame)
+      clearTimeout(timer)
+      clearTimeout(fallback)
+    }
+  }, [value, shown])
+  return shown
+}
+
+export function Inspector() {
+  // The selection as the Inspector shows it: a frame behind the store's when it changes, so a click's outline and gizmo
+  // show in the viewport straight away, rather than after the sections a selection mounts.
+  const selectedIds = useAfterPaint(useEditor((s) => s.selectedIds))
+  const doc = useEditor((s) => s.doc)
+  // Selected items in selection order, with their shown transforms (live while the gizmo drags or a field scrubs;
+  // committed on release). Kept while they are the same items, so an edit elsewhere in the map renders none of this.
+  const indices = useShallow(sameArray<number>)(selectedIndices({ doc, selectedIds }))
+  const items = useShallow(sameArray<Item>)(indices.flatMap((index) => doc.map.items[index] ?? []))
+  const ids = useShallow(sameArray<string>)(indices.map((index) => doc.ids[index] ?? ""))
   const preview = useEditor((s) => s.preview)
   // As `shownTransform` reads them, but memoised: `editTransform` builds a decal's or an elevator's transform afresh
   // each call, and a selector returning fresh objects would re-render without end.
@@ -960,7 +996,6 @@ export function Inspector() {
   )
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const tree = useEditor((s) => s.doc.structure.tree)
-  const selectedIds = useEditor((s) => s.selectedIds)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
   const group = useMemo(
     () => soleGroupOf(tree, selectedIds, enteredGroupId),
@@ -970,10 +1005,9 @@ export function Inspector() {
   // it is built afresh from the items' shown transforms and a selector returning it would re-render without end.
   const pivotMode = useEditor((s) => s.pivotMode)
   const chainMode = useEditor((s) => s.chainMode)
-  const doc = useEditor((s) => s.doc)
   const previewLanding = useEditor((s) => s.previewLanding)
   const target = useMemo(() => {
-    const s = useEditor.getState()
+    const s = { ...useEditor.getState(), selectedIds }
     return selectionPivot(s, (id) => shownTransform(s, id))
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the target is built from, read inside
   }, [doc, preview, previewLanding, catalogIndex, pivotMode, chainMode, selectedIds, enteredGroupId])
@@ -988,6 +1022,12 @@ export function Inspector() {
     if (unitNode === undefined) return undefined
     return unitExtentOf(useEditor.getState(), unitNode)
   }, [unitNode])
+
+  // Kept from one render to the next, so the sections that take it skip the renders a drag or a scrub causes.
+  const placed = useMemo(
+    () => items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) })),
+    [items, catalogIndex]
+  )
 
   const prefab = useOpenPrefab()
   const noTab = useEditor(noTabOpen)
@@ -1020,7 +1060,6 @@ export function Inspector() {
     )
   }
 
-  const placed = items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) }))
   const editor = (
     <ItemEditor
       items={items}

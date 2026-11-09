@@ -1,9 +1,19 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { UE_TO_THREE_MATRIX, ueToScene } from "../domain/coords"
 import { showsTarget } from "./paintTarget"
-import { OUTLINE_COLORS, outlineOf, PAINT_HOVER_COLORS, SelectionOutline, setOutlineTheme } from "./selectionOutline"
-import { isLine, isMesh } from "./threeGuards"
+import { HIDDEN_OPACITY, LINE_WIDTH } from "./screenLines"
+import {
+  isOutlinePart,
+  OUTLINE_COLORS,
+  outlineOf,
+  PAINT_HOVER_COLORS,
+  SelectionOutline,
+  setOutlineTheme
+} from "./selectionOutline"
+import { isMesh } from "./threeGuards"
 import { VISUAL_KEY } from "./visuals"
 
 /** A wedge (ramp) in UE local space: 400 long in X, 100 wide in Y, rising 0..30 cm in Z. */
@@ -36,39 +46,59 @@ const makeItem = (geometry: THREE.BufferGeometry) => {
   return { item, mesh }
 }
 
+/** A segment's two ends, `i`th of an outline's fat lines. */
+const endsOf = (geometry: THREE.BufferGeometry, i: number): [THREE.Vector3, THREE.Vector3] => [
+  new THREE.Vector3().fromBufferAttribute(geometry.getAttribute("instanceStart"), i),
+  new THREE.Vector3().fromBufferAttribute(geometry.getAttribute("instanceEnd"), i)
+]
+const countOf = (geometry: THREE.BufferGeometry) => geometry.getAttribute("instanceStart").count
+
 /** World-space endpoints of every drawn segment, rounded so they compare as strings. */
-const segments = (line: THREE.Line): Array<string> => {
-  const position = line.geometry.getAttribute("position")
+const segments = (line: THREE.Mesh): Array<string> => {
   const out: Array<string> = []
-  for (let i = 0; i < position.count; i += 2) {
-    const ends = [i, i + 1].map((j) =>
-      new THREE.Vector3().fromBufferAttribute(position, j).applyMatrix4(line.matrixWorld).toArray().map((n) =>
-        Math.round(n * 1000) / 1000
-      ).join(",")
+  for (let i = 0; i < countOf(line.geometry); i++) {
+    const ends = endsOf(line.geometry, i).map((end) =>
+      end.applyMatrix4(line.matrixWorld).toArray().map((n) => Math.round(n * 1000) / 1000).join(",")
     )
     out.push(ends.sort().join(" | "))
   }
   return out.sort()
 }
 
-const firstLine = (outline: THREE.Group): THREE.Line => {
-  const line = outline.children[0]
-  if (line === undefined || !isLine(line)) throw new Error("outline has no lines")
+/** The outline's lines: what shows, then what shows through. Fat lines are meshes, apart from the fills. */
+const linesOf = (outline: THREE.Group) => outline.children.filter((c) => c instanceof LineSegments2)
+const firstLine = (outline: THREE.Group): LineSegments2 => {
+  const [line] = linesOf(outline)
+  if (line === undefined) throw new Error("outline has no lines")
   return line
 }
+const lineMaterialOf = (line: LineSegments2 | undefined): LineMaterial => {
+  const material = line?.material
+  if (!(material instanceof LineMaterial)) throw new Error("not an outline line")
+  return material
+}
 
-/** The segments the shader keeps for an eye at `eye` (mesh-local): its facing test, on the CPU. */
-const visibleFrom = (outline: THREE.BufferGeometry, eye: THREE.Vector3): Array<[THREE.Vector3, THREE.Vector3]> => {
-  const position = outline.getAttribute("position")
+/**
+ * The segments the shaders keep for an eye at `eye` (mesh-local): their facing tests, on the CPU. `hidden` is the pass
+ * that shows through the scene, which keeps to the item's side toward the eye.
+ */
+const visibleFrom = (
+  outline: THREE.BufferGeometry,
+  eye: THREE.Vector3,
+  hidden = false
+): Array<[THREE.Vector3, THREE.Vector3]> => {
   const normalA = outline.getAttribute("faceNormalA")
   const normalB = outline.getAttribute("faceNormalB")
+  const always = outline.getAttribute("edgeAlways")
   const kept: Array<[THREE.Vector3, THREE.Vector3]> = []
-  for (let i = 0; i < position.count; i += 2) {
-    const from = new THREE.Vector3().fromBufferAttribute(position, i)
+  for (let i = 0; i < countOf(outline); i++) {
+    const [from, to] = endsOf(outline, i)
     const toEye = eye.clone().sub(from)
     const a = new THREE.Vector3().fromBufferAttribute(normalA, i).dot(toEye)
     const b = new THREE.Vector3().fromBufferAttribute(normalB, i).dot(toEye)
-    if (a * b <= 0) kept.push([from, new THREE.Vector3().fromBufferAttribute(position, i + 1)])
+    const crease = always.getX(i) > 0.5
+    const shown = hidden ? a * b <= 0 || (crease && Math.max(a, b) > 0) : crease || a * b <= 0
+    if (shown) kept.push([from, to])
   }
   return kept
 }
@@ -77,7 +107,7 @@ describe("selection outline", () => {
   it("draws a ramp's own edges, not its bounding box, from any side", () => {
     // a triangular prism has 9 edges, all creases; its bounding box would have 12
     const outline = outlineOf(wedge())
-    expect(outline.getAttribute("position").count / 2).toBe(9)
+    expect(countOf(outline)).toBe(9)
     expect(visibleFrom(outline, new THREE.Vector3(1000, 500, -300))).toHaveLength(9)
     expect(visibleFrom(outline, new THREE.Vector3(-1000, -500, 300))).toHaveLength(9)
   })
@@ -100,10 +130,24 @@ describe("selection outline", () => {
     }
   })
 
+  it("shows through the scene only on its side toward the eye", () => {
+    // from far out on +X, the box's own front face: its 4 edges, not the 8 its other faces close behind it
+    const box = outlineOf(new THREE.BoxGeometry(10, 20, 30))
+    const eye = new THREE.Vector3(1000, 0, 0)
+    expect(visibleFrom(box, eye)).toHaveLength(12)
+    const through = visibleFrom(box, eye, true)
+    expect(through).toHaveLength(4)
+    for (const [from, to] of through) expect([from.x, to.x]).toEqual([5, 5])
+    // a sphere shows its silhouette through, as it draws it in the open
+    const sphere = outlineOf(new THREE.SphereGeometry(100, 48, 24))
+    const far = new THREE.Vector3(100_000, 0, 0)
+    expect(visibleFrom(sphere, far, true)).toEqual(visibleFrom(sphere, far))
+  })
+
   it("welds glb seams: a box split per face still has only its 12 edges", () => {
     // BoxGeometry duplicates every corner per face, like a glb with hard normals
     const box = new THREE.BoxGeometry(10, 20, 30)
-    expect(outlineOf(box).getAttribute("position").count / 2).toBe(12)
+    expect(countOf(outlineOf(box))).toBe(12)
   })
 
   it("lands every edge on the mesh in world space, through the item's transform", () => {
@@ -113,11 +157,48 @@ describe("selection outline", () => {
     outline.update(item)
     outline.updateMatrixWorld(true)
     expect(outline.visible).toBe(true)
-    expect(outline.children).toHaveLength(1)
+    // the lines, and the same lines again for what shows through
+    expect(outline.children).toHaveLength(2)
+    expect(linesOf(outline)[1]?.geometry).toBe(linesOf(outline)[0]?.geometry)
     const line = firstLine(outline)
-    const expected = new THREE.LineSegments(outlineOf(mesh.geometry))
+    const expected = new THREE.Mesh(outlineOf(mesh.geometry))
     expected.matrixWorld.copy(mesh.matrixWorld)
     expect(segments(line)).toEqual(segments(expected))
+  })
+
+  it("lands on the mesh through the scene's own update, which forces nothing, however it comes and goes", () => {
+    // The viewport works out world matrices once a frame, where they changed (PaneRenderer), and items keep theirs fixed
+    // (FixedGroup in ItemObject.tsx), so nothing above an outline forces it. A mesh at its item's origin places a line
+    // where a new line already stands.
+    const scene = new THREE.Scene()
+    scene.matrixAutoUpdate = false // as PaneRenderer keeps it
+    const fixedItem = (x: number) => {
+      const item = new THREE.Group()
+      item.position.set(x, 20, -30)
+      item.updateMatrix()
+      item.matrixAutoUpdate = false
+      const mesh = new THREE.Mesh(wedge())
+      mesh.matrixAutoUpdate = false
+      item.add(mesh)
+      scene.add(item)
+      return { item, mesh }
+    }
+    const { item, mesh } = fixedItem(100)
+    const other = fixedItem(-500).item
+    scene.updateMatrixWorld(true)
+    const expected = new THREE.Mesh(outlineOf(mesh.geometry))
+    expected.matrixWorld.copy(mesh.matrixWorld)
+    const outline = new SelectionOutline()
+    const shownOn = (under: THREE.Object3D) => {
+      under.add(outline)
+      outline.update(under)
+      scene.updateMatrixWorld()
+      return segments(firstLine(outline))
+    }
+    expect(shownOn(item)).toEqual(segments(expected))
+    // moved to another item and back, as the paint tool's hover goes from item to item
+    shownOn(other)
+    expect(shownOn(item)).toEqual(segments(expected))
   })
 
   it("follows meshes as they load and leave, and is never raycast", () => {
@@ -128,9 +209,9 @@ describe("selection outline", () => {
     const second = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10))
     mesh.parent!.add(second)
     outline.update(item)
-    expect(outline.children).toHaveLength(2)
+    expect(outline.children).toHaveLength(4)
     outline.update(item) // idempotent: the outline's own lines are not meshes
-    expect(outline.children).toHaveLength(2)
+    expect(outline.children).toHaveLength(4)
     second.removeFromParent()
     mesh.removeFromParent()
     outline.update(item)
@@ -142,8 +223,8 @@ describe("selection outline", () => {
     // a ray straight through a drawn vertex still hits nothing
     const line = firstLine(outline)
     line.updateMatrixWorld(true)
-    const vertex = new THREE.Vector3().fromBufferAttribute(line.geometry.getAttribute("position"), 0)
-      .applyMatrix4(line.matrixWorld)
+    const [vertex] = endsOf(line.geometry, 0)
+    vertex.applyMatrix4(line.matrixWorld)
     const ray = new THREE.Raycaster(vertex.clone().add(new THREE.Vector3(0, 1000, 0)), new THREE.Vector3(0, -1, 0))
     expect(ray.intersectObject(outline, true)).toHaveLength(0)
   })
@@ -153,19 +234,55 @@ describe("selection outline", () => {
     const outline = new SelectionOutline()
     item.add(outline)
     outline.update(item)
-    const colorOf = () => {
-      const { material } = firstLine(outline)
-      return material instanceof THREE.LineBasicMaterial ? `#${material.color.getHexString()}` : material
-    }
-    expect(colorOf()).toBe(OUTLINE_COLORS.dark.selected)
+    const colorsOf = () => linesOf(outline).map((line) => `#${lineMaterialOf(line).color.getHexString()}`)
+    expect(colorsOf()).toEqual([OUTLINE_COLORS.dark.selected, OUTLINE_COLORS.dark.selected])
     outline.update(item, true)
-    expect(colorOf()).toBe(OUTLINE_COLORS.dark.active)
+    expect(colorsOf()).toEqual([OUTLINE_COLORS.dark.active, OUTLINE_COLORS.dark.active])
     setOutlineTheme(false)
-    expect(colorOf()).toBe(OUTLINE_COLORS.light.active)
+    expect(colorsOf()).toEqual([OUTLINE_COLORS.light.active, OUTLINE_COLORS.light.active])
     outline.update(item, false)
-    expect(colorOf()).toBe(OUTLINE_COLORS.light.selected)
+    expect(colorsOf()).toEqual([OUTLINE_COLORS.light.selected, OUTLINE_COLORS.light.selected])
     setOutlineTheme(true)
-    expect(colorOf()).toBe(OUTLINE_COLORS.dark.selected)
+    expect(colorsOf()).toEqual([OUTLINE_COLORS.dark.selected, OUTLINE_COLORS.dark.selected])
+  })
+
+  it("draws what the scene hides lighter, where the scene is nearer", () => {
+    const { item } = makeItem(wedge())
+    const outline = new SelectionOutline()
+    item.add(outline)
+    outline.update(item)
+    const [shown, hidden] = linesOf(outline).map(lineMaterialOf)
+    expect([shown?.depthFunc, shown?.transparent]).toEqual([THREE.LessEqualDepth, false])
+    expect([hidden?.depthFunc, hidden?.depthWrite, hidden?.transparent]).toEqual([THREE.GreaterDepth, false, true])
+    expect(hidden?.opacity).toBe(HIDDEN_OPACITY)
+    // what shows through is lighter than what shows, and the same colour
+    expect([shown?.linewidth, hidden?.linewidth]).toEqual([LINE_WIDTH.outline, LINE_WIDTH.light])
+    expect(hidden?.color.getHexString()).toBe(shown?.color.getHexString())
+  })
+
+  it("outlines the hover in the pointer's colour, only where it shows, and unshaded", () => {
+    const { item } = makeItem(wedge())
+    const outline = new SelectionOutline()
+    item.add(outline)
+    outline.update(item)
+    outline.updateHover(item)
+    expect(outline.children).toHaveLength(1)
+    const hover = lineMaterialOf(linesOf(outline)[0])
+    expect(`#${hover.color.getHexString()}`).toBe(PAINT_HOVER_COLORS.dark.paint)
+    // lighter than the selection's, which it would become
+    expect(hover.linewidth).toBe(LINE_WIDTH.light)
+  })
+
+  it("marks its lines as no part of the item, though fat lines are meshes", () => {
+    const { item, mesh } = makeItem(wedge())
+    const outline = new SelectionOutline()
+    item.add(outline)
+    outline.update(item)
+    const meshes: Array<THREE.Object3D> = []
+    item.traverse((object) => {
+      if (isMesh(object) && !isOutlinePart(object)) meshes.push(object)
+    })
+    expect(meshes).toEqual([mesh])
   })
 
   describe("the paint tool's hover", () => {
@@ -189,20 +306,22 @@ describe("selection outline", () => {
       return { item, outline, slots: [mesh, glass] as const }
     }
     const fillsOf = (outline: THREE.Group) =>
-      outline.children.filter((c): c is THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> => isMesh(c))
+      outline.children.filter((c): c is THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> =>
+        isMesh(c) && !(c instanceof LineSegments2)
+      )
     const spotAt = (slot: number) => ({ itemId: "a", visual: "m0", slot })
 
     it("shades the target's faces under its outline: the slot's primitives, or every mesh for the whole piece", () => {
       const { item, outline, slots } = paintable()
       outline.updatePaintHover(item, showsTarget({ spot: spotAt(1), whole: false }), false)
       expect(fillsOf(outline).map((fill) => fill.geometry)).toEqual([slots[1].geometry])
-      expect(outline.children.filter(isLine)).toHaveLength(1)
+      expect(linesOf(outline)).toHaveLength(1)
       outline.updatePaintHover(item, showsTarget({ spot: spotAt(1), whole: true }), false)
       expect(fillsOf(outline).map((fill) => fill.geometry)).toEqual(slots.map((mesh) => mesh.geometry))
       // the selection's outline has no fill, and leaves none behind
       outline.update(item)
       expect(fillsOf(outline)).toHaveLength(0)
-      expect(outline.children.filter(isLine)).toHaveLength(2)
+      expect(linesOf(outline)).toHaveLength(4)
     })
 
     it("lies on the mesh's faces, mirrored with it, translucent over them, and is never raycast", () => {
@@ -255,9 +374,9 @@ describe("selection outline", () => {
       outline.updatePaintHover(item, () => true, false)
       selection.update(item)
       outline.updatePaintHover(item, () => true, false)
-      expect(selection.children).toHaveLength(2)
+      expect(selection.children).toHaveLength(4)
       expect(fillsOf(outline)).toHaveLength(2)
-      expect(outline.children.filter(isLine)).toHaveLength(2)
+      expect(linesOf(outline)).toHaveLength(2)
     })
   })
 

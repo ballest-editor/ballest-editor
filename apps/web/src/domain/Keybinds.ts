@@ -36,6 +36,8 @@ export const keybindSections = [
       "focusSelection",
       "addToSelection",
       "toggleSelection",
+      "removeFromSelection",
+      "lassoSelect",
       "paintWholePiece",
       "pickPaint"
     ]
@@ -94,7 +96,12 @@ export const keybindSections = [
       "viewRight",
       "viewLeft",
       "toggleOrthographic",
-      "frameAll"
+      "frameAll",
+      "hideSelection",
+      "showAll",
+      "isolateSelection",
+      "lockSelection",
+      "unlockAll"
     ]
   },
   {
@@ -140,6 +147,8 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   focusSelection: "focus selection",
   addToSelection: "add to selection",
   toggleSelection: "toggle selection",
+  removeFromSelection: "remove from selection",
+  lassoSelect: "lasso",
   paintWholePiece: "paint whole piece",
   pickPaint: "pick paint",
   deleteSelection: "delete",
@@ -196,6 +205,11 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   viewLeft: "left view",
   toggleOrthographic: "perspective view",
   frameAll: "frame all",
+  hideSelection: "hide / show",
+  showAll: "show all",
+  isolateSelection: "isolate",
+  lockSelection: "lock / unlock",
+  unlockAll: "unlock all",
   newMap: "new map",
   openMap: "import map",
   saveMap: "save map",
@@ -223,9 +237,13 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Switch what a selection of several pieces or groups pivots about: one point for all of them, the active one's pivot, as the game does (Together), or each about its own pivot and axes (Each). With a chain selected, switch it between Rigid, where it moves as one piece, and link by link, where a turn bends it, a move spreads it and a scale stretches it. No equivalent in the in-game editor; Blender's pivot key.",
   focusSelection: "Frame the current selection in the viewport. F in the in-game editor.",
   addToSelection:
-    "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
+    "Click an item to add it to the selection (it becomes the active item), or drag a box to add what it catches. Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
   toggleSelection:
-    "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the in-game editor uses to deselect.",
+    "Click an item to add it to the selection, or to remove it if it's already selected; drag a box to do that to each thing it catches. Ctrl+click, which the in-game editor uses to deselect.",
+  removeFromSelection:
+    "Click an item, or drag a box, to take what it catches out of the selection, never adding. Editor only.",
+  lassoSelect:
+    "Hold while dragging a box to draw a lasso along the pointer's path instead, from where the drag began; let go for the box again. Only once the drag has begun: Alt at the press orbits. Editor only.",
   paintWholePiece:
     "With the paint tool, click or drag with this to paint every slot of a piece instead of the one under the pointer; hold its modifier to see which pieces. A surface always covers the whole piece.",
   pickPaint:
@@ -241,7 +259,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Add the copied items where they were when copied, and select them. Ctrl+V in the in-game editor, which also pastes in place.",
   undo: "Undo the last change. Ctrl+Z in the in-game editor; a whole gizmo drag or number-field scrub is one step.",
   redo: "Redo the last undone change. Ctrl+Y in the in-game editor; Ctrl+Shift+Z also works.",
-  selectAll: "Select every item in the map; inside an entered group, every item in that group.",
+  selectAll:
+    "Select every item in the map; inside an entered group, every item in that group. Hidden and locked items are left out.",
   deselect:
     "Clear the selection. Inside an entered group it steps out of the group instead, and with a pane maximised it restores the panes. (The game uses Ctrl+click.)",
   cancelDrag:
@@ -305,7 +324,16 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   viewLeft: "Look at the map from its left (the -Y side) in the active pane, orthographic.",
   toggleOrthographic:
     "Switch the active pane between perspective and the orthographic view closest to where it is looking.",
-  frameAll: "Frame the whole map in the active pane.",
+  frameAll: "Frame the whole map in the active pane, as far as it's drawn.",
+  hideSelection:
+    "Hide the selection: it isn't drawn, picked or snapped to until it's shown again. With all of it hidden already (picked in the Outline), show it. H in Blender, Unity and Unreal; the game has no hiding.",
+  showAll:
+    "Show every hidden item, and select them. Alt+H, as in Blender. Editor only, like hiding: the game always draws everything.",
+  isolateSelection:
+    "Draw only the selection in the map's panes, until this is pressed again; nothing is hidden for good, and pieces added meanwhile show. Shift+H in Unity; Numpad / is Blender's local view. Editor only.",
+  lockSelection:
+    "Lock the selection: it's still drawn and snapped to, but a click goes through it, and Select all and the paint tool leave it alone. Pick it in the Outline to unlock it. Ctrl+L, as in Godot and Rhino. Editor only.",
+  unlockAll: "Unlock every locked item, and select them. Editor only.",
   newMap: "Start a new map.",
   openMap:
     "Import a .balledit or .ballmap file: it is copied into the project and opened from there. In the browser, open it.",
@@ -337,6 +365,7 @@ export const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>>
 export const mouseClickActions: ReadonlySet<KeybindAction> = new Set([
   "addToSelection",
   "toggleSelection",
+  "removeFromSelection",
   "paintWholePiece",
   "pickPaint"
 ])
@@ -371,6 +400,8 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   focusSelection: {},
   addToSelection: SELECTING,
   toggleSelection: SELECTING,
+  removeFromSelection: SELECTING,
+  lassoSelect: { drag: ["area"] },
   paintWholePiece: PAINTING,
   pickPaint: PAINTING,
   undo: {},
@@ -382,7 +413,7 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   deleteSelection: {},
   selectAll: {},
   deselect: {},
-  cancelDrag: { drag: ["move", "turn", "scale"] },
+  cancelDrag: { drag: ["move", "turn", "scale", "area"] },
   enterGroup: {},
   groupSelection: {},
   chainSelection: {},
@@ -415,6 +446,11 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   viewLeft: {},
   toggleOrthographic: {},
   frameAll: {},
+  hideSelection: {},
+  showAll: {},
+  isolateSelection: {},
+  lockSelection: {},
+  unlockAll: {},
   snapToggle: {},
   snapOff: { drag: ["move", "turn", "scale", "place"] },
   snapHold: { drag: ["move", "turn"] },
@@ -456,7 +492,8 @@ export const keybindActionHints: Partial<Record<KeybindAction, string>> = {
   snapLockZ: "lock",
   snapOnlyConnectors: "ends",
   snapOnlyMesh: "pieces",
-  snapOnlyAlignment: "guides"
+  snapOnlyAlignment: "guides",
+  lassoSelect: "lasso"
 }
 
 /** Actions that are held down rather than fired once. */
@@ -505,6 +542,8 @@ export const defaultKeybinds: Keybinds = {
   focusSelection: ["KeyF"],
   addToSelection: ["Shift+Mouse0"],
   toggleSelection: ["Ctrl+Mouse0"],
+  removeFromSelection: ["Ctrl+Shift+Mouse0"],
+  lassoSelect: ["AltLeft", "AltRight"],
   paintWholePiece: ["Shift+Mouse0"],
   pickPaint: ["Alt+Mouse0"],
   deleteSelection: ["Backspace", "Delete"],
@@ -549,6 +588,11 @@ export const defaultKeybinds: Keybinds = {
   viewLeft: ["Ctrl+Numpad3"],
   toggleOrthographic: ["Numpad5"],
   frameAll: ["Shift+KeyF"],
+  hideSelection: ["KeyH"],
+  showAll: ["Alt+KeyH"],
+  isolateSelection: ["Shift+KeyH", "NumpadDivide"],
+  lockSelection: ["Ctrl+KeyL"],
+  unlockAll: ["Alt+KeyL"],
   newMap: ["Alt+KeyN"],
   openMap: ["Ctrl+KeyO"],
   saveMap: ["Ctrl+KeyS"],

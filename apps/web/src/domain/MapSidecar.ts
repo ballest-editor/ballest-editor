@@ -23,7 +23,11 @@ export class SidecarItem extends Schema.Opaque<SidecarItem>()(
     fingerprint: Schema.String,
     name: Schema.optionalKey(Schema.String),
     tags: Schema.optionalKey(Tags),
-    connectAt: Schema.optionalKey(ConnectAt)
+    connectAt: Schema.optionalKey(ConnectAt),
+    /** Not drawn, picked or snapped to (docs/DESKTOP.md § Hide, isolate and lock); absent when shown. */
+    hidden: Schema.optionalKey(Schema.Literal(true)),
+    /** Drawn and snapped to, but not picked in the viewport; absent when it isn't locked. */
+    locked: Schema.optionalKey(Schema.Literal(true))
   })
 ) {}
 

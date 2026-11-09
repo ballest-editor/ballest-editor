@@ -1,3 +1,4 @@
+import { areaShapes } from "../domain/areaSelect"
 import { viewLayoutKinds } from "../domain/viewLayout"
 import { dialogIds, settingsCategories } from "../editor/store"
 import { dockPanels } from "./dock/panels"
@@ -18,5 +19,6 @@ export const viewIds = (): ReadonlyArray<string> => [
   ...MENU_TITLES.map((title) => `menu:${title}`),
   ...viewLayoutKinds.map((kind) => `viewport:${kind}`),
   ...POPOVERS.map((id) => `popover:${id}`),
-  ...toolPanels.map((tool) => `tool:${tool}`)
+  ...toolPanels.map((tool) => `tool:${tool}`),
+  ...areaShapes.map((shape) => `select:${shape}`)
 ]

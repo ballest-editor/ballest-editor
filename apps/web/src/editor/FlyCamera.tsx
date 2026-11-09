@@ -146,9 +146,11 @@ export function FlyCamera() {
       }
     }
 
+    // The pane pressed in, with any button, becomes the active one. Ahead of every other press on the canvas, the gizmo's
+    // among them, which stops the presses it takes; passing over a pane leaves the active one as it is.
+    const onPressAnyPane = (e: PointerEvent) => useEditor.getState().setActivePane(panePointer(el, e).slot)
     const onPointerDown = (e: PointerEvent) => {
-      const { pane, slot } = panePointer(el, e)
-      useEditor.getState().setActivePane(slot)
+      const { pane } = panePointer(el, e)
       // No gizmo check: the gizmo stops the left presses it takes, other buttons fall through.
       const chord = mouseChordOf(e)
       // Ctrl+click and the like: the held modifier is the click's, not "down".
@@ -168,10 +170,7 @@ export function FlyCamera() {
     }
     const onPointerMove = (e: PointerEvent) => {
       const pane = dragPane.current
-      if (drag.current === null || pane === null) {
-        if (e.buttons === 0) useEditor.getState().setActivePane(panePointer(el, e).slot)
-        return
-      }
+      if (drag.current === null || pane === null) return
       if (performance.now() < settleUntil) return
       if (pane.view !== undefined) {
         // the point under the pointer stays under it
@@ -226,6 +225,7 @@ export function FlyCamera() {
     window.addEventListener("keydown", onKeyDown, { signal })
     window.addEventListener("keyup", (e) => pressed.current.release(e.code), { signal })
     window.addEventListener("blur", () => pressed.current.clear(), { signal })
+    el.addEventListener("pointerdown", onPressAnyPane, { capture: true, signal })
     el.addEventListener("pointerdown", onPointerDown, { signal })
     el.addEventListener("pointermove", onPointerMove, { signal })
     el.addEventListener("pointerup", onPointerUp, { signal })

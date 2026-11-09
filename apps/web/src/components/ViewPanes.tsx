@@ -6,6 +6,7 @@ import {
   IconBoxAlignRight,
   IconBoxAlignTop,
   IconChevronDown,
+  IconFocus2,
   IconLayoutColumns,
   IconLayoutGrid,
   IconLayoutRows,
@@ -234,6 +235,9 @@ const LABEL_WORD = "@max-[10rem]:hidden"
 const CORNER_LABEL_WORD = "@max-[16rem]:hidden"
 const AXES_ROOM = "[@container_(height<10rem)]:hidden @max-[7.5rem]:hidden"
 const CORNER_AXES_ROOM = "[@container_(height<10rem)]:hidden @max-[20rem]:hidden"
+/** Where the isolation's chip goes in the corner's pane: beside the card while the controls leave room, else under it. */
+const CORNER_CHIP_BESIDE = "@max-[42rem]:hidden"
+const CORNER_CHIP_UNDER = "hidden @max-[42rem]:flex"
 
 /** The foot of a pane's menu: how big the axes are, the same setting as Settings › Camera, for every pane. */
 function AxesSizeRow() {
@@ -285,6 +289,43 @@ function RestoreChip({ slot, disabled }: { readonly slot: PaneSlot; readonly dis
   )
 }
 
+/**
+ * The isolation's way out, beside every pane's card, as every pane of the tab is isolated (Blender marks each quad view
+ * "(Local)"): a click, or the key it names. A pane in the corner with too little room beside its card for the view
+ * controls has it under the card's label instead (`CORNER_CHIP_BESIDE`, `CORNER_CHIP_UNDER`).
+ */
+function IsolationChip({ disabled, className }: { readonly disabled: boolean; readonly className?: string }) {
+  const binding = useEditor((s) => s.keybinds.isolateSelection[0])
+  const count = useEditor((s) => s.isolation === null ? 0 : s.doc.ids.length - s.isolation.outside.size)
+  const label = `End isolation: ${count} ${count === 1 ? "item is" : "items are"} isolated`
+  return (
+    <div className={cn(GROUP, className)}>
+      <ViewTip
+        label={label}
+        render={
+          <button
+            type="button"
+            aria-label="End isolation"
+            disabled={disabled}
+            className={SEGMENT}
+            onClick={() => useEditor.getState().toggleIsolation()}
+            {...noFocus}
+          />
+        }
+      >
+        <IconFocus2 className="size-4" />
+        <span className="text-caption @max-[60rem]/viewport:hidden">
+          {binding === undefined ? "Isolated" : (
+            <>
+              Isolated · <ChordText binding={binding} /> to end
+            </>
+          )}
+        </span>
+      </ViewTip>
+    </div>
+  )
+}
+
 /** How far a press on a pane's label moves before it's a drag and not a click. */
 const DRAG_START_PX = 4
 
@@ -314,6 +355,7 @@ function PaneCard({ pane, projection, disabled, active, inCorner, drag }: {
 }) {
   const kind = useEditor((s) => shownKindOf(s.viewLayout))
   const maximised = useEditor((s) => maximisedSlotOf(s.viewLayout) !== undefined)
+  const isolated = useEditor((s) => s.isolation !== null)
   const setPaneProjection = useEditor((s) => s.setPaneProjection)
   const togglePaneMaximised = useEditor((s) => s.togglePaneMaximised)
   const [open, setOpen] = useState(false)
@@ -394,11 +436,13 @@ function PaneCard({ pane, projection, disabled, active, inCorner, drag }: {
               footer={<AxesSizeRow />}
             />
           </div>
+          {isolated && inCorner && <IsolationChip disabled={disabled} className={CORNER_CHIP_UNDER} />}
           <div className={cn("rounded-full p-1", SURFACE, inCorner ? CORNER_AXES_ROOM : AXES_ROOM)}>
             <ViewGizmo slot={pane.slot} projection={projection} disabled={disabled} />
           </div>
         </div>
         {maximised && <RestoreChip slot={pane.slot} disabled={disabled} />}
+        {isolated && <IsolationChip disabled={disabled} {...(inCorner && { className: CORNER_CHIP_BESIDE })} />}
       </ContextMenuTrigger>
       <ContextMenuContent>
         <PaneMenuItems slot={pane.slot} kind={kind} />

@@ -84,6 +84,11 @@ export const actionCommands = {
   viewLeft: () => lookAlong("left"),
   toggleOrthographic: () => lookAlong(sceneRegistry.toggledProjection()),
   frameAll: onOpenTab(() => useEditor.getState().requestFrameAll()),
+  hideSelection: () => useEditor.getState().toggleSelectionFlag("hidden"),
+  showAll: () => useEditor.getState().clearFlag("hidden"),
+  isolateSelection: () => useEditor.getState().toggleIsolation(),
+  lockSelection: () => useEditor.getState().toggleSelectionFlag("locked"),
+  unlockAll: () => useEditor.getState().clearFlag("locked"),
   newMap: () => void startNewMap(),
   /** Import… on desktop, Open… in a browser. */
   openMap: () => void importMap(),

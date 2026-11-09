@@ -1,4 +1,14 @@
-import { IconBoxMultiple, IconChevronRight, IconFolder, IconFolderOpen, IconLink } from "@tabler/icons-react"
+import {
+  IconBoxMultiple,
+  IconChevronRight,
+  IconEye,
+  IconEyeOff,
+  IconFolder,
+  IconFolderOpen,
+  IconLink,
+  IconLock,
+  IconLockOpen
+} from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
@@ -6,6 +16,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { createElement, memo, useLayoutEffect, useRef, useState } from "react"
 import type { CatalogPiece } from "../domain/Catalog"
 import type { OutlineRow } from "../domain/outline"
+import { type FlagState, type ItemFlag, toggledFlag } from "../domain/visibility"
 import { useEditor } from "../editor/store"
 import { Ordinal } from "./Ordinal"
 import { type Glyph, hasOwnGlyph, itemGlyphOf } from "./outlineGlyphs"
@@ -99,6 +110,54 @@ export function ItemIcon({ actorClass }: { readonly actorClass: string }) {
     : <PieceIcon key={actorClass} piece={piece} glyph={glyph} />
 }
 
+const FLAG_ICONS = {
+  hidden: { on: IconEyeOff, off: IconEye, set: "Hide", clear: "Show" },
+  locked: { on: IconLock, off: IconLockOpen, set: "Lock", clear: "Unlock" }
+} as const
+
+/**
+ * A row's eye or padlock: shown while any of the row's items is hidden or locked (faint when only some are, as Unity's
+ * mixed state), and under the pointer otherwise. A press hides or locks all of them, or clears the flag when all have
+ * it, as one undo step, and leaves the selection to the row's own click.
+ */
+function FlagToggle({ row, keysOf, flag, state }: {
+  readonly row: OutlineRow
+  readonly keysOf: (id: string) => ReadonlyArray<string>
+  readonly flag: ItemFlag
+  readonly state: FlagState
+}) {
+  const { clear, off: Off, on: On, set } = FLAG_ICONS[flag]
+  const label = `${state === "all" ? clear : set} ${row.name}`
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={label}
+      aria-pressed={state === "all"}
+      title={label}
+      className={cn(
+        "shrink-0 transition-opacity",
+        state === "none"
+          ? "text-fg-tertiary opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
+          : state === "some"
+          ? "text-fg-tertiary"
+          : "text-fg-secondary"
+      )}
+      onMouseDown={(e) => e.preventDefault()} // leaves focus where it is, for the editor's keys
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        const s = useEditor.getState()
+        const items = keysOf(row.id)
+        s.setItemFlag(items, flag, toggledFlag(s.doc.structure, items, flag))
+      }}
+    >
+      {state === "none" ? <Off /> : <On />}
+    </Button>
+  )
+}
+
 /** What a row's name says when the pointer rests on it: an item's class, a group's item count. */
 const nameTooltip = (row: OutlineRow): string =>
   row.kind === "item"
@@ -113,8 +172,13 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
   readonly partial: boolean
   /** The entered group's own row. */
   readonly entered: boolean
-  /** Outside the entered group. */
+  /** Outside the entered group, or left out by the tab's isolation. */
   readonly dimmed: boolean
+  /** How much of the row's items is hidden, and locked. */
+  readonly hidden: FlagState
+  readonly locked: FlagState
+  /** A row's items, for its toggles: read when pressed, so a row doesn't redraw for them. */
+  readonly keysOf: (id: string) => ReadonlyArray<string>
   readonly dragged: boolean
   readonly dropInto: boolean
   readonly filtering: boolean
@@ -122,6 +186,7 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
   readonly onRenamed: (row: OutlineRow, value: string | null) => void
 }) {
   const { row, rowIndex, selected, partial, entered, dimmed, dragged, dropInto, filtering, renaming, onRenamed } = props
+  const { hidden, keysOf, locked } = props
   const setGroupCollapsed = useEditor((s) => s.setGroupCollapsed)
   const isGroup = row.kind === "group"
   const FolderIcon = row.instance ? IconBoxMultiple : row.chain ? IconLink : row.collapsed ? IconFolder : IconFolderOpen
@@ -134,7 +199,7 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
       {...(isGroup && { "aria-expanded": !row.collapsed })}
       data-row-index={rowIndex}
       className={cn(
-        "absolute inset-x-0 flex items-center pr-2 text-body transition-colors focus-ring-inset hover:bg-hover active:bg-pressed",
+        "group/row absolute inset-x-0 flex items-center pr-1 text-body transition-colors focus-ring-inset hover:bg-hover active:bg-pressed",
         selected && "bg-selected hover:lift-selected active:press-selected",
         partial && !selected && "bg-primary/5",
         entered && "shadow-[inset_2px_0_0_var(--primary)]",
@@ -180,12 +245,21 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
         ? <RenameField name={row.name} onDone={(value) => onRenamed(row, value)} />
         : (
           <>
-            <span className={cn("mr-1 min-w-0 truncate", selected && "text-body-strong")} title={nameTooltip(row)}>
+            <span
+              className={cn(
+                "mr-1 min-w-0 truncate",
+                selected && "text-body-strong",
+                hidden === "all" && "text-fg-tertiary italic"
+              )}
+              title={nameTooltip(row)}
+            >
               {row.name}
             </span>
             <Ordinal value={row.ordinal} />
             <span className="flex-1" />
             {row.tags.length > 0 && <TagChips tags={row.tags} />}
+            <FlagToggle row={row} keysOf={keysOf} flag="locked" state={locked} />
+            <FlagToggle row={row} keysOf={keysOf} flag="hidden" state={hidden} />
           </>
         )}
     </div>

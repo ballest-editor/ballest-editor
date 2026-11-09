@@ -44,7 +44,9 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
         "index": 3,
         "fingerprint": "BP_Prim_Cube|100,200,8615|0,0,0,1|1,1,1",
         "name": "Left ramp",
-        "tags": ["start"]
+        "tags": ["start"],
+        "hidden": true,
+        "locked": true
       }
     },
     "tree": [
@@ -85,7 +87,7 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
   ```
 
   - A **key** is 12 random URL-safe characters that an item gets when it enters the document (placed, pasted, duplicated, imported). It is the item's one identity in the editor: the store's `ids`, the selection and the sidecar all use it. A group's `id` is made the same way, and keys and ids share one space.
-  - `items` has an entry per item. `index` is its place in `map.items`. `fingerprint` is its class and transform, rounded to 0.01 cm and four places for rotation and scale, with a quaternion and its negative written alike. `name` and `tags` are optional, and tags are free strings. Groups have tags too.
+  - `items` has an entry per item. `index` is its place in `map.items`. `fingerprint` is its class and transform, rounded to 0.01 cm and four places for rotation and scale, with a quaternion and its negative written alike. `name` and `tags` are optional, and tags are free strings. Groups have tags too. `hidden` and `locked` are `true` or absent: the item is hidden or locked in the editor ([DESKTOP.md § Hide, isolate and lock](DESKTOP.md#hide-isolate-and-lock)). A group is hidden or locked by its items.
   - `tree` holds every item in exactly one place, and groups nest to any depth. A group left empty by an edit goes with it, as the game's do.
   - `prefab` makes a group an instance of a prefab ([DESKTOP.md § Prefabs](DESKTOP.md#prefabs)). `tier` and `name` say which, and `hash` is the SHA-256 of its file when the instance was placed or last updated. `items` has a signature per item the definition held then, in its frame and document order: class, transform and a digest of the rest (`signatureOf`, `domain/prefabInstance.ts`). It is what tells an unedited instance once the file has moved on. Copying an instance copies its link.
   - `pivot` is where a group turns and scales, and where its gizmo sits, when that isn't the centre of its items' box ([DESKTOP.md § Group pivots](DESKTOP.md#group-pivots-and-chains)): `{ "choice": "Top" }` or another face (`Bottom`, `Left`, `Right`, `Back`, `Front`), `{ "choice": "item", "key": "<key>" }` for one member's own pivot, or `{ "choice": "point", "world": { "x", "y", "z" } }` for a point frozen in the world. Absent for the centre. `chain: true` makes the group a chain: its children, in this order, are its links, and a chain has no `pivot`. `growth` is how much more each joint takes than the one before when the chain bends, spreads or stretches, the Inspector's Joints: `curve` `linear` (Linear) adds `percent` of the first joint's share per joint, `compound` (Exponential) multiplies by `1 + percent / 100` per joint; absent (Even), every joint takes the same. Save writes the pivot as the game group's `frame`, and a map with no sidecar whose frame sits off the centre comes in with a `point` pivot there ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)).
@@ -114,7 +116,7 @@ A project is never the game's maps folder. The game loads only from `UserSavedMa
 
 ### Source of truth
 
-**The `.balledit` in the project is the source of truth for the pieces, and the sidecar for the structure:** the groups, each item's and group's name and tags, which groups are prefab instances, and what snapping keeps per map. An export is a byte-for-byte copy of the `.balledit` plus a link record. Save regenerates the `.balledit`'s `editorState.groups` from the sidecar's tree, so the game sees what it can hold of the structure ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). A change to the game's groups never reaches the tree of a map that has a sidecar. Later, the sidecar also holds hidden and locked pieces, layers and reference underlays. The reasons:
+**The `.balledit` in the project is the source of truth for the pieces, and the sidecar for the structure:** the groups, each item's and group's name and tags, which groups are prefab instances, and what snapping keeps per map. An export is a byte-for-byte copy of the `.balledit` plus a link record. Save regenerates the `.balledit`'s `editorState.groups` from the sidecar's tree, so the game sees what it can hold of the structure ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). A change to the game's groups never reaches the tree of a map that has a sidecar. The sidecar also holds which pieces are hidden and locked, and later layers and reference underlays. The reasons:
 
 - Round trips with the game lose nothing, because there is no converter to get wrong.
 - Git diffs of a map are the game's own JSON, readable without the editor.

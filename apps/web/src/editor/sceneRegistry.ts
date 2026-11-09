@@ -21,6 +21,10 @@ export const sceneRegistry = {
   gizmoDragActive: () => false,
   /** true while the selection is being dragged by an item's body */
   bodyDragActive: () => false,
+  /** true from a press on the selection that a body drag would take, to its release: no box starts from it */
+  bodyDragPending: () => false,
+  /** true while a box or lasso is being dragged */
+  areaDragActive: () => false,
   /** what a gizmo handle's drag does, while one is under way */
   gizmoDragKind: (): Exclude<Drag, "none"> | null => null,
   /** true while the paint tool is in a stroke */

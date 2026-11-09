@@ -16,7 +16,37 @@
   </head>
   <!-- With <html> clipping the viewport, this overflow stays on <body>: `clip` can't scroll, even by script or focus. -->
   <body class="relative h-svh overflow-clip">
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        The first paint, before any script has loaded: the editor's frame as EditorSkeleton draws it, so a new window
+        shows at once (the desktop app shows a window when it first paints). React replaces it with EditorSkeleton as
+        the page's code starts. A window started on the start screen shows its background alone, as ChooserSkeleton.
+      -->
+      <div id="first-paint" class="flex h-svh flex-col bg-background" aria-busy="true">
+        <div class="h-10 shrink-0 border-b bg-card [-webkit-app-region:drag]"></div>
+        <div class="flex min-h-0 flex-1 bg-background">
+          <div
+            class="shrink-0 bg-card shadow-[inset_-1px_0_0_var(--border)]"
+            style="width: var(--dock-left, 260px)"
+          ></div>
+          <div class="flex min-w-0 flex-1 flex-col">
+            <div class="h-8 shrink-0 bg-background"></div>
+            <div class="relative min-h-0 flex-1 bg-[#d0e4ef] dark:bg-[#0f242f]"></div>
+            <div
+              class="shrink-0 bg-card shadow-[inset_0_1px_0_var(--border)]"
+              style="height: var(--dock-bottom, 0px)"
+            ></div>
+          </div>
+          <div
+            class="shrink-0 bg-card shadow-[inset_1px_0_0_var(--border)]"
+            style="width: var(--dock-right, 300px)"
+          ></div>
+        </div>
+      </div>
+      <script>
+        if (new URLSearchParams(location.search).has("chooser")) document.getElementById("first-paint").replaceChildren()
+      </script>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

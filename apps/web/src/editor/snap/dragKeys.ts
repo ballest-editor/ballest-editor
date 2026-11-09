@@ -16,7 +16,7 @@ import {
   resolveChord
 } from "../../domain/Keybinds"
 import { type KeyContext, matches } from "../../domain/keyContext"
-import { SNAP_KINDS, type SnapKind, type SnapTransform } from "../../domain/snapConfig"
+import { SNAP_KINDS, type SnapKind } from "../../domain/snapConfig"
 import { type DragKeysShown, useEditor } from "../store"
 import type { MoveLock, MoveSession } from "./moveSession"
 
@@ -24,7 +24,7 @@ export interface DragKeyState {
   /** The codes down now. */
   readonly pressed: Set<string>
   /** What the drag does, for the keys the status bar offers. */
-  readonly transform: SnapTransform
+  readonly transform: DragKeysShown["transform"]
   /** The move's lock, as the status bar shows it. */
   lock: MoveLock | undefined
 }
@@ -52,7 +52,11 @@ const held = (pressed: Set<string>, { ctrlKey, shiftKey }: Modifiers) => {
  * The context a drag's keys resolve in. A drag key never names a tool or a platform, so the drag is all that counts:
  * the keys don't change with the tool a drag was started in.
  */
-const dragContext = (transform: SnapTransform): KeyContext => ({ drag: transform, tool: "select", platform: "desktop" })
+const dragContext = (transform: DragKeysShown["transform"]): KeyContext => ({
+  drag: transform,
+  tool: "select",
+  platform: "desktop"
+})
 
 /** Shows the keys in the status bar, when they have changed since it last did. */
 const show = ({ lock, pressed, transform }: DragKeyState) => {
@@ -65,7 +69,7 @@ const show = ({ lock, pressed, transform }: DragKeyState) => {
 }
 
 /** The keys as a drag starts, or a press that may become one: a modifier pressed before it counts. */
-export const seedDragKeys = (e: Modifiers, transform: SnapTransform = "move"): DragKeyState => {
+export const seedDragKeys = (e: Modifiers, transform: DragKeysShown["transform"] = "move"): DragKeyState => {
   const state: DragKeyState = { pressed: new Set<string>(), transform, lock: undefined }
   held(state.pressed, e)
   show(state)

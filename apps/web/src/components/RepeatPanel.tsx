@@ -4,6 +4,7 @@ import { useState } from "react"
 import { LIMITS } from "../domain/limits"
 import { isPlayerStart } from "../domain/MapFile"
 import { defaultRepeat, repeatCopies, type RepeatOptions, repeatProblem } from "../domain/repeat"
+import { indexOfKey } from "../domain/structure"
 import { repeatSelection } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
@@ -16,7 +17,7 @@ export function RepeatPanel() {
   const [options, setOptions] = useState<RepeatOptions>(defaultRepeat)
   const selected = useEditor((s) =>
     s.selectedIds.filter((id) => {
-      const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+      const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
       return item !== undefined && !isPlayerStart(item)
     }).length
   )
