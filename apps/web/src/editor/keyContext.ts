@@ -5,13 +5,14 @@ import { type EditorState, useEditor } from "./store"
 
 /**
  * What is being dragged: a look, orbit or pan; a gizmo handle's move, turn or scale, or the selection's body (a move);
- * a paint stroke; a number field's scrub, which previews a transform with no pointer drag of its own.
+ * a box or lasso; a paint stroke; a number field's scrub, which previews a transform with no pointer drag of its own.
  */
 const dragOf = (s: EditorState): Drag => {
   if (sceneRegistry.lookDragActive()) return "camera"
   const gizmo = sceneRegistry.gizmoDragKind()
   if (gizmo !== null) return gizmo
   if (sceneRegistry.bodyDragActive()) return "move"
+  if (sceneRegistry.areaDragActive()) return "area"
   if (sceneRegistry.paintStrokeActive()) return "stroke"
   return s.preview !== null ? "scrub" : "none"
 }

@@ -69,6 +69,8 @@ describe("keybind table", () => {
       ["focus selection", ["KeyF"]],
       ["add to selection", ["Shift+Mouse0"]],
       ["toggle selection", ["Ctrl+Mouse0"]],
+      ["remove from selection", ["Ctrl+Shift+Mouse0"]], // editor only
+      ["lasso", ["AltLeft", "AltRight"]], // editor only
       ["paint whole piece", ["Shift+Mouse0"]], // editor only
       ["pick paint", ["Alt+Mouse0"]] // editor only
     ])
@@ -408,7 +410,9 @@ describe("the caption under an action", () => {
     expect(caption("snapHold")).toBe("While moving or turning")
     expect(caption("snapLockX")).toBe("While moving")
     expect(caption("snapOnlyMesh")).toBe("While moving, turning or scaling")
-    expect(caption("cancelDrag")).toBe("While moving, turning or scaling")
+    expect(caption("cancelDrag")).toBe("While moving, turning, scaling or selecting")
+    expect(caption("lassoSelect")).toBe("While selecting")
+    expect(caption("removeFromSelection")).toBe("Select, Move, Rotate and Scale tools")
     expect(caption("addToSelection")).toBe("Select, Move, Rotate and Scale tools")
     expect(caption("pickPaint")).toBe("Paint tool")
     expect(caption("playMap")).toBe("Desktop app")
@@ -436,11 +440,21 @@ describe("resolveChord", () => {
     expect(resolveChord(defaultKeybinds, { ...idle, drag: "camera" }, "KeyF")).toEqual([])
   })
 
+  it("gives a box drag its lasso key and Escape, and nothing else", () => {
+    const area = { ...idle, drag: "area" } as const
+    expect(resolveChord(defaultKeybinds, area, "AltLeft")).toEqual(["lassoSelect"])
+    expect(resolveChord(defaultKeybinds, idle, "AltLeft")).toEqual([])
+    expect(resolveChord(defaultKeybinds, area, "Escape")).toEqual(["cancelDrag"])
+    expect(resolveChord(defaultKeybinds, area, "Ctrl+KeyZ")).toEqual([])
+    expect(resolveChord(defaultKeybinds, area, "KeyX")).toEqual([])
+  })
+
   it("gives the paint tool its own clicks and Escape to the drag under way", () => {
     expect(resolveChord(defaultKeybinds, idle, "Shift+Mouse0")).toEqual(["addToSelection"])
     expect(resolveChord(defaultKeybinds, { ...idle, tool: "paint" }, "Shift+Mouse0")).toEqual(["paintWholePiece"])
     expect(resolveChord(defaultKeybinds, { ...idle, tool: "paint" }, "Alt+Mouse0")).toEqual(["pickPaint", "orbit"])
     expect(resolveChord(defaultKeybinds, idle, "Alt+Mouse0")).toEqual(["orbit"])
+    expect(resolveChord(defaultKeybinds, idle, "Ctrl+Shift+Mouse0")).toEqual(["removeFromSelection"])
     expect(resolveChord(defaultKeybinds, idle, "Escape")).toEqual(["deselect"])
     expect(resolveChord(defaultKeybinds, { ...idle, drag: "move" }, "Escape")).toEqual(["cancelDrag"])
   })

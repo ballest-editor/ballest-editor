@@ -4,6 +4,7 @@
  * or hand-edited saves never break the editor.
  */
 import { Equal, Option, Predicate, Schema, Struct } from "effect"
+import { areaRules } from "./areaSelect"
 import { movementLookModes } from "./flyKeys"
 import { PLACE_DISTANCE } from "./placement"
 import { SCENE_COLORS, shadeOf } from "./sceneGround"
@@ -36,7 +37,9 @@ export const EditorSettings = Schema.Struct({
   /** How far from the camera (cm) a palette piece may land; bigger pieces go further (see domain/placement). */
   placeDistance: Schema.Finite.check(Schema.isBetween({ minimum: 500, maximum: 10000 })),
   /** Whether a selection change is its own undo step (edits always restore their selection). */
-  undoSelection: Schema.Boolean
+  undoSelection: Schema.Boolean,
+  /** Whether a box or lasso takes what it touches or what is wholly inside, or goes by the drag's direction. */
+  areaSelect: Schema.Literals(areaRules)
 })
 
 /** The sizes a gizmo comes in, as the Display popover and a pane's menu offer them. */
@@ -149,7 +152,7 @@ export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
   general: { units: "cm", creatorName: null, altDragDuplicates: true, exportOnSave: false, projectOpensIn: "ask" },
-  editor: { placeDistance: PLACE_DISTANCE, undoSelection: false },
+  editor: { placeDistance: PLACE_DISTANCE, undoSelection: false, areaSelect: "direction" },
   camera: {
     flySpeed: 2000,
     lookSensitivity: 1,

@@ -25,6 +25,8 @@ import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gizmoScaleOf, gridColorsOf } from "../domain/Settings"
 import { snapsGrid } from "../domain/snapConfig"
 import { holdsDrop, placeAt, placePrefab } from "./actions"
+import { useAreaDrag } from "./areaDrag"
+import { AreaOverlay, AreaSelect } from "./AreaSelect"
 import { ChainStart } from "./chainStart"
 import { fadeFineLines, gridReach } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
@@ -151,7 +153,7 @@ function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
 }
 
 /**
- * How a left click selects, from its chord: the add/toggle selection bindings where they work (not in the paint tool),
+ * How a left click or box selects, from its chord: the add, toggle and remove bindings where they work (not in the paint tool),
  * else a plain click. Null when the chord drives the camera instead (Alt+LMB orbit), or paints (PaintTool).
  */
 const selectModeOf = (e: MouseEvent): SelectMode | null => {
@@ -160,6 +162,7 @@ const selectModeOf = (e: MouseEvent): SelectMode | null => {
   const ctx = keyContextOf()
   const chord = mouseChordOf(e)
   const actions = resolveChord(keybinds, ctx, chord)
+  if (actions.includes("removeFromSelection")) return "remove"
   if (actions.includes("toggleSelection")) return "toggle"
   if (actions.includes("addToSelection")) return "add"
   // the paint tool's plain click paints
@@ -623,8 +626,14 @@ function SelectedOutline({ id, active }: { readonly id: string; readonly active:
   return null
 }
 
+/** What the viewport outlines: the selection, or during a box or lasso drag, what its release would select. */
+const useShownSelection = (): ReadonlyArray<string> => {
+  const selected = useEditor((s) => s.selectedIds)
+  return useAreaDrag((s) => s.drag?.result) ?? selected
+}
+
 function SelectedOutlines() {
-  const selectedIds = useEditor((s) => s.selectedIds)
+  const selectedIds = useShownSelection()
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => setOutlineTheme(dark), [dark])
   const active = selectedIds.at(-1)
@@ -698,7 +707,7 @@ function ChainStartMarker() {
 
 function GroupBoxes() {
   const tree = useEditor((s) => s.doc.structure.tree)
-  const selectedIds = useEditor((s) => s.selectedIds)
+  const selectedIds = useShownSelection()
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
   const targets = useMemo(() => groupBoxTargets(tree, selectedIds, enteredGroupId), [tree, selectedIds, enteredGroupId])
   return targets.map(({ id, keys, entered }) => <GroupBoxView key={id} keys={keys} entered={entered} />)
@@ -792,6 +801,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <ArrangeOverlay />
         <GizmoController />
         <SnapInput />
+        <AreaSelect opOf={selectModeOf} />
         <ClickSelect />
         <PaintTool />
         <FlyCamera />
@@ -799,6 +809,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
+      <AreaOverlay />
       <Controls disabled={!revealed} />
     </div>
   )

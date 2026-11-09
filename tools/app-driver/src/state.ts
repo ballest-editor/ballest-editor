@@ -34,7 +34,20 @@ export type Step =
   | { readonly do: "app"; readonly call: string; readonly args: ReadonlyArray<unknown> }
   | { readonly do: "click"; readonly at: Target; readonly button?: "left" | "right" }
   | { readonly do: "hover"; readonly at: Target }
-  | { readonly do: "drag"; readonly from: Target; readonly to: Target; readonly steps?: number }
+  | {
+    readonly do: "drag"
+    readonly from: Target
+    readonly to: Target
+    readonly steps?: number
+    /** Points passed on the way, in order: a lasso's path. */
+    readonly through?: ReadonlyArray<Point>
+    /** Held from the press: DevTools' bits, Alt 1, Ctrl 2, Meta 4, Shift 8. */
+    readonly modifiers?: number
+    /** A key pressed once the drag has begun and held to the end, as a drag's own keys are. */
+    readonly key?: { readonly key: string; readonly code: string }
+    /** Leave the button down, so the capture shows the drag under way. */
+    readonly hold?: boolean
+  }
   | { readonly do: "key"; readonly key: string; readonly code?: string; readonly modifiers?: number }
   | { readonly do: "wheel"; readonly at: Target; readonly deltaY: number }
   | { readonly do: "answerDialog"; readonly path?: string | null; readonly button?: number }
@@ -63,7 +76,11 @@ export const input = {
   click: (at: Target): Step => ({ do: "click", at }),
   rightClick: (at: Target): Step => ({ do: "click", at, button: "right" }),
   hover: (at: Target): Step => ({ do: "hover", at }),
-  drag: (from: Target, to: Target, steps = 8): Step => ({ do: "drag", from, to, steps }),
+  drag: (
+    from: Target,
+    to: Target,
+    options: Omit<Extract<Step, { readonly do: "drag" }>, "do" | "from" | "to"> = {}
+  ): Step => ({ do: "drag", from, to, steps: 8, ...options }),
   key: (key: string, code?: string, modifiers?: number): Step => ({
     do: "key",
     key,

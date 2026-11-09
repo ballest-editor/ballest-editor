@@ -6,7 +6,7 @@
  */
 
 /** What is being dragged, if anything. One at a time. */
-const drags = ["none", "camera", "move", "turn", "scale", "place", "stroke", "scrub"] as const
+const drags = ["none", "camera", "move", "turn", "scale", "place", "stroke", "scrub", "area"] as const
 export type Drag = (typeof drags)[number]
 
 /** The drags that change the map: "while dragging" in Settings' words. Looking and a number field's scrub aren't. */
@@ -69,7 +69,8 @@ const DRAG_WORDS: Readonly<Record<Drag, string>> = {
   scale: "scaling",
   place: "placing",
   stroke: "painting",
-  scrub: "scrubbing"
+  scrub: "scrubbing",
+  area: "selecting"
 }
 
 const TOOL_WORDS: Readonly<Record<Tool, string>> = {

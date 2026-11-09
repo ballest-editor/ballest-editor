@@ -231,6 +231,9 @@ const everyMesh = () => true
 /** Every outline's own lines and fills: under the item, but no part of it, so no outline outlines a fill. */
 const outlineParts = new WeakSet<THREE.Object3D>()
 
+/** Whether `object` is an outline's line or fill, and no part of the item it hangs under. */
+export const isOutlinePart = (object: THREE.Object3D): boolean => outlineParts.has(object)
+
 const inverse = new THREE.Matrix4()
 
 /** The outline of one item: add it to the item, then `update` it from that item. Never raycast. */

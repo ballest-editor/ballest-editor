@@ -15,6 +15,7 @@ import { type Effect, Option } from "effect"
 import { useMemo } from "react"
 import { create } from "zustand"
 import { useShallow } from "zustand/react/shallow"
+import type { AreaOp } from "../domain/areaSelect"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
 import { endsOf } from "../domain/connectors"
 import type { WorldEnd } from "../domain/connectors"
@@ -48,6 +49,7 @@ import {
   enteredLevelOf,
   groupPathOf,
   nodeKeys,
+  selectableKeys,
   selectedGroupIds,
   selectionNodeIds,
   soleGroupOf
@@ -180,6 +182,7 @@ import {
   unitOf,
   withCarriedPoints
 } from "../domain/units"
+import { areaDragging } from "./areaDrag"
 import type { GizmoSpace } from "./gizmo/handles"
 import type { Brush } from "./paintTarget"
 
@@ -216,8 +219,8 @@ export interface DocClip extends Clip {
  */
 export type Selection = ReadonlyArray<string>
 
-/** How a click changes the selection: plain click, add-to-selection, or toggle. */
-export type SelectMode = "replace" | "add" | "toggle"
+/** How a click or a box changes the selection: plain, add-to-selection, toggle, or remove. */
+export type SelectMode = AreaOp
 
 /**
  * One undo/redo step, seen from the side it restores: the document and the selection that
@@ -250,8 +253,8 @@ export interface TransformOptions {
  * the selection's body to the drag's end, and only when a key changes, so a pointer move doesn't render the bar.
  */
 export interface DragKeysShown {
-  /** What the drag does, which says which keys mean something to it. */
-  readonly transform: SnapTransform
+  /** What the drag does, which says which keys mean something to it: a transform, or a box or lasso. */
+  readonly transform: SnapTransform | "area"
   /** The codes down now, in the order they went down. */
   readonly pressed: ReadonlyArray<string>
   /** The move's lock, while one is set. */
@@ -2213,8 +2216,16 @@ export const nextSelection = (current: Selection, ids: ReadonlyArray<string>, mo
   if (ids.length === 0) return current
   const clicked = new Set(ids)
   const rest = current.filter((x) => !clicked.has(x))
+  if (mode === "remove") return rest.length === current.length ? current : rest
   return mode === "toggle" && rest.length === current.length - clicked.size ? rest : [...rest, ...ids]
 }
+
+/**
+ * What a box or lasso can catch, in Outline order: what Select all takes, the map's items or the entered group's. The
+ * one place hidden and locked items (#81) are to leave the box, as they leave a click.
+ */
+export const areaCandidates = (s: Pick<EditorState, "doc" | "enteredGroupId">): ReadonlyArray<string> =>
+  selectableKeys(s.doc.structure.tree, s.enteredGroupId)
 
 /** Each key's place in `ids`, kept per array: a group's selection can be thousands of items. */
 const keyIndices = new WeakMap<ReadonlyArray<string>, ReadonlyMap<string, number>>()
@@ -2265,7 +2276,7 @@ export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? 
 export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, indexOfKey(s.doc.ids, id))
 
 /** An item's edit transform (see domain/editTransform.ts) in the document. */
-const docTransformOf = (s: EditorState, id: string): UeTransform | undefined => {
+export const docTransformOf = (s: EditorState, id: string): UeTransform | undefined => {
   const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
   return item === undefined ? undefined : editTransform(item)
 }
@@ -2387,6 +2398,7 @@ export const shownPivotMode = (s: EditorState): PivotMode => {
 
 /** The pivot dots to draw for the selection as shown (`pivotDotsOf`). */
 export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => {
+  if (areaDragging()) return []
   const transformOf = (id: string) => shownTransform(s, id)
   const selection = selectionUnits(s, transformOf)
   return selection === undefined
@@ -2406,6 +2418,7 @@ export interface ChainStartSpec {
  * says a transform tool's gizmo is on it, as it is for a whole chain, so its mark goes under the gizmo.
  */
 export const shownChainStart = (s: EditorState): ChainStartSpec | undefined => {
+  if (areaDragging()) return undefined
   const selection = selectionUnits(s, (id) => shownTransform(s, id))
   if (selection === undefined || !isChainSelection(selection)) return undefined
   const at = (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot

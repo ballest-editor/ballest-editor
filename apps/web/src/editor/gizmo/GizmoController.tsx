@@ -19,6 +19,7 @@ import {
   turnAccumulates
 } from "../../domain/units"
 import { transformSelection } from "../actions"
+import { areaDragging } from "../areaDrag"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
@@ -126,6 +127,8 @@ const applyToObjects = (transforms: ReadonlyMap<string, UeTransform>) => {
  */
 const currentTarget = (): DragTarget | undefined => {
   const s = useEditor.getState()
+  // a box or lasso drag is about to change the selection: the gizmo would sit on what it may drop
+  if (areaDragging()) return undefined
   // Settings › Display can keep the gizmo off a whole group, which is moved from the outline instead.
   if (
     !s.settings.gizmo.showForGroups &&

@@ -105,6 +105,7 @@ export function SnapInput() {
     let hoverAt: { x: number; y: number } | undefined
 
     sceneRegistry.bodyDragActive = () => drag !== null
+    sceneRegistry.bodyDragPending = () => pressed !== null || drag !== null
 
     const end = () => {
       drag = null
@@ -368,6 +369,7 @@ export function SnapInput() {
       stopHover()
       clearTimeout(itemTimer)
       sceneRegistry.bodyDragActive = () => false
+      sceneRegistry.bodyDragPending = () => false
       if (pressed !== null) letGo()
       if (drag !== null) cancel()
     }

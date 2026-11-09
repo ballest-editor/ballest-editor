@@ -652,13 +652,17 @@ describe("editor store", () => {
       return { ids, steps: s().past.length }
     }
 
-    it("selects with replace, add and toggle clicks", () => {
+    it("selects with replace, add, toggle and remove clicks", () => {
       assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "replace"), ["c"])
       assert.deepStrictEqual(nextSelection(["a", "b"], [], "replace"), [])
       assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "add"), ["a", "b", "c"])
       assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "add"), ["b", "a"]) // re-adding makes it active
       assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "toggle"), ["b"])
       assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "toggle"), ["a", "b", "c"])
+      // remove never adds, and leaves the selection as it was when the item wasn't in it
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "remove"), ["b"])
+      const ab = ["a", "b"]
+      assert.strictEqual(nextSelection(ab, ["c"], "remove"), ab)
       // a modifier click on empty space keeps the selection
       assert.deepStrictEqual(nextSelection(["a", "b"], [], "add"), ["a", "b"])
       assert.deepStrictEqual(nextSelection(["a", "b"], [], "toggle"), ["a", "b"])

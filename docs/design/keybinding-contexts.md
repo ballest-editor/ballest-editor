@@ -4,13 +4,13 @@ A binding is a chord string on an action (`domain/Keybinds.ts`). Where it works 
 
 ## The context
 
-| Dimension  | Values                                                                | Read from                                                                                                   |
-| ---------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `drag`     | `none`, `camera`, `move`, `turn`, `scale`, `place`, `stroke`, `scrub` | `sceneRegistry`: a look, a gizmo handle's kind, a body drag (a move), a paint stroke; `preview` for a scrub |
-| `tool`     | `select`, `translate`, `rotate`, `scale`, `paint`                     | the store's `tool`                                                                                          |
-| `platform` | `desktop`, `browser`                                                  | `capabilities.play`                                                                                         |
+| Dimension  | Values                                                                        | Read from                                                                                                                   |
+| ---------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `drag`     | `none`, `camera`, `move`, `turn`, `scale`, `place`, `stroke`, `scrub`, `area` | `sceneRegistry`: a look, a gizmo handle's kind, a body drag (a move), a box or lasso, a paint stroke; `preview` for a scrub |
+| `tool`     | `select`, `translate`, `rotate`, `scale`, `paint`                             | the store's `tool`                                                                                                          |
+| `platform` | `desktop`, `browser`                                                          | `capabilities.play`                                                                                                         |
 
-Drags are exclusive: one at a time. The ones that change the map (move, turn, scale, place, stroke) are "while dragging" in Settings' words (`describeWhen`); looking and a number field's scrub are kept apart. A move is a move handle's drag, the selection's body dragged, or an Alt+drag's copy; the names follow [SNAPPING.md](../SNAPPING.md) ("a move", "a turn", "a scale"), not the tools', since the Move tool can be picked with nothing moving and a body drag moves things in any tool. `place` is a palette or prefab drop, which is the browser's own drag and reports modifiers only, so a snapping-off key held through one has to be a modifier (`dropSnapOff`).
+Drags are exclusive: one at a time. The ones that change the map (move, turn, scale, place, stroke) are "while dragging" in Settings' words (`describeWhen`); looking, a number field's scrub and a box or lasso (`area`, "while selecting") are kept apart. A move is a move handle's drag, the selection's body dragged, or an Alt+drag's copy; the names follow [SNAPPING.md](../SNAPPING.md) ("a move", "a turn", "a scale"), not the tools', since the Move tool can be picked with nothing moving and a body drag moves things in any tool. `place` is a palette or prefab drop, which is the browser's own drag and reports modifiers only, so a snapping-off key held through one has to be a modifier (`dropSnapOff`).
 
 What stays in code, on purpose:
 
@@ -25,18 +25,19 @@ What stays in code, on purpose:
 
 `actionWhen` gives every action its `When`. An unset field holds always, except `drag`, which unset means "nothing dragged", so an action has to say if it works during a drag.
 
-| Actions                                                   | When                                                    |
-| --------------------------------------------------------- | ------------------------------------------------------- |
-| one-shots: tools, edit, view, file, snap magnet, help     | nothing dragged                                         |
-| the fly keys, look keys, fly faster, camera speed         | nothing dragged, looking, a move, turn or scale         |
-| `addToSelection`, `toggleSelection`                       | Select, Move, Rotate and Scale tools                    |
-| `paintWholePiece`, `pickPaint`                            | Paint tool                                              |
-| `snapOff`                                                 | a move, turn, scale or placement                        |
-| `snapHold`                                                | a move or turn                                          |
-| `snapLockX/Y/Z`, `snapPlaneX/Y/Z`                         | a move                                                  |
-| `snapOnlyConnectors`, `snapOnlyMesh`, `snapOnlyAlignment` | the transforms that snap to that kind (`SNAP_KINDS_OF`) |
-| `cancelDrag`                                              | a move, turn or scale                                   |
-| `playMap`                                                 | desktop                                                 |
+| Actions                                                    | When                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------- |
+| one-shots: tools, edit, view, file, snap magnet, help      | nothing dragged                                         |
+| the fly keys, look keys, fly faster, camera speed          | nothing dragged, looking, a move, turn or scale         |
+| `addToSelection`, `toggleSelection`, `removeFromSelection` | Select, Move, Rotate and Scale tools                    |
+| `lassoSelect`                                              | a box or lasso                                          |
+| `paintWholePiece`, `pickPaint`                             | Paint tool                                              |
+| `snapOff`                                                  | a move, turn, scale or placement                        |
+| `snapHold`                                                 | a move or turn                                          |
+| `snapLockX/Y/Z`, `snapPlaneX/Y/Z`                          | a move                                                  |
+| `snapOnlyConnectors`, `snapOnlyMesh`, `snapOnlyAlignment`  | the transforms that snap to that kind (`SNAP_KINDS_OF`) |
+| `cancelDrag`                                               | a move, turn, scale, or a box or lasso                  |
+| `playMap`                                                  | desktop                                                 |
 
 The fly keys keep flying during a gizmo drag because `FlyCamera` never checked for one; it lets go of its modifiers then, so Ctrl is snapping's. `cancelDrag` (Escape) replaced the gizmo's and the body drag's "Escape or the deselect key": a save from before it had a key of its own keeps cancelling on what `deselect` was bound to (`mergeKeybinds`).
 

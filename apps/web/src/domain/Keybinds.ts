@@ -36,6 +36,8 @@ export const keybindSections = [
       "focusSelection",
       "addToSelection",
       "toggleSelection",
+      "removeFromSelection",
+      "lassoSelect",
       "paintWholePiece",
       "pickPaint"
     ]
@@ -140,6 +142,8 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   focusSelection: "focus selection",
   addToSelection: "add to selection",
   toggleSelection: "toggle selection",
+  removeFromSelection: "remove from selection",
+  lassoSelect: "lasso",
   paintWholePiece: "paint whole piece",
   pickPaint: "pick paint",
   deleteSelection: "delete",
@@ -223,9 +227,13 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Switch what a selection of several pieces or groups pivots about: one point for all of them, the active one's pivot, as the game does (Together), or each about its own pivot and axes (Each). With a chain selected, switch it between Rigid, where it moves as one piece, and link by link, where a turn bends it, a move spreads it and a scale stretches it. No equivalent in the in-game editor; Blender's pivot key.",
   focusSelection: "Frame the current selection in the viewport. F in the in-game editor.",
   addToSelection:
-    "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
+    "Click an item to add it to the selection (it becomes the active item), or drag a box to add what it catches. Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
   toggleSelection:
-    "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the in-game editor uses to deselect.",
+    "Click an item to add it to the selection, or to remove it if it's already selected; drag a box to do that to each thing it catches. Ctrl+click, which the in-game editor uses to deselect.",
+  removeFromSelection:
+    "Click an item, or drag a box, to take what it catches out of the selection, never adding. Editor only.",
+  lassoSelect:
+    "Hold while dragging a box to draw a lasso along the pointer's path instead, from where the drag began; let go for the box again. Only once the drag has begun: Alt at the press orbits. Editor only.",
   paintWholePiece:
     "With the paint tool, click or drag with this to paint every slot of a piece instead of the one under the pointer; hold its modifier to see which pieces. A surface always covers the whole piece.",
   pickPaint:
@@ -337,6 +345,7 @@ export const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>>
 export const mouseClickActions: ReadonlySet<KeybindAction> = new Set([
   "addToSelection",
   "toggleSelection",
+  "removeFromSelection",
   "paintWholePiece",
   "pickPaint"
 ])
@@ -371,6 +380,8 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   focusSelection: {},
   addToSelection: SELECTING,
   toggleSelection: SELECTING,
+  removeFromSelection: SELECTING,
+  lassoSelect: { drag: ["area"] },
   paintWholePiece: PAINTING,
   pickPaint: PAINTING,
   undo: {},
@@ -382,7 +393,7 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   deleteSelection: {},
   selectAll: {},
   deselect: {},
-  cancelDrag: { drag: ["move", "turn", "scale"] },
+  cancelDrag: { drag: ["move", "turn", "scale", "area"] },
   enterGroup: {},
   groupSelection: {},
   chainSelection: {},
@@ -456,7 +467,8 @@ export const keybindActionHints: Partial<Record<KeybindAction, string>> = {
   snapLockZ: "lock",
   snapOnlyConnectors: "ends",
   snapOnlyMesh: "pieces",
-  snapOnlyAlignment: "guides"
+  snapOnlyAlignment: "guides",
+  lassoSelect: "lasso"
 }
 
 /** Actions that are held down rather than fired once. */
@@ -505,6 +517,8 @@ export const defaultKeybinds: Keybinds = {
   focusSelection: ["KeyF"],
   addToSelection: ["Shift+Mouse0"],
   toggleSelection: ["Ctrl+Mouse0"],
+  removeFromSelection: ["Ctrl+Shift+Mouse0"],
+  lassoSelect: ["AltLeft", "AltRight"],
   paintWholePiece: ["Shift+Mouse0"],
   pickPaint: ["Alt+Mouse0"],
   deleteSelection: ["Backspace", "Delete"],

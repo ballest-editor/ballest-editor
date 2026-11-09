@@ -62,9 +62,11 @@ import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { activePaneCamera } from "../paneCameras"
 import { snapMarks } from "../snap/snapMarks"
 import {
+  docTransformOf,
   editedKeys,
   type EditorState,
   fitTransforms,
+  indexOfKey,
   type PickedTarget,
   type PickerRequest,
   selectionPivot,
@@ -161,21 +163,16 @@ export const resetSnapDefaults = () => saveSettings({ ...useEditor.getState().se
 const movingKeys = (s: EditorState, item: string | undefined): ReadonlyArray<string> =>
   item === undefined ? [] : s.selectedIds.includes(item) ? s.selectedIds : [item]
 
-const editTransformOf = (s: EditorState, key: string): UeTransform | undefined => {
-  const item = s.doc.map.items[s.doc.ids.indexOf(key)]
-  return item === undefined ? undefined : editTransform(item)
-}
-
 /** The document's transforms of `keys`. */
 const editTransformsOf = (s: EditorState, keys: ReadonlyArray<string>) =>
   new Map(keys.flatMap((key) => {
-    const t = editTransformOf(s, key)
+    const t = docTransformOf(s, key)
     return t === undefined ? [] : [[key, t] as const]
   }))
 
 /** The item `key`s through `delta`, and when they are the selection, the links it carries inside an entered chain. */
 const movedBy = (s: EditorState, keys: ReadonlyArray<string>, delta: RigidDelta) => {
-  const selection = keys === s.selectedIds ? selectionUnits(s, (key) => editTransformOf(s, key)) : undefined
+  const selection = keys === s.selectedIds ? selectionUnits(s, (key) => docTransformOf(s, key)) : undefined
   const start = editTransformsOf(s, selection === undefined ? keys : editedKeys(s))
   return selection === undefined
     ? new Map([...start].map(([key, t]) => [key, applyGroupDelta(t, t.translation, delta)] as const))
@@ -243,7 +240,7 @@ export const setFlushOptions = (options: { readonly mode?: FaceMeeting; readonly
   useEditor.setState((s) => ({ flushMode: options.mode ?? s.flushMode, flushOffset: options.offset ?? s.flushOffset }))
 
 const itemsOf = (s: EditorState, keys: ReadonlyArray<string>) =>
-  keys.flatMap((key) => s.doc.map.items[s.doc.ids.indexOf(key)] ?? [])
+  keys.flatMap((key) => s.doc.map.items[indexOfKey(s.doc.ids, key)] ?? [])
 
 /** A unit of the selection and the box around all of it. */
 interface UnitBox {
@@ -251,13 +248,27 @@ interface UnitBox {
   readonly box: Box
 }
 
+interface SelectedBoxes {
+  readonly selection: SelectionUnits | undefined
+  readonly boxes: ReadonlyArray<UnitBox>
+}
+
+/** The last few `selectedBoxes` worked out, and what from: the Align section asks for every button's plan at once. */
+const boxesMemo: Array<{ readonly from: ReadonlyArray<unknown>; readonly boxes: SelectedBoxes }> = []
+
 /** The selection as units, each with its box where the document has one, square to `frame`'s axes and in its terms. */
-const selectedBoxes = (s: EditorState, frame?: Quat4) => {
-  const selection = selectionUnits(s, (key) => editTransformOf(s, key))
+const selectedBoxes = (s: EditorState, frame?: Quat4): SelectedBoxes => {
+  const { w, x, y, z } = frame ?? IDENTITY_QUAT
+  const from = [s.doc, s.selectedIds, s.enteredGroupId, s.catalogIndex, s.preview, x, y, z, w]
+  const known = boxesMemo.find((entry) => entry.from.every((value, i) => Object.is(value, from[i])))
+  if (known !== undefined) return known.boxes
+  const selection = selectionUnits(s, (key) => docTransformOf(s, key))
   const boxes = (selection?.units ?? []).flatMap((unit): ReadonlyArray<UnitBox> => {
     const box = itemsBoxOf(itemsOf(s, unit.keys), s.catalogIndex, frame)
     return box === undefined ? [] : [{ unit, box }]
   })
+  boxesMemo.unshift({ from, boxes: { selection, boxes } })
+  boxesMemo.length = Math.min(boxesMemo.length, 2)
   return { selection, boxes }
 }
 
@@ -314,20 +325,29 @@ export const arrangePlanOf = (s: EditorState, op: ArrangeOp): ArrangePlan | unde
   const own = arrangeOffsets(boxes.map(({ box }) => box), op, Math.max(active, 0), s.arrangeSpacing ?? undefined)
   const toWorld = (v: Vec3) => rotateVec(frame, v)
   const points = (list: ReadonlyArray<Vec3>) => list.map(toWorld)
-  const marks = arrangeMarks(boxes.map(({ box }) => box), own, op, Math.max(active, 0))
+  let marks: ArrangeMarks | undefined
+  // the marks are the preview's alone: the Align section asks every button's plan only for whether it moves anything
+  const marksOf = (): ArrangeMarks => {
+    if (marks !== undefined) return marks
+    const drawn = arrangeMarks(boxes.map(({ box }) => box), own, op, Math.max(active, 0))
+    marks = {
+      // a landing stays a box in the frame's terms: the overlay turns its corners
+      landings: drawn.landings,
+      faces: drawn.faces.map(({ from, to }) => ({ from: points(from), to: points(to) })),
+      ...(drawn.reference !== undefined && { reference: points(drawn.reference) }),
+      ...(drawn.plane !== undefined && { plane: points(drawn.plane) }),
+      paths: drawn.paths.map(({ from, to }) => ({ from: toWorld(from), to: toWorld(to) })),
+      dimensions: drawn.dimensions.map(({ cm, from, to }) => ({ cm, from: toWorld(from), to: toWorld(to) }))
+    }
+    return marks
+  }
   return {
     selection,
     boxes,
     offsets: own.map(toWorld),
     moving: own.filter(movesBox).length,
-    marks: {
-      // a landing stays a box in the frame's terms: the overlay turns its corners
-      landings: marks.landings,
-      faces: marks.faces.map(({ from, to }) => ({ from: points(from), to: points(to) })),
-      ...(marks.reference !== undefined && { reference: points(marks.reference) }),
-      ...(marks.plane !== undefined && { plane: points(marks.plane) }),
-      paths: marks.paths.map(({ from, to }) => ({ from: toWorld(from), to: toWorld(to) })),
-      dimensions: marks.dimensions.map(({ cm, from, to }) => ({ cm, from: toWorld(from), to: toWorld(to) }))
+    get marks() {
+      return marksOf()
     },
     frame,
     direction: toWorld(UNIT_AXES[op.axis])
@@ -370,7 +390,7 @@ export const screenAlignOf = (s: EditorState, direction: ScreenDirection): Arran
   const { right, up } = activePaneCamera().screenAxes()
   const toward = direction === "left" || direction === "right" ? right : up
   const sign = direction === "left" || direction === "down" ? -1 : 1
-  const selection = selectionUnits(s, (key) => editTransformOf(s, key))
+  const selection = selectionUnits(s, (key) => docTransformOf(s, key))
   const frame = selection === undefined ? IDENTITY_QUAT : arrangeFrameOf(s, selection.active)
   const reach = (axis: BoxAxis) => sign * vecDot(rotateVec(frame, UNIT_AXES[axis]), toward)
   const [best] = (["x", "y", "z"] as const).toSorted((a, b) => Math.abs(reach(b)) - Math.abs(reach(a)))
@@ -531,7 +551,7 @@ export const applyFlipOffer = () => {
     offset: vecSub(other.position, own.position)
   }
   const moved = new Map(offer.keys.flatMap((key) => {
-    const t = editTransformOf(s, key)
+    const t = docTransformOf(s, key)
     return t === undefined ? [] : [[key, applyGroupDelta(t, t.translation, delta)] as const]
   }))
   s.mirrorItems(fitTransforms(s, moved), new Set([offer.own.item]), offer.axis, {

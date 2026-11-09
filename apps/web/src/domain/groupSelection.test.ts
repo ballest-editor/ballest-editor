@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
+import { group, item, nestedTree } from "../test/trees"
 import {
   activeNodeOf,
   canGroupSelection,
@@ -17,23 +18,8 @@ import {
   selectionSummaryOf,
   unitSummaryOf
 } from "./groupSelection"
-import type { TreeNode } from "./MapSidecar"
 
-const item = (key: string): TreeNode => ({ kind: "item", key })
-const group = (id: string, ...children: ReadonlyArray<TreeNode>): TreeNode => ({
-  kind: "group",
-  id,
-  name: id,
-  tags: [],
-  children
-})
-
-/** outer > (inner > (a, b), c); d loose; solo > only > e */
-const tree: ReadonlyArray<TreeNode> = [
-  group("outer", group("inner", item("a"), item("b")), item("c")),
-  item("d"),
-  group("solo", group("only", item("e")))
-]
+const tree = nestedTree
 
 describe("groupPathOf and nodeKeys", () => {
   it("gives the groups around a node, outermost first", () => {
