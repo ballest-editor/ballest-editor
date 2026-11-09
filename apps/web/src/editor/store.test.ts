@@ -1746,7 +1746,11 @@ describe("groups and the selection", () => {
     assert.strictEqual(state().enteredGroupId, null)
     assert.isTrue(isShownChain(state()))
     assert.strictEqual(shownPivotMode(state()), "each", "a new chain goes link by link, so a turn bends it")
-    assert.deepStrictEqual(shownChainStart(state()), selectionPivot(state(), transformOf)?.pivot, "link 1, its pivot")
+    assert.deepStrictEqual(
+      shownChainStart(state()),
+      { at: selectionPivot(state(), transformOf)!.pivot, gizmo: true },
+      "link 1's pivot, under the gizmo"
+    )
     // the period key flips the chain's setting, and leaves the pivot setting alone
     state().togglePivotMode()
     assert.strictEqual(state().chainMode, "rigid")
