@@ -803,13 +803,28 @@ describe("resolveDrag", () => {
     assert.strictEqual(hit?.label, "In line with End of Track L")
   })
 
-  it("reaches an end the path passes anywhere in its range, and a vertex only within a third", () => {
+  it("reaches an end as soon as it shows within range, and a vertex only once passed within a third", () => {
     const { end, items, own } = endWithVertex({ x: 300, y: 0, z: 0 })
     const path = [280, 296, 304]
     const passing = (config: SnapConfig, y: number) => dragAlong(path, { config, bases: [own], items }, y)[2]?.landing
     assert.deepStrictEqual(passing(only("connectors"), 8), end.position)
     assert.isUndefined(passing(only("mesh"), 8))
     assert.deepStrictEqual(passing(only("mesh"), 3), end.position)
+    // short of the end, still coming up to it: an end is a socket and takes the piece, a vertex waits to be passed
+    const short = (config: SnapConfig) => dragAlong([280, 292], { config, bases: [own], items }, 3)[1]?.landing
+    assert.deepStrictEqual(short(only("connectors")), end.position)
+    assert.isUndefined(short(only("mesh")))
+  })
+
+  it("leaves an end's cap to the end: its vertex isn't Mesh's while Connectors is on", () => {
+    const { end, items, own } = endWithVertex({ x: 300, y: 0, z: 0 })
+    const at = (config: SnapConfig) => dragAlong([280, 296, 304], { config, bases: [own], items }, 3)[2]
+    assert.strictEqual(at(only("mesh"))?.relation, "coincident", "Mesh alone offers the vertex")
+    const config = on(defaultSnapConfig, "mesh", "connectors")
+    const both = at(config)
+    assert.strictEqual(both?.relation, "join")
+    assert.deepStrictEqual(both?.landing, end.position)
+    assert.isEmpty(meshHits(frameOf({ x: 296, y: 3, z: 0 }, { config, bases: [own], items })), "nothing of the cap")
   })
 
   it("takes a point on the edge it's sliding along", () => {

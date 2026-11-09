@@ -5,7 +5,7 @@
 import { useThree } from "@react-three/fiber"
 import { useEffect } from "react"
 import * as THREE from "three"
-import type { UeTransform } from "../../domain/coords"
+import type { UeTransform, Vec3 } from "../../domain/coords"
 import { chordOf, mouseChordOf } from "../../domain/Keybinds"
 import type { Constraint } from "../../domain/snapFrame"
 import { shownMarks } from "../../domain/snapRelation"
@@ -44,6 +44,8 @@ interface Pressed {
   readonly pointerId: number
   readonly slot: number
   readonly e: PointerEvent
+  /** Where on the selection the pointer took hold, which the drag slides by. */
+  readonly at: Vec3
   /** The keys from the press on, so one held before the drag's first move counts, and the status bar offers them. */
   readonly keys: DragKeyState
 }
@@ -69,18 +71,27 @@ const surfaceOf = (pane: PaneCamera): Constraint => ({
     : toGame(pane.camera.getWorldDirection(new THREE.Vector3()).normalize())
 })
 
-const itemUnder = (el: HTMLElement, e: PointerEvent, raycaster: THREE.Raycaster, slot?: number): string | null => {
+/** The item under the pointer and where on it the pointer is, in the game's frame. */
+const pressedOn = (
+  el: HTMLElement,
+  e: PointerEvent,
+  raycaster: THREE.Raycaster,
+  slot?: number
+): { readonly key: string; readonly at: Vec3 } | null => {
   const { ndc, pane } = panePointer(el, e, slot)
   raycaster.setFromCamera(ndc, pane.camera)
   const root = sceneRegistry.itemsRoot
   for (const hit of root === null ? [] : raycaster.intersectObject(root, true)) {
     for (let at: THREE.Object3D | null = hit.object; at !== null; at = at.parent) {
       const id: unknown = at.userData["itemId"]
-      if (typeof id === "string") return id
+      if (typeof id === "string") return { key: id, at: toGame(hit.point) }
     }
   }
   return null
 }
+
+const itemUnder = (el: HTMLElement, e: PointerEvent, raycaster: THREE.Raycaster, slot?: number): string | null =>
+  pressedOn(el, e, raycaster, slot)?.key ?? null
 
 export function SnapInput() {
   const gl = useThree((s) => s.gl)
@@ -133,6 +144,7 @@ export function SnapInput() {
         ends: selection.ends,
         rotation: target.rotation,
         constraint: surfaceOf(pointer.pane),
+        grab: from.at,
         ray: gameRayOf(raycaster.ray),
         px: pointer.px
       })
@@ -250,9 +262,9 @@ export function SnapInput() {
       if (s.tool !== "select" && s.tool !== "translate") return
       if (sceneRegistry.isNavigationChord(mouseChordOf(e)) || e.ctrlKey || e.shiftKey || e.altKey) return
       const slot = panePointer(el, e).slot
-      const key = itemUnder(el, e, raycaster, slot)
-      if (key === null || !s.selectedIds.includes(key) || !bodyDrags(s)) return
-      pressed = { x: e.clientX, y: e.clientY, pointerId: e.pointerId, slot, e, keys: seedDragKeys(e) }
+      const under = pressedOn(el, e, raycaster, slot)
+      if (under === null || !s.selectedIds.includes(under.key) || !bodyDrags(s)) return
+      pressed = { x: e.clientX, y: e.clientY, pointerId: e.pointerId, slot, e, at: under.at, keys: seedDragKeys(e) }
     }
 
     const onPointerMove = (e: PointerEvent) => {

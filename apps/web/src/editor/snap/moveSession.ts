@@ -85,6 +85,11 @@ export interface MoveStart {
   readonly frame?: Quat4 | undefined
   /** What the handle allows; a drag by the body slides on a surface. */
   readonly constraint: Constraint
+  /**
+   * Where the pointer took hold of the selection, for a drag by the body: the surface goes through it, so what was
+   * grabbed stays under the pointer. A handle's drag goes by the pivot.
+   */
+  readonly grab?: Vec3 | undefined
   /** Whole grid steps along these, for a handle on the item's own axes. */
   readonly stepAxes?: ReadonlyArray<Vec3> | undefined
   /** The pointer at the start. */
@@ -162,11 +167,12 @@ export class MoveSession {
   /** `config`, the session's under the keys held. */
   private frame(ray: Ray, px: ScreenPoint, config: SnapConfig): SnapFrame {
     const { constraint, start } = this
-    const offset = freeOffset(constraint, start.pivot, start.ray, ray) ?? this.lastOffset
+    const by = start.grab ?? start.pivot
+    const offset = freeOffset(constraint, by, start.ray, ray) ?? this.lastOffset
     this.lastOffset = offset
     // What the pointer took hold of goes with the move, so it stays under the pointer on a plane, and a line leaves the
     // pointer off it by as much as it is off the line. Measured in pixels of the pivot, a grab would drift in perspective.
-    const held = pointOn(constraint, start.pivot, start.ray)
+    const held = pointOn(constraint, by, start.ray)
     const moved = held === undefined ? undefined : this.view.project(vecAdd(held, offset))
     const slip = moved === undefined ? { x: 0, y: 0 } : { x: px.x - moved.x, y: px.y - moved.y }
     const s = useEditor.getState()

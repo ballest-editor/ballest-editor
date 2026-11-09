@@ -449,12 +449,35 @@ const stationHit = (
   }]
 }
 
+/** How far from an end's point its cap reaches, in cm: the widest cap is 300 cm across. */
+const CAP_CM = 300
+
+/** How far off an end's plane a point can be and still be on its cap, in cm. */
+const ON_CAP_CM = 1
+
+/**
+ * Whether `point` is on the cap of one of `item`'s ends, with Connectors on: the end is the cap's one target, so its
+ * face, centre, edges and corners aren't Mesh's to offer, and a piece brought to an end joins it instead of catching on
+ * the cap on the way (docs/SNAPPING.md § Mesh).
+ */
+const onEndCap = (frame: SnapFrame, item: SnapItem, point: Vec3): boolean =>
+  frame.config.targets.connectors.enabled && item.ends.some((end) => {
+    const out = vecSub(point, end.position)
+    return Math.abs(vecDot(out, end.forward)) <= ON_CAP_CM && vecLength(out) <= CAP_CM
+  })
+
 export const meshHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
   const range = rangeOf(frame.config, "mesh")
   const measured = measuredBases(frame)
   const near = itemsNear(frame, measured.map(({ reference }) => reference), range)
+  const byKey = new Map(near.map((item) => [item.key, item]))
+  const offCaps = (hits: ReadonlyArray<SnapHit>) =>
+    hits.filter((hit) => {
+      const item = hit.item === undefined ? undefined : byKey.get(hit.item)
+      return item === undefined || !onEndCap(frame, item, hit.landing)
+    })
   if (frame.constraint.kind !== "surface") {
-    return near.flatMap((item) => {
+    return offCaps(near.flatMap((item) => {
       const { centres, stations } = stationsOf(frame, item)
       return [
         ...stations.flatMap((station) =>
@@ -462,16 +485,16 @@ export const meshHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
         ),
         ...centres.flatMap((spot) => measured.flatMap((one) => pointHit(frame, "mesh", one, spot, range)))
       ]
-    })
+    }))
   }
   const { elements } = frame.config.targets.mesh
-  return measured.flatMap((one) => [
+  return offCaps(measured.flatMap((one) => [
     ...near.flatMap((item) => [
       ...meshSpotsOf(frame.config, item).flatMap((spot) => pointHit(frame, "mesh", one, spot, range)),
       ...(elements.sharpEdges ? edgeHits(frame, one, item, range) : [])
     ]),
     ...faceHits(frame, one, near)
-  ])
+  ]))
 }
 
 /** A hit that holds a plane, as a station or one axis of an alignment does. */

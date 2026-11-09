@@ -496,6 +496,35 @@ describe("a body drag in perspective", () => {
     return pane
   }
 
+  /** A session on the ground through `pivot`, pressed where `grab` shows in `pane`. */
+  const groundSession = (
+    pane: PaneCamera,
+    key: string,
+    ends: MoveStart["ends"],
+    grab: Vec3,
+    top: number
+  ) => {
+    const view = snapViewOf(pane)
+    const pointerAt = (p: Vec3) => {
+      const px = view.project(p) ?? { x: 0, y: 0 }
+      return { ray: view.rayAt(px), px }
+    }
+    const start = pointerAt(grab)
+    const session = new MoveSession({
+      pane,
+      keys: new Set([key]),
+      pivot: ORIGIN,
+      box: { min: { x: -250, y: -250, z: 0 }, max: { x: 250, y: 250, z: top } },
+      ends,
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      constraint: { kind: "surface", normal: { x: 0, y: 0, z: 1 } },
+      grab,
+      ray: start.ray,
+      px: start.px
+    })
+    return { session, pointerAt }
+  }
+
   it("measures an end where it shows, so one shown on another's end joins it however far the move has come", () => {
     const target = { x: 2350, y: 1800, z: 50 }
     const [a = ""] = loadPieces([ORIGIN, { x: 2600, y: 1800, z: 0 }])
@@ -510,33 +539,29 @@ describe("a body drag in perspective", () => {
     })
     const s = useEditor.getState()
     const { ends } = selectionSnapStart(s, new Map([[a, shownTransform(s, a) ?? identityTransform()]]), [a])
-    const pane = angled(target)
-    const view = snapViewOf(pane)
     // pressed on the body 200 cm from the pivot, and moved so a's +X end shows on b's -X end
     const grabbed = { x: -200, y: 150, z: 0 }
-    const pointerAt = (offset: Vec3) => {
-      const px = view.project(vecAdd(grabbed, offset)) ?? { x: 0, y: 0 }
-      return { ray: view.rayAt(px), px }
-    }
-    const start = pointerAt(ORIGIN)
-    const session = new MoveSession({
-      pane,
-      keys: new Set([a]),
-      pivot: ORIGIN,
-      box: { min: { x: -250, y: -250, z: 0 }, max: { x: 250, y: 250, z: 100 } },
-      ends,
-      rotation: { x: 0, y: 0, z: 0, w: 1 },
-      constraint: { kind: "surface", normal: { x: 0, y: 0, z: 1 } },
-      ray: start.ray,
-      px: start.px
-    })
+    const { pointerAt, session } = groundSession(angled(target), a, ends, grabbed, 100)
     const meet = vecSub(target, { x: 250, y: 0, z: 50 })
-    const short = pointerAt(vecScale(meet, 0.98))
+    const short = pointerAt(vecAdd(grabbed, vecScale(meet, 0.98)))
     session.update(short.ray, short.px, up)
-    const there = pointerAt(meet)
+    const there = pointerAt(vecAdd(grabbed, meet))
     const hit = session.update(there.ray, there.px, up).hit
     assert.strictEqual(hit?.relation, "join")
     assertVec(hit?.landing ?? ORIGIN, target, "on b's end")
+  })
+
+  it("keeps a point grabbed above the ground under the pointer, instead of running ahead on the ground plane", () => {
+    const [a = ""] = loadPieces([ORIGIN])
+    useEditor.getState().setTabSnap({ ...onlyGrid(), enabled: false })
+    // held by its top, 300 cm up, and the pointer moved to where that top would show 400 cm along y
+    const grab = { x: 0, y: 0, z: 300 }
+    const moved = { x: 0, y: 400, z: 0 }
+    const { pointerAt, session } = groundSession(angled(ORIGIN), a, [], grab, 300)
+    const there = pointerAt(vecAdd(grab, moved))
+    const { delta } = session.update(there.ray, there.px, up)
+    assert.strictEqual(delta?.kind, "translate")
+    if (delta?.kind === "translate") assertVec(delta.offset, moved, "the grabbed top follows the pointer")
   })
 })
 

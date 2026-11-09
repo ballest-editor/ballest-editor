@@ -36,9 +36,7 @@ const UNDER_PX = 0.5
 /** How far to the side of a point a move can pass and still stop on it, as a share of its range. */
 const PASSING_SHARE = 1 / 3
 
-/** An end takes all of its range: a join turns the piece anyway, so a sideways step is no surprise. */
-const passingRange = (frame: SnapFrame, { target }: SnapHit) =>
-  rangeOf(frame.config, target) * (target === "connectors" ? 1 : PASSING_SHARE)
+const passingRange = (frame: SnapFrame, { target }: SnapHit) => rangeOf(frame.config, target) * PASSING_SHARE
 
 /** What counts as one place, in cm. */
 const SAME_CM = 1e-3
@@ -94,6 +92,8 @@ const arrives = (frame: SnapFrame, { current, from }: DragPath, hit: SnapHit): b
   if (before === undefined || now === undefined || point === undefined) return false
   if (pixelDistance(before, now) === 0) return false
   if ((constraint.kind === "surface" ? hit.distance : pixelDistance(point, now)) < UNDER_PX) return true
+  // An end is a socket, not a point to pass: showing within its range of another end is meeting it.
+  if (hit.target === "connectors") return true
   // On a line every target comes down to one value along it.
   if (hit.held.shape !== "point" && constraint.kind !== "line") return crossed(frame, from, hit, before, now)
   const aside = passingRange(frame, hit)
