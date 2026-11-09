@@ -1,4 +1,4 @@
-import { app, count, rect, scene, states, store } from "@ballest/app-driver/state"
+import { app, count, input, rect, scene, states, store } from "@ballest/app-driver/state"
 
 export default states({
   "editor/start": {
@@ -30,6 +30,15 @@ export default states({
     reach: [app.select("")],
     measure: { selected: store("selectedIds") },
     checks: [{ metric: "selected", equals: 1 }]
+  },
+  "editor/scale": {
+    views: ["viewport:single"],
+    fixture: "map:simple",
+    anchor: true,
+    reach: [app.select(""), input.click("[aria-label=\"Scale\"]")],
+    measure: { selected: store("selectedIds"), tool: store("tool") },
+    checks: [{ metric: "selected", equals: 1 }, { metric: "tool", equals: "scale" }],
+    axes: { panes: ["quad"] }
   },
   "editor/selected-size": {
     views: ["panel:inspector"],

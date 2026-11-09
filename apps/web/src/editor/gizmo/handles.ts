@@ -19,7 +19,14 @@ import type { Quat4 } from "../../domain/coords"
 import { isLine, isMesh } from "../threeGuards"
 import { type Axis, axisWorldDir } from "./math"
 
-type HandleKind = "translateAxis" | "translatePlane" | "rotateAxis" | "rotateView" | "scaleAxis" | "scaleUniform"
+type HandleKind =
+  | "translateAxis"
+  | "translatePlane"
+  | "rotateAxis"
+  | "rotateView"
+  | "scaleAxis"
+  | "scalePlane"
+  | "scaleUniform"
 
 export interface HandleSpec {
   readonly id: string
@@ -39,7 +46,7 @@ const axisSpecs = (kind: HandleKind, prefix: string): Array<HandleSpec> =>
 export const toolHandles: Readonly<Record<GizmoTool, ReadonlyArray<HandleSpec>>> = {
   translate: [...axisSpecs("translatePlane", "tp"), ...axisSpecs("translateAxis", "t")],
   rotate: [...axisSpecs("rotateAxis", "r"), { id: "r-view", kind: "rotateView" }],
-  scale: [...axisSpecs("scaleAxis", "s"), { id: "s-uniform", kind: "scaleUniform" }]
+  scale: [...axisSpecs("scalePlane", "sp"), ...axisSpecs("scaleAxis", "s"), { id: "s-uniform", kind: "scaleUniform" }]
 }
 
 /** What isn't an axis's colour, against each theme's scene: the view ring, and what a hovered handle leans to. */
@@ -131,6 +138,23 @@ const buildVisual = (
         S.axisLength + S.coneLength
       )
       return { parts: [mesh(shaft, material), mesh(tip, material)], hits: [mesh(hit, hitMaterial)] }
+    }
+    case "scalePlane": {
+      // A caret between the two positive axes, with a wider copy for picking.
+      const caret = (width: number, tipPadding = 0) => {
+        const inner = 44 - width / 2
+        const outer = 44 + width / 2
+        const shape = new THREE.Shape()
+        shape.moveTo(20 - tipPadding, inner)
+        shape.lineTo(inner, inner)
+        shape.lineTo(inner, 20 - tipPadding)
+        shape.lineTo(outer, 20 - tipPadding)
+        shape.lineTo(outer, outer)
+        shape.lineTo(20 - tipPadding, outer)
+        shape.closePath()
+        return new THREE.ShapeGeometry(shape)
+      }
+      return { parts: [mesh(caret(2.2), material)], hits: [mesh(caret(12, 6), hitMaterial)] }
     }
     case "translatePlane": {
       const center = S.planeOffset + S.plane / 2
@@ -233,6 +257,7 @@ const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
       root.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, v, u.clone().cross(v)))
       return
     }
+    case "scalePlane":
     case "translatePlane": {
       if (spec.axis === undefined) return
       const [u, v] = pairWorldDirs(spec.axis, frame)
@@ -265,6 +290,7 @@ export const handleFacesCamera = (spec: HandleSpec, frame: GizmoFrame): boolean 
     case "scaleAxis":
       return facing < END_ON
     case "translatePlane":
+    case "scalePlane":
     case "rotateAxis":
       return facing > EDGE_ON
     case "rotateView":

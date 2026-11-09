@@ -56,7 +56,7 @@ import {
   stepAxesOf,
   turnOf
 } from "./drag"
-import { GizmoObject, type HandleSpec, SIZE, toolHandles } from "./handles"
+import { GizmoObject, type HandleSpec, pairOf, SIZE, toolHandles } from "./handles"
 
 interface ActiveDrag {
   readonly id: string
@@ -153,7 +153,7 @@ const isTranslate = ({ kind }: HandleSpec) => kind === "translateAxis" || kind =
 const transformOf = ({ kind }: HandleSpec): SnapTransform =>
   kind === "rotateAxis" || kind === "rotateView"
     ? "turn"
-    : kind === "scaleAxis" || kind === "scaleUniform"
+    : kind === "scaleAxis" || kind === "scalePlane" || kind === "scaleUniform"
     ? "scale"
     : "move"
 
@@ -329,6 +329,8 @@ export function GizmoController() {
         : isDecal(item)
         ? { x: 1, y: 1, z: 1 }
         : extentOf(item, s.catalogIndex)
+      // a caret scales two axes by one factor, measured on the first of them
+      const scaleKey = spec.kind === "scalePlane" && spec.axis !== undefined ? pairOf(spec.axis)[0] : spec.axis ?? "x"
       drag.current = {
         id,
         pointerId: e.pointerId,
@@ -376,8 +378,8 @@ export function GizmoController() {
         },
         stops: scaleAxis === undefined ? [] : scaleStopsOf(scaleAxis, target.pivot, selection.box, items),
         reach: scaleAxis === undefined ? 0 : reachAlong(selection.box, target.pivot, scaleAxis),
-        scaleFrom: unit.transform.scale3D[spec.axis ?? "x"],
-        scaleExtent: extent?.[spec.axis ?? "x"],
+        scaleFrom: unit.transform.scale3D[scaleKey],
+        scaleExtent: extent?.[scaleKey],
         rangeCm,
         keys: seedDragKeys(e, transformOf(spec)),
         lastEvent: undefined

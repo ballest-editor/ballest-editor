@@ -103,6 +103,29 @@ describe("gizmo handles", () => {
     gizmo.traverse((o) => expect(o.matrixWorld.determinant()).toBeGreaterThan(0))
   })
 
+  it("orients and picks each scale caret in its local plane, with space between it and the centre", () => {
+    const gizmo = new GizmoObject(toolHandles.scale)
+    gizmo.update({ ...frame, space: "local", toCamera: v3(1, 1, 1).normalize() }, null, null)
+    for (const axis of ["x", "y", "z"] as const) {
+      const handle = gizmo.handle(`sp-${axis}`)!
+      const [a, b] = pairOf(axis)
+      const corner = handle.root.localToWorld(v3(44, 44, 0))
+      const expected = frame.origin.clone().addScaledVector(axisWorldDir(a), 88).addScaledVector(axisWorldDir(b), 88)
+      expect(corner.distanceTo(expected)).toBeLessThan(1e-9)
+      const normal = axisWorldDir(axis)
+      const ray = new THREE.Raycaster(corner.clone().addScaledVector(normal, 100), normal.clone().negate())
+      expect(ray.intersectObjects([...gizmo.pickableMeshes])[0]?.object.userData["handleId"]).toBe(handle.spec.id)
+      // Near either arm tip should still scale, rather than picking the item behind it.
+      for (const tip of [v3(17, 44, 0), v3(44, 17, 0)]) {
+        ray.set(handle.root.localToWorld(tip).addScaledVector(normal, 100), normal.clone().negate())
+        expect(ray.intersectObjects([...handle.hits]).length).toBeGreaterThan(0)
+      }
+      ray.set(handle.root.localToWorld(v3(30, 30, 0)).addScaledVector(normal, 100), normal.clone().negate())
+      expect(ray.intersectObjects([...handle.hits])).toHaveLength(0)
+    }
+    gizmo.dispose()
+  })
+
   it("shows the quarter of each rotate ring that faces the camera, like the game", () => {
     const local = { space: "local" as const, gameRotation: rotatorToQuat({ roll: 20, pitch: -35, yaw: 70 }) }
     const views = [v3(1, 1, 1), v3(-2, 1, 0.5), v3(0.3, -1, -2)].map((d) => d.normalize())
@@ -171,7 +194,7 @@ describe("gizmo handles seen along an axis", () => {
 
   it("drops the axis pointing at the camera", () => {
     expect(shown("translate")).toEqual(["tp-z", "t-x", "t-y"])
-    expect(shown("scale")).toEqual(["s-x", "s-y", "s-uniform"])
+    expect(shown("scale")).toEqual(["sp-z", "s-x", "s-y", "s-uniform"])
   })
 
   it("keeps only the ring it can see open, and the view ring", () => {
@@ -356,6 +379,37 @@ describe("gizmo drags (game space)", () => {
       y: 1.5,
       z: 1.5
     })
+  })
+
+  it("scales each pair of local axes together, leaving the normal axis unchanged", () => {
+    for (const axis of ["x", "y", "z"] as const) {
+      const rotation = rotatorToQuat({ roll: 20, pitch: 30, yaw: 40 })
+      const [a, b] = pairOf(axis).map((one) => axisWorldDir(one, rotation))
+      const normal = axisWorldDir(axis, rotation)
+      const origin = v3(20, 30, 40)
+      const diagonal = a!.clone().add(b!)
+      const eye = origin.clone().addScaledVector(normal, 1000)
+      const sample = (distance: number): PointerSample => ({
+        rayOrigin: eye,
+        rayDir: origin.clone().addScaledVector(diagonal, distance).sub(eye).normalize(),
+        px: { x: 0, y: 0 }
+      })
+      const s = {
+        ...start(`sp-${axis}`, { ...identity, rotation }, undefined, "local"),
+        originWorld: origin,
+        pointer: sample(40)
+      }
+      for (const factor of [2, 0.5, -1]) {
+        const scale = scaleOf(s, sample(40 * factor))!
+        expect(scale.factor).toBeCloseTo(factor, 9)
+        const out = applyGroupDelta(identity, identity.translation, { kind: "scale", ...scale })
+        for (const one of ["x", "y", "z"] as const) {
+          expect(out.scale3D[one]).toBeCloseTo(one === axis ? 1 : factor, 9)
+        }
+      }
+      expect(scaleOf({ ...s, pointer: sample(0) }, sample(40))).toBeUndefined()
+      expect(scaleOf(s, { ...sample(40), rayDir: a! })).toBeUndefined()
+    }
   })
 
   describe("local vs world space", () => {

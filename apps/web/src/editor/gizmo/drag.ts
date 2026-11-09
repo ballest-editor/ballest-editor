@@ -10,7 +10,7 @@ import { type Quat4, threeToUeVector, type Vec3 } from "../../domain/coords"
 import type { Constraint } from "../../domain/snapFrame"
 import { rotateVec } from "../../domain/ueMath"
 import { type GizmoSpace, type HandleSpec, handleWorldDir, pairOf } from "./handles"
-import { type Axis, axisParamFromRay, GAME_BASIS, type Px, screenAngle } from "./math"
+import { type Axis, axisParamFromRay, axisWorldDir, GAME_BASIS, planeHit, type Px, screenAngle } from "./math"
 
 export interface PointerSample {
   /** World-space pointer ray (unit direction). */
@@ -93,7 +93,7 @@ export const turnOf = (
 export const scaleOf = (
   start: DragStart,
   now: PointerSample
-): { readonly factor: number; readonly axis?: Axis } | undefined => {
+): { readonly factor: number; readonly axis?: Axis; readonly excludeAxis?: Axis } | undefined => {
   const { spec } = start
   if (spec.kind === "scaleUniform") {
     const r0 = Math.hypot(start.pointer.px.x - start.originPx.x, start.pointer.px.y - start.originPx.y)
@@ -101,6 +101,18 @@ export const scaleOf = (
     return r0 < 1 ? undefined : { factor: r1 / r0 }
   }
   const dir = dragAxisWorld(start)
+  if (spec.kind === "scalePlane" && spec.axis !== undefined && dir !== undefined) {
+    const hit = (pointer: PointerSample) => planeHit(start.originWorld, dir, pointer.rayOrigin, pointer.rayDir)
+    const from = hit(start.pointer)
+    const to = hit(now)
+    if (from === undefined || to === undefined) return undefined
+    const [a, b] = pairOf(spec.axis)
+    const rotation = start.space === "local" ? start.frameRotation : undefined
+    const diagonal = axisWorldDir(a, rotation).add(axisWorldDir(b, rotation))
+    const t0 = from.sub(start.originWorld).dot(diagonal)
+    const t1 = to.sub(start.originWorld).dot(diagonal)
+    return Math.abs(t0) < 1e-6 ? undefined : { factor: t1 / t0, excludeAxis: spec.axis }
+  }
   if (dir === undefined || spec.kind !== "scaleAxis" || spec.axis === undefined) return undefined
   // The handle is measured along its world direction, but each item scales its own axis.
   const t = axisParams(start, now, dir)

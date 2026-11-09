@@ -47,6 +47,16 @@ describe("group transforms", () => {
     expect(mirrored.scale3D).toEqual({ x: -3, y: 1, z: 1 })
   })
 
+  it("scales two own axes about a shared pivot, including rotated and mirrored items", () => {
+    const t = { ...at(10, 20, 30, yaw90), scale3D: { x: -2, y: 3, z: 4 } }
+    const out = applyGroupDelta(t, { x: 0, y: 0, z: 0 }, { kind: "scale", factor: 2, excludeAxis: "y" })
+    expect(out.scale3D).toEqual({ x: -4, y: 3, z: 8 })
+    expectVec(out.translation, { x: 10, y: 40, z: 60 })
+    const local = { x: 5, y: 10, z: 15 }
+    const pivot = localToWorld(t, local)
+    expectVec(localToWorld(applyGroupDelta(t, pivot, { kind: "scale", factor: 2, excludeAxis: "z" }), local), pivot)
+  })
+
   it("leaves an item on the pivot where it is, and keeps a pivot on the item in place", () => {
     const turned = { ...at(10, 20, 30, yaw90), scale3D: { x: 2, y: 1, z: 0.5 } }
     const top = { x: 0, y: 0, z: 100 }
