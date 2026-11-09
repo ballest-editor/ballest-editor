@@ -1,11 +1,21 @@
 import { useStatusHint } from "../editor/statusHint"
+import { DragKeyHints, useDragKeysShown } from "./DragKeyHints"
 import { EnteredGroupStatus } from "./EnteredGroupStatus"
 import { LastExportStatus, LinkStatus } from "./LinkStatus"
 import { NotificationCenter } from "./NotificationCenter"
 import { PaintToolStatus } from "./PaintPalette"
 import { SelectionStatus } from "./SelectionStatus"
+import { SnapStatus } from "./SnapStatus"
 import { StatusHintLine } from "./StatusHintLine"
 import { UpdatePill, UpdateStatus } from "./UpdatePill"
+
+/**
+ * The middle of the bar: the map's sync status, or during a drag the keys it can take. Nothing is saved or exported until
+ * the drag lets go, so the status has nothing to say meanwhile. A click shows no keys, so the status stays put.
+ */
+function CenterStatus() {
+  return useDragKeysShown() ? <DragKeyHints /> : <LinkStatus />
+}
 
 /**
  * Along the bottom of the window (docs/PROJECTS.md § Shell): the selection and the paint tool's hint, the map's sync
@@ -27,11 +37,12 @@ export function StatusBar() {
         )}
       </div>
       <div className="flex min-w-0 items-center justify-center">
-        <LinkStatus />
+        <CenterStatus />
       </div>
       <div className="flex min-w-0 items-center gap-1">
         <LastExportStatus />
-        <div className="ml-auto flex shrink-0 items-center gap-1">
+        <div className="ml-auto flex min-w-0 items-center gap-1">
+          <SnapStatus />
           <UpdatePill />
           <NotificationCenter />
         </div>

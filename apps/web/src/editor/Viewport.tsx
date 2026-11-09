@@ -23,6 +23,7 @@ import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gridColorsOf } from "../domain/Settings"
+import { snapsGrid } from "../domain/snapConfig"
 import { holdsDrop, placeAt, placePrefab } from "./actions"
 import { fadeFineLines, gridReach } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
@@ -43,6 +44,10 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
+import { endSnapDisplay } from "./snap/moveSession"
+import { landDrop, showDrop, snappedDrop } from "./snap/pieceDrop"
+import { SnapInput } from "./snap/SnapInput"
+import { SnapOverlay } from "./snap/SnapOverlay"
 import {
   currentBrush,
   groupBoxOf,
@@ -50,6 +55,7 @@ import {
   noTabOpen,
   type SelectMode,
   shownPivotDots,
+  snapConfigOf,
   useEditor,
   useOpenPrefab
 } from "./store"
@@ -59,6 +65,9 @@ import { glbUrl, visualsOf } from "./visuals"
 import { setWaterShown, setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
 
 const CLICK_SLOP_PX = 4
+
+/** The floor grid's cells with no snapping to show: 1 m, with 10 m sections. */
+const FLOOR_CELL_CM = 100
 
 function MapItems() {
   const doc = useEditor((s) => s.doc)
@@ -409,14 +418,12 @@ const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
 }
 
 /**
- * Places `piece` under a pointer: on the item it is over, else on the floor it is over, or in an orthographic view on the
- * plane a click would place on, keeping clear of any other item there. The raycast is here rather than on every drag
- * event, for the same reason as a click's.
+ * What's under a pointer dragging `piece`: the item it is over, else the floor, or in an orthographic view the plane a
+ * click would place on. The raycast is here rather than on every drag event, for the same reason as a click's.
  */
-const dropPiece = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: number; clientY: number }) => {
-  const { ndc, pane, slot } = panePointer(canvas, e)
-  const { floorHeight, setActivePane, settings } = useEditor.getState()
-  setActivePane(slot)
+const dropTarget = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: number; clientY: number }) => {
+  const { ndc, pane, px, slot } = panePointer(canvas, e)
+  const { floorHeight, settings } = useEditor.getState()
   const raycaster = new THREE.Raycaster()
   raycaster.setFromCamera(ndc, pane.camera)
   const { ray } = raycaster
@@ -425,21 +432,39 @@ const dropPiece = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: numbe
     const id = isMesh(hit.object) ? hitItemId([hit]) : null
     return id !== null && holdsDrop(id) ? [{ id, point: hit.point }] : []
   })[0]
-  placeAt(
-    piece,
-    surface !== undefined
-      ? threeToUeVector(surface.point)
-      : pane.orthographicPlacement(floorHeight, ray.closestPointToPoint(pane.target, new THREE.Vector3())) ??
-        dropPoint(
-          threeToUeVector(ray.origin),
-          threeToUeVector(ray.direction),
-          floorHeight,
-          SKY_DOME_RADIUS,
-          pane.placeDistance(pieceFootprint(piece), settings.editor.placeDistance)
-        ),
-    pane.placementView(),
-    surface?.id
-  )
+  const point = surface !== undefined
+    ? threeToUeVector(surface.point)
+    : pane.orthographicPlacement(floorHeight, ray.closestPointToPoint(pane.target, new THREE.Vector3())) ??
+      dropPoint(
+        threeToUeVector(ray.origin),
+        threeToUeVector(ray.direction),
+        floorHeight,
+        SKY_DOME_RADIUS,
+        pane.placeDistance(pieceFootprint(piece), settings.editor.placeDistance)
+      )
+  return { pane, px, slot, point, surface: surface?.id }
+}
+
+/** Places `piece` under a pointer, on what snapping lands it on, else on what `dropTarget` found, clear of any other item. */
+const dropPiece = (
+  piece: CatalogPiece,
+  canvas: HTMLElement,
+  e: { clientX: number; clientY: number; ctrlKey: boolean }
+) => {
+  const { pane, point, px, slot, surface } = dropTarget(piece, canvas, e)
+  useEditor.getState().setActivePane(slot)
+  landDrop(piece, pane, px, point, e.ctrlKey, () => placeAt(piece, point, pane.placementView(), surface))
+}
+
+/** Shows where a piece on its way would land. */
+const showPieceDrop = (
+  piece: CatalogPiece,
+  canvas: HTMLElement,
+  e: { clientX: number; clientY: number; ctrlKey: boolean }
+) => {
+  const { pane, point, px } = dropTarget(piece, canvas, e)
+  const s = useEditor.getState()
+  showDrop(snappedDrop(s, piece, pane, px, point, e.ctrlKey))
 }
 
 /**
@@ -494,6 +519,10 @@ function ViewportGrid() {
   const floorHeight = useEditor((s) => s.floorHeight)
   const dark = useDarkTheme(appearance.theme)
   const colors = gridColorsOf(appearance, dark)
+  const snapping = useEditor(snapConfigOf)
+  const { origin, yaw } = snapping.targets.grid
+  // what is seen is what snaps: the grid's own step while it is on, from its origin and turned with it
+  const step = snapsGrid(snapping) ? snapping.gridSize : FLOOR_CELL_CM
   const grid = useRef<THREE.Mesh>(null)
   useLayoutEffect(() => {
     const material = grid.current?.material
@@ -518,13 +547,14 @@ function ViewportGrid() {
       ref={grid}
       layers={floorGridOnly}
       visible={appearance.gridVisible}
-      position={[0, floorHeight, 0]}
+      position={toTuple3(ueToThreeVector({ ...origin, z: floorHeight }))}
+      rotation={[0, -yaw * Math.PI / 180, 0]}
       side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
       followCamera // with the plane below, the grid has no edge to see: it ends where its fade does, wherever the camera is
       args={[2, 2]} // drei scales this by the fade distance, and the 1 x 1 default stops at half of it, still visible
-      cellSize={100}
-      sectionSize={1000}
+      cellSize={step}
+      sectionSize={step * 10}
       fadeDistance={SKY_DOME_RADIUS}
       fadeStrength={2}
       cellThickness={1} // drei's half-pixel default makes the 1 m lines unreadable in the light theme
@@ -686,6 +716,12 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         if (!isPrefabDrag(e.dataTransfer) && !isPieceDrag(e.dataTransfer)) return
         e.preventDefault()
         e.dataTransfer.dropEffect = "copy"
+        const piece = isPieceDrag(e.dataTransfer) ? draggedPiece() : undefined
+        const canvas = e.currentTarget.querySelector("canvas")
+        if (piece !== undefined && canvas !== null) showPieceDrop(piece, canvas, e)
+      }}
+      onDragLeave={(e) => {
+        if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) endSnapDisplay()
       }}
       onDrop={(e) => {
         const prefab = droppedPrefab(e.dataTransfer)
@@ -717,7 +753,9 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <GroupBoxes />
         <PrefabOriginMarker />
         <PivotDots />
+        <SnapOverlay />
         <GizmoController />
+        <SnapInput />
         <ClickSelect />
         <PaintTool />
         <FlyCamera />

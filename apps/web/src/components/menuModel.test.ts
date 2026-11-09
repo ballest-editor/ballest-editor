@@ -28,6 +28,10 @@ const state = (over: Partial<MenuState> = {}): MenuState => ({
   openElsewhere: [],
   panels: [{ id: "outline", title: "Outline", open: true }],
   snapping: defaultSettings.snapping,
+  undoDescription: undefined,
+  redoDescription: undefined,
+  selectionCount: 0,
+  measurements: 0,
   units: "cm",
   layout: defaultViewLayout,
   projection: "perspective",
@@ -61,7 +65,7 @@ describe("searching the menus", () => {
   it("reaches into sections and submenus", () => {
     assert.deepStrictEqual(find("outline"), ["View › Panels › Outline"])
     assert.include(find("active top"), "View › Panes › Active pane › Top")
-    assert.include(find("grid size 50"), "View › Grid › Grid size › 50 cm")
+    assert.include(find("snapping"), "View › Snap › Snapping")
   })
 
   it("finds nothing for what's in no menu", () => {
@@ -76,6 +80,20 @@ describe("searching the menus", () => {
     const perspective = searchMenus(entries(), "perspective")[0]
     assert.strictEqual(perspective?.checked, true)
     assert.strictEqual(perspective?.shortcut, "toggleOrthographic")
+  })
+})
+
+describe("View › Snap", () => {
+  const snapRows = (over?: Partial<MenuState>) =>
+    entries(over).filter(({ path }) => path.join(" › ") === "View › Snap" && path.length === 2)
+  const checks = (over?: Partial<MenuState>) =>
+    snapRows(over).flatMap(({ label, checked }) => checked === undefined ? [] : [[label, checked] as const])
+
+  it("turns snapping as a whole on with its keybind, and leaves the rest to the snap menu", () => {
+    const snapping = { ...defaultSettings.snapping, enabled: true }
+    assert.deepStrictEqual(checks({ snapping }), [["Snapping", true]])
+    assert.deepStrictEqual(snapRows().map(({ label }) => label), ["Snapping"])
+    assert.strictEqual(snapRows().find(({ label }) => label === "Snapping")?.shortcut, "snapToggle")
   })
 })
 

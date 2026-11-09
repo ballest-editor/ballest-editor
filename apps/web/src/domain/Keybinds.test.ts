@@ -99,13 +99,15 @@ describe("keybind table", () => {
     expect(defaultKeybinds.fastMove).toEqual([])
   })
 
-  it("only shares keys between a fly key and a tool shortcut (W: forward + translate, as in the game), and the paint tool's clicks", () => {
+  it("only shares keys between a fly key and a tool shortcut (W: forward + translate, as in the game), a drag's, and the paint tool's clicks", () => {
     const seen = new Map<string, Array<string>>()
     for (const [action, bindings] of Object.entries(defaultKeybinds)) {
       for (const b of bindings) seen.set(b, [...(seen.get(b) ?? []), action])
     }
     const shared = [...seen].filter(([, actions]) => actions.length > 1)
+    // Ctrl is snapping's only once a drag has begun, and flying's otherwise
     expect(shared).toEqual([
+      ["ControlLeft", ["snapOff", "moveDown"]],
       ["KeyW", ["translateMode", "moveForward"]],
       ["Shift+Mouse0", ["addToSelection", "paintWholePiece"]],
       ["Alt+Mouse0", ["pickPaint", "orbit"]]
@@ -115,7 +117,8 @@ describe("keybind table", () => {
     expect(isOneShotChord(defaultKeybinds, "KeyS")).toBe(false)
     expect(actionsFor(defaultKeybinds, "KeyC")).toEqual(["toggleGizmoSpace"])
     expect(actionsFor(defaultKeybinds, "KeyF")).toEqual(["focusSelection"])
-    expect(actionsFor(defaultKeybinds, "KeyX")).toEqual([])
+    expect(actionsFor(defaultKeybinds, "KeyX")).toEqual(["snapLockX"])
+    expect(isOneShotChord(defaultKeybinds, "KeyX")).toBe(false)
   })
 
   it("merges stored bindings, accepting the old single-string form", () => {
@@ -133,6 +136,14 @@ describe("keybind table", () => {
     expect(merged.saveMapAs).toEqual(["Ctrl+Shift+KeyE"])
     expect(merged.saveMap).toEqual(["Ctrl+KeyS"])
     expect(mergeKeybinds({ importMap: ["Ctrl+KeyI"], openMap: ["Ctrl+KeyP"] }).openMap).toEqual(["Ctrl+KeyP"])
+  })
+
+  it("keeps the binding saved for invert snapping as snapping off, and drops the grid and step keys", () => {
+    const merged = mergeKeybinds({ snapInvert: ["AltLeft"], snapOnlyGrid: ["KeyQ"], snapOnlyStep: ["KeyT"] })
+    expect(merged.snapOff).toEqual(["AltLeft"])
+    expect(merged).not.toHaveProperty("snapOnlyGrid")
+    expect(merged).not.toHaveProperty("snapOnlyStep")
+    expect(merged).not.toHaveProperty("snapInvert")
   })
 
   it("formats bindings for display", () => {
@@ -309,6 +320,23 @@ describe("conflictingBindings", () => {
   it("marks a chord two actions of a kind share, and not one shared across kinds", () => {
     expect(newConflicts({ ...defaultKeybinds, undo: ["Ctrl+KeyJ"], redo: ["Ctrl+KeyJ"] })).toEqual(["Ctrl+KeyJ"])
     expect(newConflicts({ ...defaultKeybinds, moveForward: ["KeyJ"], translateMode: ["KeyJ"] })).toEqual([])
+  })
+
+  it("marks two of a drag's keys sharing a chord", () => {
+    expect(newConflicts({ ...defaultKeybinds, snapOnlyMesh: ["KeyJ"] })).toEqual(["KeyJ"])
+  })
+
+  it("gives the keys that narrow snapping chords nothing else is bound to", () => {
+    const narrowing = keybindActions.filter((action) => action.startsWith("snapOnly"))
+    expect(narrowing).toEqual([
+      "snapOnlyConnectors",
+      "snapOnlyMesh",
+      "snapOnlyAlignment"
+    ])
+    expect(conflictingBindings(defaultKeybinds).size).toBe(0)
+    for (const action of narrowing) {
+      for (const chord of defaultKeybinds[action]) expect(actionsFor(defaultKeybinds, chord)).toEqual([action])
+    }
   })
 
   it("keeps the paint tool's clicks apart from selection and camera clicks, but not from each other", () => {

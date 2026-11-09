@@ -90,6 +90,23 @@ export const keybindSections = [
       "frameAll"
     ]
   },
+  {
+    name: "snapping",
+    actions: [
+      "snapToggle",
+      "snapOff",
+      "snapHold",
+      "snapLockX",
+      "snapLockY",
+      "snapLockZ",
+      "snapPlaneX",
+      "snapPlaneY",
+      "snapPlaneZ",
+      "snapOnlyConnectors",
+      "snapOnlyMesh",
+      "snapOnlyAlignment"
+    ]
+  },
   { name: "file", actions: ["newMap", "openMap", "saveMap", "saveMapAs", "closeTab", "nextTab", "previousTab"] },
   { name: "game", actions: ["playMap"] },
   { name: "help", actions: ["showKeybinds"] }
@@ -147,6 +164,18 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   speedSlower: "camera speed down",
   orbit: "orbit",
   pan: "pan",
+  snapToggle: "snapping on / off",
+  snapOff: "snapping off",
+  snapHold: "hold target",
+  snapLockX: "lock to x",
+  snapLockY: "lock to y",
+  snapLockZ: "lock to z",
+  snapPlaneX: "lock to plane across x",
+  snapPlaneY: "lock to plane across y",
+  snapPlaneZ: "lock to plane across z",
+  snapOnlyConnectors: "connectors only",
+  snapOnlyMesh: "mesh only",
+  snapOnlyAlignment: "alignment only",
   viewTop: "top view",
   viewBottom: "bottom view",
   viewFront: "front view",
@@ -173,7 +202,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Move: drag the arrows or plane handles to move the selection. W in the in-game editor. When its key is also a movement key, the \"fly only while looking\" camera setting decides which it does.",
   rotateMode: "Rotate: drag a ring to rotate the selection. E in the in-game editor.",
   scaleMode:
-    "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the in-game editor.",
+    "Scale: drag a cube to scale along one axis, or the center ring to scale uniformly. R in the in-game editor.",
   paintMode:
     "Paint: click or drag over pieces to paint the slot under the pointer with the tool's paint or surface, no gizmo. Editor only: the game paints from its Paint panel.",
   toggleGizmoSpace:
@@ -228,6 +257,24 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   speedSlower: "Lower the camera's fly speed one step.",
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
+  snapToggle:
+    "Turn snapping as a whole on or off: the magnet in the view bar. Grid, rotation, scale and each target keep their own toggles under it. No equivalent in the in-game editor.",
+  snapOff:
+    "Hold during a drag: nothing snaps while it is held. With snapping off already it does nothing. Only once a drag has begun, so Ctrl still flies down.",
+  snapHold:
+    "Hold during a drag: the selection stays on the target it found, sliding along it, and nothing else takes over.",
+  snapLockX: "During a drag, lock the move to the X axis (the grid's, when it is turned). Press again to unlock.",
+  snapLockY: "During a drag, lock the move to the Y axis (the grid's, when it is turned). Press again to unlock.",
+  snapLockZ: "During a drag, lock the move to the Z axis. Press again to unlock.",
+  snapPlaneX: "During a drag, lock the move to the plane square to X. Press again to unlock.",
+  snapPlaneY: "During a drag, lock the move to the plane square to Y. Press again to unlock.",
+  snapPlaneZ: "During a drag, lock the move to the plane square to Z. Press again to unlock.",
+  snapOnlyConnectors:
+    "Hold during a move or a turn: only connector ends count, even with snapping off. A move stays where it started until one of its ends meets another on screen, from further off than usual, and jumps to the join. J for join: C is the game's key for the gizmo's axes.",
+  snapOnlyMesh:
+    "Hold during a move, a turn or a scale: only the Mesh target counts (vertices, edges and faces, and the faces a turn or a scale stops on), even with snapping off. M for mesh.",
+  snapOnlyAlignment:
+    "Hold during a move: only alignment and tracking count, even with snapping off, so a row lines up without the grid or a face taking over. L for line up: A flies the camera left.",
   viewTop: "Look straight down in the active pane, orthographic. Editor only: the game has no orthographic views.",
   viewBottom: "Look straight up from under the map in the active pane, orthographic.",
   viewFront: "Look at the map from its front (the +X side, the game's forward) in the active pane, orthographic.",
@@ -279,6 +326,20 @@ export const mouseClickActions: ReadonlySet<KeybindAction> = new Set([
 
 /** Actions bound to a mouse button held while dragging. */
 export const mouseDragActions: ReadonlySet<KeybindAction> = new Set(["look", "orbit", "pan"])
+/** Actions a drag takes once it has begun (docs/SNAPPING.md § Modifiers): nothing fires them from a key by itself. */
+export const duringDragActions: ReadonlySet<KeybindAction> = new Set([
+  "snapOff",
+  "snapHold",
+  "snapLockX",
+  "snapLockY",
+  "snapLockZ",
+  "snapPlaneX",
+  "snapPlaneY",
+  "snapPlaneZ",
+  "snapOnlyConnectors",
+  "snapOnlyMesh",
+  "snapOnlyAlignment"
+])
 /** Actions that are held down rather than fired once. */
 export const heldActions: ReadonlySet<KeybindAction> = new Set([
   "moveForward",
@@ -303,6 +364,18 @@ export type Keybinds = Readonly<Record<KeybindAction, Bindings>>
  * defines on top.
  */
 export const defaultKeybinds: Keybinds = {
+  snapToggle: ["KeyN"],
+  snapOff: ["ControlLeft", "ControlRight"],
+  snapHold: ["ShiftLeft", "ShiftRight"],
+  snapLockX: ["KeyX"],
+  snapLockY: ["KeyY"],
+  snapLockZ: ["KeyZ"],
+  snapPlaneX: ["Shift+KeyX"],
+  snapPlaneY: ["Shift+KeyY"],
+  snapPlaneZ: ["Shift+KeyZ"],
+  snapOnlyConnectors: ["KeyJ"],
+  snapOnlyMesh: ["KeyM"],
+  snapOnlyAlignment: ["KeyL"],
   selectMode: ["KeyQ"],
   translateMode: ["KeyW"],
   rotateMode: ["KeyE"],
@@ -372,7 +445,11 @@ export const uniqueBindings = (
 ): Bindings => [...new Set(bindings.filter((b) => b.length > 0))]
 
 /** Actions saved under an older name: their bindings carry over when the new name has none saved. */
-const RENAMED_ACTIONS: Partial<Record<KeybindAction, string>> = { openMap: "importMap", saveMapAs: "exportMap" }
+const RENAMED_ACTIONS: Partial<Record<KeybindAction, string>> = {
+  openMap: "importMap",
+  saveMapAs: "exportMap",
+  snapOff: "snapInvert"
+}
 
 export const mergeKeybinds = (stored: StoredKeybinds, defaults: Keybinds = defaultKeybinds): Keybinds => {
   const out: Record<KeybindAction, Bindings> = { ...defaults }
@@ -401,6 +478,13 @@ const MODIFIER_NAME_CODES: Readonly<Record<string, ReadonlyArray<string>>> = {
 /** Does releasing key `code` end a hold of `binding` (its key, or one of its modifiers)? */
 export const releasesBinding = (binding: string, code: string): boolean =>
   binding.split("+").some((part) => part === code || (MODIFIER_NAME_CODES[part]?.includes(code) ?? false))
+
+/** Is `binding` held, of the codes `pressed`: its key, and each of its modifiers by either hand? */
+export const bindingHeld = (binding: string, pressed: ReadonlySet<string>): boolean =>
+  binding.length > 0 &&
+  binding.split("+").every((part) =>
+    pressed.has(part) || (MODIFIER_NAME_CODES[part]?.some((code) => pressed.has(code)) ?? false)
+  )
 
 /** Is `chord` one of the action's bindings? */
 export const isBound = (keybinds: Keybinds, action: KeybindAction, chord: string): boolean =>
@@ -489,7 +573,9 @@ export const holdsModifiersOf = (keybinds: Keybinds, action: KeybindAction, e: M
 
 /** True when `chord` is bound to a one-shot action (anything that isn't held or a drag). */
 export const isOneShotChord = (keybinds: Keybinds, chord: string): boolean =>
-  actionsFor(keybinds, chord).some((action) => !heldActions.has(action) && !mouseDragActions.has(action))
+  actionsFor(keybinds, chord).some((action) =>
+    !heldActions.has(action) && !mouseDragActions.has(action) && !duringDragActions.has(action)
+  )
 
 /** True when `chord` (from chordOf) is bound to a one-shot action with a modifier, e.g. Ctrl+KeyZ. */
 export const isBoundChord = (keybinds: Keybinds, chord: string): boolean =>
@@ -630,6 +716,8 @@ export const conflictingBindings = (keybinds: Keybinds): ReadonlySet<string> => 
   for (const action of keybindActions) {
     const kind = heldActions.has(action)
       ? "held"
+      : duringDragActions.has(action)
+      ? "duringDrag"
       : paintClickActions.has(action)
       ? "paint"
       : mouseDragActions.has(action) || mouseClickActions.has(action)

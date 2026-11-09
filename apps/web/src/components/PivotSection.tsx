@@ -8,11 +8,12 @@ import { soleGroupOf } from "../domain/groupSelection"
 import type { Axis } from "../domain/groupTransform"
 import { GROUP_PIVOT_FACES, type GroupNode, type GroupPivot } from "../domain/MapSidecar"
 import { PIVOT_CHOICES, pivotBoundsOf } from "../domain/pivot"
+import { snapsGrid } from "../domain/snapConfig"
 import { pieceNameOf, treeKeys } from "../domain/structure"
 import { vecSub } from "../domain/ueMath"
 import { editSelectionAxis, moveSelectionBy, previewSelectionAxis, setSelectionPivot } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { pivotOf, shownPivotPoint, useEditor } from "../editor/store"
+import { pivotOf, shownPivotPoint, snapConfigOf, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
 import { NumberField } from "./NumberField"
 import { RowClipboard } from "./RowClipboard"
@@ -31,7 +32,7 @@ const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
  */
 function PivotPosition({ point }: { readonly point: Vec3 }) {
   const units = useEditor((s) => s.settings.general.units)
-  const snapping = useEditor((s) => s.settings.snapping)
+  const snapping = useEditor(snapConfigOf)
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
   const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
@@ -64,7 +65,7 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
               onScrub={(v, from) => previewSelectionAxis("translation", axis, v === null ? null : offset(v, from))}
               onScrubCommit={(v, from) => editSelectionAxis("translation", axis, offset(v, from))}
               step={units === "m" ? 0.01 : 1}
-              snap={snapping.enabled ? snapping.gridSize / perUnit : undefined}
+              snap={snapsGrid(snapping) ? snapping.gridSize / perUnit : undefined}
               digits={units === "m" ? 3 : 1}
               handleClassName={AXIS_BG_CLASSES[axis]}
               handleText={axis.toUpperCase()}
@@ -77,11 +78,11 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
 }
 
 /** A group's pivot choices, in the order of a piece's: the centre of its items' box, a face of it, a member, a frozen point. */
-const GROUP_CHOICES = ["Centre", ...GROUP_PIVOT_FACES, "Item", "Point"] as const
+const GROUP_CHOICES = ["Center", ...GROUP_PIVOT_FACES, "Item", "Point"] as const
 type GroupChoice = (typeof GROUP_CHOICES)[number]
 
 const groupChoiceOf = (pivot: GroupPivot | undefined): GroupChoice =>
-  pivot === undefined ? "Centre" : pivot.choice === "item" ? "Item" : pivot.choice === "point" ? "Point" : pivot.choice
+  pivot === undefined ? "Center" : pivot.choice === "item" ? "Item" : pivot.choice === "point" ? "Point" : pivot.choice
 
 /**
  * Where a whole group pivots (docs/design/pivot-modes-and-chains.md § Group pivot): the centre of the box around its
@@ -104,7 +105,7 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
   const point = useEditor(useShallow(shownPivotPoint))
   const choice = groupChoiceOf(group.pivot)
   const pick = (next: GroupChoice) => {
-    if (next === "Centre") setGroupPivot(group.id, undefined)
+    if (next === "Center") setGroupPivot(group.id, undefined)
     else if (next === "Item") {
       setGroupPivot(group.id, {
         choice: "item",

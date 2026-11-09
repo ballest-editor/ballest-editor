@@ -1,11 +1,25 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { listSamples, readSample } from "../test/samples"
-import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
+import { catalogWithEnds } from "../test/snapFixtures"
+import { indexCatalog } from "./Catalog"
+import { defaultEditorState, identityTransform, itemFromPiece, newMapFile, playerStartItem } from "./factory"
 import { type Item, MapFile } from "./MapFile"
-import type { MapSidecar } from "./MapSidecar"
+import { MapSidecar } from "./MapSidecar"
 import { fingerprintOf, loadGameStructure, loadStructure, sidecarOf, structureOfMap } from "./sidecar"
-import { type Structure, treeKeys, withGroup, withItemName, withTags } from "./structure"
+import { defaultSnapConfig } from "./snapConfig"
+import {
+  itemNode,
+  type Structure,
+  treeKeys,
+  withAnnotations,
+  withChain,
+  withConnectAt,
+  withGroup,
+  withGroupPivot,
+  withItemName,
+  withTags
+} from "./structure"
 
 const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
 
@@ -33,6 +47,7 @@ const authored = () => {
   next = withItemName(next, k1, "Named")!
   next = withTags(next, k2, ["tagged"])!
   next = withTags(next, "g1", ["a tag"])!
+  next = withConnectAt(next, k3, 0, "bottomLeft")!
   return { map, ids, keys: { k0, k1, k2, k3, k4 }, structure: next, sidecar: sidecarOf(map, ids, next, HASH) }
 }
 
@@ -63,6 +78,16 @@ describe("loadStructure", () => {
     assert.deepStrictEqual(loaded.structure.items, structure.items)
     assert.strictEqual(loaded.unmatched, 0)
     assert.isFalse(loaded.rematched)
+  })
+
+  it("reads back where an item's ends connect, through the sidecar's file", () => {
+    const { keys, map, sidecar } = authored()
+    const Codec = Schema.fromJsonString(MapSidecar)
+    const file = Schema.decodeSync(Codec)(Schema.encodeSync(Codec)(sidecar))
+    assert.deepStrictEqual(file.items[keys.k3]?.connectAt, { "0": "bottomLeft" })
+    assert.deepStrictEqual(loadStructure(map, HASH, file).structure.items.get(keys.k3), {
+      connectAt: { "0": "bottomLeft" }
+    })
   })
 
   it("makes keys and a flat tree without a sidecar, with the file's groups", () => {
@@ -96,6 +121,7 @@ describe("loadStructure", () => {
 
     assert.deepStrictEqual(loaded.structure.items.get(keys.k1), { name: "Named" })
     assert.deepStrictEqual(loaded.structure.items.get(keys.k2), { tags: ["tagged"] })
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k3), { connectAt: { "0": "bottomLeft" } })
     const groups = loaded.structure.tree.flatMap((node) => node.kind === "group" ? [node] : [])
     assert.deepStrictEqual(groups.map((g) => [g.name, g.tags, treeKeys(g.children)]), [
       ["Inner", ["a tag"], [keys.k1, keys.k2]],
@@ -245,4 +271,106 @@ describe("loadStructure", () => {
       assert.strictEqual(loaded.unmatched, 0)
     }
   )
+})
+
+describe("snap data in the sidecar", () => {
+  const joint = (a: string, b: string) => ({ a: { item: a, end: 0 }, b: { item: b, end: 1 } })
+  const plane = {
+    kind: "plane",
+    id: "plane1",
+    name: "Landing",
+    origin: { x: 0, y: 0, z: 100 },
+    normal: { x: 0, y: 0, z: 1 },
+    xAxis: { x: 1, y: 0, z: 0 },
+    extent: 500,
+    grid: false
+  } as const
+  const measurement = { id: "measure1", a: { x: 0, y: 0, z: 0 }, b: { x: 100, y: 0, z: 0 } }
+
+  it("keeps a map's annotations and snap settings beside its pivots and chains, through a save and a rewrite", () => {
+    const { ids, keys, map, structure } = authored()
+    const annotations = { joints: [joint(keys.k0, keys.k1)], construction: [plane], measurements: [measurement] }
+    const snap = { ...defaultSnapConfig, enabled: true, gridSize: 37 }
+    const group = structure.tree.find((node) => node.kind === "group")
+    if (group?.kind !== "group") return assert.fail("the map has no group")
+    const world = { x: 1, y: 2, z: 3 }
+    const authoredTrees = [
+      structure,
+      withGroupPivot(structure, group.id, { choice: "point", world }),
+      withChain(structure, group.id, true)
+    ].flatMap((one) => one ?? [])
+    assert.lengthOf(authoredTrees, 3)
+    for (const authoredTree of authoredTrees) {
+      const sidecar = sidecarOf(map, ids, withAnnotations(authoredTree, annotations), HASH, snap)
+      for (const hash of [HASH, OTHER_HASH]) {
+        const loaded = loadStructure(map, hash, sidecar)
+        assert.deepStrictEqual(loaded.structure.tree, authoredTree.tree, hash)
+        assert.deepStrictEqual(loaded.structure.annotations, annotations, hash)
+        assert.deepStrictEqual(loaded.snap, snap, hash)
+      }
+    }
+  })
+
+  it("writes neither while the map has none of its own", () => {
+    const { sidecar } = authored()
+    assert.isFalse("annotations" in sidecar)
+    assert.isFalse("snap" in sidecar)
+  })
+
+  it("drops a joint when one of its items can't be found, and keeps what belongs to the map", () => {
+    const { ids, keys, map, structure } = authored()
+    const annotations = {
+      joints: [joint(keys.k0, keys.k1), joint(keys.k3, keys.k4)],
+      construction: [plane],
+      measurements: []
+    }
+    const sidecar = sidecarOf(map, ids, withAnnotations(structure, annotations), HASH)
+    const loaded = loadStructure(mapOf(map.items.slice(0, 4).map((item) => item)), OTHER_HASH, sidecar)
+    assert.deepStrictEqual(loaded.structure.annotations?.joints, [joint(keys.k0, keys.k1)])
+    assert.deepStrictEqual(loaded.structure.annotations?.construction, [plane])
+  })
+})
+
+describe("a version the game saved", () => {
+  const catalog = indexCatalog(catalogWithEnds())
+  const piece = catalog.pieceByClass.values().next().value
+  if (piece === undefined) throw new Error("the bundled catalog has no pieces")
+  const track = (x: number) => itemFromPiece(piece, identityTransform({ x, y: 0, z: 0 }))
+  const ids = ["left", "right", "away"]
+  const joined = [{ a: { item: "right", end: 1 }, b: { item: "left", end: 0 } }]
+  const map = mapOf([track(0), track(500), track(5000)])
+  const tree = [
+    { kind: "group", id: "g", name: "Group", tags: [], children: [itemNode("right"), itemNode("away")], chain: true },
+    itemNode("left")
+  ] as const
+  const snap = { ...defaultSnapConfig, gridSize: 37 }
+  const sidecar = sidecarOf(
+    map,
+    ids,
+    withAnnotations({ tree, items: new Map() }, { joints: joined, construction: [], measurements: [] }),
+    HASH,
+    snap
+  )
+
+  it("keeps joints that still meet, its chains and its snap settings when the game moved something else", () => {
+    const loaded = loadGameStructure(mapOf([track(0), track(500), track(7000)]), OTHER_HASH, sidecar, catalog)
+    assert.deepStrictEqual(loaded.ids, ids)
+    assert.deepStrictEqual(loaded.structure.tree, tree)
+    assert.deepStrictEqual(loaded.structure.annotations?.joints, joined)
+    assert.deepStrictEqual(loaded.snap, snap)
+    assert.isTrue(loaded.rematched)
+  })
+
+  const pulledApart = mapOf([track(0), track(800), track(5000)])
+
+  it("drops a joint whose item the game moved off the other end, and keeps the item's key", () => {
+    const loaded = loadGameStructure(pulledApart, OTHER_HASH, sidecar, catalog)
+    assert.deepStrictEqual(loaded.ids, ids)
+    assert.isUndefined(loaded.structure.annotations)
+    assert.deepStrictEqual(loaded.snap, snap)
+  })
+
+  it("keeps a joint it can't read the ends of, before the catalog has loaded", () => {
+    assert.deepStrictEqual(loadGameStructure(pulledApart, OTHER_HASH, sidecar).structure.annotations?.joints, joined)
+  })
 })

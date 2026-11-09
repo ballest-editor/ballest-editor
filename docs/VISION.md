@@ -36,12 +36,12 @@ Numbers are issues. The [milestones](https://github.com/ballest-editor/ballest-e
 
 ### Partly built
 
-- **Grid snapping** covers position and rotation, on fixed steps. Still to come: scale snapping, and user-defined origins, spacing and angle steps (#84).
-- **Mirroring** is the game's per-item Flip X and Flip Y. Still to come: flipping the selection or the map across a chosen plane in world, grid or selection space (#87).
+- **Snapping** lands a move, turn or scale on the grid, piece ends, meshes, construction geometry, tracking lines and alignment guides, by a priority the user sets, with the tools built on the same targets: flush and tangent, align and distribute, measure, mirror ([SNAPPING.md](SNAPPING.md)). Still to come: connector data for the families not measured yet.
+- **Mirroring** is the game's per-item Flip X and Flip Y, and a selection mirrored across a face, a construction plane or a world plane ([SNAPPING.md](SNAPPING.md)). Still to come: mirroring in selection space.
 - **Linting** stops a save on the first problems it finds. Still to come: a lint view and the checks the game doesn't make itself, such as a missing goal and pieces outside the palette (#98).
 - **Prefabs** read and write the game's `BallestPrefab` files in a user and a project tier, and place as instances that follow their definition ([DESKTOP.md](DESKTOP.md#prefabs)). Still to come: the ballestrecords library (#102).
 - **Importing from the Workshop cache** works through the file dialog. Still to come: finding maps there for study and remix (#103).
-- **Menus** are missing Select and Tools.
+- **Menus** are missing Select.
 
 ### Planned
 
@@ -60,8 +60,7 @@ Gizmos and transform:
 Selection-based operations:
 
 - Box and lasso select (#85), and select similar by class or material (#86).
-- Align and distribute along an axis, equal spacing, stacking (#88).
-- Flush and tangent: pick a face on object A and a face on object B and make them coplanar or tangent (#89).
+- Stacking (#88).
 - Linear and radial arrays (#90), and path-following placement along a spline for tracks and bevels (#91).
 
 Organisation:

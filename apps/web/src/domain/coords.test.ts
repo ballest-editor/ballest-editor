@@ -15,19 +15,15 @@ import {
   type Vec3
 } from "./coords"
 import { MapFile } from "./MapFile"
+import { vecCross } from "./ueMath"
 
 const decodeSample = Schema.decodeSync(Schema.fromJsonString(MapFile))
 
 /** FQuat::RotateVector: v' = v + 2w(q x v) + 2 q x (q x v), evaluated on raw UE components. */
 const ueRotate = (q: Quat4, v: Vec3): Vec3 => {
-  const cross = (a: Vec3, b: Vec3): Vec3 => ({
-    x: a.y * b.z - a.z * b.y,
-    y: a.z * b.x - a.x * b.z,
-    z: a.x * b.y - a.y * b.x
-  })
-  const t = cross(q, v)
+  const t = vecCross(q, v)
   const t2 = { x: 2 * t.x, y: 2 * t.y, z: 2 * t.z }
-  const u = cross(q, t2)
+  const u = vecCross(q, t2)
   return { x: v.x + q.w * t2.x + u.x, y: v.y + q.w * t2.y + u.y, z: v.z + q.w * t2.z + u.z }
 }
 

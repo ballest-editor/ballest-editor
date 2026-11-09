@@ -14,7 +14,8 @@ import {
   playMap,
   saveMap,
   selectAll,
-  startNewMap
+  startNewMap,
+  toggleSnapping
 } from "./actions"
 import { sceneRegistry } from "./sceneRegistry"
 import { noTabOpen, useEditor } from "./store"
@@ -67,6 +68,7 @@ export const actionCommands = {
   paintMode: () => useEditor.getState().setTool("paint"),
   toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
   togglePivotMode: () => useEditor.getState().togglePivotMode(),
+  snapToggle: onOpenTab(toggleSnapping),
   speedFaster: () => useEditor.getState().changeSpeed(1),
   speedSlower: () => useEditor.getState().changeSpeed(-1),
   viewTop: () => lookAlong("top"),

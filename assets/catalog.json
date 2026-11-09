@@ -43,6 +43,64 @@
           144.6538
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -224.49,
+            0,
+            144.654
+          ],
+          "forward": [
+            -0.923879,
+            0,
+            0.382684
+          ],
+          "up": [
+            0.382684,
+            0,
+            0.923879
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -243.624,
+              0,
+              98.46
+            ]
+          }
+        },
+        {
+          "position": [
+            224.49,
+            0,
+            144.654
+          ],
+          "forward": [
+            0.923879,
+            0,
+            0.382684
+          ],
+          "up": [
+            -0.382684,
+            0,
+            0.923879
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              243.624,
+              0,
+              98.46
+            ]
+          }
+        }
+      ],
       "seenInSamples": 55,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500_45scoop.SM_500_45scoop",
@@ -158,6 +216,64 @@
           193.1136
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -468.113,
+            0,
+            193.114
+          ],
+          "forward": [
+            -0.92388,
+            0,
+            0.382683
+          ],
+          "up": [
+            0.382683,
+            0,
+            0.92388
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -487.248,
+              0,
+              146.92
+            ]
+          }
+        },
+        {
+          "position": [
+            468.113,
+            0,
+            193.114
+          ],
+          "forward": [
+            0.92388,
+            0,
+            0.382683
+          ],
+          "up": [
+            -0.382683,
+            0,
+            0.92388
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              487.248,
+              0,
+              146.92
+            ]
+          }
+        }
+      ],
       "seenInSamples": 14,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_45.SM_1000_45",
@@ -273,6 +389,64 @@
           290.0331
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -955.361,
+            0,
+            290.033
+          ],
+          "forward": [
+            -0.92388,
+            0,
+            0.382683
+          ],
+          "up": [
+            0.382683,
+            0,
+            0.92388
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -974.495,
+              0,
+              243.839
+            ]
+          }
+        },
+        {
+          "position": [
+            955.361,
+            0,
+            290.033
+          ],
+          "forward": [
+            0.92388,
+            0,
+            0.382683
+          ],
+          "up": [
+            -0.382683,
+            0,
+            0.92388
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              974.495,
+              0,
+              243.839
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_45scoop.SM_2000_45scoop",
@@ -388,6 +562,64 @@
           271.817
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -414.803,
+            0,
+            271.817
+          ],
+          "forward": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -450.158,
+              0,
+              236.462
+            ]
+          }
+        },
+        {
+          "position": [
+            414.803,
+            0,
+            271.817
+          ],
+          "forward": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              450.158,
+              0,
+              236.462
+            ]
+          }
+        }
+      ],
       "seenInSamples": 22,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_90scoop.SM_1000_90scoop",
@@ -509,6 +741,64 @@
           178.5862
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -189.724,
+            0,
+            178.586
+          ],
+          "forward": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -225.079,
+              0,
+              143.231
+            ]
+          }
+        },
+        {
+          "position": [
+            189.724,
+            0,
+            178.586
+          ],
+          "forward": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              225.079,
+              0,
+              143.231
+            ]
+          }
+        }
+      ],
       "seenInSamples": 5,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500_90scoop.SM_500_90scoop",
@@ -624,6 +914,64 @@
           458.2786
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -864.961,
+            0,
+            458.279
+          ],
+          "forward": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -900.316,
+              0,
+              422.923
+            ]
+          }
+        },
+        {
+          "position": [
+            864.961,
+            0,
+            458.279
+          ],
+          "forward": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              900.316,
+              0,
+              422.923
+            ]
+          }
+        }
+      ],
       "seenInSamples": 29,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_90scoop.SM_2000_90scoop",
@@ -739,6 +1087,64 @@
           178.5862
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -250,
+            0,
+            100
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -250,
+              0,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            189.724,
+            0,
+            178.586
+          ],
+          "forward": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              225.079,
+              0,
+              143.231
+            ]
+          }
+        }
+      ],
       "seenInSamples": 12,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500_softkicker.SM_500_softkicker",
@@ -860,6 +1266,64 @@
           271.817
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            100
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -500,
+              0,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            414.803,
+            0,
+            271.817
+          ],
+          "forward": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              450.158,
+              0,
+              236.462
+            ]
+          }
+        }
+      ],
       "seenInSamples": 11,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_softkicker.SM_1000_softkicker",
@@ -981,6 +1445,64 @@
           209.1549
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -250,
+            0,
+            100
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -250,
+              0,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            109.155,
+            0,
+            209.155
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              159.155,
+              0,
+              209.155
+            ]
+          }
+        }
+      ],
       "seenInSamples": 6,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500_kicker.SM_500_kicker",
@@ -1096,6 +1618,64 @@
           368.3099
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            100
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -500,
+              0,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            268.31,
+            0,
+            368.31
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              318.31,
+              0,
+              368.31
+            ]
+          }
+        }
+      ],
       "seenInSamples": 6,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_kicker.SM_1000_kicker",
@@ -1223,6 +1803,66 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -481.408,
+            141.001,
+            -78.501
+          ],
+          "forward": [
+            -0.707107,
+            0.5,
+            -0.5
+          ],
+          "up": [
+            -0.5,
+            0.146446,
+            0.853553
+          ],
+          "profile": "Bevel_C",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              -450.158,
+              131.848,
+              -131.848
+            ]
+          }
+        },
+        {
+          "position": [
+            481.408,
+            141.001,
+            -78.501
+          ],
+          "forward": [
+            0.707107,
+            0.5,
+            -0.5
+          ],
+          "up": [
+            0.5,
+            0.146446,
+            0.853553
+          ],
+          "profile": "Bevel_C",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              450.158,
+              131.848,
+              -131.848
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_ShallowCornerHump.Bevel_Half_ShallowCornerHump",
@@ -1350,6 +1990,66 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -494.352,
+            0,
+            -142.267
+          ],
+          "forward": [
+            -0.707107,
+            0,
+            -0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Bevel_C",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              -450.158,
+              0,
+              -186.462
+            ]
+          }
+        },
+        {
+          "position": [
+            494.352,
+            0,
+            -142.267
+          ],
+          "forward": [
+            0.707107,
+            0,
+            -0.707107
+          ],
+          "up": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Bevel_C",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              450.158,
+              0,
+              -186.462
+            ]
+          }
+        }
+      ],
       "seenInSamples": 2,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_SteepCornerHump.Bevel_Half_SteepCornerHump",
@@ -1477,6 +2177,66 @@
           230.6558
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -405.964,
+            0,
+            230.656
+          ],
+          "forward": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Bevel_C",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              -450.158,
+              0,
+              186.462
+            ]
+          }
+        },
+        {
+          "position": [
+            405.964,
+            0,
+            230.656
+          ],
+          "forward": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Bevel_C",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              450.158,
+              0,
+              186.462
+            ]
+          }
+        }
+      ],
       "seenInSamples": 2,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_DeepCornerScoop.Bevel_Half_DeepCornerScoop",
@@ -1604,6 +2364,66 @@
           203.5012
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -418.908,
+            122.695,
+            185.195
+          ],
+          "forward": [
+            -0.707107,
+            0.5,
+            0.5
+          ],
+          "up": [
+            0.5,
+            -0.146447,
+            0.853553
+          ],
+          "profile": "Bevel_C",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              -450.158,
+              131.848,
+              131.848
+            ]
+          }
+        },
+        {
+          "position": [
+            418.908,
+            122.695,
+            185.195
+          ],
+          "forward": [
+            0.707107,
+            0.5,
+            0.5
+          ],
+          "up": [
+            -0.5,
+            -0.146446,
+            0.853553
+          ],
+          "profile": "Bevel_C",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              450.158,
+              131.848,
+              131.848
+            ]
+          }
+        }
+      ],
       "seenInSamples": 8,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_ShallowCornerScoop.Bevel_Half_ShallowCornerScoop",
@@ -1737,6 +2557,36 @@
           435.776
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -211.461,
+            0,
+            435.776
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -211.461,
+              0,
+              318.276
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_StubKicker.Bevel_Full_StubKicker",
@@ -1870,6 +2720,64 @@
           269.5467
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -367.073,
+            0,
+            269.547
+          ],
+          "forward": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -450.158,
+              0,
+              186.462
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            117.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              500,
+              0,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 13,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
@@ -2003,6 +2911,64 @@
           318.3133
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -201.216,
+            0,
+            318.313
+          ],
+          "forward": [
+            -0.002002,
+            0,
+            0.999998
+          ],
+          "up": [
+            0.999998,
+            0,
+            0.002002
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -318.715,
+              0,
+              318.078
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            117.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              500,
+              0,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 6,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker",
@@ -2136,6 +3102,64 @@
           435.776
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -211.461,
+            0,
+            -200.776
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -211.461,
+              0,
+              -318.276
+            ]
+          }
+        },
+        {
+          "position": [
+            -211.461,
+            0,
+            435.776
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -211.461,
+              0,
+              318.276
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShortScoop.Bevel_Full_ShortScoop",
@@ -2269,6 +3293,64 @@
           377.0599
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -377.06,
+            0,
+            377.06
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -377.06,
+              0,
+              259.56
+            ]
+          }
+        },
+        {
+          "position": [
+            -326.816,
+            -4.901,
+            -875.78
+          ],
+          "forward": [
+            -0.995138,
+            -0.000474,
+            -0.098485
+          ],
+          "up": [
+            -0.098485,
+            0.009609,
+            0.995092
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235.001,
+            "centre": [
+              -315.244,
+              -6.03,
+              -992.704
+            ]
+          }
+        }
+      ],
       "seenInSamples": 5,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop",
@@ -2402,6 +3484,64 @@
           377.0599
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -377.06,
+            0,
+            377.06
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -377.06,
+              0,
+              259.56
+            ]
+          }
+        },
+        {
+          "position": [
+            377.06,
+            0,
+            -377.06
+          ],
+          "forward": [
+            0,
+            0,
+            -1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              259.56,
+              0,
+              -377.06
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowScoop.Bevel_Full_ShallowScoop",
@@ -2535,6 +3675,64 @@
           377.0599
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -377.06,
+            0,
+            377.06
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -377.06,
+              0,
+              259.56
+            ]
+          }
+        },
+        {
+          "position": [
+            377.06,
+            0,
+            -377.06
+          ],
+          "forward": [
+            0,
+            0,
+            -1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              259.56,
+              0,
+              -377.06
+            ]
+          }
+        }
+      ],
       "seenInSamples": 2,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowShortScoop.Bevel_Full_ShallowShortScoop",
@@ -2668,6 +3866,64 @@
           196.7612
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -334.536,
+            39.034,
+            172.853
+          ],
+          "forward": [
+            -0.707107,
+            0.363526,
+            0.606506
+          ],
+          "up": [
+            0.606506,
+            -0.129154,
+            0.784519
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -405.8,
+              54.209,
+              80.672
+            ]
+          }
+        },
+        {
+          "position": [
+            544.358,
+            -41.651,
+            38.239
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              544.358,
+              -41.651,
+              -79.261
+            ]
+          }
+        }
+      ],
       "seenInSamples": 6,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_L.Bevel_Full_ShallowSideKicker_L",
@@ -2801,6 +4057,64 @@
           276.0224
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -378.893,
+            -80.685,
+            252.115
+          ],
+          "forward": [
+            -0.707107,
+            -0.363526,
+            0.606506
+          ],
+          "up": [
+            0.606506,
+            0.129153,
+            0.784519
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235.001,
+            "centre": [
+              -450.158,
+              -95.86,
+              159.933
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            117.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              500,
+              0,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_R.Bevel_Full_ShallowSideKicker_R",
@@ -3067,6 +4381,64 @@
           377.0599
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -636.81,
+            -623.026,
+            377.06
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            0,
+            1,
+            0
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -636.81,
+              -740.526,
+              377.06
+            ]
+          }
+        },
+        {
+          "position": [
+            636.81,
+            -119.276,
+            -141.5
+          ],
+          "forward": [
+            0,
+            -1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              636.81,
+              -119.276,
+              -259
+            ]
+          }
+        }
+      ],
       "seenInSamples": 11,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_L.Bevel_Full_ShortUScoop_L",
@@ -3200,6 +4572,64 @@
           526.0599
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -659.81,
+            -383.276,
+            7.5
+          ],
+          "forward": [
+            0,
+            -1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -659.81,
+              -383.276,
+              -110
+            ]
+          }
+        },
+        {
+          "position": [
+            613.81,
+            -887.026,
+            526.06
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            0,
+            1,
+            0
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              613.81,
+              -1004.526,
+              526.06
+            ]
+          }
+        }
+      ],
       "seenInSamples": 9,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R",
@@ -3333,6 +4763,64 @@
           373.6898
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -443.31,
+            -636.62,
+            117.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -443.31,
+              -636.62,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            -443.31,
+            636.62,
+            117.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -443.31,
+              636.62,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 6,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_HalfRingKicker.Bevel_Full_HalfRingKicker",
@@ -3448,6 +4936,64 @@
           385.6667
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -932.534,
+            0,
+            385.667
+          ],
+          "forward": [
+            -0.92388,
+            0,
+            0.382683
+          ],
+          "up": [
+            0.382683,
+            0,
+            0.92388
+          ],
+          "profile": "Round",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 198.249,
+            "centre": [
+              -970.467,
+              0,
+              294.087
+            ]
+          }
+        },
+        {
+          "position": [
+            936.269,
+            0,
+            385.667
+          ],
+          "forward": [
+            0.92388,
+            0,
+            0.382683
+          ],
+          "up": [
+            -0.382683,
+            0,
+            0.92388
+          ],
+          "profile": "Round",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 198.249,
+            "centre": [
+              974.202,
+              0,
+              294.087
+            ]
+          }
+        }
+      ],
       "seenInSamples": 8,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Sausage_45scoop.SM_2000_Sausage_45scoop",
@@ -3563,6 +5109,64 @@
           197.2186
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -966.544,
+            0,
+            -201.327
+          ],
+          "forward": [
+            -0.707107,
+            0,
+            -0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Round",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 198.249,
+            "centre": [
+              -896.453,
+              0,
+              -271.418
+            ]
+          }
+        },
+        {
+          "position": [
+            970.279,
+            0,
+            -201.327
+          ],
+          "forward": [
+            0.707107,
+            0,
+            -0.707107
+          ],
+          "up": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Round",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 198.249,
+            "centre": [
+              900.188,
+              0,
+              -271.418
+            ]
+          }
+        }
+      ],
       "seenInSamples": 42,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
@@ -3805,6 +5409,64 @@
           100
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -250,
+            0,
+            100
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -250,
+              0,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            250,
+            0,
+            100
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              250,
+              0,
+              50
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1261,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500.SM_500",
@@ -3926,6 +5588,64 @@
           100
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            100
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -500,
+              0,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            100
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              500,
+              0,
+              50
+            ]
+          }
+        }
+      ],
       "seenInSamples": 44,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000.SM_1000",
@@ -4041,6 +5761,64 @@
           100
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            93.231,
+            -225.079,
+            100
+          ],
+          "forward": [
+            0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              93.231,
+              -225.079,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            93.231,
+            225.079,
+            100
+          ],
+          "forward": [
+            0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              93.231,
+              225.079,
+              50
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500_90turn.SM_500_90turn",
@@ -4156,6 +5934,64 @@
           100
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            450.158,
+            186.462,
+            100
+          ],
+          "forward": [
+            0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              450.158,
+              186.462,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            -450.158,
+            186.462,
+            100
+          ],
+          "forward": [
+            -0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -450.158,
+              186.462,
+              50
+            ]
+          }
+        }
+      ],
       "seenInSamples": 5,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_90turn.SM_1000_90turn",
@@ -4271,6 +6107,64 @@
           100
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            900.316,
+            -372.923,
+            100
+          ],
+          "forward": [
+            0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              900.316,
+              -372.923,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            -900.316,
+            -372.923,
+            100
+          ],
+          "forward": [
+            -0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -900.316,
+              -372.923,
+              50
+            ]
+          }
+        }
+      ],
       "seenInSamples": 47,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_90turn.SM_2000_90turn",
@@ -4392,6 +6286,64 @@
           100
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            100
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -500,
+              0,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            100
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              500,
+              0,
+              50
+            ]
+          }
+        }
+      ],
       "seenInSamples": 653,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000.SM_1000",
@@ -4525,6 +6477,64 @@
           117.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            500,
+            0,
+            117.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              500,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            -500,
+            0,
+            117.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -500,
+              0,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 25,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
@@ -4652,6 +6662,36 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            175,
+            0,
+            62.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 250,
+            "centre": [
+              175,
+              0,
+              -62.5
+            ]
+          }
+        }
+      ],
       "seenInSamples": 9,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Cap.Bevel_Full_Cap",
@@ -4785,6 +6825,64 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            136.62,
+            511.62,
+            62.5
+          ],
+          "forward": [
+            0,
+            1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              136.62,
+              511.62,
+              -55
+            ]
+          }
+        },
+        {
+          "position": [
+            -500,
+            -125,
+            62.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -500,
+              -125,
+              -55
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Turn.Bevel_Full_Turn",
@@ -4912,6 +7010,36 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            175,
+            0,
+            62.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              175,
+              0,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_Cap.Bevel_Half_Cap",
@@ -5045,6 +7173,92 @@
           117.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -449.12,
+            0.06,
+            117.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -449.12,
+              0.06,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            199.12,
+            636.56,
+            117.5
+          ],
+          "forward": [
+            0,
+            1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              199.12,
+              636.56,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            187.5,
+            -636.56,
+            117.5
+          ],
+          "forward": [
+            0,
+            -1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              187.5,
+              -636.56,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 5,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Branch.Bevel_Full_Branch",
@@ -5172,6 +7386,66 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            450.158,
+            186.462,
+            62.5
+          ],
+          "forward": [
+            0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_C",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              450.158,
+              186.462,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            -450.158,
+            186.462,
+            62.5
+          ],
+          "forward": [
+            -0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_C",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              -450.158,
+              186.462,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_ConcaveCornerCurveFlat.Bevel_Half_ConcaveCornerCurveFlat",
@@ -5299,6 +7573,66 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            450.158,
+            186.462,
+            62.5
+          ],
+          "forward": [
+            0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_C",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              450.158,
+              186.462,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            -450.158,
+            186.462,
+            62.5
+          ],
+          "forward": [
+            -0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_C",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              -450.158,
+              186.462,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 6,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_TightConcaveCornerCurveFlat.Bevel_Half_TightConcaveCornerCurveFlat",
@@ -5426,6 +7760,66 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -450.158,
+            -186.462,
+            62.5
+          ],
+          "forward": [
+            -0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_C",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              -450.158,
+              -186.462,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            450.158,
+            -186.462,
+            62.5
+          ],
+          "forward": [
+            0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_C",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              450.158,
+              -186.462,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 2,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_ConvexCornerCurveFlat.Bevel_Half_ConvexCornerCurveFlat",
@@ -5553,6 +7947,66 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            62.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_C",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              -500,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            62.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_C",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 125,
+            "centre": [
+              500,
+              0,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 2,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_CornerStraight.Bevel_Half_CornerStraight",
@@ -5807,6 +8261,64 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            500,
+            0,
+            62.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              500,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            -500,
+            0,
+            62.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              -500,
+              0,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_Straight.Bevel_Half_Straight",
@@ -5934,6 +8446,64 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            450.158,
+            61.462,
+            62.5
+          ],
+          "forward": [
+            0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              450.158,
+              61.462,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            -450.158,
+            61.462,
+            62.5
+          ],
+          "forward": [
+            -0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              -450.158,
+              61.462,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 5,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_Turn.Bevel_Half_Turn",
@@ -6067,6 +8637,92 @@
           117.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -449.12,
+            0.06,
+            117.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_T",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 5041.5,
+            "centre": [
+              -449.12,
+              0.06,
+              -2403.25
+            ]
+          }
+        },
+        {
+          "position": [
+            187.5,
+            -636.56,
+            117.5
+          ],
+          "forward": [
+            0,
+            -1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_T",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 5041.5,
+            "centre": [
+              187.5,
+              -636.56,
+              -2403.25
+            ]
+          }
+        },
+        {
+          "position": [
+            199.12,
+            636.56,
+            117.5
+          ],
+          "forward": [
+            0,
+            1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_T",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 5041.5,
+            "centre": [
+              199.12,
+              636.56,
+              -2403.25
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Tall/Bevel_Tall_Branch.Bevel_Tall_Branch",
@@ -6194,6 +8850,36 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            175,
+            0,
+            62.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_T Sheer",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 5212.5,
+            "centre": [
+              175,
+              0,
+              -2543.75
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Tall/Bevel_Tall_Cap.Bevel_Tall_Cap",
@@ -6321,6 +9007,66 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -450.158,
+            186.462,
+            62.5
+          ],
+          "forward": [
+            -0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_TC",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 5121.5,
+            "centre": [
+              -450.158,
+              186.462,
+              -2498.25
+            ]
+          }
+        },
+        {
+          "position": [
+            450.158,
+            186.462,
+            62.5
+          ],
+          "forward": [
+            0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_TC",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 5121.5,
+            "centre": [
+              450.158,
+              186.462,
+              -2498.25
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Tall/Bevel_Tall_CornerConcave.Bevel_Tall_CornerConcave",
@@ -6448,6 +9194,66 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            62.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_TC",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 5118.5,
+            "centre": [
+              -500,
+              0,
+              -2496.75
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            62.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_TC",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 250,
+            "height": 5118.5,
+            "centre": [
+              500,
+              0,
+              -2496.75
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Tall/Bevel_Tall_CornerStraight.Bevel_Tall_CornerStraight",
@@ -6708,6 +9514,64 @@
           117.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            117.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -500,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            117.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              500,
+              0,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 5,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Tall/Bevel_Tall_StraightPlatform.Bevel_Tall_StraightPlatform",
@@ -6835,6 +9699,64 @@
           0
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_T Sheer",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 5118.5,
+            "centre": [
+              -500,
+              0,
+              -2559.25
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            0
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_T Sheer",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 5118.5,
+            "centre": [
+              500,
+              0,
+              -2559.25
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Tall/Bevel_Tall_SheerStraight.Bevel_Tall_SheerStraight",
@@ -6968,6 +9890,64 @@
           117.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            117.5
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_T",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 6980.5,
+            "centre": [
+              -500,
+              0,
+              -3372.75
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            117.5
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_T",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 6980.5,
+            "centre": [
+              500,
+              0,
+              -3372.75
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Tall/Bevel_Tall_StraightWall.Bevel_Tall_StraightWall",
@@ -7228,6 +10208,64 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -900.158,
+            0.212,
+            62.5
+          ],
+          "forward": [
+            -0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              -900.158,
+              0.212,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            900.158,
+            -0.212,
+            62.5
+          ],
+          "forward": [
+            0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              900.158,
+              -0.212,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_SSurve.Bevel_Half_SSurve",
@@ -7355,6 +10393,64 @@
           62.5
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -900.158,
+            -0.212,
+            62.5
+          ],
+          "forward": [
+            -0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              -900.158,
+              -0.212,
+              0
+            ]
+          }
+        },
+        {
+          "position": [
+            900.158,
+            0.212,
+            62.5
+          ],
+          "forward": [
+            0.707107,
+            0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Bevel_H",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 125,
+            "centre": [
+              900.158,
+              0.212,
+              0
+            ]
+          }
+        }
+      ],
       "seenInSamples": 4,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Workshop/BevelExtras/Mirror_246A67AB.Mirror_246A67AB",
@@ -7470,6 +10566,64 @@
           149.9013
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -499.786,
+            0,
+            149.901
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Round Low",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 149.566,
+            "centre": [
+              -499.786,
+              0,
+              75.119
+            ]
+          }
+        },
+        {
+          "position": [
+            499.949,
+            0,
+            149.901
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Round Low",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 149.566,
+            "centre": [
+              499.949,
+              0,
+              75.119
+            ]
+          }
+        }
+      ],
       "seenInSamples": 3,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_Sausage.SM_1000_Sausage",
@@ -7585,6 +10739,64 @@
           199.8027
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -896.453,
+            -372.096,
+            199.803
+          ],
+          "forward": [
+            -0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Round",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 198.249,
+            "centre": [
+              -896.453,
+              -372.096,
+              100.678
+            ]
+          }
+        },
+        {
+          "position": [
+            900.188,
+            -372.096,
+            199.803
+          ],
+          "forward": [
+            0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Round",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 198.249,
+            "centre": [
+              900.188,
+              -372.096,
+              100.678
+            ]
+          }
+        }
+      ],
       "seenInSamples": 8,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Sausage_90turn.SM_2000_Sausage_90turn",
@@ -7833,6 +11045,64 @@
           209.1549
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -109.155,
+            0,
+            209.155
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -159.155,
+              0,
+              209.155
+            ]
+          }
+        },
+        {
+          "position": [
+            109.155,
+            0,
+            209.155
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              159.155,
+              0,
+              209.155
+            ]
+          }
+        }
+      ],
       "seenInSamples": 10,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500_180scoop.SM_500_180scoop",
@@ -7948,6 +11218,64 @@
           368.3099
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -268.31,
+            0,
+            368.31
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -318.31,
+              0,
+              368.31
+            ]
+          }
+        },
+        {
+          "position": [
+            268.31,
+            0,
+            368.31
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              318.31,
+              0,
+              368.31
+            ]
+          }
+        }
+      ],
       "seenInSamples": 58,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_180.SM_1000_180",
@@ -8063,6 +11391,64 @@
           686.6198
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -586.62,
+            0,
+            686.62
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -636.62,
+              0,
+              686.62
+            ]
+          }
+        },
+        {
+          "position": [
+            586.62,
+            0,
+            686.62
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              636.62,
+              0,
+              686.62
+            ]
+          }
+        }
+      ],
       "seenInSamples": 16,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_180scoop.SM_2000_180scoop",
@@ -8178,6 +11564,66 @@
           368.3099
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -1000,
+            -65.845,
+            368.31
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Pipe Q",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 368.31,
+            "height": 368.31,
+            "centre": [
+              -1000,
+              -65.845,
+              184.155
+            ]
+          }
+        },
+        {
+          "position": [
+            0,
+            -65.845,
+            368.31
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Pipe Q",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 368.31,
+            "height": 368.31,
+            "centre": [
+              0,
+              -65.845,
+              184.155
+            ]
+          }
+        }
+      ],
       "seenInSamples": 22,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Quarter.SM_2000_Quarter",
@@ -8299,6 +11745,66 @@
           268.4883
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -622.683,
+            -677.465,
+            268.488
+          ],
+          "forward": [
+            0,
+            -1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Pipe Q Small",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 390.435,
+            "height": 268.488,
+            "centre": [
+              -622.683,
+              -677.465,
+              134.244
+            ]
+          }
+        },
+        {
+          "position": [
+            17.432,
+            -55.33,
+            268.488
+          ],
+          "forward": [
+            0.996195,
+            -0.087156,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Pipe Q Small",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 390.852,
+            "height": 268.488,
+            "centre": [
+              17.432,
+              -55.33,
+              134.244
+            ]
+          }
+        }
+      ],
       "seenInSamples": 2,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Quarter_180turn.SM_Quarter_180turn",
@@ -8414,6 +11920,66 @@
           368.3099
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -900.316,
+            -438.768,
+            368.31
+          ],
+          "forward": [
+            -0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Pipe Q",
+          "hand": "left",
+          "cap": {
+            "shape": "polygon",
+            "width": 368.31,
+            "height": 368.31,
+            "centre": [
+              -900.316,
+              -438.768,
+              184.155
+            ]
+          }
+        },
+        {
+          "position": [
+            900.316,
+            -438.768,
+            368.31
+          ],
+          "forward": [
+            0.707107,
+            -0.707107,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Pipe Q",
+          "hand": "right",
+          "cap": {
+            "shape": "polygon",
+            "width": 368.31,
+            "height": 368.31,
+            "centre": [
+              900.316,
+              -438.768,
+              184.155
+            ]
+          }
+        }
+      ],
       "seenInSamples": 15,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Quarter90turn.SM_2000_Quarter90turn",
@@ -8529,6 +12095,52 @@
           2000
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            0,
+            0,
+            -1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ],
+          "profile": "Pipe",
+          "cap": {
+            "shape": "circle",
+            "radius": 50
+          }
+        },
+        {
+          "position": [
+            0,
+            0,
+            2000
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ],
+          "profile": "Pipe",
+          "cap": {
+            "shape": "circle",
+            "radius": 50
+          }
+        }
+      ],
       "seenInSamples": 590,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Pipe.SM_2000_Pipe",
@@ -8656,6 +12268,54 @@
           96
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -744.265,
+            0,
+            48
+          ],
+          "forward": [
+            0,
+            -1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tunnel",
+          "cap": {
+            "shape": "annulus",
+            "radius": 48,
+            "innerRadius": 46
+          }
+        },
+        {
+          "position": [
+            744.265,
+            0,
+            48
+          ],
+          "forward": [
+            0,
+            -1,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tunnel",
+          "cap": {
+            "shape": "annulus",
+            "radius": 48,
+            "innerRadius": 46
+          }
+        }
+      ],
       "seenInSamples": 10,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/Meshes/SMHalfTunnel_223D6CF8.SMHalfTunnel_223D6CF8",
@@ -9158,6 +12818,54 @@
           33.0469
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Rail",
+          "cap": {
+            "shape": "polygon",
+            "width": 140.625,
+            "height": 66.094
+          }
+        },
+        {
+          "position": [
+            1062.25,
+            0,
+            0
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Rail",
+          "cap": {
+            "shape": "polygon",
+            "width": 140.625,
+            "height": 66.094
+          }
+        }
+      ],
       "seenInSamples": 30,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
@@ -9406,6 +13114,64 @@
           231.4809
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -200.776,
+            0,
+            -1412.513
+          ],
+          "forward": [
+            0,
+            0,
+            -1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              -318.276,
+              0,
+              -1412.513
+            ]
+          }
+        },
+        {
+          "position": [
+            200.776,
+            0,
+            -1412.513
+          ],
+          "forward": [
+            0,
+            0,
+            -1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Bevel_F",
+          "cap": {
+            "shape": "polygon",
+            "width": 500,
+            "height": 235,
+            "centre": [
+              318.276,
+              0,
+              -1412.513
+            ]
+          }
+        }
+      ],
       "seenInSamples": 4,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Scenery/Bevel_Arch.Bevel_Arch",
@@ -9521,6 +13287,64 @@
           100
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            -500,
+            0,
+            100
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              -500,
+              0,
+              50
+            ]
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            100
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Track",
+          "cap": {
+            "shape": "rect",
+            "width": 500,
+            "height": 100,
+            "centre": [
+              500,
+              0,
+              50
+            ]
+          }
+        }
+      ],
       "seenInSamples": 131,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_Bridge.SM_1000_Bridge",
@@ -14436,6 +18260,64 @@
           100.3365
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              0,
+              0,
+              -75
+            ]
+          }
+        },
+        {
+          "position": [
+            952.588,
+            0,
+            100.336
+          ],
+          "forward": [
+            0.906308,
+            0,
+            0.422619
+          ],
+          "up": [
+            -0.422619,
+            0,
+            0.906308
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              984.285,
+              0,
+              32.363
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Half_TubeLong_Straight_Bend_25.SM_GlossyRed_Half_TubeLong_Straight_Bend_25",
@@ -14551,6 +18433,64 @@
           164.4946
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              0,
+              0,
+              -75
+            ]
+          }
+        },
+        {
+          "position": [
+            897.125,
+            0,
+            164.495
+          ],
+          "forward": [
+            0.707107,
+            0,
+            0.707106
+          ],
+          "up": [
+            -0.707106,
+            0,
+            0.707107
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              950.158,
+              0,
+              111.462
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Half_TubeLong_Bend_45.SM_GlossyRed_Half_TubeLong_Bend_45",
@@ -14666,6 +18606,64 @@
           243.3099
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              0,
+              0,
+              -75
+            ]
+          }
+        },
+        {
+          "position": [
+            743.31,
+            0,
+            243.31
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              818.31,
+              0,
+              243.31
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Half_TubeLong_Bend_90.SM_GlossyRed_Half_TubeLong_Bend_90",
@@ -14781,6 +18779,64 @@
           207.6998
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              0,
+              0,
+              -75
+            ]
+          }
+        },
+        {
+          "position": [
+            936.873,
+            0,
+            207.7
+          ],
+          "forward": [
+            0.906308,
+            0,
+            0.422617
+          ],
+          "up": [
+            -0.422617,
+            0,
+            0.906308
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              968.57,
+              0,
+              139.727
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Half_TubeLong_Curve_25.SM_GlossyRed_Half_TubeLong_Curve_25",
@@ -14896,6 +18952,64 @@
           350.9562
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              0,
+              0,
+              -75
+            ]
+          }
+        },
+        {
+          "position": [
+            847.283,
+            0,
+            350.956
+          ],
+          "forward": [
+            0.707108,
+            0,
+            0.707105
+          ],
+          "up": [
+            -0.707105,
+            0,
+            0.707108
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              900.316,
+              0,
+              297.923
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Half_TubeLong_Curve_45.SM_GlossyRed_Half_TubeLong_Curve_45",
@@ -15011,6 +19125,64 @@
           561.6198
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              0,
+              0,
+              -75
+            ]
+          }
+        },
+        {
+          "position": [
+            561.62,
+            0,
+            561.62
+          ],
+          "forward": [
+            0.000001,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0.000001
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              636.62,
+              0,
+              561.62
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Half_TubeLong_Curve_90.SM_GlossyRed_Half_TubeLong_Curve_90",
@@ -15126,6 +19298,64 @@
           0
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              0,
+              0,
+              -75
+            ]
+          }
+        },
+        {
+          "position": [
+            1000,
+            0,
+            0
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube H",
+          "cap": {
+            "shape": "polygon",
+            "width": 300,
+            "height": 150,
+            "centre": [
+              1000,
+              0,
+              -75
+            ]
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Half_TubeLong_Straight.SM_GlossyRed_Half_TubeLong_Straight",
@@ -15241,6 +19471,54 @@
           243.3095
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            984.285,
+            0,
+            107.363
+          ],
+          "forward": [
+            0.906308,
+            0,
+            0.422618
+          ],
+          "up": [
+            -0.422618,
+            0,
+            0.906308
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 2,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_TubeLong_Bend_25.SM_GlossyRed_TubeLong_Bend_25",
@@ -15356,6 +19634,54 @@
           292.5276
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            950.158,
+            0,
+            186.462
+          ],
+          "forward": [
+            0.707106,
+            0,
+            0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707106
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_TubeLong_Bend_45.SM_GlossyRed_TubeLong_Bend_45",
@@ -15471,6 +19797,54 @@
           318.3099
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            818.31,
+            0,
+            318.31
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_TubeLong_Bend_90.SM_GlossyRed_TubeLong_Bend_90",
@@ -15586,6 +19960,54 @@
           350.6729
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            968.57,
+            0,
+            214.727
+          ],
+          "forward": [
+            0.906308,
+            0,
+            0.422618
+          ],
+          "up": [
+            -0.422618,
+            0,
+            0.906308
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_TubeLong_Curve_25.SM_GlossyRed_TubeLong_Curve_25",
@@ -15701,6 +20123,54 @@
           478.9892
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            -0.000001
+          ],
+          "up": [
+            -0.000001,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            900.316,
+            0,
+            372.923
+          ],
+          "forward": [
+            0.707108,
+            0,
+            0.707106
+          ],
+          "up": [
+            -0.707106,
+            0,
+            0.707108
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_TubeLong_Straight_Curve_45.SM_GlossyRed_TubeLong_Straight_Curve_45",
@@ -15816,6 +20286,54 @@
           636.6198
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            636.62,
+            0,
+            636.62
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_TubeLong_Curve_90.SM_GlossyRed_TubeLong_Curve_90",
@@ -15931,6 +20449,54 @@
           150
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            1000,
+            0,
+            0
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_TubeLong_Straight.SM_GlossyRed_TubeLong_Straight",
@@ -16046,6 +20612,54 @@
           189.6279
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            492.142,
+            0,
+            53.682
+          ],
+          "forward": [
+            0.906308,
+            0,
+            0.422618
+          ],
+          "up": [
+            -0.422618,
+            0,
+            0.906308
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Tube_Bend_25.SM_GlossyRed_Tube_Bend_25",
@@ -16161,6 +20775,54 @@
           199.2968
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            475.079,
+            0,
+            93.231
+          ],
+          "forward": [
+            0.707107,
+            0,
+            0.707107
+          ],
+          "up": [
+            -0.707107,
+            0,
+            0.707107
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Tube_Bend_45.SM_GlossyRed_Tube_Bend_45",
@@ -16276,6 +20938,54 @@
           159.1549
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            409.155,
+            0,
+            159.155
+          ],
+          "forward": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Tube_Bend_90.SM_GlossyRed_Tube_Bend_90",
@@ -16391,6 +21101,54 @@
           238.793
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            0
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Funnel",
+          "cap": {
+            "shape": "annulus",
+            "radius": 238.793,
+            "innerRadius": 226.853
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Tube_Funnel.SM_GlossyRed_Tube_Funnel",
@@ -16506,6 +21264,54 @@
           150
         ]
       },
+      "connectors": [
+        {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "forward": [
+            -1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        },
+        {
+          "position": [
+            500,
+            0,
+            0
+          ],
+          "forward": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            0,
+            1
+          ],
+          "profile": "Tube F",
+          "cap": {
+            "shape": "annulus",
+            "radius": 150,
+            "innerRadius": 142.5
+          }
+        }
+      ],
       "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/Meshes/SM_GlossyRed_Tube_Straight.SM_GlossyRed_Tube_Straight",

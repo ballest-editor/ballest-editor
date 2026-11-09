@@ -23,6 +23,29 @@ export const vecSub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y,
 
 export const sameVec = (a: Vec3, b: Vec3): boolean => a.x === b.x && a.y === b.y && a.z === b.z
 
+export const vecScale = (v: Vec3, by: number): Vec3 => ({ x: v.x * by, y: v.y * by, z: v.z * by })
+
+export const vecDot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z
+
+export const vecCross = (a: Vec3, b: Vec3): Vec3 => ({
+  x: a.y * b.z - a.z * b.y,
+  y: a.z * b.x - a.x * b.z,
+  z: a.x * b.y - a.y * b.x
+})
+
+export const vecLength = (v: Vec3): number => Math.hypot(v.x, v.y, v.z)
+
+export const vecDistance = (a: Vec3, b: Vec3): number => vecLength(vecSub(a, b))
+
+/** `v` at unit length; a zero vector stays one. */
+export const vecNormalize = (v: Vec3): Vec3 => {
+  const length = vecLength(v)
+  return length === 0 ? v : vecScale(v, 1 / length)
+}
+
+/** The point `by` of the way from `a` to `b`. */
+export const vecLerp = (a: Vec3, b: Vec3, by: number): Vec3 => vecAdd(a, vecScale(vecSub(b, a), by))
+
 // --- quaternions (Hamilton product on raw components) ---------------------------------
 
 export const quatMul = (a: Quat4, b: Quat4): Quat4 => ({
@@ -64,6 +87,56 @@ export const rotateVec = (q: Quat4, v: Vec3): Vec3 => {
   }
 }
 /** FQuat::Rotator (unit quaternion -> degrees), same formula and gimbal-lock handling as the engine. */
+/** A turn of `angle` radians about the unit vector `axis`, in the sense `rotateVec` turns. */
+export const quatFromAxisAngle = (axis: Vec3, angle: number): Quat4 => {
+  const half = angle / 2
+  const s = Math.sin(half)
+  return { x: axis.x * s, y: axis.y * s, z: axis.z * s, w: Math.cos(half) }
+}
+
+export const IDENTITY_QUAT: Quat4 = { x: 0, y: 0, z: 0, w: 1 }
+
+/** Any unit vector square to the unit vector `v`. */
+export const squareTo = (v: Vec3): Vec3 =>
+  vecNormalize(vecCross(v, Math.abs(v.z) < 0.9 ? { x: 0, y: 0, z: 1 } : { x: 1, y: 0, z: 0 }))
+
+/** The shortest turn taking the unit vector `from` onto the unit vector `to`. */
+export const quatBetween = (from: Vec3, to: Vec3): Quat4 => {
+  const d = vecDot(from, to)
+  if (d > 1 - 1e-12) return IDENTITY_QUAT
+  if (d < -1 + 1e-12) return quatFromAxisAngle(squareTo(from), Math.PI)
+  const { x, y, z } = vecCross(from, to)
+  return quatNormalize({ x, y, z, w: 1 + d })
+}
+
+/**
+ * The rotation taking local +X onto `forward` and local +Z onto `up`, as nearly as they allow: `up` is made square to
+ * `forward`. Both unit length.
+ */
+export const quatFromFrame = (forward: Vec3, up: Vec3): Quat4 => {
+  const f = vecNormalize(forward)
+  const u = vecNormalize(vecSub(up, vecScale(f, vecDot(up, f))))
+  const r = vecCross(u, f)
+  const [m00, m10, m20] = [f.x, f.y, f.z]
+  const [m01, m11, m21] = [r.x, r.y, r.z]
+  const [m02, m12, m22] = [u.x, u.y, u.z]
+  const trace = m00 + m11 + m22
+  if (trace > 0) {
+    const s = Math.sqrt(trace + 1) * 2
+    return quatNormalize({ x: (m21 - m12) / s, y: (m02 - m20) / s, z: (m10 - m01) / s, w: s / 4 })
+  }
+  if (m00 > m11 && m00 > m22) {
+    const s = Math.sqrt(1 + m00 - m11 - m22) * 2
+    return quatNormalize({ x: s / 4, y: (m01 + m10) / s, z: (m02 + m20) / s, w: (m21 - m12) / s })
+  }
+  if (m11 > m22) {
+    const s = Math.sqrt(1 + m11 - m00 - m22) * 2
+    return quatNormalize({ x: (m01 + m10) / s, y: s / 4, z: (m12 + m21) / s, w: (m02 - m20) / s })
+  }
+  const s = Math.sqrt(1 + m22 - m00 - m11) * 2
+  return quatNormalize({ x: (m02 + m20) / s, y: (m12 + m21) / s, z: s / 4, w: (m10 - m01) / s })
+}
+
 export const quatToRotator = (q: Quat4): { readonly pitch: number; readonly yaw: number; readonly roll: number } => {
   const r2d = 180 / Math.PI
   const singularity = q.z * q.x - q.w * q.y

@@ -135,6 +135,7 @@ function Row({ node, inset }: Indent & { readonly node: MenuNode }) {
       return (
         <MenubarCheckboxItem closeOnClick checked={node.checked} onCheckedChange={() => node.run()}>
           {node.label}
+          {node.shortcut !== undefined && <Shortcut action={node.shortcut} />}
         </MenubarCheckboxItem>
       )
     case "section":
@@ -275,7 +276,7 @@ function HelpMenu() {
   )
 }
 
-const PLAIN_MENUS: ReadonlyArray<MenuTitle> = ["File", "Edit", "View", "Project"]
+const PLAIN_MENUS: ReadonlyArray<MenuTitle> = ["File", "Edit", "View", "Tools", "Project"]
 
 /** File, Edit, View, Project and Help (docs/DESKTOP.md § Menus), drawn from `menuModel`. */
 export function MenuBar() {

@@ -22,9 +22,9 @@ import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeProje
  * lands there even when another tab is active by then).
  */
 const exportOpenMap = Effect.gen(function*() {
-  const { catalogIndex, doc, tabId } = useEditor.getState()
+  const { catalogIndex, doc, snap, tabId } = useEditor.getState()
   const result = yield* (yield* MapExporter).prepare(gameMapOf(doc, catalogIndex), catalogIndex)
-  return { doc, tabId, result }
+  return { doc, snap, tabId, result }
 })
 
 type ExportedOpenMap = Effect.Success<typeof exportOpenMap>
@@ -33,9 +33,9 @@ type ExportedOpenMap = Effect.Success<typeof exportOpenMap>
  * Tab `tabId` has the map `written` open, with its sidecar and prefs under the name it went to. Its thumbnail follows
  * in the background: a save doesn't wait for a render.
  */
-const afterWrite = Effect.fnUntraced(function*({ doc, result, tabId }: ExportedOpenMap, written: ProjectMap) {
-  useEditor.getState().markSaved(tabId, doc, result.map, fileOf(written))
-  yield* writeSidecarOf(doc, written.fileName, written.hash)
+const afterWrite = Effect.fnUntraced(function*({ doc, result, snap, tabId }: ExportedOpenMap, written: ProjectMap) {
+  useEditor.getState().markSaved(tabId, doc, result.map, fileOf(written), snap)
+  yield* writeSidecarOf(doc, written.fileName, written.hash, snap)
   yield* saveTabPrefs(tabId)
   yield* refreshProject
   yield* Effect.forkDetach(cacheMapThumbnail(doc, written.hash))
@@ -95,9 +95,9 @@ const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options
 
 /** A browser's Save and Export: the open map as a download, named the way the game wants it. */
 const downloadOpenMap = Effect.gen(function*() {
-  const { doc, tabId, result } = yield* exportOpenMap
+  const { doc, snap, tabId, result } = yield* exportOpenMap
   yield* (yield* Platform).download({ name: result.filename, text: result.text })
-  useEditor.getState().markSaved(tabId, doc, result.map, { name: result.filename, path: null })
+  useEditor.getState().markSaved(tabId, doc, result.map, { name: result.filename, path: null }, snap)
   yield* saveTabPrefs(tabId)
   useEditor.getState().notify("info", `Downloaded ${result.filename}`, { kind: "mapDownloaded" })
 })
@@ -206,10 +206,10 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
  */
 export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
   function*(displayName: string, creatorName: string, replace = false, newDraft = false) {
-    const { catalogIndex, doc, file, tabId } = useEditor.getState()
+    const { catalogIndex, doc, file, snap, tabId } = useEditor.getState()
     const named = asNewMap(setLevelNames(gameMapOf(doc, catalogIndex), displayName, creatorName))
     const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named, catalogIndex)
-    const created = yield* createAsOpenMap({ doc, tabId, result }, replace)
+    const created = yield* createAsOpenMap({ doc, snap, tabId, result }, replace)
     const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
     const over = replace ? " (the map it replaced went to the backups)" : ""
     useEditor.getState().notify(

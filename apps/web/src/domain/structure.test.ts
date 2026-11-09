@@ -17,6 +17,7 @@ import {
   numberedNameText,
   type Structure,
   treeKeys,
+  withConnectAt,
   withGroup,
   withGroupName,
   withItemName,
@@ -157,6 +158,23 @@ describe("names and tags", () => {
     assert.deepStrictEqual(withItemName(tagged, "a", null)!.items.get("a"), { tags: ["x"] })
     assert.isFalse(withItemName(named, "a", " ")!.items.has("a"))
     assert.isUndefined(withItemName(named, "nope", "x"))
+  })
+
+  it("sets where an item's end connects, keeping its name, and clears it back to the measured point", () => {
+    const named = withItemName(flatStructure(["a"]), "a", "Ramp")!
+    const chosen = withConnectAt(named, "a", 1, "topLeft")!
+    assert.deepStrictEqual(chosen.items.get("a"), { name: "Ramp", connectAt: { "1": "topLeft" } })
+    assert.isUndefined(withConnectAt(chosen, "a", 1, "topLeft"))
+    assert.deepStrictEqual(withItemName(chosen, "a", null)!.items.get("a"), { connectAt: { "1": "topLeft" } })
+    assert.deepStrictEqual(withTags(chosen, "a", ["x"])!.items.get("a"), {
+      name: "Ramp",
+      tags: ["x"],
+      connectAt: { "1": "topLeft" }
+    })
+    const cleared = withConnectAt(withItemName(chosen, "a", null)!, "a", 1, undefined)!
+    assert.isFalse(cleared.items.has("a"))
+    assert.isUndefined(withConnectAt(named, "a", 0, undefined))
+    assert.isUndefined(withConnectAt(named, "nope", 0, "top"))
   })
 
   it("renames a group, not to nothing", () => {

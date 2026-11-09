@@ -35,7 +35,7 @@ const docUnitContext = (
     localPivotOf: (key) => pivotAt(map, indexOf.get(key) ?? -1).localPosition,
     boxOf: (keys) => itemsBoxOf(keys.flatMap((key) => itemAt(key) ?? []), catalog),
     instanceOriginOf,
-    liveOffsetOf: () => undefined
+    livePointOf: (_, world) => world
   }
 }
 

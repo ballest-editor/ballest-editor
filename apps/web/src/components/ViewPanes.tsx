@@ -59,6 +59,7 @@ import { useEditor } from "../editor/store"
 import { InstanceBanner } from "./InstanceBanner"
 import { ChordText } from "./KeyChip"
 import { SizeToggle } from "./SizeToggle"
+import { SnapLabel } from "./SnapStatus"
 import { CONTROL_WORD, GROUP, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
 import { ViewGizmo } from "./ViewGizmo"
 import { ViewTip } from "./ViewTip"
@@ -523,6 +524,7 @@ export function ViewPanes({ disabled, children }: { readonly disabled: boolean; 
               />
               {pane === panes[0] && <InstanceBanner />}
             </div>
+            {active && <SnapLabel />}
           </div>
         )
       })}

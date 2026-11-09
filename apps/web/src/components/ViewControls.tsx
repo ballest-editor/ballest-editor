@@ -18,15 +18,23 @@ import { cn } from "@workspace/ui/lib/utils"
 import type { ReactNode } from "react"
 import { soleGroupOf } from "../domain/groupSelection"
 import { floorHeightOf } from "../domain/level"
-import { AUTO_GRID_COLORS, isDefaultDisplay, type Settings, withDefaultDisplay } from "../domain/Settings"
+import { AUTO_GRID_COLORS, isDefaultDisplay, withDefaultDisplay } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
 import { canEach } from "../domain/units"
-import { saveSettings, setGridHeight, updateSettings } from "../editor/actions"
+import {
+  pickGridSize,
+  saveSettings,
+  setGridHeight,
+  updateSettings,
+  updateSnap,
+  updateSnapTarget
+} from "../editor/actions"
 import {
   selectionUnits,
   shownGizmoSpace,
   shownPivotMode,
   shownTransform,
+  snapConfigOf,
   useEditor,
   useOpenPrefab
 } from "../editor/store"
@@ -35,6 +43,7 @@ import { ColorSetting } from "./ColorSetting"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
 import { SizeToggle } from "./SizeToggle"
+import { SnapMagnet } from "./SnapMagnet"
 import { ToolBar } from "./ToolBar"
 import { CONTROL_WORD, GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
@@ -43,15 +52,13 @@ import { ViewTip, ViewTipBoundary } from "./ViewTip"
 /**
  * Everything floating over the viewport: its panes' frames, the tool bar (bottom) and, in the viewport's top right like
  * the game's, over every pane since they all share them, two pills: how the view divides into panes and what it displays,
- * then the gizmo's axes with grid and rotation snapping. They sit in the top right pane's corner (`ViewPanes`): as that
+ * then the gizmo's pivot and axes with snapping: the magnet and its menu, and the grid and angle steps. They sit in the top right pane's corner (`ViewPanes`): as that
  * pane narrows they go to icons, and only then does the second pill drop under the first, clear of the pane's label.
  * Pointer-only, so keybinds stay with the viewport.
  */
 export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
-  const settings = useEditor((s) => s.settings)
-  const { enabled, gridSize, rotationEnabled, rotationStep } = settings.snapping
-  const units = settings.general.units
-  const update = (snapping: Partial<Settings["snapping"]>) => void updateSettings("snapping", snapping)
+  const units = useEditor((s) => s.settings.general.units)
+  const { enabled, gridSize, rotationEnabled, rotationStep, targets } = useEditor(snapConfigOf)
 
   return (
     <ViewTipBoundary>
@@ -67,14 +74,17 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
             <span aria-hidden className={GROUP_DIVIDER} />
             <AxesToggle disabled={disabled} />
             <span aria-hidden className={GROUP_DIVIDER} />
+            <SnapMagnet disabled={disabled} />
+            <span aria-hidden className={GROUP_DIVIDER} />
             <SnapGroup
               icon={<IconGrid4x4 />}
               label="Snap to grid"
-              enabled={enabled}
-              onToggle={(pressed) => update({ enabled: pressed })}
+              enabled={targets.grid.enabled}
+              snapping={enabled}
+              onToggle={(pressed) => updateSnapTarget("grid", { enabled: pressed })}
               value={gridSize}
               options={GRID_SIZES}
-              onPick={(size) => update({ enabled: true, gridSize: size })}
+              onPick={pickGridSize}
               valueLabel="Grid size"
               format={(size) => formatGridSize(size, units)}
               disabled={disabled}
@@ -82,13 +92,14 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
             <span aria-hidden className={GROUP_DIVIDER} />
             <SnapGroup
               icon={<IconAngle />}
-              label="Snap rotation"
+              label="Snap angle"
               enabled={rotationEnabled}
-              onToggle={(pressed) => update({ rotationEnabled: pressed })}
+              snapping={enabled}
+              onToggle={(pressed) => updateSnap({ rotationEnabled: pressed })}
               value={rotationStep}
               options={ROTATION_STEPS}
-              onPick={(step) => update({ rotationEnabled: true, rotationStep: step })}
-              valueLabel="Rotation step"
+              onPick={(step) => updateSnap({ rotationEnabled: true, rotationStep: step })}
+              valueLabel="Angle step"
               format={formatRotationStep}
               disabled={disabled}
             />
@@ -236,7 +247,7 @@ function GridColorsRow() {
   return (
     <div className="flex flex-col gap-1 pb-2">
       <div className="flex h-6 items-center justify-between">
-        Grid colours
+        Grid colors
         <Button
           variant="ghost"
           size="icon-sm"
@@ -251,14 +262,14 @@ function GridColorsRow() {
         <span>1 m cells</span>
         <span>10 m sections</span>
         <ColorSetting
-          label="Grid colour (1 m cells)"
+          label="Grid color (1 m cells)"
           className="w-full"
           value={gridCellColor}
           auto={auto.cell}
           onChange={(v) => void updateSettings("appearance", { gridCellColor: v })}
         />
         <ColorSetting
-          label="Grid colour (10 m sections)"
+          label="Grid color (10 m sections)"
           className="w-full"
           value={gridSectionColor}
           auto={auto.section}
@@ -364,11 +375,16 @@ function DisplayControl({ disabled }: { readonly disabled: boolean }) {
   )
 }
 
-/** One kind of gizmo snapping: the icon turns it on and off, the value next to it picks the step and turns it on. */
+/**
+ * One kind of gizmo snapping: the icon turns it on and off, the value next to it picks the step and turns it on. Both
+ * stay working while snapping as a whole (the magnet beside them) is off, and are dimmed to say they wait on it.
+ */
 function SnapGroup<V extends number>(props: {
   readonly icon: ReactNode
   readonly label: string
   readonly enabled: boolean
+  /** Snapping as a whole. */
+  readonly snapping: boolean
   readonly onToggle: (pressed: boolean) => void
   readonly value: V
   readonly options: ReadonlyArray<V>
@@ -379,20 +395,25 @@ function SnapGroup<V extends number>(props: {
   readonly format: (value: V) => string
   readonly disabled: boolean
 }) {
-  const { enabled, disabled } = props
+  const { enabled, disabled, snapping } = props
   const items = Object.fromEntries(props.options.map((v) => [v, props.format(v)]))
 
   return (
     <>
       <ViewTip
-        label={`${props.label}: ${enabled ? "on" : "off"}`}
+        label={`${props.label}: ${enabled ? "on" : "off"}${snapping ? "" : " (snapping is off)"}`}
+        action={snapping ? undefined : "snapToggle"}
         render={
           <Toggle
             pressed={enabled}
             onPressedChange={props.onToggle}
             disabled={disabled}
             aria-label={props.label}
-            className={cn(SEGMENT, "aria-pressed:bg-primary/12 aria-pressed:text-foreground")}
+            className={cn(
+              SEGMENT,
+              "aria-pressed:bg-primary/12",
+              snapping ? "aria-pressed:text-foreground" : "text-fg-disabled aria-pressed:text-fg-tertiary"
+            )}
             {...noFocus}
           />
         }
@@ -415,7 +436,7 @@ function SnapGroup<V extends number>(props: {
               className={cn(
                 SEGMENT,
                 "border-none bg-transparent px-2 tabular-nums data-[size=default]:h-full dark:bg-transparent [&>svg]:hidden @max-[42rem]/corner:px-1 @max-[42rem]/corner:*:data-[slot=select-value]:hidden @max-[42rem]/corner:[&>svg]:block",
-                enabled ? "text-foreground" : "text-fg-tertiary"
+                enabled && snapping ? "text-foreground" : snapping ? "text-fg-tertiary" : "text-fg-disabled"
               )}
             />
           }

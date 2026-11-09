@@ -1,31 +1,50 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
-import { ueToScene, ueToThreeVector, type UeTransform, type Vec3 } from "../../domain/coords"
+import { threeToUeVector, ueToScene, type UeTransform, type Vec3 } from "../../domain/coords"
 import { selectedGroupIds } from "../../domain/groupSelection"
+import type { GroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { gizmoScaleOf } from "../../domain/Settings"
-import { applyUnitEdit, deltaEdit, type PivotMode, type SelectionUnits } from "../../domain/units"
+import { type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
+import { type ScaleStop, snappedScale, turnLanding, turnReach, type TurnStop } from "../../domain/snapRotate"
+import { quatFromAxisAngle } from "../../domain/ueMath"
+import { applyDelta, leadingKeys, type PivotMode, type SelectionUnits, turnAccumulates } from "../../domain/units"
 import { transformSelection } from "../actions"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
+import { type DragKeyState, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "../snap/dragKeys"
 import {
-  editedKeys,
-  fitTransforms,
-  type SelectionPivot,
-  selectionPivot,
-  selectionUnits,
-  shownGizmoSpace,
-  shownTransform,
-  useEditor
-} from "../store"
+  dragKeysOf,
+  endSnapDisplay,
+  flipOfferOf,
+  MoveSession,
+  previewMove,
+  showSnap,
+  turnCommitOptions
+} from "../snap/moveSession"
+import { type DragTarget, dragTargetOf, selectionSnapStart } from "../snap/selectionStart"
+import { ownSnapItemsOf, snapItemsOf } from "../snap/snapScene"
+import { gameRayOf, snapViewOf, toThree } from "../snap/snapView"
+import { allTurnStopsOf, reachAlong, scaleStopsOf, turnStopsFrom } from "../snap/turnScale"
+import { fitTransforms, selectionUnits, shownGizmoSpace, snapConfigOf, useEditor } from "../store"
 import { useDarkTheme } from "../theme"
-import { dragAxisWorld, dragDelta, type DragStart, type PointerSample } from "./drag"
-import { GizmoObject, type HandleSpec, toolHandles } from "./handles"
+import {
+  constraintOf,
+  dragAxisWorld,
+  type DragStart,
+  localFrameOf,
+  type PointerSample,
+  scaleOf,
+  stepAxesOf,
+  turnOf
+} from "./drag"
+import { GizmoObject, type HandleSpec, SIZE, toolHandles } from "./handles"
 
 interface ActiveDrag {
   readonly id: string
+  readonly pointerId: number
   /** The pane the drag started in: it measures the pointer against that pane's camera to the end. */
   readonly slot: number
   readonly start: DragStart
@@ -35,13 +54,36 @@ interface ActiveDrag {
    */
   startTransforms: ReadonlyMap<string, UeTransform>
   readonly pivot: Vec3
-  readonly activePivot: Vec3
   /** The selection as units at drag start, which the pivot setting applies the delta by. */
   selection: SelectionUnits
   readonly pivotMode: PivotMode
   last: ReadonlyMap<string, UeTransform> | undefined
   /** "pending": an Alt+drag that copies the selection once it moves; "copied": it has. */
   duplicate: "pending" | "copied" | undefined
+  /** The snapping session of a move; a turn and a scale keep what they can meet instead. */
+  readonly move: MoveSession | undefined
+  readonly turn: TurnSession | undefined
+  readonly stops: ReadonlyArray<ScaleStop>
+  /** How far the active item's scaled face reaches from the pivot at the drag's start, in cm. */
+  readonly reach: number
+  /** The active item's scale along the handle's axis at the drag's start. */
+  readonly scaleFrom: number
+  /** The cm the threshold covers at the pivot. */
+  readonly rangeCm: number
+  readonly keys: DragKeyState
+  /** The last pointer position, to go again when a key changes with the pointer still. */
+  lastEvent: { readonly clientX: number; readonly clientY: number } | undefined
+}
+
+/** What a turn can stop on, and where it has got to (docs/SNAPPING.md § Affect). */
+interface TurnSession {
+  readonly stops: ReadonlyArray<TurnStop>
+  /** Radians past a stop the pointer can go and hold it, and ahead of it that reach it: pixels along the ring. */
+  readonly reach: number
+  readonly nudge: number
+  /** The last sample's free angle, and the stop it landed on. */
+  from: number
+  on: TurnStop | undefined
 }
 
 const applyToObject = (object: THREE.Object3D, transform: UeTransform) => {
@@ -61,16 +103,11 @@ const applyToObjects = (transforms: ReadonlyMap<string, UeTransform>) => {
   }
 }
 
-interface GizmoTarget extends SelectionPivot {
-  /** The selected items' shown transforms (live preview, else the document). */
-  readonly transforms: ReadonlyMap<string, UeTransform>
-}
-
 /**
  * What the gizmo acts on: the selected items that are in the scene, at the selection's pivot
  * like the game's editor.
  */
-const currentTarget = (): GizmoTarget | undefined => {
+const currentTarget = (): DragTarget | undefined => {
   const s = useEditor.getState()
   // Settings › Display can keep the gizmo off a whole group, which is moved from the outline instead.
   if (
@@ -79,15 +116,7 @@ const currentTarget = (): GizmoTarget | undefined => {
   ) {
     return undefined
   }
-  // inside an entered chain the links after a selected one come along, so they are dragged too
-  const transforms = new Map(
-    editedKeys(s).flatMap((id) => {
-      const t = shownTransform(s, id)
-      return t === undefined || !sceneRegistry.objects.has(id) ? [] : [[id, t] as const]
-    })
-  )
-  const target = selectionPivot(s, (id) => transforms.get(id))
-  return target === undefined ? undefined : { ...target, transforms }
+  return dragTargetOf(s)
 }
 
 /** A drag's start transforms re-keyed from each source id to its copy's. */
@@ -102,10 +131,17 @@ const byCopy = (
 
 const isTranslate = ({ kind }: HandleSpec) => kind === "translateAxis" || kind === "translatePlane"
 
-const toWorld = (v: Vec3) => {
-  const w = ueToThreeVector(v)
-  return new THREE.Vector3(w.x, w.y, w.z)
-}
+/** What a handle's drag does, for the keys it can take. */
+const transformOf = ({ kind }: HandleSpec): SnapTransform =>
+  kind === "rotateAxis" || kind === "rotateView"
+    ? "turn"
+    : kind === "scaleAxis" || kind === "scaleUniform"
+    ? "scale"
+    : "move"
+
+const toWorld = toThree
+
+const threeToGame = (v: THREE.Vector3): Vec3 => threeToUeVector({ x: v.x, y: v.y, z: v.z })
 
 /**
  * Hosts the Blender-style gizmo for the current tool: hover picking, dragging with a live
@@ -129,7 +165,7 @@ export function GizmoController() {
   const hoverSlot = useRef<number | null>(null)
   const drag = useRef<ActiveDrag | null>(null)
   /** What the gizmo acts on this frame; every pane places it from this. */
-  const frameTarget = useRef<GizmoTarget | undefined>(undefined)
+  const frameTarget = useRef<DragTarget | undefined>(undefined)
 
   useEffect(() => {
     sceneRegistry.gizmo = gizmo
@@ -141,10 +177,10 @@ export function GizmoController() {
 
   useEffect(() => {
     sceneRegistry.gizmoActive = () => hovered.current !== null || drag.current !== null
-    sceneRegistry.gizmoDragActive = () => drag.current !== null
+    sceneRegistry.gizmoDragActive = () => drag.current !== null || sceneRegistry.bodyDragActive()
     return () => {
       sceneRegistry.gizmoActive = () => false
-      sceneRegistry.gizmoDragActive = () => false
+      sceneRegistry.gizmoDragActive = () => sceneRegistry.bodyDragActive()
     }
   }, [])
 
@@ -204,14 +240,21 @@ export function GizmoController() {
       drag.current = null
       gizmo.setGuide(undefined, undefined)
       useEditor.getState().setPreview(null)
+      endSnapDisplay()
     }
-    /** Drops the copies of an Alt+drag that is cancelled (Escape, unmount). */
-    const cancelDuplicate = (active: ActiveDrag) => {
+    /**
+     * A drag let go of without landing (Escape, a lost pointer, unmount): an Alt+drag's copies go, and its tracking points
+     * as after a landing.
+     */
+    const cancelDrag = (active: ActiveDrag) => {
+      endDrag()
       if (active.duplicate === "copied") useEditor.getState().endDuplicateDrag(null)
+      useEditor.getState().clearTracked()
     }
 
     const onPointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return
+      // a click for the target picker is the picker's, even over a handle
+      if (e.button !== 0 || useEditor.getState().picker !== null) return
       const pointer = panePointer(el, e)
       const id = pick(pointer)
       const target = currentTarget()
@@ -239,19 +282,75 @@ export function GizmoController() {
         toCamera: pointer.pane.toCameraFrom(originWorld),
         pointer: sample(pointer)
       }
-      const { settings } = useEditor.getState()
+      const s = useEditor.getState()
+      const { settings } = s
       const duplicate = e.altKey && settings.general.altDragDuplicates && isTranslate(spec) ? "pending" : undefined
+      const config = snapConfigOf(s)
+      const { pivotMode } = s
+      const frame = localFrameOf(start)
+      // a move along world axes is the same for every unit, so any of them can lead it
+      const leads = leadingKeys(target.selection, isTranslate(spec) && frame === undefined ? "together" : pivotMode)
+      const selection = selectionSnapStart(s, target.transforms, leads)
+      const view = snapViewOf(pointer.pane)
+      const rangeCm = config.threshold * view.cmPerPixelAt(target.pivot)
+      const constraint = constraintOf(start)
+      const axisWorld = spec.kind === "scaleAxis" ? dragAxisWorld(start) : undefined
+      const scaleAxis = axisWorld === undefined ? undefined : threeToGame(axisWorld)
+      const turnAxis = spec.kind === "rotateAxis" || spec.kind === "rotateView" ? dragAxisWorld(start) : undefined
+      const items = constraint === undefined
+        ? snapItemsOf(s, new Set(target.transforms.keys()), config.targets.mesh.sharpAngle)
+        : []
       drag.current = {
         id,
+        pointerId: e.pointerId,
         slot: pointer.slot,
         start,
         startTransforms: target.transforms,
         pivot: target.pivot,
-        activePivot: target.activePivot,
         selection: target.selection,
-        pivotMode: useEditor.getState().pivotMode,
+        pivotMode,
         last: undefined,
-        duplicate
+        duplicate,
+        move: constraint === undefined ? undefined : new MoveSession({
+          pane: pointer.pane,
+          keys: new Set(target.transforms.keys()),
+          pivot: target.pivot,
+          box: selection.box,
+          ends: selection.ends,
+          rotation: target.rotation,
+          frame,
+          constraint,
+          stepAxes: stepAxesOf(start),
+          ray: gameRayOf({ origin: start.pointer.rayOrigin, direction: start.pointer.rayDir }),
+          px: start.pointer.px
+        }),
+        turn: turnAxis === undefined ? undefined : {
+          // what a turn stops on assumes the unit ends up turned by the angle dragged, which a chain's pass goes past
+          stops: turnAccumulates(target.selection, pivotMode) ? [] : allTurnStopsOf(
+            config,
+            {
+              axis: threeToGame(turnAxis),
+              pivot: target.pivot,
+              rotation: target.rotation,
+              own: ownSnapItemsOf(s, leads, config.targets.mesh.sharpAngle),
+              ends: selection.ends
+            },
+            items,
+            rangeCm
+          ),
+          ...turnReach(
+            config.threshold,
+            (spec.kind === "rotateView" ? SIZE.viewRing : SIZE.ring) * gizmoScaleOf(settings.gizmo.size)
+          ),
+          from: 0,
+          on: undefined
+        },
+        stops: scaleAxis === undefined ? [] : scaleStopsOf(scaleAxis, target.pivot, selection.box, items),
+        reach: scaleAxis === undefined ? 0 : reachAlong(selection.box, target.pivot, scaleAxis),
+        scaleFrom: spec.axis === undefined ? target.active.scale3D.x : target.active.scale3D[spec.axis],
+        rangeCm,
+        keys: seedDragKeys(e, transformOf(spec)),
+        lastEvent: undefined
       }
       const axis = spec.kind === "translateAxis" || spec.kind === "scaleAxis" || spec.kind === "rotateAxis"
         ? dragAxisWorld(start)
@@ -269,11 +368,62 @@ export function GizmoController() {
         }
         return
       }
-      const { snapping } = useEditor.getState().settings
-      const delta = dragDelta(active.start, sample(panePointer(el, e, active.slot)), {
-        grid: snapping.enabled ? { size: snapping.gridSize, pivot: active.activePivot } : undefined,
-        rotationStep: snapping.rotationEnabled ? snapping.rotationStep : undefined
+      active.lastEvent = e
+      syncDragKeys(active.keys, e)
+      applySample(active, e)
+    }
+
+    /** What the drag does for the pointer at `e`, with the keys held now. */
+    const deltaAt = (active: ActiveDrag, e: { readonly clientX: number; readonly clientY: number }) => {
+      const s = useEditor.getState()
+      const config = snapConfigOf(s)
+      const pointer = panePointer(el, e, active.slot)
+      const now = sample(pointer)
+      const keys = dragKeysOf(s.keybinds, active.keys.pressed)
+      if (active.move !== undefined) {
+        return active.move.update(gameRayOf({ origin: now.rayOrigin, direction: now.rayDir }), now.px, keys).delta
+      }
+      const turn = turnOf(active.start, now)
+      if (turn !== undefined && active.turn !== undefined) {
+        const session = active.turn
+        const snap = turnSnapOf(config, "turn", keys.only ?? [], keys.off)
+        const turned = turnLanding({
+          free: turn.angle,
+          from: session.from,
+          on: session.on !== undefined && snap.targets.includes(session.on.from) ? session.on : undefined,
+          stops: turnStopsFrom(session.stops, snap.targets),
+          reach: session.reach,
+          nudge: session.nudge,
+          hold: keys.hold,
+          step: snap.step ? config.rotationStep : undefined
+        })
+        session.from = turn.angle
+        session.on = turned.on
+        showSnap(turned.on ?? {}, snap.targets)
+        const rotation = quatFromAxisAngle(turn.axis, turned.angle)
+        const frame = localFrameOf(active.start)
+        return (frame === undefined
+          ? { kind: "rotate", rotation }
+          : { kind: "rotate", rotation, frame }) satisfies GroupDelta
+      }
+      const scale = scaleOf(active.start, now)
+      if (scale === undefined) return undefined
+      const snap = turnSnapOf(config, "scale", keys.only ?? [], keys.off)
+      const scaled = snappedScale({
+        from: active.scaleFrom,
+        free: active.scaleFrom * scale.factor,
+        step: snap.step ? config.scaleStep : undefined,
+        face: snap.targets.includes("mesh") && scale.axis !== undefined && active.scaleFrom !== 0 && active.reach > 0
+          ? { reach: active.reach / active.scaleFrom, range: active.rangeCm }
+          : undefined,
+        stops: active.stops
       })
+      showSnap(scaled, snap.targets)
+      return { ...scale, kind: "scale", factor: scaled.factor } satisfies GroupDelta
+    }
+
+    const applySample = (active: ActiveDrag, e: { readonly clientX: number; readonly clientY: number }) => {
+      const delta = deltaAt(active, e)
       if (delta === undefined) return
       if (active.duplicate === "pending") {
         // The copies start where the selection is; the selection itself stays put.
@@ -287,55 +437,91 @@ export function GizmoController() {
       }
       const next = fitTransforms(
         useEditor.getState(),
-        applyUnitEdit(active.selection, active.pivotMode, active.startTransforms, deltaEdit(delta))
+        applyDelta(active.selection, active.pivotMode, active.startTransforms, delta)
       )
       active.last = next
       applyToObjects(next)
-      useEditor.getState().setPreview(next)
+      previewMove(next, delta)
+    }
+
+    /** Commits what the drag came to. */
+    const land = (active: ActiveDrag) => {
+      const options = active.move?.commitOptions(active.startTransforms.size) ??
+        turnCommitOptions(active.turn?.on, active.startTransforms.size)
+      if (active.duplicate === "copied") {
+        // the copy and the move are one undo entry; refused, the copies go
+        useEditor.getState().endDuplicateDrag(active.last ?? null, options)
+        return
+      }
+      if (active.last === undefined) return
+      useEditor.getState().setFlipOffer(flipOfferOf(active.move?.current, [...active.startTransforms.keys()]))
+      // One undo entry for the whole selection. If the document refuses it, the scene objects
+      // go back where they started.
+      if (!transformSelection(active.last, options)) applyToObjects(active.startTransforms)
     }
 
     const onPointerUp = (e: PointerEvent) => {
       const active = drag.current
       if (active === null) return
       e.stopImmediatePropagation()
-      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       endDrag()
-      if (active.duplicate === "copied") {
-        // the copy and the move are one undo entry; refused, the copies go
-        useEditor.getState().endDuplicateDrag(active.last ?? null)
-        return
-      }
-      if (active.last === undefined) return
-      // One undo entry for the whole selection. If the document refuses it, the scene objects
-      // go back where they started.
-      if (!transformSelection(active.last)) applyToObjects(active.startTransforms)
+      // the drag is over first, so the capture this lets go of doesn't cancel it
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      land(active)
+      // a click on a handle isn't a drag: what was acquired for the drag to come stays
+      if (active.last !== undefined) useEditor.getState().clearTracked()
+    }
+
+    /** The pointer gone from under a drag (the system took it, or the capture was lost): it goes back, as on Escape. */
+    const onPointerLost = (e: PointerEvent) => {
+      const active = drag.current
+      if (active === null || active.pointerId !== e.pointerId) return
+      applyToObjects(active.startTransforms)
+      cancelDrag(active)
+    }
+
+    /** A key changing with the pointer still takes effect at once. */
+    const afterKey = (active: ActiveDrag) => {
+      if (active.lastEvent !== undefined) applySample(active, active.lastEvent)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      const active = drag.current
+      if (active === null) return
+      releaseDragKey(active.keys, e.code)
+      afterKey(active)
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
       const active = drag.current
       if (active === null) return
+      if (handleDragKey(active.keys, active.move, e, useEditor.getState().keybinds)) {
+        afterKey(active)
+        return
+      }
       if (e.code !== "Escape" && !useEditor.getState().keybinds.deselect.includes(chordOf(e))) return
       e.preventDefault()
       e.stopImmediatePropagation() // don't also deselect
       applyToObjects(active.startTransforms)
-      endDrag()
-      cancelDuplicate(active)
+      cancelDrag(active)
     }
 
     el.addEventListener("pointerdown", onPointerDown, { capture: true })
     el.addEventListener("pointermove", onPointerMove)
     el.addEventListener("pointerup", onPointerUp, { capture: true })
+    el.addEventListener("pointercancel", onPointerLost)
+    el.addEventListener("lostpointercapture", onPointerLost)
     window.addEventListener("keydown", onKeyDown, { capture: true })
+    window.addEventListener("keyup", onKeyUp, { capture: true })
     return () => {
       el.removeEventListener("pointerdown", onPointerDown, { capture: true })
       el.removeEventListener("pointermove", onPointerMove)
       el.removeEventListener("pointerup", onPointerUp, { capture: true })
+      el.removeEventListener("pointercancel", onPointerLost)
+      el.removeEventListener("lostpointercapture", onPointerLost)
       window.removeEventListener("keydown", onKeyDown, { capture: true })
+      window.removeEventListener("keyup", onKeyUp, { capture: true })
       const active = drag.current
-      if (active !== null) {
-        endDrag()
-        cancelDuplicate(active)
-      }
+      if (active !== null) cancelDrag(active)
       hovered.current = null
     }
   }, [gizmo, gl])

@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { MapSidecar } from "./MapSidecar"
+import { defaultSnapConfig, SnapConfig } from "./snapConfig"
 
 const Codec = Schema.fromJsonString(MapSidecar)
 
@@ -10,7 +11,7 @@ const sidecar = {
   items: {
     "k-1": { index: 0, fingerprint: "BP_Prim_Cube|0,0,0|0,0,0,1|1,1,1" },
     k_2: { index: 1, fingerprint: "BP_Prim_Cube|1,0,0|0,0,0,1|1,1,1", name: "Left ramp", tags: ["start", "hard"] },
-    k3: { index: 2, fingerprint: "BP_Prim_Cube|2,0,0|0,0,0,1|1,1,1" }
+    k3: { index: 2, fingerprint: "BP_Prim_Cube|2,0,0|0,0,0,1|1,1,1", connectAt: { "0": "topLeft", "1": "centre" } }
   },
   tree: [
     { kind: "item", key: "k-1" },
@@ -28,7 +29,16 @@ const sidecar = {
 }
 
 describe("MapSidecar", () => {
-  it("round-trips nested groups, names and tags", () => {
+  it("refuses a connection spot it doesn't know, and drops one not keyed by an end", () => {
+    const decoded = (connectAt: unknown) =>
+      Schema.decodeUnknownOption(MapSidecar)({ ...sidecar, items: { k3: { index: 2, fingerprint: "x", connectAt } } })
+        .pipe(Option.map(({ items }) => items["k3"]?.connectAt))
+    assert.deepStrictEqual(decoded({ "2": "bottomRight" }), Option.some({ "2": "bottomRight" }))
+    assert.isTrue(Option.isNone(decoded({ "0": "middle" })))
+    assert.deepStrictEqual(decoded({ front: "top" }), Option.some({}))
+  })
+
+  it("round-trips nested groups, names, tags and connection spots", () => {
     const text = JSON.stringify(sidecar)
     const decoded = Schema.decodeSync(Codec)(text)
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(decoded)), sidecar)
@@ -63,5 +73,34 @@ describe("MapSidecar", () => {
     assert.isFalse(decodes({ ...sidecar, mapHash: "abc" }))
     assert.isFalse(decodes({ ...sidecar, tree: [{ kind: "item", key: "not a key" }] }))
     assert.isFalse(decodes({ ...sidecar, items: { k: { index: -1, fingerprint: "" } } }))
+  })
+})
+
+describe("snap data", () => {
+  const decode = Schema.decodeUnknownOption(MapSidecar)
+  const bare = { formatVersion: 1, mapHash: "a".repeat(64), items: {}, tree: [] }
+
+  it("reads a sidecar written before snapping had any", () => {
+    assert.isTrue(Option.isSome(decode(bare)))
+  })
+
+  it("reads a map's snapping from before your snapping moved to Settings, without what moved", () => {
+    const snap = Schema.encodeSync(SnapConfig)(defaultSnapConfig)
+    const old = {
+      ...snap,
+      bodyDrag: "never",
+      targets: { ...snap.targets, mesh: { ...snap.targets.mesh, occlusion: "through" } }
+    }
+    const decoded = decode({ ...bare, snap: old })
+    assert.isTrue(Option.isSome(decoded))
+    assert.deepStrictEqual(Option.getOrThrow(decoded).snap, defaultSnapConfig)
+  })
+
+  it("reads annotations and turns down a joint that names no item", () => {
+    const joint = { a: { item: "abc", end: 0 }, b: { item: "def", end: 1 } }
+    const annotations = { joints: [joint], construction: [], measurements: [] }
+    assert.isTrue(Option.isSome(decode({ ...bare, annotations })))
+    const broken = { ...annotations, joints: [{ a: { item: "", end: 0 }, b: joint.b }] }
+    assert.isTrue(Option.isNone(decode({ ...bare, annotations: broken })))
   })
 })

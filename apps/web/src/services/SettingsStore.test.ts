@@ -127,3 +127,72 @@ describe("Settings", () => {
       assert.deepStrictEqual(yield* store.load, defaultSettings)
     }).pipe(Effect.provide(SettingsStore.layerTest)))
 })
+
+describe("snapping settings", () => {
+  it("keeps what an older save chose, and fills in what it never had", () => {
+    const merged = mergeSettings({ snapping: { enabled: true, gridSize: 25, rotationEnabled: true, rotationStep: 5 } })
+    assert.strictEqual(merged.snapping.enabled, true)
+    assert.strictEqual(merged.snapping.gridSize, 25)
+    assert.strictEqual(merged.snapping.rotationStep, 5)
+    assert.deepStrictEqual(merged.snapping.targets, defaultSettings.snapping.targets)
+    assert.strictEqual(merged.snapping.scaleStep, defaultSettings.snapping.scaleStep)
+  })
+
+  it("takes a typed step, and turns down one that can't be", () => {
+    assert.strictEqual(mergeSettings({ snapping: { gridSize: 37 } }).snapping.gridSize, 37)
+    assert.strictEqual(
+      mergeSettings({ snapping: { gridSize: -5 } }).snapping.gridSize,
+      defaultSettings.snapping.gridSize
+    )
+  })
+})
+
+describe("your snapping", () => {
+  it("starts on the rows' old defaults, and keeps them apart from what a new map starts on", () => {
+    assert.deepStrictEqual(defaultSettings.snapPrefs, {
+      bodyDrag: "ends",
+      showOpenEnds: "hover",
+      profiles: "warn",
+      flipToFit: true,
+      occlusion: "front",
+      trackingKeep: 6,
+      trackingHoverMs: 400,
+      trackingAcquire: "auto"
+    })
+    assert.isFalse("bodyDrag" in defaultSettings.snapping)
+  })
+
+  it("takes an older save's choices from its map defaults, where they used to be", () => {
+    const merged = mergeSettings({
+      snapping: {
+        bodyDrag: "always",
+        targets: {
+          connectors: { profiles: "strict", showOpenEnds: "always", flipToFit: false },
+          mesh: { occlusion: "through" },
+          tracking: { keep: 3, hoverMs: 200, acquire: "shift" }
+        }
+      }
+    })
+    assert.deepStrictEqual(merged.snapPrefs, {
+      bodyDrag: "always",
+      showOpenEnds: "always",
+      profiles: "strict",
+      flipToFit: false,
+      occlusion: "through",
+      trackingKeep: 3,
+      trackingHoverMs: 200,
+      trackingAcquire: "shift"
+    })
+    assert.strictEqual(
+      mergeSettings({ snapping: { bodyDrag: "always" }, snapPrefs: { bodyDrag: "never" } }).snapPrefs.bodyDrag,
+      "never"
+    )
+  })
+
+  it("keeps each row on its own, falling back for a bad one", () => {
+    const merged = mergeSettings({ snapPrefs: { trackingKeep: 0, occlusion: "through", profiles: "loose" } })
+    assert.strictEqual(merged.snapPrefs.trackingKeep, defaultSettings.snapPrefs.trackingKeep)
+    assert.strictEqual(merged.snapPrefs.occlusion, "through")
+    assert.strictEqual(merged.snapPrefs.profiles, "warn")
+  })
+})

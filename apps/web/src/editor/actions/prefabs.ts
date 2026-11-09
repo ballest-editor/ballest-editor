@@ -9,6 +9,7 @@ import { PREFAB_ITEMS, PREFAB_REFUSALS } from "../../domain/gameRules"
 import { counted, exactSelectedGroup } from "../../domain/groupSelection"
 import { itemsBoxOf } from "../../domain/itemBounds"
 import { classNameOf, isPlayerStart, type Item } from "../../domain/MapFile"
+import { type MapPrefs, prefabSnapKeyOf } from "../../domain/MapPrefs"
 import type { PrefabLink } from "../../domain/MapSidecar"
 import { frameStanding, NO_BOX, roomOf } from "../../domain/placement"
 import {
@@ -27,6 +28,7 @@ import type { PrefabFile } from "../../domain/PrefabFile"
 import { definitionOf, instancesIn, instancesOfPrefab } from "../../domain/prefabInstance"
 import { DEFAULT_GROUP_NAME, flatStructure, freshKeys, treeKeys } from "../../domain/structure"
 import { MapCodec } from "../../services/MapCodec"
+import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { Platform, PlatformError } from "../../services/Platform"
 import { sceneRegistry } from "../sceneRegistry"
 import {
@@ -195,10 +197,13 @@ const loadDefinition = Effect.fnUntraced(function*(ref: PrefabRef, into: "newTab
     sources: prefabSourcesOf(prefab, map.items, ids)
   }
   const file = { name: prefabFileNameOf(ref.name), path: read.path }
+  const prefs = yield* MapPrefsStore.use((store) => store.load(prefabSnapKeyOf(ref))).pipe(
+    Effect.orElseSucceed((): MapPrefs => ({}))
+  )
   useEditor.getState().loadMap(map, file, undefined, {
     document,
     into,
-    loaded: { ids, structure: flatStructure(ids) }
+    loaded: { ids, structure: flatStructure(ids), snap: prefs.snap ?? null }
   })
 })
 

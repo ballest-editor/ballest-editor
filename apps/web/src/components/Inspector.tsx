@@ -32,6 +32,7 @@ import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
 import { assetNameOf } from "../domain/Materials"
+import { snapsGrid, snapsRotation } from "../domain/snapConfig"
 import { pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
 import type { MapValidation } from "../domain/validateMap"
@@ -53,12 +54,14 @@ import {
   selectionPivot,
   shownTransform,
   shownValidation,
+  snapConfigOf,
   useCreator,
   useEditor,
   useOpenPrefab
 } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
+import { ConnectsAtSection } from "./ConnectsAtSection"
 import { Disclosure } from "./Disclosure"
 import { Fact, Facts } from "./Facts"
 import { FlipSection } from "./FlipSection"
@@ -328,7 +331,7 @@ const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<T
     field: "translation",
     label: "Location",
     unit: units,
-    help: `The piece's origin, as the map stores it, in ${units === "m" ? "metres" : "centimetres"}, Z up`,
+    help: `The piece's origin, as the map stores it, in ${units === "m" ? "meters" : "centimeters"}, Z up`,
     axisLabels: AXIS_LABELS,
     step: units === "m" ? 0.01 : 1,
     digits: units === "m" ? 3 : 1,
@@ -465,13 +468,13 @@ function TransformRow(props: {
   readonly clipKey?: ClipKey
   readonly mode?: ReactNode
 }) {
-  const snapping = useEditor((s) => s.settings.snapping)
+  const snapping = useEditor(snapConfigOf)
   const { row, perUnit } = props
   const { field } = row
   // Scrubs follow the tool bar's snapping, in display units: the grid for a location or a size, the step for rotation.
   const snap = row.grid !== undefined
-    ? snapping.enabled ? snapping.gridSize / row.grid : undefined
-    : field === "rotation" && snapping.rotationEnabled
+    ? snapsGrid(snapping) ? snapping.gridSize / row.grid : undefined
+    : field === "rotation" && snapsRotation(snapping)
     ? snapping.rotationStep
     : undefined
   return (
@@ -779,6 +782,7 @@ function ItemEditor({ items, ids, transforms, placed, transform }: {
             <FlipSection items={placed} />
           </TransformSection>
           <PivotSection />
+          {items.length === 1 && ids[0] !== undefined && <ConnectsAtSection itemKey={ids[0]} />}
         </>
       )}
       <Section>

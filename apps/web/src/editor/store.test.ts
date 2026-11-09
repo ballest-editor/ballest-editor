@@ -6,6 +6,7 @@ import type { UeTransform, Vec3 } from "../domain/coords"
 import { setLevelNames, withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
 import { nodeKeys } from "../domain/groupSelection"
+import { applyGroupDelta, type RigidDelta } from "../domain/groupTransform"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
@@ -331,7 +332,7 @@ describe("editor store", () => {
 
     describe("dirty", () => {
       const saved = { name: "saved.balledit", path: null }
-      const save = () => s().markSaved(s().tabId, s().doc, s().doc.map, saved)
+      const save = () => s().markSaved(s().tabId, s().doc, s().doc.map, saved, null)
 
       it("clears when undo gets back to the map as it was opened", () => {
         s().loadMap(startOnlyMap(), null)
@@ -382,7 +383,7 @@ describe("editor store", () => {
         place(0)
         const from = s().doc
         place(10)
-        s().markSaved(s().tabId, from, from.map, saved)
+        s().markSaved(s().tabId, from, from.map, saved, null)
         assert.isTrue(s().dirty)
         s().undo()
         assert.isFalse(s().dirty)
@@ -1149,7 +1150,7 @@ describe("document tabs", () => {
     state().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 0 }))
     const { doc } = state()
     state().loadMap(named("B"), fileOf("b"), undefined, { into: "newTab" })
-    state().markSaved(first, doc, doc.map, fileOf("a"))
+    state().markSaved(first, doc, doc.map, fileOf("a"), null)
     assert.strictEqual(state().file?.name, "b.balledit")
     assert.include(state().parkedTabs.get(first), { dirty: false })
     assert.deepStrictEqual(state().parkedTabs.get(first)?.file, { name: "a.balledit", path: null })
@@ -1753,6 +1754,21 @@ describe("groups and the selection", () => {
       return { ...t, translation: { ...t.translation, x: t.translation.x + 300 } }
     }
     assert.closeTo(selectionPivot(state(), live)?.pivot.x ?? 0, 5300, 0.01)
+    const landing: RigidDelta = {
+      kind: "rigid",
+      about: { x: 0, y: 0, z: 0 },
+      offset: { x: 100, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
+    }
+    state().setPreview(
+      new Map(keys.map((key) => [key, applyGroupDelta(transformOf(key), { x: 0, y: 0, z: 0 }, landing)])),
+      landing
+    )
+    const previewPivot = selectionPivot(state(), (key) => shownTransform(state(), key))?.pivot
+    assert.closeTo(previewPivot?.x ?? 0, 100, 0.01)
+    assert.closeTo(previewPivot?.y ?? 0, 5000, 0.01)
+    state().setPreview(null)
+    assert.closeTo(selectionPivot(state(), transformOf)?.pivot.x ?? 0, 5000, 0.01)
     // edited, it has no origin left, so it's any group
     moveItem(keys[0]!, { ...transformOf(keys[0]!).translation, x: 9000 })
     assert.isAbove(Math.abs(selectionPivot(state(), transformOf)?.pivot.z ?? 0), 1)
@@ -1979,7 +1995,7 @@ describe("the Validate result", () => {
   it("outlasts a Save, which edits nothing", () => {
     validated()
     const { doc } = state()
-    state().markSaved(state().tabId, doc, { ...doc.map }, { name: "saved.balledit", path: null })
+    state().markSaved(state().tabId, doc, { ...doc.map }, { name: "saved.balledit", path: null }, null)
     assert.notStrictEqual(state().doc, doc)
     assert.isDefined(shownValidation(state()))
   })

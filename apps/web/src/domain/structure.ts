@@ -4,19 +4,24 @@
  * undefined, so the store leaves no undo step for it. An item's key is its entry in the store's `ids`.
  */
 import type { CatalogIndex } from "./Catalog"
+import type { ConnectAt, SpotId } from "./connectorSpots"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
-import type { ChainGrowth, GroupNode, GroupPivot, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
+import type { Annotations, ChainGrowth, GroupNode, GroupPivot, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
 import { pieceLabelOf } from "./pieceName"
 
-/** What an item has beyond the game's data. An item with neither has no entry. */
+/** What an item has beyond the game's data. An item with none of it has no entry. */
 export interface ItemMeta {
   readonly name?: string
   readonly tags?: ReadonlyArray<string>
+  /** Where its ends connect, when not where they were measured (docs/SNAPPING.md § Connectors). */
+  readonly connectAt?: ConnectAt
 }
 
 export interface Structure {
   readonly tree: ReadonlyArray<TreeNode>
   readonly items: ReadonlyMap<string, ItemMeta>
+  /** Joints, construction geometry and measurements (docs/SNAPPING.md); undoable with the rest. Absent with none. */
+  readonly annotations?: Annotations
 }
 
 /** A document, as the store and the sidecar hold it. */
@@ -33,6 +38,27 @@ export const freshKey = (): string =>
   btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(9)))).replaceAll("+", "-").replaceAll("/", "_")
 
 export const freshKeys = (n: number): ReadonlyArray<string> => Array.from({ length: n }, freshKey)
+
+const NO_ANNOTATIONS: Annotations = { joints: [], construction: [], measurements: [] }
+
+/** A structure's annotations, empty when it has none. */
+export const annotationsOf = (structure: Structure): Annotations => structure.annotations ?? NO_ANNOTATIONS
+
+/** `structure` with `annotations`, or without any when they hold nothing. */
+export const withAnnotations = (structure: Structure, annotations: Annotations): Structure => {
+  const { annotations: _gone, ...rest } = structure
+  const empty = annotations.joints.length + annotations.construction.length + annotations.measurements.length === 0
+  return empty ? rest : { ...rest, annotations }
+}
+
+/** `structure` with no joint that touches `keys`. */
+export const withoutJointsOf = (structure: Structure, keys: ReadonlySet<string>): Structure => {
+  const annotations = annotationsOf(structure)
+  const joints = annotations.joints.filter(({ a, b }) => !keys.has(a.item) && !keys.has(b.item))
+  return joints.length === annotations.joints.length
+    ? structure
+    : withAnnotations(structure, { ...annotations, joints })
+}
 
 export const itemNode = (key: string): ItemNode => ({ kind: "item", key })
 
@@ -96,15 +122,16 @@ export const withNewItems = (structure: Structure, keys: ReadonlyArray<string>):
   tree: [...structure.tree, ...keys.map(itemNode)]
 })
 
-/** Drops items from the tree and their names and tags. */
+/** Drops items from the tree, their names and tags, and the joints they were part of. */
 export const withoutKeys = (structure: Structure, keys: ReadonlySet<string>): Structure => ({
+  ...withoutJointsOf(structure, keys),
   tree: rewriteTree(structure.tree, (node) => node.kind === "item" && keys.has(node.key) ? [] : [node]),
   items: new Map([...structure.items].filter(([key]) => !keys.has(key)))
 })
 
 const withMeta = (structure: Structure, key: string, meta: ItemMeta): Structure => {
   const items = new Map(structure.items)
-  if (meta.name === undefined && meta.tags === undefined) items.delete(key)
+  if (meta.name === undefined && meta.tags === undefined && meta.connectAt === undefined) items.delete(key)
   else items.set(key, meta)
   return { ...structure, items }
 }
@@ -113,12 +140,28 @@ const withMeta = (structure: Structure, key: string, meta: ItemMeta): Structure 
 export const withItemName = (structure: Structure, key: string, name: string | null): Structure | undefined => {
   if (findNode(structure.tree, key)?.node.kind !== "item") return undefined
   const trimmed = name?.trim() ?? ""
-  const { name: current, tags } = structure.items.get(key) ?? {}
+  const { name: current, ...rest } = structure.items.get(key) ?? {}
   if (trimmed === (current ?? "")) return undefined
-  return withMeta(structure, key, {
-    ...(trimmed.length > 0 && { name: trimmed }),
-    ...(tags !== undefined && { tags })
-  })
+  return withMeta(structure, key, { ...(trimmed.length > 0 && { name: trimmed }), ...rest })
+}
+
+/**
+ * Where end `end` of the item `key` connects: the spot `spot`, or the measured point for undefined. Which spots the end
+ * has is the catalog's, so the caller offers only those.
+ */
+export const withConnectAt = (
+  structure: Structure,
+  key: string,
+  end: number,
+  spot: SpotId | undefined
+): Structure | undefined => {
+  if (findNode(structure.tree, key)?.node.kind !== "item") return undefined
+  const { connectAt = {}, ...rest } = structure.items.get(key) ?? {}
+  const slot = String(end)
+  if (connectAt[slot] === spot) return undefined
+  const { [slot]: _gone, ...others } = connectAt
+  const next = spot === undefined ? others : { ...others, [slot]: spot }
+  return withMeta(structure, key, { ...rest, ...(Object.keys(next).length > 0 && { connectAt: next }) })
 }
 
 const withGroupNode = (structure: Structure, id: string, change: (group: GroupNode) => GroupNode): Structure => ({
@@ -232,12 +275,9 @@ export const withTags = (structure: Structure, target: string, tags: ReadonlyArr
     if (sameStrings(clean, node.tags)) return undefined
     return withGroupNode(structure, target, (group) => ({ ...group, tags: clean }))
   }
-  const { name, tags: current = [] } = structure.items.get(target) ?? {}
+  const { tags: current = [], ...rest } = structure.items.get(target) ?? {}
   if (sameStrings(clean, current)) return undefined
-  return withMeta(structure, target, {
-    ...(name !== undefined && { name }),
-    ...(clean.length > 0 && { tags: clean })
-  })
+  return withMeta(structure, target, { ...rest, ...(clean.length > 0 && { tags: clean }) })
 }
 
 /** What a group is called until the user names it. Its ordinal tells it from the others (`groupNames`). */
@@ -392,7 +432,7 @@ export const withPasted = (
     const key = keyOf.get(source)
     if (key !== undefined) items.set(key, meta)
   }
-  return { tree: [...tree, ...[...waiting.values()].flat()], items }
+  return { ...structure, tree: [...tree, ...[...waiting.values()].flat()], items }
 }
 
 /** A name as it's shown: `ordinal` tells apart what shares `name`, and something with a name of its own has none. */

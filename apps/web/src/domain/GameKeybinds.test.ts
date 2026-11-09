@@ -104,6 +104,7 @@ describe("GameKeybinds", () => {
       "edit",
       "camera",
       "view",
+      "snapping",
       "file",
       "game",
       "help"

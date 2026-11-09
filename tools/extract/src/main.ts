@@ -1,10 +1,18 @@
 #!/usr/bin/env -S node --experimental-strip-types
-// The TypeScript half of tools/extract (run.sh drives it): `shaders` and `materials list|build`.
+// The TypeScript half of tools/extract (run.sh drives it): `shaders` and `materials list|build`; and `connectors`, the
+// cap survey run by hand (docs/qa/connectors.md).
 import { NodeRuntime, NodeServices } from "@effect/platform-node"
 import { Effect } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
+import { connectorSurvey } from "./connectorSurvey.ts"
 import { materialsBuild, materialsList, materialsShaderList } from "./materials.ts"
 import { shaders } from "./shaders.ts"
+
+// The raw meshes when the game was extracted here, else the asset pack's: both hold pieces/**.glb at the same paths.
+const repo = join(import.meta.dirname, "..", "..", "..")
+const meshesDefault = existsSync(join(repo, "assets", "pieces")) ? join(repo, "assets") : join(repo, "web-assets")
 
 const shadersCommand = Command.make(
   "shaders",
@@ -35,8 +43,25 @@ const shaderList = Command.make("shader-list", { work }, materialsShaderList).pi
 )
 const materialsCommand = Command.make("materials").pipe(Command.withSubcommands([list, shaderList, build]))
 
+const connectorsCommand = Command.make(
+  "connectors",
+  {
+    meshes: Flag.String("meshes").pipe(
+      Flag.withDescription(
+        "the folder that holds pieces/**.glb: assets/ after an extract, or the asset pack's web-assets/"
+      ),
+      Flag.withDefault(meshesDefault)
+    ),
+    write: Flag.Boolean("write").pipe(
+      Flag.withDescription("write connectors.json and the catalog's connectors"),
+      Flag.withDefault(false)
+    )
+  },
+  connectorSurvey
+).pipe(Command.withDescription("Read every directional piece's ends off its mesh (docs/qa/connectors.md)"))
+
 Command.make("extract").pipe(
-  Command.withSubcommands([shadersCommand, materialsCommand]),
+  Command.withSubcommands([shadersCommand, materialsCommand, connectorsCommand]),
   Command.run({ version: "0.1.0" }),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain

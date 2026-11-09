@@ -45,6 +45,25 @@ node $B stop                             # always: idle software WebGL burns abo
 - Theme: set `settings.appearance.theme` with `setSettings`. Toggling `.dark` by hand doesn't switch it properly.
 - Switches: Base UI puts `id` on a 1px hidden input, so click `[role=switch]`.
 
+## Snapping on real drags
+
+`scripts/snaplab.mjs` drives drags in the browser `browser.mjs start` opened and prints what snapped at every step, folded into runs: the target's label, the base, and where the selection stood. For tuning snapping from real use, not for logic, which gets a test.
+
+```sh
+L=.claude/skills/test-ballest-app/scripts/snaplab.mjs
+node $L boot                                                    # after browser.mjs start, and after any code change (restart the browser: the scene caches mesh elements)
+node $L scene '{"pieces":[{"name":"Track L","x":-2000},{"name":"Track S","x":-300}],"view":"top","snap":{"enabled":true}}'
+node $L px 1; node $L end 1 0; node $L arrow 1 x 35            # page pixels: a piece's origin, a connector end, a translate handle
+node $L drag 620 148 0 330 --steps 110 --lock x --shot /tmp/a.png   # a drag by page pixels, with a lock key, a screenshot before release
+node $L drag 620 148 0 330 --key KeyJ --hold --shot /tmp/b.png  # with a key held through the drag (a KeyboardEvent.code), still pressed for `release`, which lets it go after the pointer
+node $L ring 1 z                                                # the Z ring's grabbable quarter with piece 1 selected and the rotate tool, and the gizmo's centre
+node $L turn 1 z 120 --steps 120 --hold --shot /tmp/t.png       # grab that ring and drag round the centre by 120° on screen, a degree a step
+```
+
+A `turn` prints what it stopped on, the pointer's angle and the angle the piece turned, run by run. `ring` and `turn` take `x`, `y`, `z` or `view`; `--from` is where on the ring's quarter to grab it, 0 to 90° (default 45). Put the scene's `tool` at `rotate` so the ring shows from the start.
+
+Every scene starts from the default snap config plus what `snap` gives (`enabled` is off by default); `view` is a pane projection and `frame: true` frames the map. The default top view shows world x from about -2200 (bottom) to +100 (top), so put pieces there. A `--hold` drag stays pressed for `release`.
+
 ## Traps
 
 - Don't use T3's preview tabs for the viewport. A tab that isn't on screen gets no frames, so WebGL doesn't paint and input never arrives.

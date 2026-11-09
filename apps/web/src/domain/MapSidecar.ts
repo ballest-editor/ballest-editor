@@ -4,11 +4,16 @@
  */
 import { FileHash, PrefabName, PrefabTier } from "@ballest/contracts"
 import { Schema } from "effect"
+import { SPOT_IDS } from "./connectorSpots"
+import { SnapConfig } from "./snapConfig"
 
 /** An item's stable key or a group's id: random and URL-safe. The two share one space, so a tree node has one id. */
 const NodeId = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/))
 
 export const Tags = Schema.Array(Schema.String)
+
+/** Where an item's ends connect, by end index, for those not at their measured point (docs/SNAPPING.md § Connectors). */
+const ConnectAt = Schema.Record(Schema.String.check(Schema.isPattern(/^\d{1,3}$/)), Schema.Literals(SPOT_IDS))
 
 export class SidecarItem extends Schema.Opaque<SidecarItem>()(
   Schema.Struct({
@@ -17,7 +22,8 @@ export class SidecarItem extends Schema.Opaque<SidecarItem>()(
     /** Finds the item again in a `.balledit` that changed (`fingerprintOf`). */
     fingerprint: Schema.String,
     name: Schema.optionalKey(Schema.String),
-    tags: Schema.optionalKey(Tags)
+    tags: Schema.optionalKey(Tags),
+    connectAt: Schema.optionalKey(ConnectAt)
   })
 ) {}
 
@@ -100,6 +106,66 @@ const TreeNode: Schema.Codec<TreeNode> = Schema.Union([
   })
 ])
 
+const Vector = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+
+/** One end of a placed piece: the item, and which of its piece's connectors. */
+export const EndRef = Schema.Struct({ item: NodeId, end: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) })
+export type EndRef = typeof EndRef.Type
+
+/** Two ends that met when a connector snap committed. A record, not a weld (docs/SNAPPING.md § Decisions). */
+export const Joint = Schema.Struct({ a: EndRef, b: EndRef })
+export type Joint = typeof Joint.Type
+
+/** A plane of the map's own, drawn as a finite square. */
+export const ConstructionPlane = Schema.Struct({
+  kind: Schema.Literal("plane"),
+  id: NodeId,
+  name: Schema.String,
+  origin: Vector,
+  /** Unit length, and square to `xAxis`. */
+  normal: Vector,
+  xAxis: Vector,
+  /** Half the drawn square's side, in cm. */
+  extent: Schema.Finite,
+  /** The grid's steps on the plane: a tilted grid. */
+  grid: Schema.Boolean
+})
+export type ConstructionPlane = typeof ConstructionPlane.Type
+
+/** An axis of the map's own, drawn as a finite line. */
+export const ConstructionAxis = Schema.Struct({
+  kind: Schema.Literal("axis"),
+  id: NodeId,
+  name: Schema.String,
+  origin: Vector,
+  /** Unit length. */
+  direction: Vector,
+  /** Half the drawn line's length, in cm. */
+  extent: Schema.Finite
+})
+export type ConstructionAxis = typeof ConstructionAxis.Type
+
+export const Construction = Schema.Union([ConstructionPlane, ConstructionAxis])
+export type Construction = typeof Construction.Type
+
+/** A measurement that stays until it is cleared: between two points, or the angle between two faces at `a` and `b`. */
+export const Measurement = Schema.Struct({
+  id: NodeId,
+  a: Vector,
+  b: Vector,
+  /** The angle between the faces in degrees, for two faces; absent for two points. */
+  angle: Schema.optionalKey(Schema.Finite)
+})
+export type Measurement = typeof Measurement.Type
+
+/** What a map holds for snapping beyond its settings (docs/SNAPPING.md § What the sidecar holds). */
+export const Annotations = Schema.Struct({
+  joints: Schema.Array(Joint),
+  construction: Schema.Array(Construction),
+  measurements: Schema.Array(Measurement)
+})
+export type Annotations = typeof Annotations.Type
+
 export class MapSidecar extends Schema.Opaque<MapSidecar>()(
   Schema.Struct({
     formatVersion: Schema.Literal(1),
@@ -108,6 +174,10 @@ export class MapSidecar extends Schema.Opaque<MapSidecar>()(
     /** Per item, by stable key. */
     items: Schema.Record(NodeId, SidecarItem),
     /** Groups and items as the outline shows them; groups nest to any depth, every item is in one place. */
-    tree: Schema.Array(TreeNode)
+    tree: Schema.Array(TreeNode),
+    /** Joints, construction geometry and measurements; absent while the map has none. */
+    annotations: Schema.optionalKey(Annotations),
+    /** The map's snap settings, the grid's origin and turn among them; absent while it uses the defaults. */
+    snap: Schema.optionalKey(SnapConfig)
   })
 ) {}
