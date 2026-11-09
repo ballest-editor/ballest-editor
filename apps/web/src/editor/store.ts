@@ -88,6 +88,7 @@ import { isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/pr
 import type { PrefabFile } from "../domain/PrefabFile"
 import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
 import type { RecoveredTab } from "../domain/recovery"
+import { repeatCopies, repeatOffsets, type RepeatOptions, repeatProblem } from "../domain/repeat"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import type { SnapConfig, SnapTarget, SnapTransform } from "../domain/snapConfig"
@@ -779,6 +780,7 @@ export interface EditorState extends TabState {
   readonly setItemPivots: (pivots: ReadonlyMap<string, Pivot>) => void
   readonly deleteSelection: () => void
   /** Copies the selected items in place (one undo step) and selects the copies. */
+  readonly repeatSelection: (options: RepeatOptions) => void
   readonly duplicateSelection: () => void
   /** Puts the selected items on the clipboard; the document is unchanged. */
   readonly copySelection: () => void
@@ -1560,6 +1562,42 @@ export const useEditor = create<EditorState>()((set, get) => {
       const indices = selectedIndices(s)
       if (indices.length === 0) return
       commit(withoutItems(s.doc, indices), { selectedIds: [] })
+    },
+
+    repeatSelection: (options) => {
+      if (strokeUnderway() || noTabOpen(get())) return
+      const s = get()
+      const problem = repeatProblem(options)
+      if (problem !== undefined) {
+        s.notify("error", problem)
+        return
+      }
+      const clip = clipOf(s.doc, copyableIndices(s))
+      const copies = repeatCopies(options)
+      if (clip.items.length === 0 || copies === 0 || !hasRoomFor(s, copies * clip.items.length)) return
+      let doc = s.doc
+      const selectedIds: Array<string> = []
+      for (const offset of repeatOffsets(options)) {
+        const next = withClip({ ...s, doc }, clip)
+        if (next === undefined) return
+        const transforms = new Map(clip.items.flatMap((item, n) => {
+          const id = next.added[n]
+          if (id === undefined) return []
+          const transform = editTransform(item)
+          return [[id, { ...transform, translation: vecAdd(transform.translation, offset) }] as const]
+        }))
+        const map = setTransforms(
+          next.doc.map,
+          [...transforms].map(([id, t]) => [next.doc.ids.indexOf(id), t] as const)
+        )
+        if (Option.isNone(map)) {
+          s.notify("error", INVALID_TRANSFORM)
+          return
+        }
+        doc = withMovedItems(next.doc, map.value, transforms, undefined, s.catalogIndex)
+        selectedIds.push(...next.added)
+      }
+      commit(doc, { selectedIds }, undefined, "Repeat selection")
     },
 
     duplicateSelection: () => {

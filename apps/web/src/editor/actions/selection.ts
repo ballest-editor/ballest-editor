@@ -20,6 +20,7 @@ import type { PropertyChange } from "../../domain/itemProperties"
 import type { Item } from "../../domain/MapFile"
 import type { FlipAxis } from "../../domain/mirror"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
+import type { RepeatOptions } from "../../domain/repeat"
 import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
 import { applyUnitEdit, pivotModeFor, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
 import {
@@ -46,6 +47,8 @@ export const setSelectionProperties = (changes: ReadonlyArray<PropertyChange>): 
 export const flipSelection = (axis: FlipAxis) => useEditor.getState().flipSelection(axis)
 
 export const deleteSelection = () => useEditor.getState().deleteSelection()
+
+export const repeatSelection = (options: RepeatOptions) => useEditor.getState().repeatSelection(options)
 
 export const duplicateSelection = () => useEditor.getState().duplicateSelection()
 

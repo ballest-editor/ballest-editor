@@ -68,6 +68,51 @@ const mapWithCubes = (...xs: ReadonlyArray<number>) => {
 }
 
 describe("editor store", () => {
+  it("repeats a selection across world axes in one undo step, preserving groups", () => {
+    mapWithCubes(10, 30)
+    const originals = state().doc.ids.slice(1)
+    state().select(originals)
+    state().groupSelection()
+    const before = state().doc
+    const steps = state().past.length
+    state().repeatSelection({ count: { x: 3, y: 2, z: 1 }, spacing: { x: 100, y: -200, z: 0 } })
+    assert.strictEqual(state().doc.map.items.length, 13)
+    assert.strictEqual(state().selectedIds.length, 10)
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.strictEqual(state().doc.structure.tree.length, before.structure.tree.length + 5)
+    assert.deepStrictEqual(state().doc.map.items.slice(3).map((i) => i.itemTransform.translation), [
+      { x: 10, y: -200, z: 0 },
+      { x: 30, y: -200, z: 0 },
+      { x: 110, y: 0, z: 0 },
+      { x: 130, y: 0, z: 0 },
+      { x: 110, y: -200, z: 0 },
+      { x: 130, y: -200, z: 0 },
+      { x: 210, y: 0, z: 0 },
+      { x: 230, y: 0, z: 0 },
+      { x: 210, y: -200, z: 0 },
+      { x: 230, y: -200, z: 0 }
+    ])
+    state().undo()
+    assert.strictEqual(state().doc, before)
+    state().redo()
+    assert.strictEqual(state().doc.map.items.length, 13)
+  })
+
+  it("refuses invalid or oversized repeats atomically and never copies the player start", () => {
+    mapWithCubes(10)
+    const before = state().doc
+    for (const x of [0, 1.5, Number.NaN, 100001]) {
+      state().repeatSelection({ count: { x, y: 1, z: 1 }, spacing: { x: 100, y: 0, z: 0 } })
+      assert.strictEqual(state().doc, before)
+    }
+    state().repeatSelection({ count: { x: 2, y: 1, z: 1 }, spacing: { x: Infinity, y: 0, z: 0 } })
+    assert.strictEqual(state().doc, before)
+    state().select(state().doc.ids)
+    state().repeatSelection({ count: { x: 2, y: 1, z: 1 }, spacing: { x: 100, y: 0, z: 0 } })
+    assert.strictEqual(state().doc.map.items.filter(isPlayerStart).length, 1)
+    assert.strictEqual(state().doc.map.items.length, 3)
+  })
+
   it("places, moves, deletes, and undoes/redoes", () => {
     const s = () => useEditor.getState()
     s().loadMap(startOnlyMap(), null)
