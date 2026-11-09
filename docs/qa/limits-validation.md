@@ -31,7 +31,7 @@ This is why a file the game refuses is worse than an error. Blocking those files
 ## What changed in the app
 
 - **Export and Play check the map first.** A map with no edits skipped `MapExporter`, and an imported `.balledit` is copied byte for byte, so neither passed any rule, including the ones we already had. `writeOpenMapToGame` now runs `gameLoadProblems` before anything is written. The test for it fails without the change.
-- **Main checks the character limit on the file it copies.** `MapExports.exportMap` runs `fileTextProblems` on the bytes it is about to write, before it asks about anything. The map the page decoded can't show this limit, since whitespace counts, and an open tab can be older than the file. Play goes through the same export. A file this long can't be imported or opened, because it is over `MAX_MAP_BYTES`, so what got through was a file that grew on disk while its tab sat open with no edits.
+- **Main checks the character limit on the file it copies.** `MapExports.exportMap` runs `fileTextProblems` on the bytes it is about to write, before it asks about anything. The map the page decoded can't show this limit, since whitespace counts, and an open tab can be older than the file. Play goes through the same export. Main also refuses to open or import a file this long (§ Characters, not bytes), so what got through was a file that grew on disk while its tab sat open with no edits.
 - **`domain/gameRules.ts` holds the new rules**, each measured below: classes the catalog lacks or the game no longer ships, unknown, misplaced, repeated and nameless properties, extra mesh components, uncooked meshes, negative and repeated material slots, too many materials or paths, unknown difficulties, `editorState.version`, repeated pivots, unknown pivot choices, group names and frames, and the parser's limits on strings, field names, containers and nesting.
 - **Writing a `.balledit` clears `bIsBaseItem`**, see below.
 
@@ -43,7 +43,7 @@ Constants read from the shipping exe at the `cmp` beside each error string, then
 
 | Limit                     | Value      | Measured                                                                                  |
 | ------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| Characters per file       | 67,108,864 | Yes. It counts characters: 80 MB of `é` under the cap loads                               |
+| Characters per file       | 67,108,864 | Yes. UTF-16 code units, not bytes, and a BOM isn't one (§ Characters, not bytes)          |
 | JSON values per file      | 2,000,000  | Yes. Every object, array and scalar counts, the root included                             |
 | String length             | 1,048,576  | Yes, on any field, modelled or not                                                        |
 | Field name length         | 4,096      | Yes                                                                                       |
@@ -56,6 +56,22 @@ Constants read from the shipping exe at the `cmp` beside each error string, then
 | Properties per typed list | 4,096      | No. No class has that many, so 4,097 fails as unknown properties first                    |
 
 The first two decide how big a map can be, and they land far below 100,000 items. A sample item is about 35 values and 1,400 characters, which puts the cap near 48,000 items. Both caps are checked since #181 (`docs/qa/budget.md`).
+
+## Characters, not bytes
+
+Measured on 2026-11-09 through the game driver (slot 4, headless), for #203. Each probe is the driver's probe map padded with spaces before its closing brace, with a marker coordinate on one cube, and counts as loaded only if the marker shows in the editor.
+
+| Probe                                    | Bytes      | UTF-16 code units        | Game      |
+| ---------------------------------------- | ---------- | ------------------------ | --------- |
+| ASCII, at the limit                      | 67,108,864 | 67,108,864               | Loads     |
+| ASCII, one over                          | 67,108,865 | 67,108,865               | Blank map |
+| A BOM, then the limit                    | 67,108,867 | 67,108,864 after the BOM | Loads     |
+| One U+1F600 in `levelDescription`, at it | 67,108,866 | 67,108,864               | Loads     |
+| The same, one over                       | 67,108,867 | 67,108,865               | Blank map |
+
+So the game counts the UTF-16 code units of the text it decodes. A character outside the BMP is two, and the last probe has only 67,108,864 code points, so the count isn't of code points. A BOM is none. That is JavaScript's `length` of what `TextDecoder` returns, which is what `fileTextProblems` counts.
+
+The app counted bytes in one place. Main refused to read any map file over 64 MiB, so a file the game loads, such as 40 million `é`, couldn't be opened, imported, listed under File › Import map, or read back by the in-game editor's sync. Main now rules out by size only a file past `MAX_FILE_BYTES`, the most a file within the limit can take (three bytes per code unit, and a BOM), and counts the characters of the rest once it has read them. A file over the limit gets "has more characters than the game loads". `mapExports.ipc.test.ts` covers each of those paths with a file at the limit in characters but past it in bytes, with and without a BOM.
 
 ## Cases
 
@@ -220,6 +236,9 @@ The first two decide how big a map can be, and they land far below 100,000 items
 | 67,108,864 characters or fewer                              | Loads     | Exports   |
 | 67,108,865                                                  | Blank map | Blocks it |
 | 40 million `é`: 80 MB as UTF-8, under the cap in characters | Loads     | Exports   |
+| A BOM, then 67,108,864 characters                           | Loads     | Exports   |
+| A character outside the BMP and 67,108,862 others           | Loads     | Exports   |
+| A character outside the BMP and 67,108,863 others           | Blank map | Blocks it |
 | 100,000 bare items (2.4 million values)                     | Blank map | Blocks it |
 | 100,001 bare items                                          | Blank map | Blocks it |
 

@@ -163,7 +163,7 @@ Found by locating the `lea` that references each error string and reading the ad
 | Prefab items              | 2 to 4,096 (0.4.1, measured)              | `Select 2 to 4096 items before saving a prefab.`              | n/a         |
 | Workshop `.ballmap` bytes | not recovered (64-bit constant elsewhere) | `...oversized root .ballmap (%lld bytes; maximum %lld)`       | 0x144ECBD1C |
 
-The value and character limits are the ones a big map meets (`docs/qa/budget.md` § The real limits). Every object, array and scalar counts as a value, and every character of the file counts, whitespace and the game's layout included. A real map stops near 46,600 items on characters, and no map gets past 83,331 items on values, so the 100,000-item limit is never the one that binds. Past either, the game drops the map without a message and opens the default new map.
+The value and character limits are the ones a big map meets (`docs/qa/budget.md` § The real limits). Every object, array and scalar counts as a value, and every character of the file counts, whitespace and the game's layout included. A character is a UTF-16 code unit, so one outside the BMP counts as two, and a BOM doesn't count ([docs/qa/limits-validation.md § Characters, not bytes](qa/limits-validation.md#characters-not-bytes)). A real map stops near 46,600 items on characters, and no map gets past 83,331 items on values, so the 100,000-item limit is never the one that binds. Past either, the game drops the map without a message and opens the default new map.
 
 There is no piece budget. Items still carry a `BudgetCost` and `MaximumMapBudget` is still 300, but on 0.4.1 nothing counts the cost or enforces the limit, and the header's bar stays empty (`docs/qa/budget.md`, which has every cost).
 

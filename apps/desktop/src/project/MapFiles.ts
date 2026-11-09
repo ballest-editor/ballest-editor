@@ -1,5 +1,6 @@
 import {
   type BackupRef,
+  fileTextProblems,
   type GameMap,
   type GameMaps,
   type ImportMapPayload,
@@ -11,6 +12,7 @@ import {
   type MapBackups,
   type MapLink,
   type MapThumbnailPng,
+  MAX_FILE_BYTES,
   type OpenedMapFile,
   type ProjectMap,
   type ProjectMapFile,
@@ -22,7 +24,7 @@ import { Context, DateTime, Effect, FileSystem, Option, Path, Schema } from "eff
 import { Buffer } from "node:buffer"
 import { GamePaths } from "../game/GamePaths"
 import { type Backup, type BackupError, Backups, parseBackupId } from "./Backups"
-import { isSamePath, MAX_MAP_BYTES, sha256, writeAtomic } from "./files"
+import { isSamePath, sha256, writeAtomic } from "./files"
 import { emptyLink, type MapLinkError, MapLinks } from "./MapLinks"
 import {
   backupsFolderIn,
@@ -126,7 +128,7 @@ export class MapFiles extends Context.Service<MapFiles, {
   readonly contentsOf: (
     file: string
   ) => Effect.Effect<MapContents, ProjectError | Effect.Error<ReturnType<FileSystem.FileSystem["stat"]>>>
-  /** Reads any map file, unless it is too large to be a map. */
+  /** Reads any map file, unless it has more characters than the game loads. */
   readonly readBytes: (file: string) => Effect.Effect<Uint8Array, ProjectError>
 }>()("ballest/desktop/project/MapFiles") {
   /** `platform` decides how paths compare (Windows: case-insensitively); `exportBackups` keeps what Export wrote over. */
@@ -195,19 +197,21 @@ export class MapFiles extends Context.Service<MapFiles, {
       return maps.flatMap(Option.toArray).sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
     }).pipe(Effect.withSpan("MapFiles.list"))
 
-    /** Reads a file with `read`, unless it is too large to be a map. */
-    const readMapFile = <A>(
-      file: string,
-      read: Effect.Effect<A, Effect.Error<ReturnType<FileSystem.FileSystem["readFile"]>>>
-    ) =>
+    /**
+     * Reads a file, unless it has more characters than the game loads. Its size rules out a file too big for any count,
+     * before it is read; the characters, as the game counts them, settle the rest.
+     */
+    const readMapFile = (file: string) =>
       fs.stat(file).pipe(
-        Effect.filterOrFail((stat) => Number(stat.size) <= MAX_MAP_BYTES, () => projectError("tooLarge", file)()),
-        Effect.andThen(read),
-        Effect.catchTag("PlatformError", (cause) => Effect.fail(readError(file)(cause)))
+        Effect.filterOrFail((stat) => Number(stat.size) <= MAX_FILE_BYTES, () => projectError("tooLarge", file)()),
+        Effect.andThen(fs.readFile(file)),
+        Effect.catchTag("PlatformError", (cause) => Effect.fail(readError(file)(cause))),
+        Effect.map((bytes) => ({ bytes, text: new TextDecoder().decode(bytes) })),
+        Effect.filterOrFail(({ text }) => fileTextProblems(text).length === 0, () => projectError("tooLarge", file)())
       )
 
-    const readBytes = (file: string) => readMapFile(file, fs.readFile(file))
-    const readText = (file: string) => readMapFile(file, fs.readFileString(file))
+    const readBytes = (file: string) => Effect.map(readMapFile(file), ({ bytes }) => bytes)
+    const readText = (file: string) => Effect.map(readMapFile(file), ({ text }) => text)
 
     const sidecarFileIn = (project: string, fileName: string) =>
       Effect.map(fileOf(project, fileName), (file) => path.join(path.dirname(file), sidecarFileNameOf(fileName)))
@@ -332,7 +336,7 @@ export class MapFiles extends Context.Service<MapFiles, {
       const gameMapOf = Effect.fnUntraced(function*(fileName: string) {
         const file = path.join(folder.value, fileName)
         const stat = yield* fs.stat(file)
-        if (stat.type !== "File" || Number(stat.size) > MAX_MAP_BYTES) return Option.none<GameMap>()
+        if (stat.type !== "File" || Number(stat.size) > MAX_FILE_BYTES) return Option.none<GameMap>()
         const { hash, ...summary } = yield* cached(file, stampOf(stat))
         return Option.some<GameMap>({
           fileName,

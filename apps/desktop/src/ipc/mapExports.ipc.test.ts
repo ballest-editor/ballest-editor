@@ -7,6 +7,7 @@ import {
   InvokeChannels,
   MapBackupFile,
   MapBackups,
+  MAX_FILE_BYTES,
   OpenedMapFile,
   ProjectMapFile,
   ProjectMaps
@@ -419,28 +420,51 @@ describe("MapExports over IPC", () => {
         assert.strictEqual(yield* fs.readFileString(inGame), "{}")
         assert.deepStrictEqual((yield* linkOf)?.export, linked?.export)
         // Nor could it be opened again: only a tab from before it grew gets as far as Export.
-        const unread = yield* Effect.flip(fake.invoke(InvokeChannels.readMap, { fileName: name }))
-        assert.match(String(unread.cause), /too large to be a map/)
+        // Counted once read, and by its size first when no count could bring it under.
+        for (const bytes of [CHARACTERS_PER_FILE + 1, MAX_FILE_BYTES + 1]) {
+          yield* fs.truncate(path.join(project, "maps", name), bytes)
+          const unread = yield* Effect.flip(fake.invoke(InvokeChannels.readMap, { fileName: name }))
+          assert.match(String(unread.cause), /more characters than the game loads \(67108864\)/)
+        }
       })
     ))
 
-  it.effect("counts characters, not bytes: a file at the limit in characters but past it in bytes exports", () =>
-    withHandlers(({ fake, project, steam }) =>
-      Effect.gen(function*() {
-        const fs = yield* FileSystem.FileSystem
-        const path = yield* Path.Path
-        const name = "Map_LevelEditorMain&Wide_me.balledit"
-        yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text: "é" })
-        yield* fs.truncate(path.join(project, "maps", name), CHARACTERS_PER_FILE + 1)
-        yield* fake.invoke(InvokeChannels.exportMap, {
-          fileName: name,
-          replacePublished: false,
-          overwriteChanged: false
+  it.effect(
+    "counts characters, not bytes: a file at the limit in characters but past it in bytes goes everywhere",
+    () =>
+      withHandlers(({ fake, project, steam }) =>
+        Effect.gen(function*() {
+          const fs = yield* FileSystem.FileSystem
+          const path = yield* Path.Path
+          // `é` is two bytes and one character, and a BOM isn't a character of the text the game reads.
+          const files = [
+            { name: "Map_LevelEditorMain&Wide_me.balledit", text: "é", bytes: CHARACTERS_PER_FILE + 1 },
+            { name: "Map_LevelEditorMain&Marked_me.balledit", text: "\uFEFFé", bytes: CHARACTERS_PER_FILE + 4 }
+          ]
+          for (const { bytes, name, text } of files) {
+            yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text })
+            yield* fs.truncate(path.join(project, "maps", name), bytes)
+            const opened = yield* fake.invokeAs(ProjectMapFile, InvokeChannels.readMap, { fileName: name })
+            assert.strictEqual(opened.text.length, CHARACTERS_PER_FILE)
+
+            yield* fake.invoke(InvokeChannels.exportMap, {
+              fileName: name,
+              replacePublished: false,
+              overwriteChanged: false
+            })
+            const inGame = path.join(steam.maps, name)
+            assert.strictEqual(Number((yield* fs.stat(inGame)).size), bytes)
+            // The in-game editor's sync reads it back, and File › Import map lists it and picks it.
+            yield* fake.invokeAs(ProjectMapFile, InvokeChannels.readExport, { fileName: name })
+            const listed = yield* fake.invokeAs(GameMaps, InvokeChannels.listGameMaps)
+            assert.include(listed.map((map) => map.fileName), name)
+            const picked = yield* fake.invokeAs(OpenedMapFile, InvokeChannels.pickGameMap, { fileName: name })
+            assert.strictEqual(picked.text.length, CHARACTERS_PER_FILE)
+          }
         })
-        const { size } = yield* fs.stat(path.join(steam.maps, name))
-        assert.strictEqual(Number(size), CHARACTERS_PER_FILE + 1)
-      })
-    ))
+      ),
+    30_000
+  )
 
   it.effect("drops no link while the game's maps folder isn't there", () =>
     withHandlers(({ fake, steam }) =>
