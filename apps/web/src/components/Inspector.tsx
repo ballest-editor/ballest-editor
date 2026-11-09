@@ -35,7 +35,7 @@ import { assetNameOf } from "../domain/Materials"
 import { scaleSnapStep, snapsGrid, snapsRotation } from "../domain/snapConfig"
 import { pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
-import { pivotUnitOf } from "../domain/units"
+import { pivotModeFor, pivotUnitOf } from "../domain/units"
 import type { MapValidation } from "../domain/validateMap"
 import {
   deleteSelection,
@@ -841,15 +841,18 @@ export function Inspector() {
   // The selection's gizmo target as shown, whose unit the Transform rows edit. Read from the store at the time, since
   // it is built afresh from the items' shown transforms and a selector returning it would re-render without end.
   const pivotMode = useEditor((s) => s.pivotMode)
+  const chainMode = useEditor((s) => s.chainMode)
   const doc = useEditor((s) => s.doc)
   const previewLanding = useEditor((s) => s.previewLanding)
   const target = useMemo(() => {
     const s = useEditor.getState()
     return selectionPivot(s, (id) => shownTransform(s, id))
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the target is built from, read inside
-  }, [doc, preview, previewLanding, catalogIndex, pivotMode, selectedIds, enteredGroupId])
+  }, [doc, preview, previewLanding, catalogIndex, pivotMode, chainMode, selectedIds, enteredGroupId])
   const frame = target?.unit
-  const unitKey = target === undefined ? undefined : pivotUnitOf(target.selection, pivotMode).id
+  const unitKey = target === undefined
+    ? undefined
+    : pivotUnitOf(target.selection, pivotModeFor({ pivotMode, chainMode }, target.selection)).id
   const groupUnit = unitKey !== undefined && !ids.includes(unitKey)
   const unitIndex = unitKey === undefined ? -1 : ids.indexOf(unitKey)
 
