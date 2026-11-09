@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import {
   activeNodeOf,
   canGroupSelection,
+  canSetItemPivots,
   clickLevelOf,
   enteredLevelOf,
   exactSelectedGroup,
@@ -13,7 +14,8 @@ import {
   selectableKeys,
   selectedGroupIds,
   selectionNodeIds,
-  selectionSummaryOf
+  selectionSummaryOf,
+  unitSummaryOf
 } from "./groupSelection"
 import type { TreeNode } from "./MapSidecar"
 
@@ -256,5 +258,24 @@ describe("groupTrail", () => {
     assert.deepStrictEqual(groupTrail(tree, "inner").map((g) => g.id), ["outer", "inner"])
     assert.deepStrictEqual(groupTrail(tree, null), [])
     assert.deepStrictEqual(groupTrail(tree, "gone"), [])
+  })
+})
+
+describe("item pivot eligibility", () => {
+  it("uses the same selection units for pieces, whole groups and entered groups", () => {
+    assert.isFalse(canSetItemPivots(tree, [], null))
+    assert.isTrue(canSetItemPivots(tree, ["d"], null))
+    assert.isFalse(canSetItemPivots(tree, ["a", "b", "d"], null))
+    assert.isFalse(canSetItemPivots(tree, ["e"], null))
+    assert.isTrue(canSetItemPivots(tree, ["a", "b"], "inner"))
+    assert.isTrue(canSetItemPivots(tree, ["e"], "only"))
+  })
+})
+
+describe("unitSummaryOf", () => {
+  it("counts groups and items when a group is among other units, and says nothing otherwise", () => {
+    assert.isUndefined(unitSummaryOf(tree, ["d"], null))
+    assert.isUndefined(unitSummaryOf(tree, ["a", "b", "c"], null))
+    assert.strictEqual(unitSummaryOf(tree, ["a", "b", "c", "d"], null), "1 group and 1 item")
   })
 })

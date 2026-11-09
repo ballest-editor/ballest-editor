@@ -268,7 +268,7 @@ const editMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
     command("deselect", "Deselect", selectionOff),
     SEPARATOR,
     command("groupSelection", "Group", state.canGroup ? null : "Select what to group first."),
-    command("chainSelection", "Group as chain", state.canChain ? null : "Select what to chain first."),
+    command("chainSelection", "Make chain", state.canChain ? null : "Select what to chain first."),
     command("ungroupSelection", "Ungroup", state.canUngroup ? null : "Select a group first."),
     SEPARATOR,
     item("Save selection as prefab…", startSavePrefab, state.prefabProblem ?? null)

@@ -24,7 +24,7 @@ If `assets/catalog.json` is missing, the app falls back to `src/domain/bundledCa
   - They render in world space, never under a mirror. Axes are expressed in game coordinates: X red, Y green, Z blue = up. Directions come from mapping the game basis through `coords.ts`, and arrows never flip toward the camera.
   - Constant screen size, drawn on top, grabbed through invisible fatter hit meshes.
   - Hover highlights only the hovered handle. A drag keeps the active handle lit, dims the others, and shows a guide line in the axis colour.
-  - Move uses axis arrows plus plane squares. Rotate uses rings, which show only the camera-facing quarter until dragged, plus a white view ring. Scale uses cubes on the gizmo's axes plus a centre uniform ring, and the item scales along its own axis.
+  - Move uses axis arrows plus plane squares. Rotate uses rings, which show only the camera-facing quarter until dragged, plus a white view ring. Scale uses cubes on the gizmo's axes, carets for scaling a pair of axes together, and a centre uniform ring. Items scale along their own axes.
   - The inspector follows the drag live. Each drag is one undo entry, and Escape cancels a drag, restoring the transform.
   - Handles are composable specs (`toolHandles`), so a combined tool is a concatenation.
 - **Selection.** A click selects, and Shift or Ctrl+click adds or toggles. The outline runs along the mesh's own edges, as the game draws it (`selectionOutline.ts`): creases always, the silhouette of smooth surfaces from the camera, and the active item lighter. Copy, cut, paste and duplicate work on the selection, and Alt+drag duplicates (Settings › General).

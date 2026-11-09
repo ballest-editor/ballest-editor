@@ -1,7 +1,6 @@
 import { IconArrowBackUp } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { ColorPicker, ColorSwatch } from "@workspace/ui/components/color-picker"
-import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
@@ -23,8 +22,8 @@ import {
 } from "../domain/itemProperties"
 import { setSelectionProperties } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
+import { FieldRow, Section } from "./InspectorLayout"
 import { NumberField } from "./NumberField"
-import { Section, SectionTitle } from "./SectionTitle"
 
 /** The value every selected item shares, or undefined when they differ (mixed). */
 export function sharedValue<T>(values: ReadonlyArray<T>): T | undefined {
@@ -118,12 +117,12 @@ function PropertyValue({ property, id, handleClassName }: {
           handleClassName={handleClassName}
         />
       )
-      if (range === undefined) return field
+      if (range === undefined) return <div className="flex-1">{field}</div>
       // The slider stays inside its range; the field shows a value past it, as the game's text box does.
       const position = Math.min(Math.max(scrub ?? shown ?? range.min, range.min), range.max)
       return (
         // The field keeps room for its widest value; where the slider would be left too short, it goes under the field.
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,1fr)] items-center gap-2 @max-[15rem]:grid-cols-1">
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2 @max-[15rem]:grid-cols-1">
           <Slider
             aria-label={propertyLabel(property)}
             className="@max-[15rem]:order-last"
@@ -215,16 +214,11 @@ function Row(props: {
   const resettable = props.properties.filter((p) => p.default !== undefined)
   const atDefault = resettable.every((p) => p.values.every((v) => v === p.default))
   return (
-    <div className="contents">
-      <Label
-        htmlFor={id}
-        title={props.details.join("\n")}
-        className="min-w-0 text-body break-words text-fg-secondary"
-      >
-        {props.label}
-      </Label>
-      {props.children(id)}
-      {resettable.length > 0 && !atDefault
+    <FieldRow
+      label={props.label}
+      htmlFor={id}
+      hint={props.details.map((line) => <span key={line}>{line}</span>)}
+      trailing={resettable.length > 0 && !atDefault
         ? (
           <Button
             variant="ghost"
@@ -238,7 +232,9 @@ function Row(props: {
           </Button>
         )
         : <span />}
-    </div>
+    >
+      {props.children(id)}
+    </FieldRow>
   )
 }
 
@@ -292,9 +288,8 @@ function PropertyRowView({ row }: { readonly row: PropertyRow }) {
 export function ItemProperties({ properties }: { readonly properties: ReadonlyArray<ItemProperty> }) {
   if (properties.length === 0) return null
   return (
-    <Section>
-      <SectionTitle>Properties</SectionTitle>
-      <div className="grid @container grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_1.5rem] items-center gap-x-2 gap-y-1">
+    <Section id="properties" title="Properties">
+      <div className="flex @container flex-col gap-2">
         {propertyRows(properties).map((row) => {
           const first = row._tag === "Color" ? row.color.channels[0] : row.property
           return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />

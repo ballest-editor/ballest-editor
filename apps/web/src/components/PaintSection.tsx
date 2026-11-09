@@ -28,6 +28,8 @@ import { type Brush, type PanelSlot, panelSlotEditsOf, panelSlotPaintOf, panelSl
 import { useEditor } from "../editor/store"
 import { HintBadge } from "./HintBadge"
 import { InfoHint } from "./InfoHint"
+import { FIELD_LABEL, Section } from "./InspectorLayout"
+import { ItemIcon } from "./OutlineRow"
 
 interface SelectedItem {
   readonly id: string
@@ -193,7 +195,7 @@ function SlotPaintRow(
     <div className="flex flex-col gap-1.5">
       {(numbered || offPanel) && (
         <div className="flex items-center justify-between gap-2">
-          {numbered && <span className="text-body text-fg-secondary">{slotName}</span>}
+          {numbered && <span className={FIELD_LABEL}>{slotName}</span>}
           {offPanel && <HintBadge label="Off-panel">{OFF_PANEL_HINT}</HintBadge>}
         </div>
       )}
@@ -234,10 +236,6 @@ function SlotPaintRow(
   )
 }
 
-function Note({ children }: { readonly children: string }) {
-  return <div className="text-body text-fg-tertiary">{children}</div>
-}
-
 function PaintGroup(
   { members, showName }: { readonly members: ReadonlyArray<SelectedItem>; readonly showName: boolean }
 ) {
@@ -249,9 +247,10 @@ function PaintGroup(
   return (
     <div className="flex flex-col gap-3">
       {showName && (
-        <div className="text-body-strong">
-          {pieceNameOf(first.item, catalogIndex)}
-          {members.length > 1 && <span className="ml-1 text-body text-fg-tertiary">× {members.length}</span>}
+        <div className="flex h-6 min-w-0 items-center gap-1 text-body">
+          <ItemIcon actorClass={first.item.actorToSpawn} />
+          <span className="truncate">{pieceNameOf(first.item, catalogIndex)}</span>
+          {members.length > 1 && <span className="shrink-0 text-caption text-fg-tertiary">× {members.length}</span>}
         </div>
       )}
       {slots.map((target) => (
@@ -268,25 +267,57 @@ function PaintGroup(
   )
 }
 
+/** Why the selection can't be painted, in short for the section's header and in full for its hint. */
+const paintStatusOf = (
+  { surfaceLocked, noItems, noSlots, loaded }: {
+    readonly surfaceLocked: boolean
+    readonly noItems: boolean
+    readonly noSlots: boolean
+    readonly loaded: boolean
+  }
+): { readonly short: string; readonly long: string } | undefined => {
+  if (surfaceLocked) return { short: "Locked", long: SURFACE_LOCKED }
+  if (noItems) return { short: "Not paintable", long: NOT_PAINTED }
+  if (noSlots) return { short: "No slots", long: "This piece has no material slots." }
+  return loaded ? undefined : { short: "Not loaded", long: "The game's materials aren't loaded." }
+}
+
 /**
- * The game's Paint panel: material and colour per slot, for the selected items it lists (see
- * `paintTargets`). Items of the same piece are edited together; an edit is one undo step.
+ * The game's Paint panel as the Inspector's Paint section: material and colour per slot, for the selected items it
+ * lists (see `paintTargets`). Items of the same piece are edited together; an edit is one undo step. A selection that
+ * can't be painted is only the header, saying why.
  */
 export function PaintSection({ selected }: { readonly selected: ReadonlyArray<SelectedItem> }) {
   const loaded = useEditor((s) => s.paint.length > 0)
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const { items, surfaceLocked } = paintTargets(selected, catalogIndex)
-  if (surfaceLocked) return <Note>{SURFACE_LOCKED}</Note>
-  if (items.length === 0) return <Note>{NOT_PAINTED}</Note>
-  if (panelSlotsOf(items.map((m) => m.item), catalogIndex, undefined).length === 0) {
-    return <Note>No material slots.</Note>
+  const status = paintStatusOf({
+    surfaceLocked,
+    noItems: items.length === 0,
+    noSlots: items.length > 0 && panelSlotsOf(items.map((m) => m.item), catalogIndex, undefined).length === 0,
+    loaded
+  })
+  if (status !== undefined) {
+    return (
+      <Section
+        id="paint"
+        title="Paint"
+        actions={
+          <>
+            {status.short}
+            <InfoHint>{status.long}</InfoHint>
+          </>
+        }
+      />
+    )
   }
-  if (!loaded) return <Note>The game's materials aren't loaded.</Note>
   return (
-    <div className="flex flex-col gap-4">
-      {paintGroups(items).map((members) => (
-        <PaintGroup key={members.map((m) => m.id).join(",")} members={members} showName={items.length > 1} />
-      ))}
-    </div>
+    <Section id="paint" title="Paint">
+      <div className="flex flex-col divide-y divide-border *:py-4 *:first:pt-0 *:last:pb-0">
+        {paintGroups(items).map((members) => (
+          <PaintGroup key={members.map((m) => m.id).join(",")} members={members} showName={items.length > 1} />
+        ))}
+      </div>
+    </Section>
   )
 }

@@ -141,6 +141,8 @@ const commands = {
       await send("Input.dispatchKeyEvent", { type: "keyDown", key })
       await send("Input.dispatchKeyEvent", { type: "keyUp", key })
     }),
+  // Text typed into whatever has focus, as a keyboard would insert it (a click on a field first).
+  type: (text) => withPage((send) => send("Input.insertText", { text })),
   shot: (file) =>
     withPage(async (send) => {
       const { data } = await send("Page.captureScreenshot", { format: "png" })

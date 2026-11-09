@@ -28,8 +28,8 @@ export type GroupDelta =
   | { readonly kind: "translate"; readonly offset: Vec3; readonly frame?: Quat4 }
   /** A rotation about the pivot (game-space unit quaternion). */
   | { readonly kind: "rotate"; readonly rotation: Quat4; readonly frame?: Quat4 }
-  /** Scale each item by `factor` about the pivot: along its own `axis`, or uniformly. */
-  | { readonly kind: "scale"; readonly factor: number; readonly axis?: Axis }
+  /** Scale each item by `factor` about the pivot: along its own `axis`, in the plane normal to `excludeAxis`, or uniformly. */
+  | { readonly kind: "scale"; readonly factor: number; readonly axis?: Axis; readonly excludeAxis?: Axis }
   | RigidDelta
 
 /** A turn about `about`, then `offset`: a move that lands on a target and takes its rotation too. */
@@ -104,11 +104,11 @@ export const applyGroupDelta = (t: UeTransform, pivot: Vec3, delta: GroupDelta):
         rotation: quatNormalize(quatMul(delta.rotation, t.rotation))
       }
     case "scale": {
-      const { factor, axis } = delta
+      const { factor, axis, excludeAxis } = delta
       const s = t.scale3D
-      const scale3D = axis !== undefined
-        ? { ...s, [axis]: clampScale(s[axis] * factor) }
-        : { x: clampScale(s.x * factor), y: clampScale(s.y * factor), z: clampScale(s.z * factor) }
+      const along = (one: Axis) =>
+        one === excludeAxis || (axis !== undefined && one !== axis) ? s[one] : clampScale(s[one] * factor)
+      const scale3D = { x: along("x"), y: along("y"), z: along("z") }
       return scaleAbout(t, scale3D, pivot)
     }
   }

@@ -1,9 +1,17 @@
-import { IconArrowsMaximize, IconArrowsMove, IconBrush, IconPointer, IconRefresh } from "@tabler/icons-react"
+import {
+  IconArrowsMaximize,
+  IconArrowsMove,
+  IconBrush,
+  IconPointer,
+  IconRefresh,
+  IconRepeat
+} from "@tabler/icons-react"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { cn } from "@workspace/ui/lib/utils"
 import type { KeybindAction } from "../domain/Keybinds"
 import { type Tool, useEditor } from "../editor/store"
 import { PaintPalette } from "./PaintPalette"
+import { RepeatPanel } from "./RepeatPanel"
 import { GROUP, noFocus, SEGMENT } from "./viewControlStyle"
 import { ViewTip } from "./ViewTip"
 
@@ -14,18 +22,19 @@ import { ViewTip } from "./ViewTip"
 const TOOLS: ReadonlyArray<{
   readonly tool: Tool
   readonly label: string
-  readonly action: KeybindAction
+  readonly action: KeybindAction | undefined
   readonly icon: typeof IconPointer
 }> = [
   { tool: "select", label: "Select", action: "selectMode", icon: IconPointer },
   { tool: "translate", label: "Move", action: "translateMode", icon: IconArrowsMove },
   { tool: "rotate", label: "Rotate", action: "rotateMode", icon: IconRefresh },
   { tool: "scale", label: "Scale", action: "scaleMode", icon: IconArrowsMaximize },
+  { tool: "repeat", label: "Repeat", action: undefined, icon: IconRepeat },
   { tool: "paint", label: "Paint", action: "paintMode", icon: IconBrush }
 ]
 
 /** The tools with chrome of their own over the tool bar while they're on: a view each (viewIds.ts, `tool:<tool>`). */
-export const toolPanels: ReadonlyArray<Tool> = ["paint"]
+export const toolPanels: ReadonlyArray<Tool> = ["repeat", "paint"]
 
 /**
  * Tool switcher, bottom-centre of the viewport. It belongs to no pane and floats over them all: a divider under it passes
@@ -38,6 +47,7 @@ export function ToolBar({ disabled }: { readonly disabled: boolean }) {
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-3 bottom-3 flex flex-col items-center justify-end gap-2">
+      {tool === "repeat" && !disabled && <RepeatPanel />}
       {tool === "paint" && !disabled && <PaintPalette />}
       <ToggleGroup
         pill="primary"

@@ -4,6 +4,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { type PlacedItem, selectionFlip } from "../domain/itemProperties"
 import type { FlipAxis } from "../domain/mirror"
 import { flipSelection } from "../editor/actions"
+import { FieldRow } from "./InspectorLayout"
 import { IN_USE_CLASSES } from "./PivotSection"
 
 /** The game's labels and help text (its strings table: `FlipXLabel`, `FlipXHelp`, ...). */
@@ -22,8 +23,7 @@ export function FlipSection({ items }: { readonly items: ReadonlyArray<PlacedIte
   const flips = FLIPS.map((flip) => ({ ...flip, state: selectionFlip(items, flip.axis) }))
   if (flips.every(({ state }) => state === "unavailable")) return null
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-body text-fg-secondary">Flip</span>
+    <FieldRow label="Flip">
       <ToggleGroup
         aria-label="Flip"
         multiple
@@ -56,6 +56,6 @@ export function FlipSection({ items }: { readonly items: ReadonlyArray<PlacedIte
           )
         })}
       </ToggleGroup>
-    </div>
+    </FieldRow>
   )
 }

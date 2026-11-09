@@ -26,6 +26,7 @@ import {
   exportProblemOf,
   gameMapOf,
   initialMap,
+  isShownChain,
   nextSelection,
   NO_TAB_OPEN,
   nodeNamesOf,
@@ -34,6 +35,7 @@ import {
   PREFAB_TAB_STAYS_HERE,
   saveProblemOf,
   selectionPivot,
+  shownChainStart,
   shownGizmoSpace,
   shownLighting,
   shownPivotMode,
@@ -66,6 +68,51 @@ const mapWithCubes = (...xs: ReadonlyArray<number>) => {
 }
 
 describe("editor store", () => {
+  it("repeats a selection across world axes in one undo step, preserving groups", () => {
+    mapWithCubes(10, 30)
+    const originals = state().doc.ids.slice(1)
+    state().select(originals)
+    state().groupSelection()
+    const before = state().doc
+    const steps = state().past.length
+    state().repeatSelection({ count: { x: 3, y: 2, z: 1 }, spacing: { x: 100, y: -200, z: 0 } })
+    assert.strictEqual(state().doc.map.items.length, 13)
+    assert.strictEqual(state().selectedIds.length, 10)
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.strictEqual(state().doc.structure.tree.length, before.structure.tree.length + 5)
+    assert.deepStrictEqual(state().doc.map.items.slice(3).map((i) => i.itemTransform.translation), [
+      { x: 10, y: -200, z: 0 },
+      { x: 30, y: -200, z: 0 },
+      { x: 110, y: 0, z: 0 },
+      { x: 130, y: 0, z: 0 },
+      { x: 110, y: -200, z: 0 },
+      { x: 130, y: -200, z: 0 },
+      { x: 210, y: 0, z: 0 },
+      { x: 230, y: 0, z: 0 },
+      { x: 210, y: -200, z: 0 },
+      { x: 230, y: -200, z: 0 }
+    ])
+    state().undo()
+    assert.strictEqual(state().doc, before)
+    state().redo()
+    assert.strictEqual(state().doc.map.items.length, 13)
+  })
+
+  it("refuses invalid or oversized repeats atomically and never copies the player start", () => {
+    mapWithCubes(10)
+    const before = state().doc
+    for (const x of [0, 1.5, Number.NaN, 100001]) {
+      state().repeatSelection({ count: { x, y: 1, z: 1 }, spacing: { x: 100, y: 0, z: 0 } })
+      assert.strictEqual(state().doc, before)
+    }
+    state().repeatSelection({ count: { x: 2, y: 1, z: 1 }, spacing: { x: Infinity, y: 0, z: 0 } })
+    assert.strictEqual(state().doc, before)
+    state().select(state().doc.ids)
+    state().repeatSelection({ count: { x: 2, y: 1, z: 1 }, spacing: { x: 100, y: 0, z: 0 } })
+    assert.strictEqual(state().doc.map.items.filter(isPlayerStart).length, 1)
+    assert.strictEqual(state().doc.map.items.length, 3)
+  })
+
   it("places, moves, deletes, and undoes/redoes", () => {
     const s = () => useEditor.getState()
     s().loadMap(startOnlyMap(), null)
@@ -1709,13 +1756,13 @@ describe("groups and the selection", () => {
     state().groupSelection()
     const { id } = state().doc.structure.tree.find((n) => n.kind === "group")!
     state().setChain(id, true)
-    assert.deepStrictEqual(linksOf(id), [a, d, b, c], "Convert to chain")
+    assert.deepStrictEqual(linksOf(id), [a, d, b, c], "Make chain on a group")
     state().undo()
     state().undo()
     state().select([c, a, d, b])
     state().chainSelection()
     const chain = state().doc.structure.tree.find((n) => n.kind === "group")!
-    assert.deepStrictEqual(linksOf(chain.id), [c, b, d, a], "Group as chain")
+    assert.deepStrictEqual(linksOf(chain.id), [c, b, d, a], "Make chain on a selection")
   })
 
   it("lays a chain along a shape as one undo step, and nothing that isn't a chain", () => {
@@ -1736,15 +1783,34 @@ describe("groups and the selection", () => {
     assert.isFalse(state().layChain(a, { kind: "straight" }))
   })
 
-  it("chains one whole group selected in place, and bends it in Each without entering it", () => {
-    const { a, b, c, outer } = nestedMap()
+  it("chains one whole group selected in place, and bends it link by link at once, without entering it", () => {
+    const { a, b, c, d, outer } = nestedMap()
     state().select([a, b, c])
     state().chainSelection()
     assert.strictEqual(findGroup(state().doc.structure.tree, outer)?.chain, true, "the group itself")
     assert.strictEqual(state().enteredGroupId, null)
-    assert.strictEqual(shownPivotMode(state()), "together")
+    assert.isTrue(isShownChain(state()))
+    assert.strictEqual(shownPivotMode(state()), "each", "a new chain goes link by link, so a turn bends it")
+    assert.deepStrictEqual(
+      shownChainStart(state()),
+      { at: selectionPivot(state(), transformOf)!.pivot, gizmo: true },
+      "link 1's pivot, under the gizmo"
+    )
+    // the period key flips the chain's setting, and leaves the pivot setting alone
     state().togglePivotMode()
-    assert.strictEqual(shownPivotMode(state()), "each", "a chain alone bends")
+    assert.strictEqual(state().chainMode, "rigid")
+    assert.strictEqual(state().pivotMode, "together")
+    assert.strictEqual(shownPivotMode(state()), "together", "Rigid")
+    state().togglePivotMode()
+    // a chain among other units follows the pivot setting, and has no start to mark
+    state().select([a, b, c, d])
+    assert.isFalse(isShownChain(state()))
+    assert.strictEqual(shownPivotMode(state()), "together")
+    assert.isUndefined(shownChainStart(state()))
+    state().togglePivotMode()
+    assert.strictEqual(state().chainMode, "links")
+    assert.strictEqual(shownPivotMode(state()), "each")
+    state().togglePivotMode()
   })
 
   it("pivots a prefab instance on its origin, and follows a live move", () => {

@@ -108,6 +108,8 @@ export const PanelSettings = Schema.Struct({
   favoritePieces: Schema.Array(Schema.String),
   /** What the Inspector's Scale row shows: a factor of the piece's own size, or its size (see domain/itemBounds). */
   inspectorScale: Schema.Literals(["factor", "size"]),
+  /** The Inspector's sections opened or closed by hand, by `SectionId`; a section not here is at its default. */
+  inspectorSections: Schema.Record(Schema.String, Schema.Boolean),
   /** How the paint tool's palette shows the picker: one finish's colours in a row, or every finish × colour. */
   paintView: Schema.Literals(["row", "grid"])
 })
@@ -176,6 +178,7 @@ export const defaultSettings: Settings = {
     recentPieces: [],
     favoritePieces: [],
     inspectorScale: "factor",
+    inspectorSections: {},
     paintView: "row"
   },
   gizmo: { size: "m", showForGroups: true },

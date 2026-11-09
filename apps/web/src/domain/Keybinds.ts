@@ -132,7 +132,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   scaleMode: "scale",
   paintMode: "paint",
   toggleGizmoSpace: "local / world axes",
-  togglePivotMode: "together / each pivot",
+  togglePivotMode: "together / each, rigid / link by link",
   focusSelection: "focus selection",
   addToSelection: "add to selection",
   toggleSelection: "toggle selection",
@@ -150,7 +150,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   cancelDrag: "cancel drag",
   enterGroup: "enter group",
   groupSelection: "group",
-  chainSelection: "group as chain",
+  chainSelection: "make chain",
   ungroupSelection: "ungroup",
   moveForward: "forward",
   moveBack: "reverse",
@@ -212,7 +212,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   toggleGizmoSpace:
     "Switch the move and rotate gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. Scale always uses each item's own axes. C in the in-game editor.",
   togglePivotMode:
-    "Switch what a selection of several pieces or groups pivots about: one point for all of them, the active one's pivot, as the game does (Together), or each about its own pivot and axes (Each). No equivalent in the in-game editor; Blender's pivot key.",
+    "Switch what a selection of several pieces or groups pivots about: one point for all of them, the active one's pivot, as the game does (Together), or each about its own pivot and axes (Each). With a chain selected, switch it between Rigid, where it moves as one piece, and link by link, where a turn bends it, a move spreads it and a scale stretches it. No equivalent in the in-game editor; Blender's pivot key.",
   focusSelection: "Frame the current selection in the viewport. F in the in-game editor.",
   addToSelection:
     "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
@@ -243,7 +243,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   groupSelection:
     "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the in-game editor.",
   chainSelection:
-    "Group the selection as a chain, in the order it was selected; one whole group selected becomes a chain itself. With the pivot setting at Each, a turn then bends it. Editor only.",
+    "Make the selection a chain, its links in order along the pieces from the first selected; one whole group selected becomes a chain itself. A turn then bends it. Editor only.",
   ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the in-game editor.",
   moveForward: "Fly the camera forward while held.",
   moveBack: "Fly the camera backward while held.",

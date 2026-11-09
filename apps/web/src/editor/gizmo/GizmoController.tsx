@@ -5,7 +5,7 @@ import { threeToUeVector, ueToScene, type UeTransform, type Vec3 } from "../../d
 import { selectedGroupIds } from "../../domain/groupSelection"
 import type { GroupDelta } from "../../domain/groupTransform"
 import { gizmoScaleOf } from "../../domain/Settings"
-import { type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
+import { scaleSnapStep, type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
 import { type ScaleStop, snappedScale, turnLanding, turnReach, type TurnStop } from "../../domain/snapRotate"
 import { quatFromAxisAngle } from "../../domain/ueMath"
 import {
@@ -13,6 +13,8 @@ import {
   leadingKeys,
   movedAlikeKeys,
   type PivotMode,
+  pivotModeFor,
+  pivotUnitOf,
   type SelectionUnits,
   turnAccumulates
 } from "../../domain/units"
@@ -41,7 +43,7 @@ import { type DragTarget, dragTargetOf, selectionSnapStart } from "../snap/selec
 import { ownSnapItemsOf, snapItemsOf } from "../snap/snapScene"
 import { gameRayOf, snapViewOf, toThree } from "../snap/snapView"
 import { allTurnStopsOf, reachAlong, scaleStopsOf, turnStopsFrom } from "../snap/turnScale"
-import { fitTransforms, selectionUnits, shownGizmoSpace, snapConfigOf, useEditor } from "../store"
+import { fitTransforms, selectionUnits, shownGizmoSpace, snapConfigOf, unitExtentOf, useEditor } from "../store"
 import { useDarkTheme } from "../theme"
 import {
   constraintOf,
@@ -53,7 +55,7 @@ import {
   stepAxesOf,
   turnOf
 } from "./drag"
-import { GizmoObject, type HandleSpec, SIZE, toolHandles } from "./handles"
+import { GizmoObject, type HandleSpec, pairOf, SIZE, toolHandles } from "./handles"
 
 interface ActiveDrag {
   readonly id: string
@@ -79,7 +81,9 @@ interface ActiveDrag {
   readonly stops: ReadonlyArray<ScaleStop>
   /** How far the active item's scaled face reaches from the pivot at the drag's start, in cm. */
   readonly reach: number
-  /** The active item's scale along the handle's axis at the drag's start. */
+  /** The unit's local size along the handle's axis (cm), which a size snap keeps on the grid; none for a group. */
+  readonly scaleExtent: number | undefined
+  /** The unit's scale along the handle's axis at the drag's start. */
   readonly scaleFrom: number
   /** The cm the threshold covers at the pivot. */
   readonly rangeCm: number
@@ -148,7 +152,7 @@ const isTranslate = ({ kind }: HandleSpec) => kind === "translateAxis" || kind =
 const transformOf = ({ kind }: HandleSpec): SnapTransform =>
   kind === "rotateAxis" || kind === "rotateView"
     ? "turn"
-    : kind === "scaleAxis" || kind === "scaleUniform"
+    : kind === "scaleAxis" || kind === "scalePlane" || kind === "scaleUniform"
     ? "scale"
     : "move"
 
@@ -168,9 +172,12 @@ export function GizmoController() {
   const gl = useThree((s) => s.gl)
   const tool = useEditor((s) => s.tool)
   // the select and paint tools have no gizmo
-  const gizmo = useMemo(() => (tool === "select" || tool === "paint" ? null : new GizmoObject(toolHandles[tool])), [
-    tool
-  ])
+  const gizmo = useMemo(
+    () => (tool === "select" || tool === "paint" || tool === "repeat" ? null : new GizmoObject(toolHandles[tool])),
+    [
+      tool
+    ]
+  )
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => gizmo?.setDark(dark), [gizmo, dark])
   const hovered = useRef<string | null>(null)
@@ -301,7 +308,7 @@ export function GizmoController() {
       const { settings } = s
       const duplicate = e.altKey && settings.general.altDragDuplicates && isTranslate(spec) ? "pending" : undefined
       const config = snapConfigOf(s)
-      const { pivotMode } = s
+      const pivotMode = pivotModeFor(s, target.selection)
       const frame = localFrameOf(start)
       // a move along world axes is the same for every unit that takes it as dragged, so any of them can lead it
       const leads = isTranslate(spec) && frame === undefined
@@ -317,6 +324,10 @@ export function GizmoController() {
       const items = constraint === undefined
         ? snapItemsOf(s, new Set(target.transforms.keys()), config.targets.mesh.sharpAngle)
         : []
+      const unit = pivotUnitOf(target.selection, pivotMode)
+      const extent = unitExtentOf(s, unit)
+      // a caret scales two axes by one factor, measured on the first of them
+      const scaleKey = spec.kind === "scalePlane" && spec.axis !== undefined ? pairOf(spec.axis)[0] : spec.axis ?? "x"
       drag.current = {
         id,
         pointerId: e.pointerId,
@@ -364,7 +375,8 @@ export function GizmoController() {
         },
         stops: scaleAxis === undefined ? [] : scaleStopsOf(scaleAxis, target.pivot, selection.box, items),
         reach: scaleAxis === undefined ? 0 : reachAlong(selection.box, target.pivot, scaleAxis),
-        scaleFrom: spec.axis === undefined ? target.active.scale3D.x : target.active.scale3D[spec.axis],
+        scaleFrom: unit.transform.scale3D[scaleKey],
+        scaleExtent: extent?.[scaleKey],
         rangeCm,
         keys: seedDragKeys(e, transformOf(spec)),
         lastEvent: undefined
@@ -429,7 +441,10 @@ export function GizmoController() {
       const scaled = snappedScale({
         from: active.scaleFrom,
         free: active.scaleFrom * scale.factor,
-        step: snap.step ? config.scaleStep : undefined,
+        step: (() => {
+          const step = scaleSnapStep(config, active.scaleExtent, keys.off)
+          return step === undefined ? undefined : step * 100
+        })(),
         face: snap.targets.includes("mesh") && scale.axis !== undefined && active.scaleFrom !== 0 && active.reach > 0
           ? { reach: active.reach / active.scaleFrom, range: active.rangeCm }
           : undefined,

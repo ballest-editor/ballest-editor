@@ -5,6 +5,7 @@ import { Catalog, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { placementTransform } from "../domain/factory"
 import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type TransformField } from "../domain/groupTransform"
+import { extentOf } from "../domain/itemBounds"
 import { localToWorld } from "../domain/pivot"
 import { quatConjugate, quatMul, rotateVec, rotatorToQuat, vecAdd } from "../domain/ueMath"
 import { assertVec } from "../test/vec"
@@ -17,7 +18,7 @@ import {
   setSelectionSize,
   setSelectionUnitField
 } from "./actions"
-import { initialMap, pivotOf, selectionPivot, shownPivotPoint, shownTransform, useEditor } from "./store"
+import { initialMap, pivotOf, selectionPivot, shownPivotPoint, shownTransform, unitExtentOf, useEditor } from "./store"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
 const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
@@ -226,18 +227,26 @@ describe("Each in the Inspector", () => {
     s().togglePivotMode()
   })
 
-  it("carries the links after a link edited inside an entered chain", () => {
+  it("carries the links after a link edited inside an entered chain, rigidly in Rigid and adding up link by link", () => {
     const { ids } = setup()
-    const [l1 = "", l2 = "", l3 = ""] = ids
+    const [, l2 = ""] = ids
     s().chainSelection()
     const chain = s().doc.structure.tree.find((n) => n.kind === "group")
     s().enterGroup(chain?.kind === "group" ? chain.id : null)
     s().select([l2])
     const before = new Map(ids.map((id) => [id, docTransform(id)]))
-    editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
-    assert.deepStrictEqual(docTransform(l1), before.get(l1), "the link before stays")
-    assert.strictEqual(docTransform(l2).translation.y, before.get(l2)!.translation.y + 40)
-    assert.strictEqual(docTransform(l3).translation.y, before.get(l3)!.translation.y + 40, "carried")
+    // how far each link moves for a y move of 40 on link 2; the link before stays
+    const movesOf = () => {
+      editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
+      const moves = ids.map((id) => docTransform(id).translation.y - before.get(id)!.translation.y)
+      s().undo()
+      return moves
+    }
+    assert.deepStrictEqual(movesOf(), [0, 40, 80], "a new chain goes link by link: the moves add up from link 2")
+    s().togglePivotMode()
+    assert.strictEqual(s().chainMode, "rigid")
+    assert.deepStrictEqual(movesOf(), [0, 40, 40], "Rigid: link 3 is carried")
+    s().togglePivotMode()
     s().enterGroup(null)
   })
 
@@ -353,6 +362,62 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     return s().selectedIds[0]!
   }
 
+  it("shows the gizmo pivot for a mixed selection with an active group, as the Location of the unit it moves", () => {
+    const { ids } = setup()
+    s().select(ids.slice(1))
+    s().groupSelection()
+    s().select(ids)
+    const target = selectionPivot(s(), (id) => shownTransform(s(), id))!
+    expectVec(target.unit.translation, target.pivot, "the Location row")
+    assert.strictEqual(shownPivotPoint(s()), undefined, "no Position row repeating it")
+  })
+
+  /** The selection's unit as the Inspector's rows read it, and that unit's size at scale 1. */
+  const unitNow = () => {
+    const target = selectionPivot(s(), (id) => shownTransform(s(), id))!
+    const unit = target.selection.units[0]!
+    return { target, extent: unitExtentOf(s(), unit) }
+  }
+  it("gives a group a Location, its pivot, that a typed value moves it to like a piece's", () => {
+    const { ids } = setup()
+    s().groupSelection()
+    const { target } = unitNow()
+    expectVec(target.unit.translation, target.pivot, "Location is the pivot")
+    editSelectionAxis("translation", "x", { kind: "set", value: 1000 })
+    const after = unitNow().target
+    assertVec(after.pivot, { ...target.pivot, x: 1000 }, "the group moved so its pivot is at x = 1000")
+    for (const id of ids) assert.closeTo(docTransform(id).translation.y, shownTransform(s(), id)!.translation.y, 1e-6)
+  })
+
+  it("gives a plain group no size, since its turned items don't scale its box by the factor", () => {
+    setup()
+    s().groupSelection()
+    assert.isUndefined(unitNow().extent)
+  })
+
+  it("sizes a group that pivots on a member by that member, whose transform its rows read", () => {
+    const { ids } = setup()
+    s().groupSelection()
+    const group = s().doc.structure.tree.find((node) => node.kind === "group")!
+    s().setGroupPivot(group.id, { choice: "item", key: ids[1]! })
+    const { target, extent } = unitNow()
+    assert.strictEqual(target.selection.units[0]?.anchor, ids[1])
+    const item = s().doc.map.items[s().doc.ids.indexOf(ids[1]!)]!
+    assertVec(extent!, extentOf(item, s().catalogIndex)!, "the member's own extent")
+  })
+
+  it("does not change member pivots through a whole group, but allows them after entering", () => {
+    const { ids } = setup()
+    s().groupSelection()
+    const group = s().doc.structure.tree.find((node) => node.kind === "group")!
+    const before = s().doc
+    setSelectionPivot("Top")
+    assert.strictEqual(s().doc, before)
+    s().enterGroup(group.id)
+    setSelectionPivot("Top")
+    for (const id of ids) assert.strictEqual(pivotOf(s(), id).choice, "Top")
+  })
+
   it("pastes a size onto every item along its own axes, keeping flips and each pivot", () => {
     const id = cubeAt({ x: 0, y: 0, z: 5000 }, 30, "Left")
     s().transformItems(new Map([[id, { ...docTransform(id), scale3D: { x: -2, y: 1, z: 0.5 } }]]))
@@ -385,7 +450,7 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     expectVec(shownPivotPoint(s())!, { x: 100, y: -500, z: 5500 }, "pivot")
   })
 
-  it("has no pivot point of its own to show on Default; a whole group always shows its pivot", () => {
+  it("shows a pivot point only where it isn't the Location already: off a piece's origin, never for a group's frame", () => {
     const { ids } = setup()
     s().select(ids.slice(0, 1))
     assert.strictEqual(shownPivotPoint(s()), undefined)
@@ -393,7 +458,9 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     setSelectionPivot("Left")
     assert.isDefined(shownPivotPoint(s()))
     s().groupSelection()
-    expectVec(shownPivotPoint(s())!, selectionPivot(s(), (id) => shownTransform(s(), id))!.pivot, "the group's pivot")
+    const target = selectionPivot(s(), (id) => shownTransform(s(), id))!
+    expectVec(target.unit.translation, target.pivot, "a group's Location is its pivot")
+    assert.strictEqual(shownPivotPoint(s()), undefined)
   })
 
   it("refuses a pivot on a whole group, whose gizmo sits on its frame, as the game does", () => {

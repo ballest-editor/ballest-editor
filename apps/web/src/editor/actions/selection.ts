@@ -1,7 +1,7 @@
 /** Selection edits: each is one undo step, however many items it touches. */
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
-import { selectableKeys, soleGroupOf } from "../../domain/groupSelection"
+import { canSetItemPivots, selectableKeys } from "../../domain/groupSelection"
 import {
   applyGroupDelta,
   type Axis,
@@ -20,8 +20,9 @@ import type { PropertyChange } from "../../domain/itemProperties"
 import type { Item } from "../../domain/MapFile"
 import type { FlipAxis } from "../../domain/mirror"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
+import type { RepeatOptions } from "../../domain/repeat"
 import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
-import { applyUnitEdit, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
+import { applyUnitEdit, pivotModeFor, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
 import {
   editedKeys,
   fitTransforms,
@@ -46,6 +47,8 @@ export const setSelectionProperties = (changes: ReadonlyArray<PropertyChange>): 
 export const flipSelection = (axis: FlipAxis) => useEditor.getState().flipSelection(axis)
 
 export const deleteSelection = () => useEditor.getState().deleteSelection()
+
+export const repeatSelection = (options: RepeatOptions) => useEditor.getState().repeatSelection(options)
 
 export const duplicateSelection = () => useEditor.getState().duplicateSelection()
 
@@ -97,8 +100,9 @@ const withUnitEdit = (edit: (active: Unit) => UnitEdit): ReadonlyMap<string, UeT
       return t === undefined ? [] : [[id, t] as const]
     })
   )
-  const active = pivotUnitOf(target.selection, s.pivotMode)
-  return fitTransforms(s, applyUnitEdit(target.selection, s.pivotMode, transforms, edit(active)))
+  const mode = pivotModeFor(s, target.selection)
+  const active = pivotUnitOf(target.selection, mode)
+  return fitTransforms(s, applyUnitEdit(target.selection, mode, transforms, edit(active)))
 }
 
 /** An axis edit: the change it makes to the active unit's axis, which every unit then takes about its own pivot. */
@@ -186,11 +190,11 @@ export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: Ax
 /**
  * Sets the pivot `choice` on every selected item, measured on each one's own bounds (one
  * undo step). Items whose bounds are unknown keep their pivot. A whole group has a pivot of
- * its own (`setGroupPivot`), so its items keep theirs.
+ * its own (`setGroupPivot`), so its items keep theirs, and so do a group's among pieces until it is entered.
  */
 export const setSelectionPivot = (choice: PivotChoice): void => {
   const { doc, selectedIds, enteredGroupId, catalogIndex, setItemPivots } = useEditor.getState()
-  if (soleGroupOf(doc.structure.tree, selectedIds, enteredGroupId) !== undefined) return
+  if (!canSetItemPivots(doc.structure.tree, selectedIds, enteredGroupId)) return
   setItemPivots(
     new Map(selectedIds.flatMap((id) => {
       const item = doc.map.items[doc.ids.indexOf(id)]

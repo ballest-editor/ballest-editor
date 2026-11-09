@@ -351,6 +351,10 @@ describe("a snapped commit on a group with a Point pivot", () => {
       const s = useEditor.getState()
       return selectionPivot(s, (id) => shownTransform(s, id))?.pivot
     }
+    const livePivotLocation = () => {
+      const s = useEditor.getState()
+      return selectionPivot(s, (id) => shownTransform(s, id))?.unit.translation
+    }
     const LANDED = { x: 0, y: 450, z: 100 }
 
     it("shows the Point where it will land, and the commit leaves it there", () => {
@@ -358,7 +362,9 @@ describe("a snapped commit on a group with a Point pivot", () => {
       useEditor.getState().select([b, c])
       previewMove(preview(b, c), landing)
       assertVec(livePivot() ?? ORIGIN, LANDED, "the gizmo")
-      assertVec(shownPivotPoint(useEditor.getState()) ?? ORIGIN, LANDED, "the Pivot section")
+      // a group's Point is its Location, which the Transform rows show; the Pivot section adds nothing
+      assertVec(livePivotLocation() ?? ORIGIN, LANDED, "the Location row")
+      assert.isUndefined(shownPivotPoint(useEditor.getState()), "no second Position row")
       assertVec(shownPivotDots(useEditor.getState())[0]?.pivot ?? ORIGIN, LANDED, "the dot")
       assert.deepStrictEqual(pivotOfGroup(id), POINT, "the document waits for the commit")
       useEditor.getState().setPreview(null)

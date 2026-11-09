@@ -7,7 +7,7 @@ import { defaultSpotOf, SPOT_IDS, SPOT_NAMES, type SpotId, spotsOf } from "../do
 import { showConnectSpot } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
-import { Section, SectionTitle } from "./SectionTitle"
+import { FIELD_LABEL, Section } from "./InspectorLayout"
 
 const NO_CONNECTORS: ReadonlyArray<Connector> = []
 
@@ -25,7 +25,7 @@ function EndSpots({ itemKey, end, connector, chosen }: {
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="flex min-w-0 flex-col">
-        <span className="text-body text-fg-secondary">{label}</span>
+        <span className={FIELD_LABEL}>{label}</span>
         <span className="truncate text-caption text-fg-tertiary">
           {connector.profile}
           {pressed !== undefined && ` · ${SPOT_NAMES[pressed]}`}
@@ -89,18 +89,19 @@ export function ConnectsAtSection({ itemKey }: { readonly itemKey: string }) {
   )
   if (ends.length === 0) return null
   return (
-    <Section>
-      <div className="flex items-center justify-between gap-2">
-        <SectionTitle>Connects at</SectionTitle>
+    <Section
+      id="connectsAt"
+      title="Connects at"
+      actions={
         <InfoHint>
           Where on each end this piece joins others, looking out of the end. Joined ends meet at their chosen spots.
         </InfoHint>
-      </div>
-      <div className="flex flex-col gap-2">
-        {ends.map(({ connector, end, id }) => (
-          <EndSpots key={id} itemKey={itemKey} end={end} connector={connector} chosen={chosen[String(end)]} />
-        ))}
-      </div>
+      }
+      className="gap-2"
+    >
+      {ends.map(({ connector, end, id }) => (
+        <EndSpots key={id} itemKey={itemKey} end={end} connector={connector} chosen={chosen[String(end)]} />
+      ))}
     </Section>
   )
 }

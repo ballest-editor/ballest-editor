@@ -10,8 +10,6 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import { ueToThreeVector } from "../domain/coords"
 import type { Box } from "../domain/itemBounds"
 
-/** How far outside its items the box sits (cm), so its lines clear theirs. */
-const PADDING = 8
 /** On screen, in pixels, at the box's distance. */
 const DASH = 10
 const GAP = 6
@@ -90,7 +88,6 @@ export class GroupBox extends LineSegments2 {
     const [min, max] = [ueToThreeVector(bounds.min), ueToThreeVector(bounds.max)]
     next.min.set(min.x, min.y, min.z)
     next.max.set(max.x, max.y, max.z)
-    next.expandByScalar(PADDING)
     if (!next.equals(this.shown)) {
       this.shown.copy(next)
       this.fit()

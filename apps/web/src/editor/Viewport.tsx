@@ -22,9 +22,10 @@ import { firesHere, holdsModifiersOf, type ModifierState, mouseChordOf, resolveC
 import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
-import { gridColorsOf } from "../domain/Settings"
+import { gizmoScaleOf, gridColorsOf } from "../domain/Settings"
 import { snapsGrid } from "../domain/snapConfig"
 import { holdsDrop, placeAt, placePrefab } from "./actions"
+import { ChainStart } from "./chainStart"
 import { fadeFineLines, gridReach } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
@@ -56,6 +57,7 @@ import {
   indexOfKey,
   noTabOpen,
   type SelectMode,
+  shownChainStart,
   shownPivotDots,
   snapConfigOf,
   useEditor,
@@ -677,6 +679,22 @@ function PivotDots() {
   return <primitive object={dots} />
 }
 
+/** The "Link 1" mark on a selected chain's first link (editor/chainStart.ts), placed for each pane like the dots. */
+function ChainStartMarker() {
+  const marker = useMemo(() => new ChainStart(), [])
+  useEffect(() => () => marker.dispose(), [marker])
+  useBeforePaneDraw((pane) => {
+    const s = useEditor.getState()
+    const start = shownChainStart(s)
+    marker.visible = start !== undefined
+    if (start === undefined) return
+    const w = ueToThreeVector(start.at)
+    const origin = new THREE.Vector3(w.x, w.y, w.z)
+    marker.update(origin, pane.worldPerPixelAt(origin), start.gizmo ? gizmoScaleOf(s.settings.gizmo.size) : undefined)
+  })
+  return <primitive object={marker} />
+}
+
 function GroupBoxes() {
   const tree = useEditor((s) => s.doc.structure.tree)
   const selectedIds = useEditor((s) => s.selectedIds)
@@ -768,6 +786,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <GroupBoxes />
         <PrefabOriginMarker />
         <PivotDots />
+        <ChainStartMarker />
         <SnapOverlay />
         <GizmoController />
         <SnapInput />

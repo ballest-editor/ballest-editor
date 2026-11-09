@@ -173,13 +173,29 @@ Which transforms snapping applies to. Move is always on. Rotate and Scale are to
 
 ### Under the pivot setting
 
-Snapping measures a drag on the items that take it as the gizmo shows it (`leadingKeys`, `domain/units.ts`), and the pivot setting says which those are ([DESKTOP.md § Pivot setting](DESKTOP.md#pivot-setting-together-and-each)).
+Snapping measures a drag on the items that take it as the gizmo shows it (`leadingKeys`, `domain/units.ts`), and the pivot setting says which those are ([DESKTOP.md § Pivot setting](DESKTOP.md#pivot-setting-together-and-each)). A chain on its own follows the chain setting instead, where Rigid reads as Together and link by link as Each ([§ Group pivots and chains](DESKTOP.md#group-pivots-and-chains)).
 
 - **Together:** every unit leads. A link carried along inside an entered chain moves but doesn't lead, so its corners and ends aren't bases.
 - **Each:** a move along world axes is the same for every unit that takes it as dragged, so they all lead it (`movedAlikeKeys`). Under a local move, a turn or a scale only the active unit leads: it lands on the target, and the others take the same move, angle or factor along their own axes and about their own pivots. A chain passes the edit down from its first link (inside an entered chain, the first selected, where the gizmo then sits), and each link after takes it again on top of the one before, so only that first link leads, for a world move too.
 - **A lock** is on the grid's axes, so every unit takes the same offset, whatever the handle's axes were.
 - **A landing that takes a rotation** (Match rotation, Rotate to face, Flush, a join) is one motion of the whole selection in either mode, as it puts the active unit's base on the target. A chain's links take it once, and it doesn't run down them. A group's Point pivot goes with it, though a turn alone leaves a Point where it is.
 - **A turn's stops** assume the active unit ends up turned by the angle dragged. A turn running down a chain in Each goes past that, so it takes the rotation step and nothing else.
+
+## Numeric steps
+
+The magnet is the master switch for all snapping. Grid enables translation snapping; **Snap size to grid** in the snap menu also uses its spacing for resizing. Both inspector scrubs and scale handles use this size setting, regardless of whether the inspector displays a factor or a dimension. Typed values and expressions are exact and bypass snapping.
+
+| Operation                         | Rule                                                                                                                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| World move or placement           | The chosen base lands on the nearest grid line, using the grid's origin and yaw.                                                                                                |
+| Local move                        | The distance from the drag's start is a multiple of the grid spacing along the local axes.                                                                                      |
+| Inspector location or pivot scrub | The displayed world coordinate lands on multiples of the spacing, measured from world zero.                                                                                     |
+| Size snap                         | The leading piece's local dimension lands on a multiple of the grid spacing. A 137 cm dimension with 50 cm spacing lands on 150 cm, not 187 cm.                                 |
+| Scale factor snap                 | When size snapping is off or bounds are unknown, the Scale factor switch snaps to absolute percentage multiples. Groups use this rule because they have no intrinsic dimension. |
+| Rotation handle                   | The angle moved is a multiple of the angle step.                                                                                                                                |
+| Inspector rotation scrub          | The displayed angle lands on a multiple of the angle step.                                                                                                                      |
+
+Uniform scaling uses the leading piece's X dimension to choose the factor and preserves its proportions. Multi-selection uses the same factor for every unit, following Together or Each; it does not independently round every member's dimensions. Decals use their editable dimensions. Piece-specific limits still apply. Mesh face targets retain priority over numeric scale steps.
 
 ## What a drag looks like
 
@@ -261,7 +277,7 @@ The menu names the targets in the user's words: **Ends** is Connectors, **Pieces
 The plain screen, top to bottom (`components/SnapMagnet.tsx`):
 
 - **Snapping**: the magnet's switch.
-- **Grid**, **Angle** (a turn's step), **Scale**: each a step, typed or picked from the list, and a switch. Picking a step turns that one on.
+- **Grid**, **Angle** (a turn's step), **Scale factor**: each a step, typed or picked from the list, and a switch. Picking a step turns that one on.
 - **Snaps to**: Ends, Pieces and Guides, each a switch. Planes joins them once the map has a construction plane or axis.
 - **Prefer**: Grid or Pieces. It sets the priority to Grid first or Pieces first (§ Priority) and Connectors' Pull back to ×1, so the order alone decides. Any other order or pull presses neither and says Custom.
 - **Snap distance**: the threshold, in px (default 12), the one distance every target shares: how close the pointer has to get, and how far past a target it goes before the selection is free.

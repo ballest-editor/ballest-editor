@@ -66,7 +66,7 @@ function SnapMenuContent() {
       <div className={BLOCK}>
         <StepRow
           label="Grid"
-          help="Moves land on grid lines this far apart. Example: at 10 cm a piece moves in 10 cm steps."
+          help="World moves land on grid lines; local moves travel in grid increments. At 50 cm, a world position of 137 snaps to 150; a local move advances by 50."
           dimmed={dimmed}
           step={{
             label: "Grid step",
@@ -78,6 +78,13 @@ function SnapMenuContent() {
           }}
           enabled={grid.enabled}
           onEnabled={(enabled) => updateSnapTarget("grid", { enabled })}
+        />
+        <SwitchRow
+          label="Snap size to grid"
+          dimmed={dimmed || !grid.enabled}
+          help="Inspector and handles resize to multiples of the grid size along the piece's own axes. Requires Grid and Snapping."
+          checked={config.scaleToGrid}
+          onChange={(scaleToGrid) => updateSnap({ scaleToGrid })}
         />
         <StepRow
           label="Angle"
@@ -95,8 +102,8 @@ function SnapMenuContent() {
           onEnabled={(rotationEnabled) => updateSnap({ rotationEnabled })}
         />
         <StepRow
-          label="Scale"
-          help="Resizing goes in steps of this much. Example: at 10%, a piece goes 100%, 110%, 120%."
+          label="Scale factor"
+          help="Absolute scale multiples. Used when size snapping is off or dimensions are unknown. At 10%, scales land on 100%, 110%, 120%."
           dimmed={dimmed}
           step={{
             label: "Scale step",

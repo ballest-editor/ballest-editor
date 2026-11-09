@@ -1,10 +1,10 @@
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type PointerEvent, type ReactNode, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { skyColorAt } from "../domain/sky"
 import { formatTimeOfDay, type Lighting, LIGHTING_RANGES, lightingOf, parseTimeOfDay } from "../domain/sunlight"
 import { shownLighting, useEditor } from "../editor/store"
+import { FieldRow } from "./InspectorLayout"
 import { NumberField } from "./NumberField"
 
 /** One control per slider in the game's World Settings › lighting, labelled as the game labels them. */
@@ -98,7 +98,7 @@ export function LightingSettings() {
   }
 
   return (
-    <div className="flex @container flex-col gap-1">
+    <div className="flex flex-col gap-2">
       {CONTROLS.map(({ key, label, title, step, digits, unit, format, parse }) => {
         const { min, max } = LIGHTING_RANGES[key]
         const value = shown[key]
@@ -122,34 +122,27 @@ export function LightingSettings() {
           />
         )
         return (
-          <div
-            key={key}
-            className="grid grid-cols-[5.5rem_minmax(0,1fr)_4.25rem] items-center gap-2 @max-[15rem]:grid-cols-[minmax(0,1fr)_4.25rem]"
-          >
-            <Tooltip>
-              <TooltipTrigger render={<span className="truncate text-body text-fg-secondary" />}>
-                {label}
-              </TooltipTrigger>
-              <TooltipContent side="left">{title}</TooltipContent>
-            </Tooltip>
-            {key === "timeOfDay"
-              ? <SkyPreview thumb={(thumbValue - min) / (max - min)}>{slider}</SkyPreview>
-              : <div className={SLIDER_PLACE}>{slider}</div>}
-            <NumberField
-              label={label}
-              value={value}
-              digits={digits}
-              handle={false}
-              onCommit={(v) => commit(key, v)}
-              unit={unit}
-              format={format}
-              parse={parse}
-            />
-          </div>
+          <FieldRow key={key} label={label} hint={title}>
+            <div className="grid w-full grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
+              {key === "timeOfDay"
+                ? <SkyPreview thumb={(thumbValue - min) / (max - min)}>{slider}</SkyPreview>
+                : <div className={SLIDER_PLACE}>{slider}</div>}
+              <NumberField
+                label={label}
+                value={value}
+                digits={digits}
+                handle={false}
+                onCommit={(v) => commit(key, v)}
+                unit={unit}
+                format={format}
+                parse={parse}
+              />
+            </div>
+          </FieldRow>
         )
       })}
       {!mapLighting && (
-        <p className="mt-1 text-body text-fg-tertiary">
+        <p className="text-body text-fg-tertiary">
           The viewport is using studio lights. Turn on View › Map lighting to see these.
         </p>
       )}

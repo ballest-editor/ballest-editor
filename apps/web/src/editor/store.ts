@@ -36,7 +36,7 @@ import {
   type SlotMaterial,
   validateItem
 } from "../domain/edits"
-import { editTransform, fitEditTransform } from "../domain/editTransform"
+import { editTransform, fitEditTransform, isDecal } from "../domain/editTransform"
 import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
@@ -52,7 +52,7 @@ import {
   soleGroupOf
 } from "../domain/groupSelection"
 import { landedPoint, type RigidDelta } from "../domain/groupTransform"
-import { placedBoxOf } from "../domain/itemBounds"
+import { extentOf, placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import { jointsAfterMove } from "../domain/joints"
 import type { Keybinds } from "../domain/Keybinds"
@@ -88,6 +88,7 @@ import { isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/pr
 import type { PrefabFile } from "../domain/PrefabFile"
 import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
 import type { RecoveredTab } from "../domain/recovery"
+import { repeatCopies, repeatOffsets, type RepeatOptions, repeatProblem } from "../domain/repeat"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import type { SnapConfig, SnapTarget, SnapTransform } from "../domain/snapConfig"
@@ -158,18 +159,22 @@ import type {
 } from "../services/Platform"
 
 import {
+  type ChainMode,
   type ChainShape,
   commonMoveOf,
   effectivePivotMode,
+  isChainSelection,
   layChain,
   pathOrder,
   pivotDotsOf,
   type PivotDotSpec,
   type PivotMode,
+  pivotModeFor,
   pivotUnitOf,
   reachableKeys,
   type SelectionUnits,
   selectionUnitsOf,
+  type Unit,
   type UnitContext,
   unitOf,
   withCarriedPoints
@@ -603,6 +608,8 @@ export interface EditorState extends TabState {
   readonly gizmoSpace: GizmoSpace
   /** What a selection pivots about: one point for all (the game's rule), or each unit its own (`domain/units.ts`). */
   readonly pivotMode: PivotMode
+  /** How a chain on its own takes an edit: whole, or link by link (`ChainMode`), so a new chain bends at once. */
+  readonly chainMode: ChainMode
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: DialogState | null
   /** The Export or Play under way, for the status bar's chip; null when there is none. */
@@ -774,6 +781,7 @@ export interface EditorState extends TabState {
   readonly setItemPivots: (pivots: ReadonlyMap<string, Pivot>) => void
   readonly deleteSelection: () => void
   /** Copies the selected items in place (one undo step) and selects the copies. */
+  readonly repeatSelection: (options: RepeatOptions) => void
   readonly duplicateSelection: () => void
   /** Puts the selected items on the clipboard; the document is unchanged. */
   readonly copySelection: () => void
@@ -857,6 +865,7 @@ export interface EditorState extends TabState {
   readonly setBrush: (brush: Brush) => void
   readonly setPaintBlockedReason: (reason: string | null) => void
   readonly toggleGizmoSpace: () => void
+  /** Flips the setting the selection follows: the chain setting for a chain on its own, else the pivot setting. */
   readonly togglePivotMode: () => void
   /** Opens `dialog` in place of the open one (and its payload). */
   readonly openDialog: (dialog: DialogState) => void
@@ -1246,6 +1255,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     paintBlockedReason: null,
     gizmoSpace: "world",
     pivotMode: "together",
+    chainMode: "links",
     dialog: null,
     gameWrite: null,
     openedInGame: null,
@@ -1555,6 +1565,42 @@ export const useEditor = create<EditorState>()((set, get) => {
       commit(withoutItems(s.doc, indices), { selectedIds: [] })
     },
 
+    repeatSelection: (options) => {
+      if (strokeUnderway() || noTabOpen(get())) return
+      const s = get()
+      const problem = repeatProblem(options)
+      if (problem !== undefined) {
+        s.notify("error", problem)
+        return
+      }
+      const clip = clipOf(s.doc, copyableIndices(s))
+      const copies = repeatCopies(options)
+      if (clip.items.length === 0 || copies === 0 || !hasRoomFor(s, copies * clip.items.length)) return
+      let doc = s.doc
+      const selectedIds: Array<string> = []
+      for (const offset of repeatOffsets(options)) {
+        const next = withClip({ ...s, doc }, clip)
+        if (next === undefined) return
+        const transforms = new Map(clip.items.flatMap((item, n) => {
+          const id = next.added[n]
+          if (id === undefined) return []
+          const transform = editTransform(item)
+          return [[id, { ...transform, translation: vecAdd(transform.translation, offset) }] as const]
+        }))
+        const map = setTransforms(
+          next.doc.map,
+          [...transforms].map(([id, t]) => [next.doc.ids.indexOf(id), t] as const)
+        )
+        if (Option.isNone(map)) {
+          s.notify("error", INVALID_TRANSFORM)
+          return
+        }
+        doc = withMovedItems(next.doc, map.value, transforms, undefined, s.catalogIndex)
+        selectedIds.push(...next.added)
+      }
+      commit(doc, { selectedIds }, undefined, "Repeat selection")
+    },
+
     duplicateSelection: () => {
       const s = get()
       const next = withClip(s, clipOf(s.doc, copyableIndices(s)))
@@ -1784,7 +1830,12 @@ export const useEditor = create<EditorState>()((set, get) => {
       set((s) => (s.paintBlockedReason === paintBlockedReason ? s : { paintBlockedReason })),
     toggleGizmoSpace: () =>
       set((s) => (s.tool === "scale" ? s : { gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
-    togglePivotMode: () => set((s) => ({ pivotMode: s.pivotMode === "together" ? "each" : "together" })),
+    togglePivotMode: () =>
+      set((s) =>
+        isShownChain(s)
+          ? { chainMode: s.chainMode === "links" ? "rigid" : "links" }
+          : { pivotMode: s.pivotMode === "together" ? "each" : "together" }
+      ),
     // The required chooser stays on top of everything: what would open behind it (the Game link's) waits for a launch.
     openDialog: (dialog) =>
       set((s) =>
@@ -2307,15 +2358,49 @@ export const selectionUnits = (
   transformOf: (id: string) => UeTransform | undefined
 ): SelectionUnits | undefined => selectionUnitsOf(s.selectedIds, s.enteredGroupId, unitContext(s, transformOf))
 
-/** The pivot setting as it applies to this selection: Each needs two or more units. */
-export const shownPivotMode = (s: EditorState): PivotMode =>
-  effectivePivotMode(s.pivotMode, selectionUnits(s, (id) => shownTransform(s, id)))
+/** Whether the selection as shown is a chain on its own, which follows the chain setting (`isChainSelection`). */
+export const isShownChain = (s: EditorState): boolean => {
+  const selection = selectionUnits(s, (id) => shownTransform(s, id))
+  return selection !== undefined && isChainSelection(selection)
+}
+
+/**
+ * The setting as it applies to this selection: the chain setting's for a chain on its own, else the pivot setting's,
+ * where Each needs two or more units.
+ */
+export const shownPivotMode = (s: EditorState): PivotMode => {
+  const selection = selectionUnits(s, (id) => shownTransform(s, id))
+  return selection === undefined ? "together" : effectivePivotMode(pivotModeFor(s, selection), selection)
+}
 
 /** The pivot dots to draw for the selection as shown (`pivotDotsOf`). */
 export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => {
   const transformOf = (id: string) => shownTransform(s, id)
   const selection = selectionUnits(s, transformOf)
-  return selection === undefined ? [] : pivotDotsOf(selection, s.pivotMode, unitContext(s, transformOf).boxOf)
+  return selection === undefined
+    ? []
+    : pivotDotsOf(selection, pivotModeFor(s, selection), unitContext(s, transformOf).boxOf)
+}
+
+/** Where a selected chain starts, and whether the gizmo sits on that point too. */
+export interface ChainStartSpec {
+  readonly at: Vec3
+  readonly gizmo: boolean
+}
+
+/**
+ * Where the selected chain starts, as shown: its first link's pivot, which a bend, spread or stretch runs from and Reverse
+ * swaps for the other end. For one whole chain, or links selected inside an entered one; undefined otherwise. `gizmo`
+ * says a transform tool's gizmo is on it, as it is for a whole chain, so its mark goes under the gizmo.
+ */
+export const shownChainStart = (s: EditorState): ChainStartSpec | undefined => {
+  const selection = selectionUnits(s, (id) => shownTransform(s, id))
+  if (selection === undefined || !isChainSelection(selection)) return undefined
+  const at = (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot
+  if (at === undefined) return undefined
+  const pivot = pivotUnitOf(selection, pivotModeFor(s, selection)).pivot
+  const transforming = s.tool === "translate" || s.tool === "rotate" || s.tool === "scale"
+  return { at, gizmo: transforming && Math.hypot(pivot.x - at.x, pivot.y - at.y, pivot.z - at.z) < 1 }
 }
 
 /**
@@ -2331,7 +2416,7 @@ export const selectionPivot = (
   const active = activeKey === undefined ? undefined : transformOf(activeKey)
   const selection = selectionUnits(s, transformOf)
   if (activeKey === undefined || active === undefined || selection === undefined) return undefined
-  const unit = pivotUnitOf(selection, s.pivotMode)
+  const unit = pivotUnitOf(selection, pivotModeFor(s, selection))
   return {
     active,
     pivot: unit.pivot,
@@ -2343,15 +2428,26 @@ export const selectionPivot = (
 }
 
 /**
- * The point the selection turns and scales about, live, when that's a pivot away from the active item's origin: what the
- * game's Location field shows for one piece (docs/qa/gizmo-scale.md). A whole group's pivot, always.
+ * The point the selection turns and scales about, live, when it isn't where the Transform rows' Location already says:
+ * what the game's Location field shows for one piece (docs/qa/gizmo-scale.md). The rows edit the gizmo's unit, so this
+ * is the same rule for a piece, several, a group (whose Location is its pivot unless it pivots on a member) and a chain.
  */
 export const shownPivotPoint = (s: EditorState): Vec3 | undefined => {
   const target = selectionPivot(s, (id) => shownTransform(s, id))
   if (target === undefined) return undefined
-  // a whole group has no origin of its own, so its pivot is its one position and always shows
-  if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) return target.pivot
-  return sameVec(target.activePivot, target.active.translation) ? undefined : target.activePivot
+  return sameVec(target.pivot, target.unit.translation) ? undefined : target.pivot
+}
+
+/**
+ * A unit's own size along its axes at scale 1 (cm): what the Scale row's Size mode shows and a size snap keeps on the
+ * grid. The extent of the item it takes its transform from (a decal's scale is its size already). A group's frame has
+ * none: its items scale along their own axes, so the box around turned items doesn't scale by the factor.
+ */
+export const unitExtentOf = (s: EditorState, unit: Unit): Vec3 | undefined => {
+  if (unit.anchor === undefined) return undefined
+  const item = s.doc.map.items[indexOfKey(s.doc.ids, unit.anchor)]
+  if (item === undefined) return undefined
+  return isDecal(item) ? { x: 1, y: 1, z: 1 } : extentOf(item, s.catalogIndex)
 }
 
 /** Edit transforms as the game would take them, so a drag stops at a decal's limits as it happens. */
@@ -2401,7 +2497,7 @@ export const useTabSummary = (tabId: string) =>
     }
   }))
 
-/** Whether Group, Group as chain and Ungroup have anything to do, for the menus that hold them. */
+/** Whether Group, Make chain and Ungroup have anything to do, for the menus that hold them. */
 export const useCanGroup = () => {
   const tree = useEditor((s) => s.doc.structure.tree)
   const selectedIds = useEditor((s) => s.selectedIds)

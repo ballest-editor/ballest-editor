@@ -14,6 +14,7 @@ import { measurementFacts } from "../../domain/snapTools"
 import { annotationsOf } from "../../domain/structure"
 import { vecAdd, vecCross, vecLerp, vecScale } from "../../domain/ueMath"
 import { sceneAxisColors } from "../axisColors"
+import { LABEL_HEIGHT, labelTexture } from "../labelTexture"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { useEditor } from "../store"
 import { useDarkTheme } from "../theme"
@@ -40,9 +41,6 @@ const TICK = 9
 const BADGE = 22
 const BADGE_OFFSET = 20
 const GLYPH = 15
-const LABEL_HEIGHT = 20
-/** The label's texture pixels to a pixel on screen, to stay sharp on a high-density display. */
-const LABEL_DENSITY = 3
 
 /** A snapping face's tint, light enough to see the piece through. */
 const FACE_TINT = 0.16
@@ -110,38 +108,6 @@ interface Sized {
   readonly size: number | readonly [number, number]
   /** A direction in the scene its x runs along on screen, as an edge's ticks do. */
   readonly along?: THREE.Vector3
-}
-
-const labelTextures = new Map<string, { readonly texture: THREE.CanvasTexture; readonly width: number }>()
-
-/** A label's picture, kept for the next time the same words come up. */
-const labelTexture = (text: string) => {
-  const kept = labelTextures.get(text)
-  if (kept !== undefined) return kept
-  const canvas = document.createElement("canvas")
-  const context = canvas.getContext("2d")
-  const font = "600 12px system-ui, sans-serif"
-  if (context !== null) context.font = font
-  const width = Math.ceil((context?.measureText(text).width ?? text.length * 7) + 14)
-  canvas.width = width * LABEL_DENSITY
-  canvas.height = LABEL_HEIGHT * LABEL_DENSITY
-  if (context !== null) {
-    context.scale(LABEL_DENSITY, LABEL_DENSITY)
-    context.fillStyle = "rgba(16, 18, 24, 0.82)"
-    context.beginPath()
-    context.roundRect(0, 0, width, LABEL_HEIGHT, LABEL_HEIGHT / 2)
-    context.fill()
-    context.fillStyle = "#ffffff"
-    context.font = font
-    context.textAlign = "center"
-    context.textBaseline = "middle"
-    context.fillText(text, width / 2, LABEL_HEIGHT / 2 + 1)
-  }
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  const entry = { texture, width }
-  labelTextures.set(text, entry)
-  return entry
 }
 
 for (const shape of [dotGeometry, ringGeometry, plusGeometry, tickGeometry]) SHARED_SHAPES.add(shape)

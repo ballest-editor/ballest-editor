@@ -12,7 +12,7 @@ export type Drag = (typeof drags)[number]
 /** The drags that change the map: "while dragging" in Settings' words. Looking and a number field's scrub aren't. */
 const mapDrags: ReadonlyArray<Drag> = ["move", "turn", "scale", "place", "stroke"]
 
-export const tools = ["select", "translate", "rotate", "scale", "paint"] as const
+export const tools = ["select", "translate", "rotate", "scale", "repeat", "paint"] as const
 export type Tool = (typeof tools)[number]
 
 export const platforms = ["desktop", "browser"] as const
@@ -77,6 +77,7 @@ const TOOL_WORDS: Readonly<Record<Tool, string>> = {
   translate: "Move",
   rotate: "Rotate",
   scale: "Scale",
+  repeat: "Repeat",
   paint: "Paint"
 }
 

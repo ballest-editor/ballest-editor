@@ -1,12 +1,17 @@
 import {
   IconAngle,
+  IconArrowAutofitWidth,
   IconChevronDown,
   IconCircleDot,
   IconCircles,
   IconCube,
   IconGrid4x4,
   IconHaze,
+  IconLine,
+  IconLink,
   IconRestore,
+  IconSpacingHorizontal,
+  IconVectorSpline,
   IconWorld
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
@@ -30,6 +35,7 @@ import {
   updateSnapTarget
 } from "../editor/actions"
 import {
+  isShownChain,
   selectionUnits,
   shownGizmoSpace,
   shownPivotMode,
@@ -111,30 +117,83 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
   )
 }
 
+/** What a chain's link-by-link edit does under each tool, as the toggle names it, with the toggle's icon. */
+const CHAIN_EDITS = {
+  rotate: { word: "Bend", Icon: IconVectorSpline, tip: "Every joint turns alike, so the chain curls" },
+  translate: {
+    word: "Spread",
+    Icon: IconSpacingHorizontal,
+    tip: "Every joint opens alike, so the links space out, or a pile stacks up"
+  },
+  scale: { word: "Stretch", Icon: IconArrowAutofitWidth, tip: "Every link scales and the joints stay closed" }
+} as const
+const LINK_BY_LINK = {
+  word: "Link by link",
+  Icon: IconLink,
+  tip: "A turn bends it, a move spreads it, a scale stretches it"
+}
+
+/**
+ * A chain on its own (`isShownChain`): taken whole (Rigid), or link by link, from link 1 or inside an entered chain from
+ * the first selected link, in the words of what the tool's drag does to it: Bend, Spread or Stretch.
+ */
+function ChainToggle({ disabled }: { readonly disabled: boolean }) {
+  const links = useEditor((s) => s.chainMode === "links")
+  const edit = useEditor((s) =>
+    s.tool === "rotate" || s.tool === "translate" || s.tool === "scale" ? CHAIN_EDITS[s.tool] : LINK_BY_LINK
+  )
+  // inside an entered chain an edit runs from the first selected link
+  const inside = useEditor((s) => selectionUnits(s, (id) => shownTransform(s, id))?.chain !== undefined)
+  const togglePivotMode = useEditor((s) => s.togglePivotMode)
+  const label = links
+    ? `${edit.word}: ${edit.tip}, from ${inside ? "the first selected link" : "link 1"} to the end`
+    : inside
+    ? "Rigid: the selected links move and turn as one, and carry the links after them"
+    : "Rigid: the chain moves, turns and scales as one piece"
+  const Icon = links ? edit.Icon : IconLine
+  return (
+    <ViewTip
+      label={label}
+      action="togglePivotMode"
+      render={
+        <Toggle
+          pressed={links}
+          onPressedChange={togglePivotMode}
+          disabled={disabled}
+          aria-label={label}
+          className={cn(SEGMENT, "aria-pressed:bg-transparent aria-pressed:hover:bg-hover")}
+          {...noFocus}
+        />
+      }
+    >
+      <Icon />
+      <span className={cn("text-foreground", CONTROL_WORD)}>{links ? edit.word : "Rigid"}</span>
+    </ViewTip>
+  )
+}
+
 /**
  * What a selection pivots about: one point for all, the active one's pivot, as the game does (Together), or each unit
- * its own (Each). Each needs two or more pieces or groups, or one chain, which it bends; with less the toggle is held at
- * Together and says why.
+ * its own (Each). Each needs two or more pieces or groups; with less the toggle is held at Together and says why. A
+ * chain on its own has its own setting, and `ChainToggle` in this one's place.
  */
 function PivotToggle({ disabled }: { readonly disabled: boolean }) {
+  const chain = useEditor(isShownChain)
   const each = useEditor((s) => shownPivotMode(s) === "each")
-  const reach = useEditor((s) => {
+  const held = useEditor((s) => {
     const selection = selectionUnits(s, (id) => shownTransform(s, id))
-    if (selection === undefined || !canEach(selection)) return "none"
-    return selection.units.length === 1 ? "chain" : "units"
+    return selection === undefined || !canEach(selection)
   })
   const soleGroup = useEditor((s) => soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined)
   const worldMove = useEditor((s) => s.tool === "translate" && shownGizmoSpace(s) === "world")
   const togglePivotMode = useEditor((s) => s.togglePivotMode)
-  const held = reach === "none"
+  if (chain) return <ChainToggle disabled={disabled} />
   const label = held
     ? soleGroup
-      ? "One group is one piece to Each: enter it to work on its members, or make it a chain to bend it"
+      ? "A group moves as one piece. Double-click it to edit its pieces, or make it a chain to bend it"
       : "Each needs two or more pieces or groups selected"
     : each
-    ? reach === "chain"
-      ? "The chain bends: each link turns on its own and carries the links after it"
-      : `Each piece or group pivots on its own${worldMove ? " (same as Together for a move along world axes)" : ""}`
+    ? `Each piece or group pivots on its own${worldMove ? " (same as Together for a move along world axes)" : ""}`
     : `Everything pivots on the active piece, as the game does${
       worldMove ? " (same as Each for a move along world axes)" : ""
     }`

@@ -20,33 +20,81 @@ type NumberEntry =
   | { readonly kind: "add"; readonly by: number }
   | { readonly kind: "multiply"; readonly by: number }
 
+/** Arithmetic only, with precedence and parentheses; never executes JavaScript. */
 const numberIn = (text: string): number | null => {
-  const n = text.trim() === "" ? Number.NaN : Number(text)
-  return Number.isFinite(n) ? n : null
+  if (text.length > 1024) return null
+  let at = 0
+  const space = () => {
+    while (/\s/.test(text[at] ?? "") && at < text.length) at++
+  }
+  const atom = (): number => {
+    space()
+    const sign = text[at]
+    if (sign === "+" || sign === "-") {
+      at++
+      return (sign === "-" ? -1 : 1) * atom()
+    }
+    if (text[at] === "(") {
+      at++
+      const value = sum()
+      space()
+      if (text[at++] !== ")") return Number.NaN
+      return value
+    }
+    const match = /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i.exec(text.slice(at))
+    if (match === null) return Number.NaN
+    at += match[0].length
+    const value = Number(match[0])
+    return Number.isFinite(value) ? value : Number.NaN
+  }
+  const product = (): number => {
+    let value = atom()
+    space()
+    while (text[at] === "*" || text[at] === "/") {
+      const op = text[at++]
+      const right = atom()
+      value = op === "*" ? value * right : right === 0 ? Number.NaN : value / right
+      if (!Number.isFinite(value)) return Number.NaN
+      space()
+    }
+    return value
+  }
+  const sum = (): number => {
+    let value = product()
+    space()
+    while (text[at] === "+" || text[at] === "-") {
+      const op = text[at++]
+      const right = product()
+      value = op === "+" ? value + right : value - right
+      if (!Number.isFinite(value)) return Number.NaN
+      space()
+    }
+    return value
+  }
+  const value = sum()
+  return at === text.length && Number.isFinite(value) ? value : null
 }
 
-/**
- * Reads `+50`, `-20`, `*2` and `/2` as operations and anything else as a value, null when it's neither. A leading `-` is
- * an operation, so `=` sets a value outright: `=-20`.
- */
+/** Negative numbers set a value. Use -= for subtraction; +, * and / retain relative entry. */
 export const parseNumberEntry = (text: string): NumberEntry | null => {
   const typed = text.trim()
-  const n = numberIn(typed.slice(1))
-  switch (typed[0]) {
-    case "=":
-      return n === null ? null : { kind: "set", value: n }
+  const relative = /^(\+=|-=|\*=|\/=|\+|\*|\/)/.exec(typed)?.[0]
+  const expression = relative === undefined
+    ? typed.startsWith("=") ? typed.slice(1) : typed
+    : typed.slice(relative.length)
+  const value = numberIn(expression)
+  if (value === null) return null
+  switch (relative?.[0]) {
     case "+":
-      return n === null ? null : { kind: "add", by: n }
+      return { kind: "add", by: value }
     case "-":
-      return n === null ? null : { kind: "add", by: -n }
+      return { kind: "add", by: -value }
     case "*":
-      return n === null ? null : { kind: "multiply", by: n }
+      return { kind: "multiply", by: value }
     case "/":
-      return n === null || n === 0 ? null : { kind: "multiply", by: 1 / n }
-    default: {
-      const value = numberIn(typed)
-      return value === null ? null : { kind: "set", value }
-    }
+      return value === 0 ? null : { kind: "multiply", by: 1 / value }
+    default:
+      return { kind: "set", value }
   }
 }
 

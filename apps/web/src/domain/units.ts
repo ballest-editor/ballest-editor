@@ -7,6 +7,7 @@
  *
  * Together, the game's rule, puts every item through one edit about the active unit's pivot. Each puts every unit
  * through the edit about its own, and a chain unit bends: it passes a turn down its links so it accumulates (§ Chains).
+ * A chain on its own has a setting of its own, Rigid or link by link (`ChainMode`), which picks between the two for it.
  */
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { identityTransform } from "./factory"
@@ -37,6 +38,18 @@ import {
 
 export type PivotMode = "together" | "each"
 
+/**
+ * How a chain on its own takes an edit (`isChainSelection`): whole, as Together moves a group, or link by link, as Each
+ * passes it down the links, so a turn bends it, a move spreads it and a scale stretches it.
+ */
+export type ChainMode = "rigid" | "links"
+
+/** The two settings an edit is applied by: one for a chain on its own, one for any other selection. */
+export interface PivotSettings {
+  readonly pivotMode: PivotMode
+  readonly chainMode: ChainMode
+}
+
 export interface Unit {
   /** The node's id: an item's key or a group's id. */
   readonly id: string
@@ -50,6 +63,11 @@ export interface Unit {
   readonly links?: ReadonlyArray<Unit>
   /** A chain's growth, when it has one. */
   readonly growth?: ChainGrowth
+  /**
+   * The item whose transform the unit takes as its own: an item itself, the member a group pivots on, a chain's first
+   * link's. None for a group's frame at its pivot, which is world-aligned and scale 1.
+   */
+  readonly anchor?: string
 }
 
 /** What a unit is made from: the tree and how to read each item as it stands (the document, or a live edit). */
@@ -93,7 +111,8 @@ const itemUnit = (key: string, ctx: UnitContext): Unit | undefined => {
     id: key,
     keys: [key],
     pivot: localToWorld(transform, ctx.localPivotOf(key)),
-    transform
+    transform,
+    anchor: key
   }
 }
 
@@ -102,10 +121,10 @@ const groupPivotOf = (
   keys: ReadonlyArray<string>,
   choice: GroupPivot | undefined,
   ctx: UnitContext
-): Pick<Unit, "pivot" | "transform"> | undefined => {
+): Pick<Unit, "pivot" | "transform" | "anchor"> | undefined => {
   if (choice?.choice === "item") {
     const item = keys.includes(choice.key) ? itemUnit(choice.key, ctx) : undefined
-    if (item !== undefined) return { pivot: item.pivot, transform: item.transform }
+    if (item !== undefined) return { pivot: item.pivot, transform: item.transform, anchor: choice.key }
   }
   if (choice?.choice === "point") {
     const world = ctx.livePointOf(keys, choice.world)
@@ -134,7 +153,8 @@ export const unitOf = (node: TreeNode, ctx: UnitContext): Unit | undefined => {
       pivot: root.pivot,
       transform: root.transform,
       links,
-      ...(node.growth !== undefined && { growth: node.growth })
+      ...(node.growth !== undefined && { growth: node.growth }),
+      ...(root.anchor !== undefined && { anchor: root.anchor })
     }
   }
   const placed = groupPivotOf(keys, node.pivot, ctx)
@@ -249,17 +269,30 @@ export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit =>
 }
 
 /**
- * The effective mode: Each needs two or more units, or one chain of two or more links, which bends; else a selection is
- * Together whatever the setting holds.
+ * The effective mode: Each needs two or more units, one chain of two or more links, or a link inside an entered chain;
+ * else a selection is Together whatever the setting holds.
  */
 export const effectivePivotMode = (mode: PivotMode, selection: SelectionUnits | undefined): PivotMode =>
   mode === "each" && selection !== undefined && canEach(selection) ? "each" : "together"
 
-/** Whether Each does anything to `selection`: two or more units, or a chain alone that can bend. */
+/** Whether Each does anything to `selection`: two or more units, a chain alone that can bend, or a link inside one. */
 export const canEach = (selection: SelectionUnits): boolean => {
   const [first, second] = selection.units
-  return second !== undefined || (first?.links?.length ?? 0) >= 2
+  return second !== undefined || selection.chain !== undefined || (first?.links?.length ?? 0) >= 2
 }
+
+/**
+ * Whether the chain setting decides how `selection` takes an edit: one whole chain of two or more links, or links
+ * selected inside an entered chain. A chain among other units follows the pivot setting.
+ */
+export const isChainSelection = (selection: SelectionUnits): boolean => {
+  const [first, second] = selection.units
+  return selection.chain !== undefined || (second === undefined && (first?.links?.length ?? 0) >= 2)
+}
+
+/** The mode an edit of `selection` is applied by: the chain setting for a chain on its own, the pivot setting else. */
+export const pivotModeFor = (settings: PivotSettings, selection: SelectionUnits): PivotMode =>
+  isChainSelection(selection) ? (settings.chainMode === "links" ? "each" : "together") : settings.pivotMode
 
 /**
  * What an edit does to the items of one unit: a function of the unit (its pivot and axes) that maps each item's

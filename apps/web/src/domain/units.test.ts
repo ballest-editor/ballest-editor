@@ -37,11 +37,13 @@ import {
   type ChainShape,
   deltaEdit,
   effectivePivotMode,
+  isChainSelection,
   layChain,
   leadingKeys,
   movedAlikeKeys,
   pathOrder,
   pivotDotsOf,
+  pivotModeFor,
   pivotUnitOf,
   type SelectionUnits,
   selectionUnitsOf,
@@ -312,6 +314,27 @@ describe("chains", () => {
     assertVec(out.get("l4")!.translation, swung({ x: 3000, y: 0, z: 0 }, { x: 2000, y: 0, z: 0 }, 90), "link 4 carried")
     assertVec(out.get("l5")!.translation, swung({ x: 4000, y: 0, z: 0 }, { x: 2000, y: 0, z: 0 }, 90), "link 5 carried")
     assert.closeTo(yawOf(out.get("l5")!), 90, 1e-6, "carried rigidly, so turned with it")
+  })
+
+  it("lets the chain setting decide a chain on its own, and the pivot setting anything else", () => {
+    const ctx = contextOf([chain, item("x")], new Map([...transforms, ["x", at(9000)]]))
+    const linksFirst = { pivotMode: "together", chainMode: "links" } as const
+    const rigidEach = { pivotMode: "each", chainMode: "rigid" } as const
+    const whole = selectionUnitsOf(links, null, ctx)!
+    const inside = selectionUnitsOf(["l3"], "chain", ctx)!
+    const mixed = selectionUnitsOf([...links, "x"], null, ctx)!
+    assert.deepStrictEqual([whole, inside, mixed].map(isChainSelection), [true, true, false])
+    assert.strictEqual(pivotModeFor(linksFirst, whole), "each")
+    assert.strictEqual(pivotModeFor(rigidEach, whole), "together")
+    assert.strictEqual(pivotModeFor(linksFirst, mixed), "together")
+    assert.strictEqual(pivotModeFor(rigidEach, mixed), "each")
+    // one link selected inside an entered chain bends from it to the end
+    assert.strictEqual(effectivePivotMode(pivotModeFor(linksFirst, inside), inside), "each")
+    const bent = applyUnitEdit(inside, "each", transforms, deltaEdit(turn(10)))
+    assert.deepStrictEqual(
+      links.map((key) => bent.has(key) ? Math.round(yawOf(bent.get(key)!)) : undefined),
+      [undefined, undefined, 10, 20, 30]
+    )
   })
 
   const xs = (out: ReadonlyMap<string, UeTransform>) => links.map((key) => out.get(key)?.translation.x)
@@ -726,5 +749,21 @@ describe("pivot dots and Point pivots", () => {
     const out = applyGroupDelta(t, ORIGIN, d)
     assert.closeTo(readField(out, "rotation").z, 55, 1e-6)
     assert.deepStrictEqual(identityTransform().rotation, { x: 0, y: 0, z: 0, w: 1 })
+  })
+})
+
+describe("a unit's anchor", () => {
+  const transforms = new Map([["a", at(0)], ["b", at(2000, 0, 0, 30)], ["c", at(4000)]])
+  const anchorOf = (node: TreeNode) => unitOf(node, contextOf([node], transforms))?.anchor
+
+  it("is the item whose transform the unit takes: itself, the member a group pivots on, a chain's first link", () => {
+    assert.strictEqual(anchorOf(item("a")), "a")
+    assert.strictEqual(anchorOf(group("g", [item("a"), item("b")], { pivot: { choice: "item", key: "b" } })), "b")
+    assert.strictEqual(anchorOf(group("ch", [item("c"), item("a")], { chain: true })), "c")
+  })
+
+  it("is none for a group's own frame, at its pivot", () => {
+    assert.isUndefined(anchorOf(group("g", [item("a"), item("b")])))
+    assert.isUndefined(anchorOf(group("g", [item("a"), item("b")], { pivot: { choice: "Top" } })))
   })
 })

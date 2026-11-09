@@ -1,6 +1,14 @@
-import { count, input, states, store } from "@ballest/app-driver/state"
+import { app, count, input, states, store } from "@ballest/app-driver/state"
 
 export default states({
+  "tool/repeat": {
+    views: ["tool:repeat"],
+    fixture: "map:simple",
+    anchor: true,
+    reach: [app.select("", 2), input.click("[aria-label=\"Repeat\"]")],
+    measure: { tool: store("tool"), panel: count("[data-repeat-panel]") },
+    checks: [{ metric: "tool", equals: "repeat" }, { metric: "panel", equals: 1 }]
+  },
   "tool/paint": {
     views: ["tool:paint"],
     fixture: "map:simple",
