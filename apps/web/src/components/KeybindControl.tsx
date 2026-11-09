@@ -2,6 +2,8 @@ import { IconPlus, IconX } from "@tabler/icons-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { useEffect, useMemo, useState } from "react"
 import {
+  actionWhen,
+  type BindingConflict,
   type Bindings,
   chordOf,
   conflictingBindings,
@@ -12,6 +14,7 @@ import {
   uniqueBindings,
   wheelChordOf
 } from "../domain/Keybinds"
+import { describeWhen } from "../domain/keyContext"
 import { saveKeybinds } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { ChordText } from "./KeyChip"
@@ -39,15 +42,39 @@ function CaptureCap() {
   )
 }
 
+/** Where the action works, under its label in Settings and Keyboard shortcuts; nothing for one that works everywhere. */
+export function KeybindWhen({ action }: { readonly action: KeybindAction }) {
+  const caption = describeWhen(actionWhen[action])
+  return caption === "" ? null : <span className="text-caption text-fg-tertiary" data-when>{caption}</span>
+}
+
+const names = (actions: ReadonlyArray<KeybindAction>) => actions.map((action) => keybindActionLabels[action]).join(", ")
+
+/** What a cap's tooltip says of the chord's other actions: a clash, or which takes the key where its condition holds. */
+const conflictTitle = (action: KeybindAction, conflict: BindingConflict | undefined): string | undefined => {
+  if (conflict === undefined) return undefined
+  if (conflict.clashes.length > 0) return `Also bound to ${names(conflict.clashes)}`
+  const notes = [
+    ...(conflict.overrides.length > 0
+      ? [`${describeWhen(actionWhen[action])}: takes the key from ${names(conflict.overrides)}`]
+      : []),
+    ...conflict.overriddenBy.map((other) =>
+      `${describeWhen(actionWhen[other])}: ${keybindActionLabels[other]} takes it`
+    )
+  ]
+  return notes.join(". ")
+}
+
 /**
  * An action's bindings as key caps (hover or focus one to reveal its ×, which slides in), then a
  * + cap to add one, after the word Unbound when there are none, and a capture cap while
- * listening. Caps bound to more than one action of the same kind are marked red.
+ * listening. A cap two actions can both take is marked red; one that another action takes
+ * where its condition holds (the eyedropper over orbit, in Paint) says so on hover.
  */
 function KeybindControl(props: {
   readonly action: KeybindAction
   readonly bindings: Bindings
-  readonly conflicts: ReadonlySet<string>
+  readonly conflicts: ReadonlyMap<string, BindingConflict> | undefined
   readonly listening: number | null
   readonly onListen: (index: number) => void
   readonly onRemove: (index: number) => void
@@ -66,9 +93,11 @@ function KeybindControl(props: {
               key={binding}
               className={cn(
                 "group/cap inline-flex h-6 items-stretch overflow-hidden rounded-full text-caption leading-none tabular-nums",
-                props.conflicts.has(binding) ? "bg-destructive/15 text-destructive" : "bg-muted text-foreground"
+                (props.conflicts?.get(binding)?.clashes.length ?? 0) > 0
+                  ? "bg-destructive/15 text-destructive"
+                  : "bg-muted text-foreground"
               )}
-              title={props.conflicts.has(binding) ? "Also bound to another action" : undefined}
+              title={conflictTitle(props.action, props.conflicts?.get(binding))}
             >
               <button
                 type="button"
@@ -192,7 +221,7 @@ export const useKeybindCapture = () => {
     <KeybindControl
       action={action}
       bindings={keybinds[action]}
-      conflicts={conflicts}
+      conflicts={conflicts.get(action)}
       listening={listening?.action === action ? listening.index : null}
       onListen={(index) => setListening({ action, index })}
       onRemove={(index) => setBindings(action, keybinds[action].filter((_, i) => i !== index))}

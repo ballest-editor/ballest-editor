@@ -103,7 +103,3 @@ const hasCommand = (action: KeybindAction): action is CommandAction => Object.ha
 /** The action's command, or undefined when it isn't a one-shot action. */
 export const commandFor = (action: KeybindAction): (() => void) | undefined =>
   hasCommand(action) ? actionCommands[action] : undefined
-
-/** Whether this platform runs the action at all. Play needs the desktop app; in a browser F5 still reloads. */
-export const runsHere = (action: KeybindAction): boolean =>
-  action !== "playMap" || useEditor.getState().capabilities.play

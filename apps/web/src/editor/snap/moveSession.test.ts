@@ -12,7 +12,7 @@ import { grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { assertVec } from "../../test/vec"
 import { PaneCamera } from "../paneCameras"
 import { selectionPivot, shownTransform, useEditor } from "../store"
-import { type DragKeyEvent, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
+import { cancelsDrag, type DragKeyEvent, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import { dragKeysOf, endSnapDisplay, joinHintOf, MoveSession, type MoveStart, previewMove } from "./moveSession"
 import { anchorUnder } from "./pickTarget"
 import { selectionSnapStart } from "./selectionStart"
@@ -688,6 +688,16 @@ describe("drag keys", () => {
     assert.deepStrictEqual(session.lock, { axis: "z", plane: true })
     assert.isTrue(handleDragKey(state, session, key("KeyY", { ctrlKey: true }), defaultKeybinds))
     assert.deepStrictEqual(session.lock, { axis: "y", plane: false })
+  })
+
+  it("cancels on Escape with a drag modifier still held, and not on a key that isn't the cancel key", () => {
+    const state = seedDragKeys({ ctrlKey: false, shiftKey: false })
+    assert.isTrue(cancelsDrag(state, key("Escape"), defaultKeybinds))
+    assert.isTrue(cancelsDrag(state, key("Escape", { shiftKey: true }), defaultKeybinds), "Shift holds the target")
+    assert.isTrue(cancelsDrag(state, key("Escape", { ctrlKey: true }), defaultKeybinds), "Ctrl holds snapping off")
+    assert.isTrue(cancelsDrag(state, key("Escape", { altKey: true }), defaultKeybinds), "Alt drags a copy")
+    assert.isFalse(cancelsDrag(state, key("KeyQ"), defaultKeybinds))
+    assert.isFalse(cancelsDrag(seedDragKeys({ ctrlKey: false, shiftKey: false }, "turn"), key("KeyQ"), defaultKeybinds))
   })
 
   it("leaves a key that isn't the drag's, and a turn takes no lock", () => {

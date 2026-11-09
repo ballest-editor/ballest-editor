@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { duringDragActions, heldActions, keybindActions, mouseClickActions, mouseDragActions } from "../domain/Keybinds"
-import { commandFor, runsHere } from "./commands"
+import { commandFor } from "./commands"
+import { keyContextOf } from "./keyContext"
 import { initialMap, useEditor } from "./store"
 
 describe("commands", () => {
@@ -12,14 +13,14 @@ describe("commands", () => {
     }
   })
 
-  it("runs Play only where the game can be reached", () => {
+  it("reads the platform off the capabilities, so Play has a key only where the game can be reached", () => {
     const s = () => useEditor.getState()
     const before = s().capabilities
-    assert.isFalse(runsHere("playMap"))
-    assert.isTrue(runsHere("saveMap"))
+    assert.strictEqual(keyContextOf().platform, "browser")
     s().setCapabilities({ ...before, play: true })
-    assert.isTrue(runsHere("playMap"))
+    assert.strictEqual(keyContextOf().platform, "desktop")
     s().setCapabilities(before)
+    assert.deepStrictEqual(keyContextOf(), { drag: "none", tool: s().tool, platform: "browser" })
   })
 
   it("has nothing to Save or Frame with no tab open", () => {

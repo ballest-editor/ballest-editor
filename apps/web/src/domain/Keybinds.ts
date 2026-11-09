@@ -6,6 +6,8 @@
  * unbound.
  */
 import { Schema } from "effect"
+import { type KeyContext, matches, needsDrag, overlaps, specificity, type When, within } from "./keyContext"
+import { SNAP_KINDS_OF, type SnapKind, type SnapTransform } from "./snapConfig"
 import type { ViewProjection } from "./viewLayout"
 
 /**
@@ -50,6 +52,7 @@ export const keybindSections = [
       "deleteSelection",
       "selectAll",
       "deselect",
+      "cancelDrag",
       "enterGroup",
       "groupSelection",
       "chainSelection",
@@ -144,6 +147,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   redo: "redo",
   selectAll: "select all",
   deselect: "deselect",
+  cancelDrag: "cancel drag",
   enterGroup: "enter group",
   groupSelection: "group",
   chainSelection: "group as chain",
@@ -231,7 +235,9 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   redo: "Redo the last undone change. Ctrl+Y in the in-game editor; Ctrl+Shift+Z also works.",
   selectAll: "Select every item in the map; inside an entered group, every item in that group.",
   deselect:
-    "Clear the selection. Inside an entered group it steps out of the group instead, with a pane maximised it restores the panes, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
+    "Clear the selection. Inside an entered group it steps out of the group instead, and with a pane maximised it restores the panes. (The game uses Ctrl+click.)",
+  cancelDrag:
+    "During a drag, put the selection back where it started and end the drag; an Alt+drag's copies go. Editor only: the game has no gizmo drags to cancel.",
   enterGroup:
     "Enter the selected group, so a click selects what is inside it. Double-clicking an item of a group does the same. Editor only.",
   groupSelection:
@@ -311,35 +317,128 @@ export const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>>
   right: "viewRight"
 }
 
-/**
- * The paint tool's clicks. They mean something only while it is the tool, when clicks don't select, so they share
- * chords with the selection clicks (Shift+click) and with orbit (Alt+click picks, Alt+drag orbits).
- */
-export const paintClickActions: ReadonlySet<KeybindAction> = new Set(["paintWholePiece", "pickPaint"])
-
 /** Actions bound to a mouse click (with modifiers) on an item in the viewport. */
 export const mouseClickActions: ReadonlySet<KeybindAction> = new Set([
   "addToSelection",
   "toggleSelection",
-  ...paintClickActions
+  "paintWholePiece",
+  "pickPaint"
 ])
 
 /** Actions bound to a mouse button held while dragging. */
 export const mouseDragActions: ReadonlySet<KeybindAction> = new Set(["look", "orbit", "pan"])
+
+/** The camera flies and changes speed with nothing dragged, during a look, and while a handle or body is being dragged. */
+const FLYING: When = { drag: ["none", "camera", "move", "turn", "scale"] }
+/** The tools whose clicks select; the paint tool's paint. */
+const SELECTING: When = { tool: ["select", "translate", "rotate", "scale"] }
+const PAINTING: When = { tool: ["paint"] }
+const snapTransforms = ["move", "turn", "scale"] as const satisfies ReadonlyArray<SnapTransform>
+/** The drags a snap key that narrows to `kind` is live in: the transforms that snap to that kind. */
+const narrowing = (kind: SnapKind): When => ({
+  drag: snapTransforms.filter((transform) => (SNAP_KINDS_OF[transform] as ReadonlyArray<SnapKind>).includes(kind))
+})
+
+/**
+ * Where each action's bindings work (docs/design/keybinding-contexts.md). An action not listed works with nothing
+ * dragged, in every tool, on both platforms. The drags are exclusive, so a key that means something during a move
+ * (X locks the axis) is free to mean something else with nothing dragged (Ctrl+X cuts).
+ */
+export const actionWhen: Readonly<Record<KeybindAction, When>> = {
+  selectMode: {},
+  translateMode: {},
+  rotateMode: {},
+  scaleMode: {},
+  paintMode: {},
+  toggleGizmoSpace: {},
+  togglePivotMode: {},
+  focusSelection: {},
+  addToSelection: SELECTING,
+  toggleSelection: SELECTING,
+  paintWholePiece: PAINTING,
+  pickPaint: PAINTING,
+  undo: {},
+  redo: {},
+  cutSelection: {},
+  copySelection: {},
+  paste: {},
+  duplicateSelection: {},
+  deleteSelection: {},
+  selectAll: {},
+  deselect: {},
+  cancelDrag: { drag: ["move", "turn", "scale"] },
+  enterGroup: {},
+  groupSelection: {},
+  chainSelection: {},
+  ungroupSelection: {},
+  moveForward: FLYING,
+  moveBack: FLYING,
+  moveLeft: FLYING,
+  moveRight: FLYING,
+  look: {},
+  moveUp: FLYING,
+  moveDown: FLYING,
+  lookRight: FLYING,
+  lookLeft: FLYING,
+  lookUp: FLYING,
+  lookDown: FLYING,
+  fastMove: FLYING,
+  speedFaster: FLYING,
+  speedSlower: FLYING,
+  orbit: {},
+  pan: {},
+  viewTop: {},
+  viewBottom: {},
+  viewFront: {},
+  viewBack: {},
+  viewRight: {},
+  viewLeft: {},
+  toggleOrthographic: {},
+  frameAll: {},
+  snapToggle: {},
+  snapOff: { drag: ["move", "turn", "scale", "place"] },
+  snapHold: { drag: ["move", "turn"] },
+  snapLockX: { drag: ["move"] },
+  snapLockY: { drag: ["move"] },
+  snapLockZ: { drag: ["move"] },
+  snapPlaneX: { drag: ["move"] },
+  snapPlaneY: { drag: ["move"] },
+  snapPlaneZ: { drag: ["move"] },
+  snapOnlyConnectors: narrowing("connectors"),
+  snapOnlyMesh: narrowing("mesh"),
+  snapOnlyAlignment: narrowing("alignment"),
+  newMap: {},
+  openMap: {},
+  saveMap: {},
+  saveMapAs: {},
+  closeTab: {},
+  nextTab: {},
+  previousTab: {},
+  playMap: { platform: ["desktop"] },
+  showKeybinds: {}
+}
+
 /** Actions a drag takes once it has begun (docs/SNAPPING.md § Modifiers): nothing fires them from a key by itself. */
-export const duringDragActions: ReadonlySet<KeybindAction> = new Set([
-  "snapOff",
-  "snapHold",
-  "snapLockX",
-  "snapLockY",
-  "snapLockZ",
-  "snapPlaneX",
-  "snapPlaneY",
-  "snapPlaneZ",
-  "snapOnlyConnectors",
-  "snapOnlyMesh",
-  "snapOnlyAlignment"
-])
+export const duringDragActions: ReadonlySet<KeybindAction> = new Set(
+  keybindActions.filter((action) => needsDrag(actionWhen[action]))
+)
+
+/**
+ * The word the status bar puts beside a drag key's chip, in the snap menu's words for the targets
+ * (docs/SNAPPING.md § Modifiers). Keys that share a word share a hint (X, Y and Z: lock). A drag key without one isn't
+ * listed.
+ */
+export const keybindActionHints: Partial<Record<KeybindAction, string>> = {
+  snapOff: "off",
+  snapHold: "hold",
+  snapLockX: "lock",
+  snapLockY: "lock",
+  snapLockZ: "lock",
+  snapOnlyConnectors: "ends",
+  snapOnlyMesh: "pieces",
+  snapOnlyAlignment: "guides"
+}
+
 /** Actions that are held down rather than fired once. */
 export const heldActions: ReadonlySet<KeybindAction> = new Set([
   "moveForward",
@@ -397,6 +496,7 @@ export const defaultKeybinds: Keybinds = {
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
   selectAll: ["Ctrl+KeyA"],
   deselect: ["Escape"],
+  cancelDrag: ["Escape"],
   enterGroup: ["Enter", "NumpadEnter"],
   groupSelection: ["Ctrl+KeyG"],
   chainSelection: ["Ctrl+Shift+KeyG"],
@@ -459,6 +559,10 @@ export const mergeKeybinds = (stored: StoredKeybinds, defaults: Keybinds = defau
     if (value === undefined) continue
     out[action] = uniqueBindings(typeof value === "string" ? [value] : value)
   }
+  // a drag used to cancel on the deselect key too, so a save from then keeps cancelling on what deselect was bound to
+  if (stored["cancelDrag"] === undefined && stored["deselect"] !== undefined) {
+    out.cancelDrag = uniqueBindings([...out.cancelDrag, ...out.deselect])
+  }
   return out
 }
 
@@ -490,9 +594,25 @@ export const bindingHeld = (binding: string, pressed: ReadonlySet<string>): bool
 export const isBound = (keybinds: Keybinds, action: KeybindAction, chord: string): boolean =>
   keybinds[action].includes(chord)
 
-/** The action(s) a chord is bound to. */
+/** The action(s) a chord is bound to, wherever they work. */
 export const actionsFor = (keybinds: Keybinds, chord: string): ReadonlyArray<KeybindAction> =>
   keybindActions.filter((action) => keybinds[action].includes(chord))
+
+/**
+ * The actions `chord` fires in `ctx`: those bound to it whose condition holds, the narrowest first, so a binding that
+ * names the tool or the drag wins over one that works everywhere. Two with the same specificity keep the table's order,
+ * and are what `conflictingBindings` marks.
+ */
+export const resolveChord = (keybinds: Keybinds, ctx: KeyContext, chord: string): ReadonlyArray<KeybindAction> =>
+  actionsFor(keybinds, chord)
+    .filter((action) => matches(actionWhen[action], ctx))
+    .map((action, index) => ({ action, index, rank: specificity(actionWhen[action]) }))
+    .sort((a, b) => b.rank - a.rank || a.index - b.index)
+    .map(({ action }) => action)
+
+/** Is `chord` bound to `action` where `ctx` is? */
+export const firesHere = (keybinds: Keybinds, ctx: KeyContext, action: KeybindAction, chord: string): boolean =>
+  keybinds[action].includes(chord) && matches(actionWhen[action], ctx)
 
 const MODIFIER_CODES = new Set([
   "ShiftLeft",
@@ -705,29 +825,59 @@ export const formatModifiers = (binding: string, mac = onMac): string | undefine
   return at < 0 ? undefined : formatBinding(binding.slice(0, at), mac)
 }
 
+/** What a chord bound to an action runs into elsewhere in the table. */
+export interface BindingConflict {
+  /** Actions with the same chord whose conditions can hold at once, neither within the other: Settings marks these red. */
+  readonly clashes: ReadonlyArray<KeybindAction>
+  /** Actions this binding takes the chord from where its narrower condition holds (the eyedropper over orbit, in Paint). */
+  readonly overrides: ReadonlyArray<KeybindAction>
+  /** Actions that take the chord from this one where theirs holds. */
+  readonly overriddenBy: ReadonlyArray<KeybindAction>
+}
+
+/** Each action's chords that run into another action's, with what they run into. */
+export type BindingConflicts = ReadonlyMap<KeybindAction, ReadonlyMap<string, BindingConflict>>
+
 /**
- * The chords two actions of the same kind share. A fly key doubling as a tool shortcut (W: forward + translate, as in the
- * game) is fine: the "movement keys need the look button" setting decides which one it does. Mouse drags and selection
- * clicks share a kind: a camera drag chord never reaches click selection. The paint tool's clicks are a kind of their
- * own (`paintClickActions`).
+ * Where two actions share a chord and both conditions (`actionWhen`) can hold at once. A condition within the other's
+ * overrides it there rather than clashing: Alt+click picks paint in the Paint tool and orbits in the rest. Held camera
+ * keys never clash with anything else: a fly key doubling as a tool shortcut (W: forward + translate, as in the game) is
+ * decided by the "movement keys need the look button" setting, and Ctrl, flying down, is snapping's once a drag has
+ * begun because the camera lets go of its modifiers then (FlyCamera).
  */
-export const conflictingBindings = (keybinds: Keybinds): ReadonlySet<string> => {
-  const kinds = new Map<string, Set<string>>()
+export const conflictingBindings = (keybinds: Keybinds): BindingConflicts => {
+  const out = new Map<KeybindAction, Map<string, BindingConflict>>()
   for (const action of keybindActions) {
-    const kind = heldActions.has(action)
-      ? "held"
-      : duringDragActions.has(action)
-      ? "duringDrag"
-      : paintClickActions.has(action)
-      ? "paint"
-      : mouseDragActions.has(action) || mouseClickActions.has(action)
-      ? "mouse"
-      : "oneShot"
-    for (const binding of keybinds[action]) {
-      const set = kinds.get(`${kind}:${binding}`) ?? new Set<string>()
-      set.add(action)
-      kinds.set(`${kind}:${binding}`, set)
+    for (const chord of keybinds[action]) {
+      const others = actionsFor(keybinds, chord).filter((other) =>
+        other !== action && heldActions.has(other) === heldActions.has(action) &&
+        overlaps(actionWhen[action], actionWhen[other])
+      )
+      if (others.length === 0) continue
+      const mine = actionWhen[action]
+      // only a key that fires one action at a time can be overridden: held keys and a drag's all apply at once
+      const exclusive = (other: KeybindAction) =>
+        !heldActions.has(other) && !duringDragActions.has(other) && !duringDragActions.has(action)
+      const overrides = (a: When, b: When) => within(a, b) && !within(b, a)
+      const conflict: BindingConflict = {
+        overrides: others.filter((other) => exclusive(other) && overrides(mine, actionWhen[other])),
+        overriddenBy: others.filter((other) => exclusive(other) && overrides(actionWhen[other], mine)),
+        clashes: others.filter((other) =>
+          !exclusive(other) || (!overrides(mine, actionWhen[other]) && !overrides(actionWhen[other], mine))
+        )
+      }
+      const byChord = out.get(action) ?? new Map<string, BindingConflict>()
+      byChord.set(chord, conflict)
+      out.set(action, byChord)
     }
   }
-  return new Set([...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1)))
+  return out
 }
+
+/** The chords Settings marks red: bound to two actions that can both take them. */
+export const clashingChords = (conflicts: BindingConflicts): ReadonlySet<string> =>
+  new Set(
+    [...conflicts.values()].flatMap((byChord) =>
+      [...byChord].filter(([, conflict]) => conflict.clashes.length > 0).map(([chord]) => chord)
+    )
+  )

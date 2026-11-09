@@ -27,9 +27,6 @@ export function useDragKeysShown(): boolean {
   return dragging && (lasted || keyed)
 }
 
-/** What the menu calls a target, where the hint's own word is the code's (docs/SNAPPING.md § The snap menu). */
-const WORDS: Readonly<Record<string, string>> = { connectors: "ends", mesh: "pieces", alignment: "guides" }
-
 /**
  * The keys a drag can take, in the middle of the status bar from the press to the release, as Blender lists a modal
  * tool's keys (docs/SNAPPING.md § Modifiers). What is held, or the lock that is set, is filled with the accent, which
@@ -47,7 +44,7 @@ export function DragKeyHints() {
             <KeyChip key={binding} binding={binding} className={cn(down && "bg-primary text-primary-foreground")} />
           ))}
           <span className={cn("text-caption", active ? "text-foreground" : "text-fg-tertiary")}>
-            {WORDS[id] ?? word}
+            {word}
           </span>
         </span>
       ))}

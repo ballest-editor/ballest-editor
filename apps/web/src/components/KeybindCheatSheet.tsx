@@ -4,7 +4,7 @@ import { type ReactNode, useState } from "react"
 import { cheatSheetSections, matchingActions, type NamedAction, namedActions } from "../domain/GameKeybinds"
 import { formatBindings, type KeybindAction } from "../domain/Keybinds"
 import { useEditor } from "../editor/store"
-import { useKeybindCapture } from "./KeybindControl"
+import { KeybindWhen, useKeybindCapture } from "./KeybindControl"
 import { KeyChip } from "./KeyChip"
 import { SectionTitle } from "./SectionTitle"
 import { SearchField } from "./SettingsShell"
@@ -28,11 +28,12 @@ function KeybindColumns({ named, keysOf }: {
                 {/* the game names its actions in lower case; the sheet reads them in sentence case like every other label */}
                 <dt
                   className={cn(
-                    "whitespace-nowrap first-letter:uppercase",
+                    "flex flex-col whitespace-nowrap",
                     keybinds[action].length === 0 && "text-fg-tertiary"
                   )}
                 >
-                  {label}
+                  <span className="first-letter:uppercase">{label}</span>
+                  <KeybindWhen action={action} />
                 </dt>
                 <dd>{keysOf(action)}</dd>
               </div>

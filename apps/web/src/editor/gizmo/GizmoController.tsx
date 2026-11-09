@@ -4,7 +4,6 @@ import * as THREE from "three"
 import { threeToUeVector, ueToScene, type UeTransform, type Vec3 } from "../../domain/coords"
 import { selectedGroupIds } from "../../domain/groupSelection"
 import type { GroupDelta } from "../../domain/groupTransform"
-import { chordOf } from "../../domain/Keybinds"
 import { gizmoScaleOf } from "../../domain/Settings"
 import { type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
 import { type ScaleStop, snappedScale, turnLanding, turnReach, type TurnStop } from "../../domain/snapRotate"
@@ -21,7 +20,14 @@ import { transformSelection } from "../actions"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
-import { type DragKeyState, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "../snap/dragKeys"
+import {
+  cancelsDrag,
+  type DragKeyState,
+  handleDragKey,
+  releaseDragKey,
+  seedDragKeys,
+  syncDragKeys
+} from "../snap/dragKeys"
 import {
   dragKeysOf,
   endSnapDisplay,
@@ -185,9 +191,11 @@ export function GizmoController() {
   useEffect(() => {
     sceneRegistry.gizmoActive = () => hovered.current !== null || drag.current !== null
     sceneRegistry.gizmoDragActive = () => drag.current !== null || sceneRegistry.bodyDragActive()
+    sceneRegistry.gizmoDragKind = () => drag.current === null ? null : transformOf(drag.current.start.spec)
     return () => {
       sceneRegistry.gizmoActive = () => false
       sceneRegistry.gizmoDragActive = () => sceneRegistry.bodyDragActive()
+      sceneRegistry.gizmoDragKind = () => null
     }
   }, [])
 
@@ -507,7 +515,7 @@ export function GizmoController() {
         afterKey(active)
         return
       }
-      if (e.code !== "Escape" && !useEditor.getState().keybinds.deselect.includes(chordOf(e))) return
+      if (!cancelsDrag(active.keys, e, useEditor.getState().keybinds)) return
       e.preventDefault()
       e.stopImmediatePropagation() // don't also deselect
       applyToObjects(active.startTransforms)
