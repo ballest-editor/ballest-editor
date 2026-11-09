@@ -64,7 +64,7 @@ describe("keybind table", () => {
       ["scale", ["KeyR"]],
       ["paint", ["KeyB"]], // editor only
       ["local / world axes", ["KeyC"]],
-      ["together / each pivot", ["Period"]], // editor only
+      ["together / each, rigid / link by link", ["Period"]], // editor only
       ["focus selection", ["KeyF"]],
       ["add to selection", ["Shift+Mouse0"]],
       ["toggle selection", ["Ctrl+Mouse0"]],
@@ -85,7 +85,7 @@ describe("keybind table", () => {
       ["cancel drag", ["Escape"]], // editor only
       ["enter group", ["Enter", "NumpadEnter"]], // editor only
       ["group", ["Ctrl+KeyG"]],
-      ["group as chain", ["Ctrl+Shift+KeyG"]], // editor only
+      ["make chain", ["Ctrl+Shift+KeyG"]], // editor only
       ["ungroup", ["Shift+KeyG"]]
     ])
   })

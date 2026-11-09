@@ -54,6 +54,18 @@ export default states({
     measure: { selected: store("selectedIds") },
     checks: [{ metric: "selected", min: 2 }]
   },
+  "editor/selected-chain": {
+    views: ["panel:inspector"],
+    fixture: "map:simple",
+    // four pieces made a chain (Ctrl+Shift+G) under the rotate tool: the toggle reads Bend, link 1 is marked
+    reach: [app.select("", 4), input.key("G", "KeyG", 10), input.key("e", "KeyE")],
+    measure: {
+      chains: count("[aria-label='Chain joints']"),
+      bend: count("[aria-label^='Bend:']"),
+      mode: store("chainMode")
+    },
+    checks: [{ metric: "chains", equals: 1 }, { metric: "bend", equals: 1 }, { metric: "mode", equals: "links" }]
+  },
   "editor/columns": { views: ["viewport:columns"], fixture: "map:simple", reach: [app.panes("columns")] },
   "editor/rows": { views: ["viewport:rows"], fixture: "map:simple", reach: [app.panes("rows")] },
   "editor/quad": { views: ["viewport:quad"], fixture: "map:simple", reach: [app.panes("quad")] }

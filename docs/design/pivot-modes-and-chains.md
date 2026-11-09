@@ -199,6 +199,16 @@ A second bend makes a helix, but its axis is the product of the two turns: bend 
 - **Helix: tipped, then turned.** The straight chain tips toward a world axis (X, Y or Z) until each step climbs the rise per link, and every joint turns the turn per link about the axis. A constant joint turn about one axis with a constant climb is a helix about that axis; a rise of 0 is a flat ring square to it, and a rise at or past a step's length stands the chain along the axis. Growth grows each joint's turn the way it grows a bend's.
 - **An action, not a setting.** Nothing goes in the sidecar, so a freehand bend after is free, and laying again starts from the straightened chain, so it repeats. A stored shape, re-laid live like a modifier stack, would fight a freehand bend over who owns the chain. Links that face other ways from one another take the first link's axes, so a chain of mixed pieces loses their own turns.
 
+## Naming, after use (2026-11-09)
+
+A review of the words the chain feature shows turned up one problem underneath the rest: a chain's behaviour hung on Each, a word for "each piece about its own pivot", which says nothing about a turn running down a chain. A new chain also opened at Together, so it turned rigidly until the user found the period key. The user settled the fixes. What is true now is in [DESKTOP.md § Group pivots and chains](../DESKTOP.md#group-pivots-and-chains).
+
+- **A setting of the chain's own.** A chain on its own (selected whole, or links inside an entered chain) follows `chainMode`, Rigid or link by link, not `pivotMode`; the same toggle and key flip whichever the selection follows. It starts link by link, so a new chain bends on its first turn, and a loose selection's Together is left alone. Removing Together/Each instead was weighed and rejected: loose selections need Each to keep a gap through a scale, to turn pieces where they stand and for local moves, and a chain needs a two-way choice either way.
+- **Words for what the drag does.** Link by link, the toggle names the tool's effect on a chain: Bend (rotate), Spread (move), Stretch (scale). The move case is the trap: a whole chain moved link by link spreads rather than moving, and the word says so before the drag. Making a whole chain's move always rigid was the alternative, left for if people trip on it.
+- **One link inside an entered chain** is enough for link by link, which bends, spreads or stretches from it to the end. Before, one link held the toggle at Together.
+- **Joints, not Growth.** The growth counts joints: Even means every joint takes the same, so the pieces already move further and further down the chain (link `k` moves `k` times as far). Read as pieces, every name looked one step behind. The control is now Joints, Even / Linear / Exponential (Compound was a finance word), with a line that says what it makes of the last link in pieces. The sidecar keeps `compound`.
+- **Make chain** replaces Group as chain and Convert to chain, three verbs for one action. Reverse's tooltip says "Start from the other end", and the view marks link 1 while a chain is selected, since everything a chain does counts from it.
+
 ## Open questions
 
 - **Escaping the carry inside a chain.** A modifier during the drag, or nothing but Unchain? Alt is duplicate and Shift is selection, so a modifier would be new.

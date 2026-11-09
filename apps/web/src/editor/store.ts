@@ -158,14 +158,17 @@ import type {
 } from "../services/Platform"
 
 import {
+  type ChainMode,
   type ChainShape,
   commonMoveOf,
   effectivePivotMode,
+  isChainSelection,
   layChain,
   pathOrder,
   pivotDotsOf,
   type PivotDotSpec,
   type PivotMode,
+  pivotModeFor,
   pivotUnitOf,
   reachableKeys,
   type SelectionUnits,
@@ -603,6 +606,8 @@ export interface EditorState extends TabState {
   readonly gizmoSpace: GizmoSpace
   /** What a selection pivots about: one point for all (the game's rule), or each unit its own (`domain/units.ts`). */
   readonly pivotMode: PivotMode
+  /** How a chain on its own takes an edit: whole, or link by link (`ChainMode`), so a new chain bends at once. */
+  readonly chainMode: ChainMode
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: DialogState | null
   /** The Export or Play under way, for the status bar's chip; null when there is none. */
@@ -857,6 +862,7 @@ export interface EditorState extends TabState {
   readonly setBrush: (brush: Brush) => void
   readonly setPaintBlockedReason: (reason: string | null) => void
   readonly toggleGizmoSpace: () => void
+  /** Flips the setting the selection follows: the chain setting for a chain on its own, else the pivot setting. */
   readonly togglePivotMode: () => void
   /** Opens `dialog` in place of the open one (and its payload). */
   readonly openDialog: (dialog: DialogState) => void
@@ -1246,6 +1252,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     paintBlockedReason: null,
     gizmoSpace: "world",
     pivotMode: "together",
+    chainMode: "links",
     dialog: null,
     gameWrite: null,
     openedInGame: null,
@@ -1784,7 +1791,12 @@ export const useEditor = create<EditorState>()((set, get) => {
       set((s) => (s.paintBlockedReason === paintBlockedReason ? s : { paintBlockedReason })),
     toggleGizmoSpace: () =>
       set((s) => (s.tool === "scale" ? s : { gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
-    togglePivotMode: () => set((s) => ({ pivotMode: s.pivotMode === "together" ? "each" : "together" })),
+    togglePivotMode: () =>
+      set((s) =>
+        isShownChain(s)
+          ? { chainMode: s.chainMode === "links" ? "rigid" : "links" }
+          : { pivotMode: s.pivotMode === "together" ? "each" : "together" }
+      ),
     // The required chooser stays on top of everything: what would open behind it (the Game link's) waits for a launch.
     openDialog: (dialog) =>
       set((s) =>
@@ -2307,15 +2319,38 @@ export const selectionUnits = (
   transformOf: (id: string) => UeTransform | undefined
 ): SelectionUnits | undefined => selectionUnitsOf(s.selectedIds, s.enteredGroupId, unitContext(s, transformOf))
 
-/** The pivot setting as it applies to this selection: Each needs two or more units. */
-export const shownPivotMode = (s: EditorState): PivotMode =>
-  effectivePivotMode(s.pivotMode, selectionUnits(s, (id) => shownTransform(s, id)))
+/** Whether the selection as shown is a chain on its own, which follows the chain setting (`isChainSelection`). */
+export const isShownChain = (s: EditorState): boolean => {
+  const selection = selectionUnits(s, (id) => shownTransform(s, id))
+  return selection !== undefined && isChainSelection(selection)
+}
+
+/**
+ * The setting as it applies to this selection: the chain setting's for a chain on its own, else the pivot setting's,
+ * where Each needs two or more units.
+ */
+export const shownPivotMode = (s: EditorState): PivotMode => {
+  const selection = selectionUnits(s, (id) => shownTransform(s, id))
+  return selection === undefined ? "together" : effectivePivotMode(pivotModeFor(s, selection), selection)
+}
 
 /** The pivot dots to draw for the selection as shown (`pivotDotsOf`). */
 export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => {
   const transformOf = (id: string) => shownTransform(s, id)
   const selection = selectionUnits(s, transformOf)
-  return selection === undefined ? [] : pivotDotsOf(selection, s.pivotMode, unitContext(s, transformOf).boxOf)
+  return selection === undefined
+    ? []
+    : pivotDotsOf(selection, pivotModeFor(s, selection), unitContext(s, transformOf).boxOf)
+}
+
+/**
+ * Where the selected chain starts, as shown: its first link's pivot, which a bend, spread or stretch runs from and Reverse
+ * swaps for the other end. For one whole chain, or links selected inside an entered one; undefined otherwise.
+ */
+export const shownChainStart = (s: EditorState): Vec3 | undefined => {
+  const selection = selectionUnits(s, (id) => shownTransform(s, id))
+  if (selection === undefined || !isChainSelection(selection)) return undefined
+  return (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot
 }
 
 /**
@@ -2331,7 +2366,7 @@ export const selectionPivot = (
   const active = activeKey === undefined ? undefined : transformOf(activeKey)
   const selection = selectionUnits(s, transformOf)
   if (activeKey === undefined || active === undefined || selection === undefined) return undefined
-  const unit = pivotUnitOf(selection, s.pivotMode)
+  const unit = pivotUnitOf(selection, pivotModeFor(s, selection))
   return {
     active,
     pivot: unit.pivot,
@@ -2401,7 +2436,7 @@ export const useTabSummary = (tabId: string) =>
     }
   }))
 
-/** Whether Group, Group as chain and Ungroup have anything to do, for the menus that hold them. */
+/** Whether Group, Make chain and Ungroup have anything to do, for the menus that hold them. */
 export const useCanGroup = () => {
   const tree = useEditor((s) => s.doc.structure.tree)
   const selectedIds = useEditor((s) => s.selectedIds)

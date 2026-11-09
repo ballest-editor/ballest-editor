@@ -7,6 +7,7 @@
  *
  * Together, the game's rule, puts every item through one edit about the active unit's pivot. Each puts every unit
  * through the edit about its own, and a chain unit bends: it passes a turn down its links so it accumulates (§ Chains).
+ * A chain on its own has a setting of its own, Rigid or link by link (`ChainMode`), which picks between the two for it.
  */
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { identityTransform } from "./factory"
@@ -36,6 +37,18 @@ import {
 } from "./ueMath"
 
 export type PivotMode = "together" | "each"
+
+/**
+ * How a chain on its own takes an edit (`isChainSelection`): whole, as Together moves a group, or link by link, as Each
+ * passes it down the links, so a turn bends it, a move spreads it and a scale stretches it.
+ */
+export type ChainMode = "rigid" | "links"
+
+/** The two settings an edit is applied by: one for a chain on its own, one for any other selection. */
+export interface PivotSettings {
+  readonly pivotMode: PivotMode
+  readonly chainMode: ChainMode
+}
 
 export interface Unit {
   /** The node's id: an item's key or a group's id. */
@@ -249,17 +262,30 @@ export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit =>
 }
 
 /**
- * The effective mode: Each needs two or more units, or one chain of two or more links, which bends; else a selection is
- * Together whatever the setting holds.
+ * The effective mode: Each needs two or more units, one chain of two or more links, or a link inside an entered chain;
+ * else a selection is Together whatever the setting holds.
  */
 export const effectivePivotMode = (mode: PivotMode, selection: SelectionUnits | undefined): PivotMode =>
   mode === "each" && selection !== undefined && canEach(selection) ? "each" : "together"
 
-/** Whether Each does anything to `selection`: two or more units, or a chain alone that can bend. */
+/** Whether Each does anything to `selection`: two or more units, a chain alone that can bend, or a link inside one. */
 export const canEach = (selection: SelectionUnits): boolean => {
   const [first, second] = selection.units
-  return second !== undefined || (first?.links?.length ?? 0) >= 2
+  return second !== undefined || selection.chain !== undefined || (first?.links?.length ?? 0) >= 2
 }
+
+/**
+ * Whether the chain setting decides how `selection` takes an edit: one whole chain of two or more links, or links
+ * selected inside an entered chain. A chain among other units follows the pivot setting.
+ */
+export const isChainSelection = (selection: SelectionUnits): boolean => {
+  const [first, second] = selection.units
+  return selection.chain !== undefined || (second === undefined && (first?.links?.length ?? 0) >= 2)
+}
+
+/** The mode an edit of `selection` is applied by: the chain setting for a chain on its own, the pivot setting else. */
+export const pivotModeFor = (settings: PivotSettings, selection: SelectionUnits): PivotMode =>
+  isChainSelection(selection) ? (settings.chainMode === "links" ? "each" : "together") : settings.pivotMode
 
 /**
  * What an edit does to the items of one unit: a function of the unit (its pivot and axes) that maps each item's

@@ -21,7 +21,7 @@ import type { Item } from "../../domain/MapFile"
 import type { FlipAxis } from "../../domain/mirror"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
 import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
-import { applyUnitEdit, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
+import { applyUnitEdit, pivotModeFor, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
 import {
   editedKeys,
   fitTransforms,
@@ -97,8 +97,9 @@ const withUnitEdit = (edit: (active: Unit) => UnitEdit): ReadonlyMap<string, UeT
       return t === undefined ? [] : [[id, t] as const]
     })
   )
-  const active = pivotUnitOf(target.selection, s.pivotMode)
-  return fitTransforms(s, applyUnitEdit(target.selection, s.pivotMode, transforms, edit(active)))
+  const mode = pivotModeFor(s, target.selection)
+  const active = pivotUnitOf(target.selection, mode)
+  return fitTransforms(s, applyUnitEdit(target.selection, mode, transforms, edit(active)))
 }
 
 /** An axis edit: the change it makes to the active unit's axis, which every unit then takes about its own pivot. */
