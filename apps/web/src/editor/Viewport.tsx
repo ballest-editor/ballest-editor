@@ -18,7 +18,7 @@ import * as THREE from "three"
 import type { CatalogPiece } from "../domain/Catalog"
 import { threeToUeVector, toTuple3, ueToThreeVector } from "../domain/coords"
 import { counted, groupBoxTargets } from "../domain/groupSelection"
-import { holdsModifiersOf, isBound, type ModifierState, mouseChordOf } from "../domain/Keybinds"
+import { firesHere, holdsModifiersOf, type ModifierState, mouseChordOf, resolveChord } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
@@ -30,6 +30,7 @@ import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { GroupBox } from "./groupBox"
 import { ItemObject } from "./ItemObject"
+import { keyContextOf } from "./keyContext"
 import { advanceGameTime } from "./materials"
 import { OrthoGrid } from "./OrthoGrid"
 import { paintSpotOf, type PaintTarget, paintTargetOf, pickedBrushOf, showsTarget } from "./paintTarget"
@@ -44,6 +45,7 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
+import { dropSnapOff } from "./snap/dragKeys"
 import { endSnapDisplay } from "./snap/moveSession"
 import { landDrop, showDrop, snappedDrop } from "./snap/pieceDrop"
 import { SnapInput } from "./snap/SnapInput"
@@ -146,17 +148,19 @@ function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
 }
 
 /**
- * How a left click selects, from its chord: the add/toggle selection bindings, else a
- * plain click. Null when the chord drives the camera instead (Alt+LMB orbit).
+ * How a left click selects, from its chord: the add/toggle selection bindings where they work (not in the paint tool),
+ * else a plain click. Null when the chord drives the camera instead (Alt+LMB orbit), or paints (PaintTool).
  */
 const selectModeOf = (e: MouseEvent): SelectMode | null => {
-  const { keybinds, tool } = useEditor.getState()
-  // the paint tool's clicks paint (PaintTool)
-  if (e.button !== 0 || tool === "paint") return null
+  const { keybinds } = useEditor.getState()
+  if (e.button !== 0) return null
+  const ctx = keyContextOf()
   const chord = mouseChordOf(e)
-  if (isBound(keybinds, "toggleSelection", chord)) return "toggle"
-  if (isBound(keybinds, "addToSelection", chord)) return "add"
-  return sceneRegistry.isNavigationChord(chord) ? null : "replace"
+  const actions = resolveChord(keybinds, ctx, chord)
+  if (actions.includes("toggleSelection")) return "toggle"
+  if (actions.includes("addToSelection")) return "add"
+  // the paint tool's plain click paints
+  return ctx.tool === "paint" || sceneRegistry.isNavigationChord(chord) ? null : "replace"
 }
 
 /**
@@ -285,6 +289,7 @@ function PaintTool() {
       useEditor.getState().endPaintStroke()
       stale = true
     }
+    sceneRegistry.paintStrokeActive = () => stroke !== null
 
     // The pane's camera: a wheel zoom or a fly key moves what's under a still pointer.
     let seenCamera: THREE.Camera | null = null
@@ -324,13 +329,15 @@ function PaintTool() {
       if (e.button !== 0 || stroke !== null) return
       const s = useEditor.getState()
       const chord = mouseChordOf(e)
+      // the press is read before the camera drag it may have just started (FlyCamera hears it first): Alt+click picks
+      const ctx = { ...keyContextOf(s), drag: "none" as const }
       const { slot } = panePointer(el, e)
-      if (isBound(s.keybinds, "pickPaint", chord)) {
+      if (firesHere(s.keybinds, ctx, "pickPaint", chord)) {
         // a drag on it still orbits (FlyCamera), so it picks on release, if the pointer stayed put
         pick = { x: e.clientX, y: e.clientY, slot, travel: 0 }
         return
       }
-      const whole = isBound(s.keybinds, "paintWholePiece", chord)
+      const whole = firesHere(s.keybinds, ctx, "paintWholePiece", chord)
       if (!whole && (chord !== "Mouse0" || sceneRegistry.isNavigationChord(chord))) return
       if (!s.beginPaintStroke()) return
       stroke = { slot, whole, painted: new Set() }
@@ -449,22 +456,30 @@ const dropTarget = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: numb
 const dropPiece = (
   piece: CatalogPiece,
   canvas: HTMLElement,
-  e: { clientX: number; clientY: number; ctrlKey: boolean }
+  e: { clientX: number; clientY: number; ctrlKey: boolean; shiftKey: boolean }
 ) => {
   const { pane, point, px, slot, surface } = dropTarget(piece, canvas, e)
-  useEditor.getState().setActivePane(slot)
-  landDrop(piece, pane, px, point, e.ctrlKey, () => placeAt(piece, point, pane.placementView(), surface))
+  const s = useEditor.getState()
+  s.setActivePane(slot)
+  landDrop(
+    piece,
+    pane,
+    px,
+    point,
+    dropSnapOff(s.keybinds, e),
+    () => placeAt(piece, point, pane.placementView(), surface)
+  )
 }
 
 /** Shows where a piece on its way would land. */
 const showPieceDrop = (
   piece: CatalogPiece,
   canvas: HTMLElement,
-  e: { clientX: number; clientY: number; ctrlKey: boolean }
+  e: { clientX: number; clientY: number; ctrlKey: boolean; shiftKey: boolean }
 ) => {
   const { pane, point, px } = dropTarget(piece, canvas, e)
   const s = useEditor.getState()
-  showDrop(snappedDrop(s, piece, pane, px, point, e.ctrlKey))
+  showDrop(snappedDrop(s, piece, pane, px, point, dropSnapOff(s.keybinds, e)))
 }
 
 /**

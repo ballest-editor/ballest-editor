@@ -6,7 +6,7 @@ import { useThree } from "@react-three/fiber"
 import { useEffect } from "react"
 import * as THREE from "three"
 import type { UeTransform, Vec3 } from "../../domain/coords"
-import { chordOf, mouseChordOf } from "../../domain/Keybinds"
+import { mouseChordOf } from "../../domain/Keybinds"
 import type { Constraint } from "../../domain/snapFrame"
 import { shownMarks } from "../../domain/snapRelation"
 import { applyDelta, movedAlikeKeys, type PivotMode, type SelectionUnits } from "../../domain/units"
@@ -14,7 +14,7 @@ import { transformSelection } from "../actions"
 import { type PaneCamera, panePointer } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
 import { fitTransforms, type PickerRequest, snapConfigOf, useEditor } from "../store"
-import { type DragKeyState, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
+import { cancelsDrag, type DragKeyState, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import {
   dragKeysOf,
   endSnapDisplay,
@@ -338,7 +338,7 @@ export function SnapInput() {
         moveDrag(active, active.lastEvent)
         return
       }
-      if (e.code !== "Escape" && !s.keybinds.deselect.includes(chordOf(e))) return
+      if (!cancelsDrag(active.keys, e, s.keybinds)) return
       e.preventDefault()
       e.stopImmediatePropagation()
       cancel()

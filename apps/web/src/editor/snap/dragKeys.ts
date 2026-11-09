@@ -1,6 +1,22 @@
-/** The keys that change a drag once it has begun (docs/SNAPPING.md § Modifiers), for the gizmo's and a body drag alike. */
-import { baseCodeOf, bindingHeld, chordOf, type KeybindAction, type Keybinds } from "../../domain/Keybinds"
-import { SNAP_KINDS, SNAP_KINDS_OF, type SnapKind, type SnapTransform } from "../../domain/snapConfig"
+/**
+ * The keys that change a drag once it has begun (docs/SNAPPING.md § Modifiers), for the gizmo's, a body drag's and a
+ * palette drop's alike. Which keys those are is `actionWhen` in domain/Keybinds.ts: the actions live in the drag under
+ * way. This file keeps what is pressed, applies the key to the drag, and lists the keys for the status bar.
+ */
+import {
+  actionWhen,
+  bindingHeld,
+  chordOf,
+  duringDragActions,
+  firesHere,
+  type KeybindAction,
+  keybindActionHints,
+  keybindActions,
+  type Keybinds,
+  resolveChord
+} from "../../domain/Keybinds"
+import { type KeyContext, matches } from "../../domain/keyContext"
+import { SNAP_KINDS, type SnapKind, type SnapTransform } from "../../domain/snapConfig"
 import { type DragKeysShown, useEditor } from "../store"
 import type { MoveLock, MoveSession } from "./moveSession"
 
@@ -18,18 +34,25 @@ interface Modifiers {
   readonly shiftKey: boolean
 }
 
-const held = (state: DragKeyState, { ctrlKey, shiftKey }: Modifiers) => {
+/** Follows the modifiers an event reports into `pressed`, as a key can come up while the window isn't looking. */
+const held = (pressed: Set<string>, { ctrlKey, shiftKey }: Modifiers) => {
   const follow = (down: boolean, left: string, right: string) => {
     if (!down) {
-      state.pressed.delete(left)
-      state.pressed.delete(right)
-    } else if (!state.pressed.has(left) && !state.pressed.has(right)) {
-      state.pressed.add(left)
+      pressed.delete(left)
+      pressed.delete(right)
+    } else if (!pressed.has(left) && !pressed.has(right)) {
+      pressed.add(left)
     }
   }
   follow(ctrlKey, "ControlLeft", "ControlRight")
   follow(shiftKey, "ShiftLeft", "ShiftRight")
 }
+
+/**
+ * The context a drag's keys resolve in. A drag key never names a tool or a platform, so the drag is all that counts:
+ * the keys don't change with the tool a drag was started in.
+ */
+const dragContext = (transform: SnapTransform): KeyContext => ({ drag: transform, tool: "select", platform: "desktop" })
 
 /** Shows the keys in the status bar, when they have changed since it last did. */
 const show = ({ lock, pressed, transform }: DragKeyState) => {
@@ -44,14 +67,14 @@ const show = ({ lock, pressed, transform }: DragKeyState) => {
 /** The keys as a drag starts, or a press that may become one: a modifier pressed before it counts. */
 export const seedDragKeys = (e: Modifiers, transform: SnapTransform = "move"): DragKeyState => {
   const state: DragKeyState = { pressed: new Set<string>(), transform, lock: undefined }
-  held(state, e)
+  held(state.pressed, e)
   show(state)
   return state
 }
 
 /** Keeps up with the modifiers an event reports, as a key can come up while the window isn't looking. */
 export const syncDragKeys = (state: DragKeyState, e: Modifiers): void => {
-  held(state, e)
+  held(state.pressed, e)
   show(state)
 }
 
@@ -61,14 +84,14 @@ export const releaseDragKey = (state: DragKeyState, code: string): void => {
   show(state)
 }
 
-const LOCKS = [
-  ["snapLockX", { axis: "x", plane: false }],
-  ["snapLockY", { axis: "y", plane: false }],
-  ["snapLockZ", { axis: "z", plane: false }],
-  ["snapPlaneX", { axis: "x", plane: true }],
-  ["snapPlaneY", { axis: "y", plane: true }],
-  ["snapPlaneZ", { axis: "z", plane: true }]
-] as const satisfies ReadonlyArray<readonly [keyof Keybinds, MoveLock]>
+const LOCKS: Partial<Record<KeybindAction, MoveLock>> = {
+  snapLockX: { axis: "x", plane: false },
+  snapLockY: { axis: "y", plane: false },
+  snapLockZ: { axis: "z", plane: false },
+  snapPlaneX: { axis: "x", plane: true },
+  snapPlaneY: { axis: "y", plane: true },
+  snapPlaneZ: { axis: "z", plane: true }
+}
 
 /** The key that narrows snapping to each kind while it is held. */
 const ONLY_ACTIONS: Readonly<Record<SnapKind, KeybindAction>> = {
@@ -81,9 +104,16 @@ const ONLY_ACTIONS: Readonly<Record<SnapKind, KeybindAction>> = {
 export const heldKindsOf = (keybinds: Keybinds, pressed: ReadonlySet<string>): ReadonlyArray<SnapKind> =>
   SNAP_KINDS.filter((kind) => keybinds[ONLY_ACTIONS[kind]].some((binding) => bindingHeld(binding, pressed)))
 
-/** Whether `code` is the key of one of the bindings that narrow snapping. */
-const narrowsWith = (keybinds: Keybinds, code: string) =>
-  SNAP_KINDS.some((kind) => keybinds[ONLY_ACTIONS[kind]].some((binding) => baseCodeOf(binding) === code))
+/**
+ * Whether a palette drop lands with snapping held off. A drop is the browser's own drag, which reports its modifiers
+ * and no key codes, so only a snapping-off key that is a modifier can be held through one.
+ */
+export const dropSnapOff = (keybinds: Keybinds, e: Modifiers): boolean => {
+  const pressed = new Set<string>()
+  held(pressed, e)
+  return matches(actionWhen.snapOff, { ...dragContext("move"), drag: "place" }) &&
+    keybinds.snapOff.some((binding) => bindingHeld(binding, pressed))
+}
 
 /** What a key press has to say, for what a drag does with it. */
 export type DragKeyEvent = Pick<
@@ -92,9 +122,26 @@ export type DragKeyEvent = Pick<
 >
 
 /**
- * A key down during a drag: it's noted, a narrowing key is the drag's alone, and a lock key sets or clears its lock. True
- * when the drag took the key. Ctrl doesn't stop a lock key, so a move with snapping off can be locked too. A turn or
- * scale has no `session` and takes no lock.
+ * The drag key `e` presses, if any: the action bound to its chord that is live in this drag. Ctrl and Shift are drag
+ * keys themselves, so the chord is read without Ctrl, and a key is also tried bare, so J narrows with Ctrl held
+ * (snapping off, but for the ends) and X locks with Shift held.
+ */
+const dragActionOf = (state: DragKeyState, e: DragKeyEvent, keybinds: Keybinds): KeybindAction | undefined => {
+  const ctx = dragContext(state.transform)
+  const chord = chordOf({ altKey: e.altKey, metaKey: false, shiftKey: e.shiftKey, ctrlKey: false, code: e.code })
+  for (const candidate of chord === e.code ? [chord] : [chord, e.code]) {
+    // cancelling is the drag's own too, but ends it rather than changing it: `cancelsDrag`
+    const action = resolveChord(keybinds, ctx, candidate).find((one) =>
+      duringDragActions.has(one) && one !== "cancelDrag"
+    )
+    if (action !== undefined) return action
+  }
+  return undefined
+}
+
+/**
+ * A key down during a drag: it's noted, a key the drag takes is the drag's alone, and a lock key sets or clears its
+ * lock. True when the drag took the key. A press that is not yet a drag has no `session` and takes no lock.
  */
 export const handleDragKey = (
   state: DragKeyState,
@@ -104,23 +151,28 @@ export const handleDragKey = (
 ): boolean => {
   state.pressed.add(e.code)
   show(state)
-  if (keybinds.snapOff.includes(e.code) || keybinds.snapHold.includes(e.code)) return true
-  if (narrowsWith(keybinds, e.code)) {
-    // a fly key or a shortcut on the same key would act on it too
-    e.preventDefault()
-    e.stopImmediatePropagation()
-    return true
-  }
-  if (session === undefined || e.repeat) return false
-  const chord = chordOf({ altKey: e.altKey, metaKey: e.metaKey, shiftKey: e.shiftKey, ctrlKey: false, code: e.code })
-  const lock = LOCKS.find(([action]) => keybinds[action].includes(chord))
-  if (lock === undefined) return false
+  const action = dragActionOf(state, e, keybinds)
+  if (action === undefined) return false
+  const lock = LOCKS[action]
+  // a press that hasn't become a drag has nothing to lock yet
+  if (lock !== undefined && session === undefined) return false
+  // a fly key or a shortcut on the same key would act on it too
   e.preventDefault()
   e.stopImmediatePropagation()
-  session.toggleLock(lock[1])
+  if (lock === undefined || session === undefined || e.repeat) return true
+  session.toggleLock(lock)
   state.lock = session.lock
   show(state)
   return true
+}
+
+/**
+ * Whether `e` is the drag's cancel key: `cancelDrag`, live in the drags the gizmo and a body drag make. The key counts
+ * bare too, so Escape cancels with Shift (hold), Ctrl (snapping off) or Alt (a copy's drag) still down.
+ */
+export const cancelsDrag = (state: DragKeyState, e: DragKeyEvent, keybinds: Keybinds): boolean => {
+  const ctx = dragContext(state.transform)
+  return firesHere(keybinds, ctx, "cancelDrag", chordOf(e)) || firesHere(keybinds, ctx, "cancelDrag", e.code)
 }
 
 /** One of the status bar's hints: the keys, and the word for what they do. */
@@ -131,39 +183,30 @@ export interface DragHint {
   readonly active: boolean
 }
 
-const KIND_WORDS: Readonly<Record<SnapKind, string>> = {
-  connectors: "connectors",
-  mesh: "mesh",
-  alignment: "align"
-}
-
 /**
- * The keys `shown`'s drag can take, Blender style: what is held lit, and only what the drag can use, so a turn offers no
- * hold or lock. An action with no binding has no hint.
+ * The keys `shown`'s drag can take, Blender style: every action with a hint word that is live in the drag
+ * (`actionWhen`), so a turn offers no lock and a scale only the mesh, with what is held or the axis locked lit. Keys
+ * that share a word share a hint (X, Y and Z: lock). An action with no binding has no hint.
  */
 export const dragHintsOf = (
   keybinds: Keybinds,
   { lock, pressed, transform }: DragKeysShown
 ): ReadonlyArray<DragHint> => {
   const down = new Set(pressed)
-  const firstOf = (action: KeybindAction) => keybinds[action][0]
-  const heldHint = (id: string, action: KeybindAction, word: string): ReadonlyArray<DragHint> => {
-    const binding = firstOf(action)
-    if (binding === undefined) return []
-    const active = keybinds[action].some((one) => bindingHeld(one, down))
-    return [{ id, keys: [{ binding, active }], word, active }]
+  const ctx = dragContext(transform)
+  const hints: Array<DragHint> = []
+  for (const action of keybindActions) {
+    const word = keybindActionHints[action]
+    const binding = keybinds[action][0]
+    if (word === undefined || binding === undefined || !matches(actionWhen[action], ctx)) continue
+    const locks = LOCKS[action]
+    const active = locks === undefined
+      ? keybinds[action].some((one) => bindingHeld(one, down))
+      : lock?.axis === locks.axis
+    const key = { binding, active }
+    const shared = hints.find((hint) => hint.word === word)
+    if (shared === undefined) hints.push({ id: word, keys: [key], word, active })
+    else hints[hints.indexOf(shared)] = { ...shared, keys: [...shared.keys, key], active: shared.active || active }
   }
-  const locks = (["x", "y", "z"] as const).flatMap((axis) => {
-    const binding = firstOf(axis === "x" ? "snapLockX" : axis === "y" ? "snapLockY" : "snapLockZ")
-    return binding === undefined ? [] : [{ binding, active: lock?.axis === axis }]
-  })
-  const move = transform === "move"
-  return [
-    ...heldHint("off", "snapOff", "off"),
-    ...(move ? heldHint("hold", "snapHold", "hold") : []),
-    ...(move && locks.length > 0
-      ? [{ id: "lock", keys: locks, word: "lock", active: lock !== undefined }]
-      : []),
-    ...SNAP_KINDS_OF[transform].flatMap((kind) => heldHint(kind, ONLY_ACTIONS[kind], KIND_WORDS[kind]))
-  ]
+  return hints
 }

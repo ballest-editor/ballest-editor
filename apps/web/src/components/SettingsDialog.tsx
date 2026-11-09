@@ -16,7 +16,8 @@ import { useEffect } from "react"
 import { movementLookModes } from "../domain/flyKeys"
 import { namedActions } from "../domain/GameKeybinds"
 import { overriddenFolders } from "../domain/gameLink"
-import { isDefaultBinding, keybindActionDescriptions } from "../domain/Keybinds"
+import { actionWhen, isDefaultBinding, keybindActionDescriptions } from "../domain/Keybinds"
+import { describeWhen } from "../domain/keyContext"
 import { AUTO_GRID_COLORS, CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Settings"
 import { BODY_DRAG_NAMES, type SnapPrefs } from "../domain/snapPrefs"
 import {
@@ -35,7 +36,7 @@ import { useDarkTheme } from "../editor/theme"
 import { ColorSetting } from "./ColorSetting"
 import { creatorSettingsRow } from "./CreatorSetting"
 import { CheckAgainButton, useGameLinkSettings } from "./GameLink"
-import { useKeybindCapture } from "./KeybindControl"
+import { KeybindWhen, useKeybindCapture } from "./KeybindControl"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
@@ -196,6 +197,8 @@ export function SettingsDialog(props: {
       label: Str.capitalize(label),
       description: keybindActionDescriptions[action],
       tooltip: true,
+      detail: <KeybindWhen action={action} />,
+      keywords: describeWhen(actionWhen[action]),
       changes: {
         modified: !isDefaultBinding(keybinds, defaults.keybinds, action),
         reset: () => capture.setBindings(action, defaults.keybinds[action])

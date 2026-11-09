@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import {
   actionsFor,
+  actionWhen,
+  clashingChords,
   conflictingBindings,
   defaultKeybinds,
   dragChordOf,
@@ -13,6 +15,7 @@ import {
   isBoundChord,
   isDefaultBinding,
   isOneShotChord,
+  type KeybindAction,
   keybindActionDescriptions,
   keybindActionLabels,
   keybindActions,
@@ -22,8 +25,10 @@ import {
   MODIFIER_HOLD_MS,
   PROJECTION_ACTIONS,
   releasesBinding,
+  resolveChord,
   wheelSpeedStep
 } from "./Keybinds"
+import { describeWhen, type KeyContext } from "./keyContext"
 import { viewProjections } from "./viewLayout"
 
 describe("keybind table", () => {
@@ -77,6 +82,7 @@ describe("keybind table", () => {
       ["delete", ["Backspace", "Delete"]],
       ["select all", ["Ctrl+KeyA"]],
       ["deselect", ["Escape"]],
+      ["cancel drag", ["Escape"]], // editor only
       ["enter group", ["Enter", "NumpadEnter"]], // editor only
       ["group", ["Ctrl+KeyG"]],
       ["group as chain", ["Ctrl+Shift+KeyG"]], // editor only
@@ -110,9 +116,10 @@ describe("keybind table", () => {
       ["ControlLeft", ["snapOff", "moveDown"]],
       ["KeyW", ["translateMode", "moveForward"]],
       ["Shift+Mouse0", ["addToSelection", "paintWholePiece"]],
-      ["Alt+Mouse0", ["pickPaint", "orbit"]]
+      ["Alt+Mouse0", ["pickPaint", "orbit"]],
+      ["Escape", ["deselect", "cancelDrag"]]
     ])
-    expect(conflictingBindings(defaultKeybinds)).toEqual(new Set())
+    expect(clashingChords(conflictingBindings(defaultKeybinds))).toEqual(new Set())
     expect(isOneShotChord(defaultKeybinds, "KeyW")).toBe(true)
     expect(isOneShotChord(defaultKeybinds, "KeyS")).toBe(false)
     expect(actionsFor(defaultKeybinds, "KeyC")).toEqual(["toggleGizmoSpace"])
@@ -136,6 +143,12 @@ describe("keybind table", () => {
     expect(merged.saveMapAs).toEqual(["Ctrl+Shift+KeyE"])
     expect(merged.saveMap).toEqual(["Ctrl+KeyS"])
     expect(mergeKeybinds({ importMap: ["Ctrl+KeyI"], openMap: ["Ctrl+KeyP"] }).openMap).toEqual(["Ctrl+KeyP"])
+  })
+
+  it("cancels a drag on what deselect was bound to in a save from before cancel drag had a key of its own", () => {
+    expect(mergeKeybinds({ deselect: ["KeyQ"] }).cancelDrag).toEqual(["Escape", "KeyQ"])
+    expect(mergeKeybinds({ deselect: ["KeyQ"], cancelDrag: ["Backquote"] }).cancelDrag).toEqual(["Backquote"])
+    expect(mergeKeybinds({}).cancelDrag).toEqual(["Escape"])
   })
 
   it("keeps the binding saved for invert snapping as snapping off, and drops the grid and step keys", () => {
@@ -254,10 +267,11 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
 })
 
 /** What `keybinds` adds to the conflicts the defaults already have. */
-const newConflicts = (keybinds: Keybinds) => {
-  const baseline = conflictingBindings(defaultKeybinds)
-  return [...conflictingBindings(keybinds)].filter((chord) => !baseline.has(chord))
-}
+/** The chords `keybinds` marks red that the defaults don't. */
+const newConflicts = (keybinds: Keybinds) =>
+  [...clashingChords(conflictingBindings(keybinds))].filter((chord) =>
+    !clashingChords(conflictingBindings(defaultKeybinds)).has(chord)
+  )
 
 describe("dragChordOf", () => {
   const press = (button: number, modifiers: { ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean } = {}) => ({
@@ -317,13 +331,16 @@ describe("wheelSpeedStep", () => {
 })
 
 describe("conflictingBindings", () => {
-  it("marks a chord two actions of a kind share, and not one shared across kinds", () => {
+  it("marks a chord two actions share where both can take it, and not one shared across held and one-shot keys", () => {
     expect(newConflicts({ ...defaultKeybinds, undo: ["Ctrl+KeyJ"], redo: ["Ctrl+KeyJ"] })).toEqual(["Ctrl+KeyJ"])
     expect(newConflicts({ ...defaultKeybinds, moveForward: ["KeyJ"], translateMode: ["KeyJ"] })).toEqual([])
   })
 
-  it("marks two of a drag's keys sharing a chord", () => {
+  it("marks two of a drag's keys sharing a chord, and not a drag's key sharing one with a key that waits for no drag", () => {
     expect(newConflicts({ ...defaultKeybinds, snapOnlyMesh: ["KeyJ"] })).toEqual(["KeyJ"])
+    expect(newConflicts({ ...defaultKeybinds, snapLockX: ["KeyX"], cutSelection: ["KeyX"] })).toEqual([])
+    expect(newConflicts({ ...defaultKeybinds, snapOnlyMesh: ["KeyX"] })).toEqual(["KeyX"]) // X locks a move too
+    expect(newConflicts({ ...defaultKeybinds, snapLockX: ["KeyM"] })).toEqual(["KeyM"])
   })
 
   it("gives the keys that narrow snapping chords nothing else is bound to", () => {
@@ -333,14 +350,78 @@ describe("conflictingBindings", () => {
       "snapOnlyMesh",
       "snapOnlyAlignment"
     ])
-    expect(conflictingBindings(defaultKeybinds).size).toBe(0)
     for (const action of narrowing) {
       for (const chord of defaultKeybinds[action]) expect(actionsFor(defaultKeybinds, chord)).toEqual([action])
     }
   })
 
-  it("keeps the paint tool's clicks apart from selection and camera clicks, but not from each other", () => {
+  it("keeps the paint tool's clicks apart from selection clicks, and says the eyedropper takes Alt+click from orbit in Paint", () => {
     expect(newConflicts({ ...defaultKeybinds, pickPaint: ["Ctrl+Mouse0"] })).toEqual([])
     expect(newConflicts({ ...defaultKeybinds, pickPaint: ["Shift+Mouse0"] })).toEqual(["Shift+Mouse0"])
+    const conflicts = conflictingBindings(defaultKeybinds)
+    expect(conflicts.get("pickPaint")?.get("Alt+Mouse0")).toEqual({
+      clashes: [],
+      overrides: ["orbit"],
+      overriddenBy: []
+    })
+    expect(conflicts.get("orbit")?.get("Alt+Mouse0")).toEqual({
+      clashes: [],
+      overrides: [],
+      overriddenBy: ["pickPaint"]
+    })
+    expect(conflicts.get("addToSelection")).toBeUndefined()
+  })
+})
+
+describe("the caption under an action", () => {
+  it("says where it works, and nothing for one that works everywhere or also during a drag", () => {
+    const caption = (action: KeybindAction) => describeWhen(actionWhen[action])
+    expect(caption("undo")).toBe("")
+    expect(caption("moveForward")).toBe("")
+    expect(caption("snapOff")).toBe("While moving, turning, scaling or placing")
+    expect(caption("snapHold")).toBe("While moving or turning")
+    expect(caption("snapLockX")).toBe("While moving")
+    expect(caption("snapOnlyMesh")).toBe("While moving, turning or scaling")
+    expect(caption("cancelDrag")).toBe("While moving, turning or scaling")
+    expect(caption("addToSelection")).toBe("Select, Move, Rotate and Scale tools")
+    expect(caption("pickPaint")).toBe("Paint tool")
+    expect(caption("playMap")).toBe("Desktop app")
+  })
+})
+
+describe("resolveChord", () => {
+  const idle: KeyContext = { drag: "none", tool: "translate", platform: "desktop" }
+
+  it("fires a chord's actions only where they work, the narrowest first", () => {
+    expect(resolveChord(defaultKeybinds, idle, "Ctrl+KeyZ")).toEqual(["undo"])
+    expect(resolveChord(defaultKeybinds, { ...idle, drag: "move" }, "Ctrl+KeyZ")).toEqual([])
+    expect(resolveChord(defaultKeybinds, { ...idle, drag: "move" }, "KeyX")).toEqual(["snapLockX"])
+    expect(resolveChord(defaultKeybinds, idle, "KeyX")).toEqual([])
+    expect(resolveChord(defaultKeybinds, { ...idle, drag: "turn" }, "KeyX")).toEqual([])
+    expect(resolveChord(defaultKeybinds, { ...idle, drag: "scrub" }, "Delete")).toEqual([])
+  })
+
+  it("lets the camera fly through a look and a gizmo drag, but not a one-shot", () => {
+    for (const drag of ["none", "camera", "move", "turn", "scale"] as const) {
+      expect(resolveChord(defaultKeybinds, { ...idle, drag }, "KeyS")).toEqual(["moveBack"])
+    }
+    expect(resolveChord(defaultKeybinds, { ...idle, drag: "camera" }, "KeyW")).toEqual(["moveForward"])
+    expect(resolveChord(defaultKeybinds, idle, "KeyW")).toEqual(["translateMode", "moveForward"])
+    expect(resolveChord(defaultKeybinds, { ...idle, drag: "camera" }, "KeyF")).toEqual([])
+  })
+
+  it("gives the paint tool its own clicks and Escape to the drag under way", () => {
+    expect(resolveChord(defaultKeybinds, idle, "Shift+Mouse0")).toEqual(["addToSelection"])
+    expect(resolveChord(defaultKeybinds, { ...idle, tool: "paint" }, "Shift+Mouse0")).toEqual(["paintWholePiece"])
+    expect(resolveChord(defaultKeybinds, { ...idle, tool: "paint" }, "Alt+Mouse0")).toEqual(["pickPaint", "orbit"])
+    expect(resolveChord(defaultKeybinds, idle, "Alt+Mouse0")).toEqual(["orbit"])
+    expect(resolveChord(defaultKeybinds, idle, "Escape")).toEqual(["deselect"])
+    expect(resolveChord(defaultKeybinds, { ...idle, drag: "move" }, "Escape")).toEqual(["cancelDrag"])
+  })
+
+  it("has Play on the desktop only, so F5 falls through to the browser", () => {
+    expect(resolveChord(defaultKeybinds, idle, "F5")).toEqual(["playMap"])
+    expect(resolveChord(defaultKeybinds, { ...idle, platform: "browser" }, "F5")).toEqual([])
+    expect(actionWhen.playMap).toEqual({ platform: ["desktop"] })
   })
 })

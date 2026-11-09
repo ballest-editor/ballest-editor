@@ -56,6 +56,7 @@ import { placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import { jointsAfterMove } from "../domain/joints"
 import type { Keybinds } from "../domain/Keybinds"
+import type { Tool } from "../domain/keyContext"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
 import { type GameWrite, type LinkState, linkStateOf } from "../domain/linkState"
@@ -313,7 +314,7 @@ export interface FlipOffer {
 /** A material slot edit on the item with this id (see `SlotMaterial`). */
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
-export type Tool = "select" | "translate" | "rotate" | "scale" | "paint"
+export type { Tool }
 export const settingsCategories = ["general", "editor", "camera", "keybinds", "appearance", "beta", "game"] as const
 export type SettingsCategory = (typeof settingsCategories)[number]
 
