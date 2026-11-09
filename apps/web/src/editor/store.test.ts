@@ -15,9 +15,12 @@ import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { findGroup, treeKeys } from "../domain/structure"
 import { lightingOf } from "../domain/sunlight"
+import { surfaceOf } from "../domain/surface"
 import { defaultViewLayout } from "../domain/viewLayout"
 import type { ProjectState } from "../services/Platform"
+import { paintTargetOf, pickedBrushOf } from "./paintTarget"
 import {
+  currentBrush,
   editedAtOf,
   exportProblemOf,
   gameMapOf,
@@ -40,7 +43,9 @@ import {
   windowTitleOf
 } from "./store"
 
-const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
+const fixtureCatalog = Schema.decodeUnknownSync(Catalog)(fixture)
+const cube = fixtureCatalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
+const cubeIndex = indexCatalog(fixtureCatalog)
 
 const emptyPrefab = prefabOfItems([], null)
 
@@ -148,6 +153,140 @@ describe("editor store", () => {
     assert.isFalse(s().paintSlots([{ id: "nope", component: 0, slot: 0, material }]))
     s().undo()
     assert.deepStrictEqual([slotOf(1), slotOf(2)], [before, before])
+  })
+
+  describe("a paint stroke", () => {
+    const material = "/Script/Engine.MaterialInstanceConstant'/Game/A/MI_Env_Rough_Red.MI_Env_Rough_Red'"
+    const slotOf = (i: number) => s().doc.map.items[i]!.meshComponents[0]!.materials[0]!.material
+    const s = state
+
+    it("is one undo step for every target it paints", () => {
+      mapWithCubes(0, 100, 200)
+      const ids = s().doc.ids.slice(1)
+      const before = slotOf(1)
+      const steps = s().past.length
+      assert.isTrue(s().beginPaintStroke())
+      assert.isFalse(s().beginPaintStroke()) // one at a time
+      for (const id of ids) assert.isTrue(s().paintSlots([{ id, component: 0, slot: 0, material }]))
+      // painted as it goes, with no step yet, and undo waits
+      assert.deepStrictEqual([slotOf(1), slotOf(2), slotOf(3)], [material, material, material])
+      assert.strictEqual(s().past.length, steps)
+      s().undo()
+      assert.strictEqual(slotOf(1), material)
+      s().endPaintStroke()
+      assert.strictEqual(s().past.length, steps + 1)
+      assert.isTrue(s().dirty)
+      s().undo()
+      assert.deepStrictEqual([slotOf(1), slotOf(2), slotOf(3)], [before, before, before])
+      s().redo()
+      assert.deepStrictEqual([slotOf(1), slotOf(2), slotOf(3)], [material, material, material])
+    })
+
+    it("leaves no step when it painted nothing new", () => {
+      mapWithCubes(0)
+      const id = s().doc.ids[1]!
+      s().paintSlots([{ id, component: 0, slot: 0, material }])
+      const steps = s().past.length
+      s().beginPaintStroke()
+      s().endPaintStroke()
+      s().beginPaintStroke()
+      s().paintSlots([{ id, component: 0, slot: 0, material }])
+      s().endPaintStroke()
+      assert.strictEqual(s().past.length, steps)
+    })
+
+    it("paints the whole piece: every slot of its components, as the paint tool asks", () => {
+      mapWithCubes(0)
+      const id = s().doc.ids[1]!
+      const item = s().doc.map.items[1]!
+      const target = paintTargetOf(
+        { itemId: id, visual: "m0", slot: 0 },
+        item,
+        cubeIndex,
+        { _tag: "Material", material },
+        true
+      )
+      assert.strictEqual(target.effect._tag, "Slots")
+      const slots = target.effect._tag === "Slots" ? target.effect.edits : []
+      assert.deepStrictEqual(slots.map((edit) => edit.slot), cube.materialSlots.map((slot) => slot.index))
+      s().beginPaintStroke()
+      s().paintSlots(slots.map((edit) => ({ id, ...edit })))
+      s().endPaintStroke()
+      assert.deepStrictEqual(
+        s().doc.map.items[1]!.meshComponents[0]!.materials.map((m) => m.material),
+        cube.materialSlots.map(() => material)
+      )
+    })
+
+    it("puts a painted piece back to its defaults, which the eyedropper then picks, as one undo step", () => {
+      mapWithCubes(0)
+      const id = s().doc.ids[1]!
+      const at = { itemId: id, visual: "m0", slot: 0 }
+      const editsOf = (brush: Parameters<typeof paintTargetOf>[3]) => {
+        const { effect } = paintTargetOf(at, s().doc.map.items[1]!, cubeIndex, brush, true)
+        return effect._tag === "Slots" ? effect.edits.map((edit) => ({ id, ...edit })) : []
+      }
+      s().paintSlots(editsOf({ _tag: "Material", material }))
+      const steps = s().past.length
+      s().beginPaintStroke()
+      s().paintSlots(editsOf({ _tag: "Default" }))
+      s().endPaintStroke()
+      const mesh = s().doc.map.items[1]!.meshComponents[0]!
+      assert.deepStrictEqual([mesh.materials, mesh.materialAssetPaths], [[], []])
+      assert.strictEqual(s().past.length, steps + 1)
+      assert.deepStrictEqual(pickedBrushOf(at, s().doc.map.items[1]!, cubeIndex), { _tag: "Default" })
+      // already there: nothing to do
+      s().beginPaintStroke()
+      s().paintSlots(editsOf({ _tag: "Default" }))
+      s().endPaintStroke()
+      assert.strictEqual(s().past.length, steps + 1)
+      s().undo()
+      assert.strictEqual(slotOf(1), material)
+    })
+
+    it("sets surfaces, with or without a stroke, and one step for each", () => {
+      mapWithCubes(0, 100)
+      const ids = s().doc.ids.slice(1)
+      const surfaceAt = (i: number) => surfaceOf(s().doc.map.items[i]!)
+      const steps = s().past.length
+      s().beginPaintStroke()
+      for (const id of ids) assert.isTrue(s().paintSurface([id], 2))
+      s().endPaintStroke()
+      assert.deepStrictEqual([surfaceAt(1), surfaceAt(2)], [2, 2])
+      assert.strictEqual(s().past.length, steps + 1)
+      // already on it: no step
+      assert.isTrue(s().paintSurface(ids, 2))
+      assert.strictEqual(s().past.length, steps + 1)
+      assert.isTrue(s().paintSurface(ids.slice(0, 1), 0))
+      assert.strictEqual(s().past.length, steps + 2)
+      assert.deepStrictEqual([surfaceAt(1), surfaceAt(2)], [0, 2])
+      assert.isFalse(s().paintSurface(["nope"], 1))
+      s().undo()
+      s().undo()
+      assert.deepStrictEqual([surfaceAt(1), surfaceAt(2)], [0, 0])
+    })
+
+    it("paints with the picker's first colour until another is picked", () => {
+      const paint = [{ name: "smooth", colors: [{ color: "Red", material }] }]
+      assert.deepStrictEqual(currentBrush({ brush: null, paint }), { _tag: "Material", material })
+      assert.isUndefined(currentBrush({ brush: null, paint: [] }))
+      const ice = { _tag: "Surface", value: 2 } as const
+      assert.deepStrictEqual(currentBrush({ brush: ice, paint }), ice)
+    })
+
+    it("holds the tab where it is until it ends", () => {
+      mapWithCubes(0)
+      s().loadMap(startOnlyMap(), null, undefined, { into: "addedTab" })
+      const second = s().tabId
+      s().activateTab(s().tabIds[0]!)
+      const first = s().tabId
+      s().beginPaintStroke()
+      s().activateTab(second)
+      assert.strictEqual(s().tabId, first)
+      s().endPaintStroke()
+      s().activateTab(second)
+      assert.strictEqual(s().tabId, second)
+    })
   })
 
   it("sets pivots on several items as one undo step, and skips no-op changes", () => {

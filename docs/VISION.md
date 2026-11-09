@@ -27,7 +27,7 @@ Numbers are issues. The [milestones](https://github.com/ballest-editor/ballest-e
 - **Gizmos.** Separate translate, rotate and scale gizmos in the Blender style, with per-handle hover highlight and axes coloured in game coordinates (X red, Y green, Z blue = up). Local or world axes for moving and turning; a scale is always along the items' own axes, as in the game. A Together or Each pivot setting, group pivots and chains ([DESKTOP.md § Pivot setting](DESKTOP.md#pivot-setting-together-and-each)), and a dot at every pivot.
 - **Placement and transform.** A piece palette using the exact meshes the in-game editor uses, numeric entry for position, rotation and scale, uniform scale, the game's pivot choices (`editorState.pivots`).
 - **Selection.** Shift or Ctrl+click multi-select. Copy, cut, paste, duplicate, and Alt+drag to duplicate.
-- **Materials.** A per-slot picker with the game's finishes and colours, and the 0.4.1 item surfaces.
+- **Materials.** A per-slot picker with the game's finishes and colours, and the 0.4.1 item surfaces. A paint tool that clicks or drags the picker's paint or a surface onto the slot under the pointer or the whole piece, by the game's paint rules, with an eyedropper (#97, [DESKTOP.md § Paint tool](DESKTOP.md#paint-tool)).
 - **App shell.** A menu bar (File, Edit, View, Project), a Settings window (keybinds, camera, appearance) whose keybind names and defaults mirror the game's settings screen, map tabs, a Project panel, a status bar and notifications.
 - **Projects.** Folders of maps, export to the game's maps folder, backups, and detection of edits made in the in-game editor ([PROJECTS.md](PROJECTS.md)).
 - **Playtest handoff.** Play exports the map and races it in the game.
@@ -71,7 +71,6 @@ Organisation:
 
 Materials:
 
-- A paint tool: pick a material and click faces or objects to assign it to the hit slot, with an eyedropper (#97).
 - Find and replace materials across the selection or the map (#96).
 
 Other:

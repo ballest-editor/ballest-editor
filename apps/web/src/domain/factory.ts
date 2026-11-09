@@ -114,6 +114,17 @@ export const meshComponentFor = (meshAssetPath: string, materials: ReadonlyArray
   materialAssetPaths: materials.map(objectPathOf)
 })
 
+/** The Main mesh component as the in-game editor writes it for a fresh piece: every slot at its default. */
+export const mainMeshComponentOf = (piece: Pick<CatalogPiece, "meshAssetPath" | "materialSlots">): MeshComponent =>
+  piece.meshAssetPath === null
+    ? meshComponentFor("", [])
+    : meshComponentFor(
+      piece.meshAssetPath,
+      [...piece.materialSlots].sort((a, b) => a.index - b.index).map((slot) =>
+        qualifyMaterialPath(slot.defaultMaterial)
+      )
+    )
+
 /**
  * Map files store materials class-qualified (`/Script/Engine.MaterialInstanceConstant'/Game/X.X'`);
  * the catalog may give bare object paths. In every sample, `MI_*` assets are
@@ -150,16 +161,7 @@ const placedProperties = (piece: CatalogPiece): Pick<Item, PropertyList> => {
 export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): Item => ({
   actorToSpawn: piece.classPath,
   itemTransform: transform,
-  meshComponents: refusesMeshComponents(piece.classPath) ? [] : [
-    piece.meshAssetPath === null
-      ? meshComponentFor("", [])
-      : meshComponentFor(
-        piece.meshAssetPath,
-        [...piece.materialSlots].sort((a, b) => a.index - b.index).map((slot) =>
-          qualifyMaterialPath(slot.defaultMaterial)
-        )
-      )
-  ],
+  meshComponents: refusesMeshComponents(piece.classPath) ? [] : [mainMeshComponentOf(piece)],
   bIsBaseItem: false,
   ...placedProperties(piece)
 })

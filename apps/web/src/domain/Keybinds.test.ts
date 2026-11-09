@@ -6,7 +6,10 @@ import {
   dragChordOf,
   formatBinding,
   formatBindings,
+  formatClick,
+  formatModifiers,
   HeldKeys,
+  holdsModifiersOf,
   isBoundChord,
   isDefaultBinding,
   isOneShotChord,
@@ -54,11 +57,14 @@ describe("keybind table", () => {
       ["move", ["KeyW"]],
       ["rotate", ["KeyE"]],
       ["scale", ["KeyR"]],
+      ["paint", ["KeyB"]], // editor only
       ["local / world axes", ["KeyC"]],
       ["together / each pivot", ["Period"]], // editor only
       ["focus selection", ["KeyF"]],
       ["add to selection", ["Shift+Mouse0"]],
-      ["toggle selection", ["Ctrl+Mouse0"]]
+      ["toggle selection", ["Ctrl+Mouse0"]],
+      ["paint whole piece", ["Shift+Mouse0"]], // editor only
+      ["pick paint", ["Alt+Mouse0"]] // editor only
     ])
     const edit = keybindSections.find((s) => s.name === "edit")!
     expect(edit.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
@@ -93,13 +99,18 @@ describe("keybind table", () => {
     expect(defaultKeybinds.fastMove).toEqual([])
   })
 
-  it("only shares keys between a fly key and a tool shortcut (W: forward + translate, as in the game)", () => {
+  it("only shares keys between a fly key and a tool shortcut (W: forward + translate, as in the game), and the paint tool's clicks", () => {
     const seen = new Map<string, Array<string>>()
     for (const [action, bindings] of Object.entries(defaultKeybinds)) {
       for (const b of bindings) seen.set(b, [...(seen.get(b) ?? []), action])
     }
     const shared = [...seen].filter(([, actions]) => actions.length > 1)
-    expect(shared).toEqual([["KeyW", ["translateMode", "moveForward"]]])
+    expect(shared).toEqual([
+      ["KeyW", ["translateMode", "moveForward"]],
+      ["Shift+Mouse0", ["addToSelection", "paintWholePiece"]],
+      ["Alt+Mouse0", ["pickPaint", "orbit"]]
+    ])
+    expect(conflictingBindings(defaultKeybinds)).toEqual(new Set())
     expect(isOneShotChord(defaultKeybinds, "KeyW")).toBe(true)
     expect(isOneShotChord(defaultKeybinds, "KeyS")).toBe(false)
     expect(actionsFor(defaultKeybinds, "KeyC")).toEqual(["toggleGizmoSpace"])
@@ -135,6 +146,32 @@ describe("keybind table", () => {
     expect(formatBindings(["KeyF", "KeyC"])).toBe("F / C")
     expect(formatBindings([])).toBe("Unbound")
     expect(formatBinding("Shift+Slash")).toBe("Shift + /")
+  })
+
+  it("says a click binding and its modifiers as a hint does", () => {
+    expect(formatClick("Alt+Mouse0", false)).toBe("Alt + click")
+    expect(formatClick("Ctrl+Shift+Mouse0", true)).toBe("⌘ + Shift + click")
+    expect(formatClick("Mouse0")).toBe("Click")
+    expect(formatClick("Alt+Mouse2")).toBe("Alt + RMB")
+    expect(formatModifiers("Shift+Mouse0")).toBe("Shift")
+    expect(formatModifiers("Mouse0")).toBeUndefined()
+  })
+
+  it("knows when the held modifiers are a binding's before its click", () => {
+    const held = (mods: { shiftKey?: boolean; altKey?: boolean; ctrlKey?: boolean }) => ({
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      metaKey: false,
+      ...mods
+    })
+    expect(holdsModifiersOf(defaultKeybinds, "paintWholePiece", held({ shiftKey: true }))).toBe(true)
+    expect(holdsModifiersOf(defaultKeybinds, "paintWholePiece", held({ shiftKey: true, altKey: true }))).toBe(false)
+    expect(holdsModifiersOf(defaultKeybinds, "paintWholePiece", held({}))).toBe(false)
+    // a binding with no modifier is never "held": the bare click is the slot's
+    expect(holdsModifiersOf({ ...defaultKeybinds, paintWholePiece: ["Mouse0"] }, "paintWholePiece", held({}))).toBe(
+      false
+    )
   })
 
   it("ends a held binding when its key or one of its modifiers is released", () => {
@@ -272,5 +309,10 @@ describe("conflictingBindings", () => {
   it("marks a chord two actions of a kind share, and not one shared across kinds", () => {
     expect(newConflicts({ ...defaultKeybinds, undo: ["Ctrl+KeyJ"], redo: ["Ctrl+KeyJ"] })).toEqual(["Ctrl+KeyJ"])
     expect(newConflicts({ ...defaultKeybinds, moveForward: ["KeyJ"], translateMode: ["KeyJ"] })).toEqual([])
+  })
+
+  it("keeps the paint tool's clicks apart from selection and camera clicks, but not from each other", () => {
+    expect(newConflicts({ ...defaultKeybinds, pickPaint: ["Ctrl+Mouse0"] })).toEqual([])
+    expect(newConflicts({ ...defaultKeybinds, pickPaint: ["Shift+Mouse0"] })).toEqual(["Shift+Mouse0"])
   })
 })

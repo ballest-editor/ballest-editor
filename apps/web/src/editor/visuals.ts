@@ -13,7 +13,14 @@ import { assetUrl } from "./assetUrl"
 export const glbUrl = (glb: string | null | undefined): string | undefined =>
   glb === undefined || glb === null || glb.length === 0 ? undefined : assetUrl(glb)
 
+/**
+ * The `userData` field each drawn visual carries its `Visual.key` in, so a raycast hit knows which of the item's meshes
+ * it is (editor/paintTarget.ts).
+ */
+export const VISUAL_KEY = "visualKey"
+
 export interface Visual {
+  /** `main` (the class's Main mesh, for an item with no components), `m<i>` (`meshComponents[i]`), `x<i>` (an extra). */
   readonly key: string
   readonly mesh: MeshInfo | undefined
   /** Game material path per UE slot index. */
