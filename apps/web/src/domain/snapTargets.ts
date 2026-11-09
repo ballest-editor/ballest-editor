@@ -449,21 +449,23 @@ const stationHit = (
   }]
 }
 
-/** How far from an end's point its cap reaches, in cm: the widest cap is 300 cm across. */
+/** How far an end's cap reaches from its point when the piece's data has no cap: the widest cap is 300 cm across. */
 const CAP_CM = 300
 
-/** How far off an end's plane a point can be and still be on its cap, in cm. */
+/** How far off an end's plane a point can be and still be on its cap, in cm, and how far past its outline. */
 const ON_CAP_CM = 1
 
 /**
  * Whether `point` is on the cap of one of `item`'s ends, with Connectors on: the end is the cap's one target, so its
  * face, centre, edges and corners aren't Mesh's to offer, and a piece brought to an end joins it instead of catching on
- * the cap on the way (docs/SNAPPING.md § Mesh).
+ * the cap on the way (docs/SNAPPING.md § Mesh). The cap's footprint is its own, scaled with the piece, whichever spot
+ * the end connects by.
  */
 const onEndCap = (frame: SnapFrame, item: SnapItem, point: Vec3): boolean =>
   frame.config.targets.connectors.enabled && item.ends.some((end) => {
-    const out = vecSub(point, end.position)
-    return Math.abs(vecDot(out, end.forward)) <= ON_CAP_CM && vecLength(out) <= CAP_CM
+    const out = vecSub(point, end.cap?.centre ?? end.position)
+    const reach = end.cap === undefined ? CAP_CM : end.cap.reach + ON_CAP_CM
+    return Math.abs(vecDot(out, end.forward)) <= ON_CAP_CM && vecLength(out) <= reach
   })
 
 export const meshHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {

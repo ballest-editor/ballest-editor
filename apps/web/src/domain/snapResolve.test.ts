@@ -827,6 +827,26 @@ describe("resolveDrag", () => {
     assert.isEmpty(meshHits(frameOf({ x: 296, y: 3, z: 0 }, { config, bases: [own], items })), "nothing of the cap")
   })
 
+  it("takes the cap's own footprint, scaled with the piece, not a fixed reach round the chosen spot", () => {
+    // the end connects by a corner spot 150 cm from a cap centred on x, and the piece is scaled to a 640 cm wide cap
+    const corner = { x: 300, y: 150, z: 0 }
+    const end = { ...endAlongX("a", 0, 300, -1), position: corner, cap: { centre: { x: 300, y: 0, z: 0 }, reach: 320 } }
+    const farCorner = { x: 300, y: -310, z: 0 }
+    const mesh = () => ({ vertices: [farCorner], edges: [], faceCentres: [], faces: [] })
+    const body = { x: 300, y: -300, z: 0 }
+    const items = [cubeAt("a", body, { ends: [end], mesh, bounds: undefined })]
+    const own: BasePoint = { start: ORIGIN, label: "End", end: endAlongX("own", 0, 0, 1) }
+    const config = on(defaultSnapConfig, "mesh", "connectors")
+    const near = frameOf({ x: 300, y: -307, z: 0 }, { config, bases: [own], items })
+    assert.isEmpty(meshHits(near), "the far corner is the cap's")
+    const { cap: _none, ...withoutCap } = end
+    const bare = [cubeAt("a", body, { ends: [withoutCap], mesh, bounds: undefined })]
+    assert.isNotEmpty(
+      meshHits({ ...near, items: bare }),
+      "without cap data the fixed reach round the spot is all there is"
+    )
+  })
+
   it("takes a point on the edge it's sliding along", () => {
     const edge = [{ x: -500, y: 0, z: 0 }, { x: 500, y: 0, z: 0 }] as const
     const mesh = () => ({ vertices: [{ x: 300, y: 0, z: 0 }], edges: [edge], faceCentres: [], faces: [] })

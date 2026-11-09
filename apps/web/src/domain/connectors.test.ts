@@ -187,6 +187,15 @@ describe("an end under a scale that isn't the same on every axis", () => {
     assert.closeTo(vecLength(end.forward), 1, 1e-9)
   })
 
+  it("carries its cap's footprint: the centre placed, the reach stretched by the largest scale", () => {
+    const [capped, bare] = endsOf("a", item, transform, index)
+    expectVec(must(capped?.cap).centre, localToWorld(transform, { x: 984.285, y: 0, z: 32.363 }))
+    assert.closeTo(must(capped?.cap).reach, Math.hypot(150, 75) * 1, 1e-9)
+    assert.isUndefined(bare?.cap, "an end measured without a cap has no footprint")
+    const doubled = must(endsOf("a", item, { ...transform, scale3D: { x: 2, y: 2, z: 1 } }, index)[0])
+    assert.closeTo(must(doubled.cap).reach, Math.hypot(150, 75) * 2, 1e-9)
+  })
+
   it("lies flush on an end it is turned to meet: its cap in the other's plane", () => {
     const own = must(endsOf("a", item, transform, index)[0])
     const other = must(endsOf("b", item, identityTransform({ x: 5000, y: 0, z: 0 }), index)[1])

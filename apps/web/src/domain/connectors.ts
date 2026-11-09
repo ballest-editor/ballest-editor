@@ -32,6 +32,14 @@ export interface WorldEnd {
   readonly up: Vec3
   readonly profile: string
   readonly hand?: "left" | "right"
+  /** Its cap's footprint in the world, when the piece's data has one: where it is centred, and how far it reaches. */
+  readonly cap?: WorldCap
+}
+
+export interface WorldCap {
+  readonly centre: Vec3
+  /** The farthest the cap's outline gets from its centre, in cm, as the piece is scaled. */
+  readonly reach: number
 }
 
 /** How far apart two ends can be and still meet, in cm. */
@@ -62,7 +70,28 @@ const mirrored = (
     ...(cap !== undefined && { cap: cap.centre === undefined ? cap : { ...cap, centre: by(cap.centre) } })
   }
   const vec = ([x, y, z]: Connector["position"]): Vec3 => ({ x, y, z })
-  return { position: vec(spotPosition(flipped, spot)), forward: vec(flipped.forward), up: vec(flipped.up) }
+  return {
+    position: vec(spotPosition(flipped, spot)),
+    forward: vec(flipped.forward),
+    up: vec(flipped.up),
+    ...(flipped.cap !== undefined && {
+      cap: {
+        centre: vec(flipped.cap.centre ?? flipped.position),
+        reach: flipped.cap.shape === "circle" || flipped.cap.shape === "annulus"
+          ? flipped.cap.radius
+          : Math.hypot(flipped.cap.width / 2, flipped.cap.height / 2)
+      }
+    })
+  }
+}
+
+/** A cap's footprint under `transform`: its centre placed, its reach stretched by the largest scale. */
+const worldCap = (transform: UeTransform, cap: { readonly centre: Vec3; readonly reach: number }): WorldCap => {
+  const { x, y, z } = transform.scale3D
+  return {
+    centre: localToWorld(transform, cap.centre),
+    reach: cap.reach * Math.max(Math.abs(x), Math.abs(y), Math.abs(z))
+  }
 }
 
 /** What flipping does to a lopsided end: one mirror swaps its sides, two put them back. */
@@ -102,14 +131,15 @@ export const endsOf = (
   if (connectors.length === 0) return []
   const flip = mirrorScaleOf(item, index)
   return connectors.map((connector, end) => {
-    const { forward, position, up } = mirrored(connector, flip, connectAt?.[String(end)])
+    const { cap, forward, position, up } = mirrored(connector, flip, connectAt?.[String(end)])
     const hand = handAfter(connector.hand, flip)
     return {
       ref: { item: key, end },
       position: localToWorld(transform, position),
       ...worldFrame(transform, forward, up),
       profile: connector.profile,
-      ...(hand !== undefined && { hand })
+      ...(hand !== undefined && { hand }),
+      ...(cap !== undefined && { cap: worldCap(transform, cap) })
     }
   })
 }
