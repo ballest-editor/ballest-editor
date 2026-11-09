@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Bundles src/functions/ into Vercel's Build Output API with apps/collect's build/vercelBuild.ts; needs none of
+    // the game assets. `transit` puts @ballest/collect's sources in the hash.
+    "build": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.config/tsconfig.base.json"],
+      "outputs": [".vercel/output/**"]
+    }
+  }
+}

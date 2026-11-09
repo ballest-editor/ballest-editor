@@ -7,6 +7,7 @@ import {
   followGameWrites,
   followNotifications,
   followOpenTabs,
+  followPageErrors,
   followPlaySessions,
   followUnloadRequests,
   followUpdates,
@@ -28,6 +29,7 @@ import { AboutDialog } from "./AboutDialog"
 import { Dock } from "./dock/Dock"
 import { blurChromeAfterClick } from "./dock/popoutWindow"
 import { ChooserSkeleton, startsOnChooser } from "./EditorSkeleton"
+import { FeedbackDialog } from "./FeedbackDialog"
 import { GameLinkDialog } from "./GameLinkDialog"
 import { ImportClashDialog } from "./ImportClashDialog"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
@@ -148,6 +150,7 @@ export function Editor() {
     void Promise.all([booted, loadPlatform()]).then(followOpenTabs)
   }, [])
   useEffect(() => followUpdates(), [])
+  useEffect(() => followPageErrors(), [])
   useEffect(() => followViewLayouts(), [])
   useEffect(() => followPlaySessions(), [])
   useEffect(() => followGameWrites(), [])
@@ -177,6 +180,7 @@ export function Editor() {
       />
       <GameLinkDialog open={dialog === "gameLink"} onClose={close} />
       <AboutDialog open={dialog === "about"} onClose={close} />
+      <FeedbackDialog open={dialog === "feedback"} onClose={close} />
       <NewProjectDialog open={dialog === "newProject"} onClose={close} />
       <WhereToOpenDialog open={dialog === "whereToOpen"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />

@@ -435,8 +435,8 @@ const projectMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
   ]
 }
 
-/** Help, in both builds; a browser has no updater, so no update rows. */
-const helpMenu = ({ update }: MenuState): ReadonlyArray<MenuNode> => [
+/** Help, in both builds; a browser has no updater and sends no feedback, so no rows for them. */
+const helpMenu = ({ update, capabilities }: MenuState): ReadonlyArray<MenuNode> => [
   // not the keybind's command: that one shows the sheet only while the key is held
   { ...item("Keyboard shortcuts", () => openDialog({ id: "keybinds" })), shortcut: "showKeybinds" },
   SEPARATOR,
@@ -444,6 +444,7 @@ const helpMenu = ({ update }: MenuState): ReadonlyArray<MenuNode> => [
     item("Check for updates", () => void checkForUpdates(), updateCheckBlockedBy(update)),
     item("Release notes", () => void openExternalLink(RELEASES_URL))
   ]),
+  ...(capabilities.feedback ? [item("Send feedback…", () => openDialog({ id: "feedback" }))] : []),
   item("About Ballest Editor", () => openDialog({ id: "about" }))
 ]
 

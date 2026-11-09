@@ -16,6 +16,12 @@ The app finds the game through Steam, and Settings › Game shows what it found.
 
 Installed copies check for new releases and offer them in the status bar.
 
+## Feedback and privacy
+
+Help › Send feedback sends a bug report or an idea without a GitHub account. Your message becomes a public issue in this repository, so leave out anything private. The Discord and creator names the form asks for are optional, go only to the maintainer so they can reply, and are never published.
+
+Installed copies send anonymous usage statistics, which you can turn off in Settings › General. They are a random id made for your installation, the app's version, your operating system and its version, when the app starts and how long it runs, and errors the app didn't handle, with file paths, map names and your user name taken out. They never include your maps, your names or your Steam account. Turning them off deletes the id and anything not sent yet. [docs/DESKTOP.md](docs/DESKTOP.md#feedback-and-usage-statistics) has the details.
+
 ## Build from source
 
 You need Git, Node.js 22.18 or newer and pnpm. `corepack enable` gives you the pnpm version the repository pins. The game is optional: without it, the first run downloads the asset pack (the game's meshes and textures, about 48 MB) from GitHub.

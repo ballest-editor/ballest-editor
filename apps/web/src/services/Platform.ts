@@ -8,6 +8,7 @@ import type {
   DesktopVersions,
   ExportChecks,
   ExportMapResult,
+  FeedbackForm,
   FoundCreator,
   GameLinkMemory,
   GameLinkResult,
@@ -44,17 +45,21 @@ import type {
   RecoveryEntry,
   ReimportMapPayload,
   RenamePrefabPayload,
+  SendFeedbackResult,
   UnloadKind,
   UnsavedChoice,
   UpdateState,
+  UsageStatsState,
   WriteMapThumbnailPayload,
   WritePrefabPayload
 } from "@ballest/contracts"
-import { prefabSummaryOf } from "@ballest/contracts"
+import { prefabSummaryOf, REPORTED_ERROR_LIMIT } from "@ballest/contracts"
 import { Context, Effect, Layer, Option, Queue, Schema, Stream } from "effect"
 import { discardQuestionOf, type UnsavedAction, unsavedPromptOf } from "../domain/unsaved"
 
 export type {
+  FeedbackForm,
+  FeedbackKind,
   FoundCreator,
   GameLinkMemory,
   GameLinkResult,
@@ -77,8 +82,10 @@ export type {
   ProjectMapFile,
   ProjectState,
   ProjectTarget,
+  SendFeedbackResult,
   UnloadKind,
-  UnsavedChoice
+  UnsavedChoice,
+  UsageStatsState
 } from "@ballest/contracts"
 
 /** What this platform can do; the menus hide what it can't. */
@@ -96,6 +103,8 @@ export interface PlatformCapabilities {
   readonly play: boolean
   /** Updating itself from GitHub Releases; whether this build actually does is the update state's `disabled`. */
   readonly updates: boolean
+  /** Help › Send feedback, and anonymous usage statistics (docs/DESKTOP.md § Feedback and usage statistics). */
+  readonly feedback: boolean
 }
 
 /**
@@ -297,6 +306,17 @@ export class Platform extends Context.Service<Platform, {
   readonly downloadUpdate: Effect.Effect<void, PlatformError>
   /** Quits the app, installs the downloaded release and starts it. */
   readonly installUpdate: Effect.Effect<void, PlatformError>
+  /** Sends Help › Send feedback's form, which becomes a public GitHub issue (desktop). */
+  readonly sendFeedback: (form: FeedbackForm) => Effect.Effect<SendFeedbackResult, PlatformError>
+  /** Whether usage statistics are on and this build sends them; a browser never does. */
+  readonly usageStats: Effect.Effect<UsageStatsState, PlatformError>
+  /** Turns usage statistics on or off, or records the first-launch notice as shown (desktop). */
+  readonly setUsageStats: (patch: {
+    readonly enabled?: boolean
+    readonly noticeShown?: boolean
+  }) => Effect.Effect<UsageStatsState, PlatformError>
+  /** Keeps an unhandled error for the next usage batch (desktop, while usage statistics are on). */
+  readonly reportError: (message: string, stack: string) => Effect.Effect<void, PlatformError>
 }>()("ballest/services/Platform") {
   static readonly layerBrowser = Layer.sync(Platform, () => makeBrowser())
 
@@ -314,7 +334,8 @@ const browserCapabilities: PlatformCapabilities = {
   exportToGame: false,
   launchGame: false,
   play: false,
-  updates: false
+  updates: false,
+  feedback: false
 }
 
 /** Main's errors arrive as "Error invoking remote method '<channel>': ProjectError: <message>". */
@@ -378,7 +399,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
       exportToGame: true,
       launchGame: true,
       play: true,
-      updates: true
+      updates: true,
+      feedback: true
     },
     runtimeVersions: bridge.versions,
     pickMapFile: call("pickImport").pipe(Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))),
@@ -449,7 +471,15 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     updates: updateStates(bridge),
     checkForUpdates: call("checkForUpdates"),
     downloadUpdate: call("downloadUpdate"),
-    installUpdate: call("installUpdate")
+    installUpdate: call("installUpdate"),
+    sendFeedback: (form) => call("sendFeedback", form),
+    usageStats: call("usageStats"),
+    setUsageStats: (patch) => call("setUsageStats", patch),
+    reportError: (message, stack) =>
+      call("reportError", {
+        message: message.slice(0, REPORTED_ERROR_LIMIT),
+        stack: stack.slice(0, REPORTED_ERROR_LIMIT)
+      })
   })
 }
 
@@ -625,6 +655,10 @@ const makeBrowser = (): Platform["Service"] => {
     updates: Stream.empty,
     checkForUpdates: Effect.void,
     downloadUpdate: Effect.void,
-    installUpdate: Effect.void
+    installUpdate: Effect.void,
+    sendFeedback: () => desktopOnly,
+    usageStats: Effect.succeed({ enabled: false, noticeShown: true, collecting: false }),
+    setUsageStats: () => desktopOnly,
+    reportError: () => Effect.void
   })
 }

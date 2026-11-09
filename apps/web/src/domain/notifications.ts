@@ -27,7 +27,8 @@ const INBOX_KINDS: ReadonlySet<string> = new Set([
   "prefabInstancesUpdated",
   "projectRefused",
   "sidecarUnmatched",
-  "sidecarUnreadable"
+  "sidecarUnreadable",
+  "usageStats"
 ])
 
 /**

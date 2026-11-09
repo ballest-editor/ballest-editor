@@ -67,7 +67,11 @@ export const InvokeChannels = {
   getUpdateState: "ballest:update:get",
   checkForUpdates: "ballest:update:check",
   downloadUpdate: "ballest:update:download",
-  installUpdate: "ballest:update:install"
+  installUpdate: "ballest:update:install",
+  sendFeedback: "ballest:feedback:send",
+  usageStats: "ballest:usage:get",
+  setUsageStats: "ballest:usage:set",
+  reportError: "ballest:usage:reportError"
 } as const
 
 /** Main → renderer (`webContents.send`): one channel per subscription in `DesktopPushes`. */

@@ -152,7 +152,8 @@ import type {
   PluginStatus,
   ProjectMap,
   ProjectState,
-  ProjectTarget
+  ProjectTarget,
+  UsageStatsState
 } from "../services/Platform"
 
 import {
@@ -176,6 +177,7 @@ import type { Brush } from "./paintTarget"
 export type { Doc } from "../domain/structure"
 /** The game folder types, for components (which reach services only through editor/). */
 export type {
+  FeedbackKind,
   GamePathKind,
   GamePaths,
   NotificationAction,
@@ -398,7 +400,7 @@ export interface ImportClash {
  *   dialog opening in its place.
  * - `rename`, `duplicate` and `recover` are the Project panel's per-map items (desktop); `gameLink` opens by itself
  *   when something is missing (`checkGameLinkEffect`).
- * - `keybinds` and `about` are the Help menu's: the cheat sheet, staying open, and the version.
+ * - `keybinds`, `feedback` and `about` are the Help menu's: the cheat sheet, staying open, Send feedback, and the version.
  * - `settings` opens on `category`, or on the page it last showed (`settingsCategory`).
  * - `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's entry in it.
  * - `replacePublished`, `syncConflict` and `importClash` ask about what Export, Play or Import found.
@@ -415,6 +417,7 @@ export type DialogState =
       | "mapSettings"
       | "gameLink"
       | "keybinds"
+      | "feedback"
       | "about"
       | "newProject"
       | "newDraft"
@@ -440,6 +443,7 @@ const everyDialog: Readonly<Record<Dialog, true>> = {
   mapSettings: true,
   gameLink: true,
   keybinds: true,
+  feedback: true,
   about: true,
   newProject: true,
   newDraft: true,
@@ -579,6 +583,8 @@ export interface EditorState extends TabState {
   readonly update: UpdateState | null
   /** A check the user asked for has finished: what the app says "up to date" on. */
   readonly updateChecked: boolean
+  /** Usage statistics' switch and whether this build sends them, once main has said; null in a browser. */
+  readonly usageStats: UsageStatsState | null
   /** Every notification, newest first, at most `NOTIFICATION_LIMIT`. */
   readonly notifications: ReadonlyArray<NotificationRecord>
   /** Immediate feedback waiting for `showToasts`, newest first, at most `NOTIFICATION_LIMIT`. Never kept. */
@@ -718,6 +724,7 @@ export interface EditorState extends TabState {
   readonly setGamePathProblem: (problem: EditorState["gamePathProblem"]) => void
   readonly setUpdate: (update: UpdateState) => void
   readonly setUpdateChecked: (updateChecked: boolean) => void
+  readonly setUsageStats: (usageStats: UsageStatsState) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform, options?: TransformOptions) => void
   /**
    * Adds `items` as one new group called `name`, selected, as one undo step: a prefab placed, as an instance when `link`
@@ -1209,7 +1216,14 @@ export const useEditor = create<EditorState>()((set, get) => {
     projectMaps: [],
     mapThumbnails: new Map(),
     prefabs: [],
-    capabilities: { projects: false, exportToGame: false, launchGame: false, play: false, updates: false },
+    capabilities: {
+      projects: false,
+      exportToGame: false,
+      launchGame: false,
+      play: false,
+      updates: false,
+      feedback: false
+    },
     runtimeVersions: null,
     gamePaths: null,
     foundCreator: Option.none(),
@@ -1217,6 +1231,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     lastGameLink: null,
     gamePathProblem: null,
     update: null,
+    usageStats: null,
     updateChecked: false,
     notifications: [],
     toasts: [],
@@ -1376,6 +1391,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setGamePathProblem: (gamePathProblem) => set({ gamePathProblem }),
     setUpdate: (update) => set({ update }),
     setUpdateChecked: (updateChecked) => set({ updateChecked }),
+    setUsageStats: (usageStats) => set({ usageStats }),
 
     placePiece: (piece, transform, options) => {
       const item = validateItem(itemFromPiece(piece, transform))

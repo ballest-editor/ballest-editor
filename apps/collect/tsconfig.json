@@ -1,0 +1,10 @@
+{
+  "extends": "../../.config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    // build/ is run directly by node (type stripping), so its imports name the .ts files.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "build", "vitest.config.ts"]
+}
