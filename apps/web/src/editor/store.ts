@@ -157,8 +157,10 @@ import type {
 } from "../services/Platform"
 
 import {
+  type ChainShape,
   commonMoveOf,
   effectivePivotMode,
+  layChain,
   pathOrder,
   pivotDotsOf,
   type PivotDotSpec,
@@ -312,7 +314,7 @@ export interface FlipOffer {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale" | "paint"
-export const settingsCategories = ["general", "editor", "camera", "keybinds", "appearance", "game"] as const
+export const settingsCategories = ["general", "editor", "camera", "keybinds", "appearance", "beta", "game"] as const
 export type SettingsCategory = (typeof settingsCategories)[number]
 
 const HISTORY_LIMIT = 200
@@ -823,8 +825,10 @@ export interface EditorState extends TabState {
   /** Groups the selection, in selection order, as a chain; one whole group selected becomes one. */
   readonly chainSelection: () => void
   readonly reverseChain: (id: string) => void
-  /** Sets how a chain grows as it bends (`withChainGrowth`), one undo step. */
+  /** Sets how a chain grows as it bends, spaces and scales (`withChainGrowth`), one undo step. */
   readonly setChainGrowth: (id: string, growth: ChainGrowth | undefined) => void
+  /** Lays chain `id` along `shape` from its first link (`layChain`), one undo step; false when the game rejects it. */
+  readonly layChain: (id: string, shape: ChainShape) => boolean
   /** `withMovedNodes` as one undo step. */
   readonly moveNodes: (nodeIds: ReadonlyArray<string>, parentGroupId: string | null, index: number) => void
   /** Restores the previous snapshot, including its selection. */
@@ -1688,6 +1692,19 @@ export const useEditor = create<EditorState>()((set, get) => {
     },
     reverseChain: (id) => commitStructure(withReversedChain(get().doc.structure, id)),
     setChainGrowth: (id, growth) => commitStructure(withChainGrowth(get().doc.structure, id, growth)),
+    layChain: (id, shape) => {
+      const s = get()
+      const group = findGroup(s.doc.structure.tree, id)
+      if (group?.chain !== true) return false
+      const unit = unitOf(group, unitContext(s, (key) => docTransformOf(s, key)))
+      if (unit?.links === undefined) return false
+      const transforms = new Map(unit.keys.flatMap((key) => {
+        const t = docTransformOf(s, key)
+        return t === undefined ? [] : [[key, t] as const]
+      }))
+      const laid = layChain(unit.links, shape, transforms, group.growth)
+      return laid.size === 0 || s.transformItems(laid)
+    },
     moveNodes: (nodeIds, parentGroupId, index) =>
       commitStructure(withMovedNodes(get().doc.structure, nodeIds, parentGroupId, index)),
 
@@ -2183,12 +2200,15 @@ export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? 
 /** An item's pivot (Default when it has none, or isn't in the document). */
 export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, indexOfKey(s.doc.ids, id))
 
-/** An item's edit transform (see domain/editTransform.ts) as shown: the live preview, else the document. */
-export const shownTransform = (s: EditorState, id: string): UeTransform | undefined => {
-  const preview = s.preview?.get(id)
-  if (preview !== undefined) return preview
+/** An item's edit transform (see domain/editTransform.ts) in the document. */
+const docTransformOf = (s: EditorState, id: string): UeTransform | undefined => {
   const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
   return item === undefined ? undefined : editTransform(item)
+}
+
+/** An item's edit transform (see domain/editTransform.ts) as shown: the live preview, else the document. */
+export const shownTransform = (s: EditorState, id: string): UeTransform | undefined => {
+  return s.preview?.get(id) ?? docTransformOf(s, id)
 }
 
 /** The axes the gizmo uses: a scale is always along the items' own, whatever the toggle holds for Move and Rotate. */

@@ -11,13 +11,29 @@
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { identityTransform } from "./factory"
 import { selectedNodes } from "./groupSelection"
-import { applyGroupDelta, forUnit, type GroupDelta } from "./groupTransform"
+import { applyGroupDelta, clampScale, forUnit, type GroupDelta, scaleAbout } from "./groupTransform"
 import type { Box } from "./itemBounds"
 import { boxCentreOf } from "./itemBounds"
 import type { ChainGrowth, GroupNode, GroupPivot, GroupPivotFace, TreeNode } from "./MapSidecar"
 import { localToWorld } from "./pivot"
 import { findGroup, idOf, rewriteTree, type Structure, treeKeys } from "./structure"
-import { ORIGIN, quatConjugate, quatMul, quatNormalize, quatPow, rotateVec, sameVec, vecAdd, vecSub } from "./ueMath"
+import {
+  ORIGIN,
+  quatBetween,
+  quatConjugate,
+  quatFromAxisAngle,
+  quatMul,
+  quatNormalize,
+  quatPow,
+  rotateVec,
+  sameVec,
+  squareTo,
+  vecAdd,
+  vecDot,
+  vecLength,
+  vecScale,
+  vecSub
+} from "./ueMath"
 
 export type PivotMode = "together" | "each"
 
@@ -214,11 +230,23 @@ export const reachableKeys = (
   return entered?.chain === true ? [...new Set([...selectedIds, ...treeKeys([entered])])] : selectedIds
 }
 
-/** The unit an edit by `mode` is measured on, and the gizmo sits on: the active unit in Each, the game's rule in Together. */
-export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit =>
-  effectivePivotMode(mode, selection) === "each" || selection.units.length === 1
-    ? selection.active
-    : selection.activeItem
+/**
+ * The first link an edit in Each runs from inside an entered chain: the first selected. The pass takes the edit as that
+ * link does, so the gizmo sits on it.
+ */
+const passHeadOf = ({ chain, units }: SelectionUnits): Unit | undefined => {
+  const selected = new Set(units.map((unit) => unit.id))
+  return chain?.find((link) => selected.has(link.id))
+}
+
+/**
+ * The unit an edit by `mode` is measured on, and the gizmo sits on: the active unit in Each, or inside an entered chain
+ * the first selected link, which the pass runs from; the game's rule in Together.
+ */
+export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit => {
+  if (effectivePivotMode(mode, selection) === "each") return passHeadOf(selection) ?? selection.active
+  return selection.units.length === 1 ? selection.active : selection.activeItem
+}
 
 /**
  * The effective mode: Each needs two or more units, or one chain of two or more links, which bends; else a selection is
@@ -322,9 +350,192 @@ const bend = (
 }
 
 /**
- * The pass down a chain in Each. A turn bends it from the first selected link to its end, selected or not (`bend`). A
- * move carries the links after the moved one by the same offset, once. A scale stays with its link: it never reaches
- * the next, so nothing shears.
+ * A shape a chain is laid along (`layChain`, docs/design/pivot-modes-and-chains.md § Laying a chain): straight along
+ * the way its first link points, or a helix about a world axis.
+ */
+export type ChainShape =
+  | { readonly kind: "straight" }
+  | {
+    readonly kind: "helix"
+    /** The world axis it winds about, a unit vector. */
+    readonly axis: Vec3
+    /** How far each link turns about the axis from the one before, in degrees. */
+    readonly turn: number
+    /** How far each link climbs along the axis from the one before, in centimetres. */
+    readonly rise: number
+  }
+
+/**
+ * Where a helix starts: the straight chain's axes tipped toward `axis` until a step of `length` along `direction`
+ * climbs `rise`. `length` is the chain's mean step, so links of one length climb it exactly. A rise at or past the
+ * length stands the chain along the axis.
+ */
+const tippedToward = (axes: Quat4, direction: Vec3, length: number, axis: Vec3, rise: number): Quat4 => {
+  const flat = vecSub(direction, vecScale(axis, vecDot(direction, axis)))
+  const outward = vecLength(flat) < 1e-6 ? squareTo(axis) : vecScale(flat, 1 / vecLength(flat))
+  const climb = Math.max(-1, Math.min(1, rise / length))
+  const tipped = vecAdd(vecScale(outward, Math.sqrt(1 - climb * climb)), vecScale(axis, climb))
+  return quatMul(quatBetween(direction, tipped), axes)
+}
+
+/**
+ * A chain's links laid along `shape` from its first link, which stays where it is. Each link keeps its step to the next
+ * in its own axes, the one thing a bend leaves alone, so the chain is straightened first: every link takes the first
+ * link's axes, and the steps line up along the way it points. Straight stops there. A helix then tips the chain toward
+ * its axis until each step climbs the rise, and turns every joint the turn about the axis, grown by `growth` like a
+ * bend: a constant joint turn about a fixed axis with a constant climb is a helix about that axis, and with no rise a
+ * flat ring square to it. No edits for a chain of fewer than two links, or with no length.
+ */
+export const layChain = (
+  links: ReadonlyArray<Unit>,
+  shape: ChainShape,
+  transforms: ReadonlyMap<string, UeTransform>,
+  growth: ChainGrowth | undefined
+): ReadonlyMap<string, UeTransform> => {
+  const out = new Map<string, UeTransform>()
+  const [head] = links
+  if (head === undefined) return out
+  const steps = links.slice(1).flatMap((next, i) => {
+    const link = links[i]
+    return link === undefined
+      ? []
+      : [rotateVec(quatConjugate(link.transform.rotation), vecSub(next.pivot, link.pivot))]
+  })
+  if (steps.length === 0) return out
+  const axes = head.transform.rotation
+  const along = steps.reduce((sum, step) => vecAdd(sum, rotateVec(axes, step)), ORIGIN)
+  const length = vecLength(along) / steps.length
+  if (length < 1e-6) return out
+  const direction = vecScale(along, 1 / vecLength(along))
+  const { axis, start, turn } = shape.kind === "straight"
+    ? { axis: direction, start: axes, turn: 0 }
+    : {
+      axis: shape.axis,
+      start: tippedToward(axes, direction, length, shape.axis, shape.rise),
+      turn: shape.turn * Math.PI / 180
+    }
+  let pivot = head.pivot
+  let turned = 0
+  links.forEach((link, i) => {
+    const rotation = quatNormalize(quatMul(quatFromAxisAngle(axis, turned), start))
+    const q = quatNormalize(quatMul(rotation, quatConjugate(link.transform.rotation)))
+    const motion = { q, t: vecSub(pivot, rotateVec(q, link.pivot)) }
+    applyTo(out, link.keys, transforms, (t) => rigidTransform(motion, t))
+    const step = steps[i]
+    if (step !== undefined) pivot = vecAdd(pivot, rotateVec(rotation, step))
+    turned += turn * growthOf(growth, i)
+  })
+  return out
+}
+
+/** `a` times `b`, axis by axis. */
+const vecMul = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x * b.x, y: a.y * b.y, z: a.z * b.z })
+
+/** How much an item's scale changed from `before` to `after`, axis by axis in its own axes. */
+const scaleRatio = (before: UeTransform, after: UeTransform): Vec3 => {
+  const along = (axis: "x" | "y" | "z") => before.scale3D[axis] === 0 ? 1 : after.scale3D[axis] / before.scale3D[axis]
+  return { x: along("x"), y: along("y"), z: along("z") }
+}
+
+/** Where `point`, held by an item at `before`, is once the item is at `after`. */
+const heldPoint = (before: UeTransform, after: UeTransform, point: Vec3): Vec3 => {
+  const local = rotateVec(quatConjugate(before.rotation), vecSub(point, before.translation))
+  return vecAdd(after.translation, rotateVec(after.rotation, vecMul(local, scaleRatio(before, after))))
+}
+
+/**
+ * Pushes the links after link `from` so every joint still meets once a scale has resized links in `out`: a link's step
+ * to the next, read in its own axes, grows or shrinks with it. The next link's pivot is where the joint is, as for a
+ * bend (§ Chains), so a chain whose pivots sit at its joints stays closed exactly.
+ */
+const keepJoints = (
+  out: Map<string, UeTransform>,
+  links: ReadonlyArray<Unit>,
+  from: number,
+  transforms: ReadonlyMap<string, UeTransform>
+) => {
+  const placed = (link: Unit) => {
+    const [key] = link.keys
+    const before = key === undefined ? undefined : transforms.get(key)
+    if (before === undefined) return undefined
+    const after = out.get(key ?? "") ?? before
+    return { before, after, pivot: heldPoint(before, after, link.pivot) }
+  }
+  let at = links[from] === undefined ? undefined : placed(links[from])?.pivot
+  for (let k = from; k + 1 < links.length && at !== undefined; k++) {
+    const link = links[k]
+    const next = links[k + 1]
+    const own = link === undefined ? undefined : placed(link)
+    const now = next === undefined ? undefined : placed(next)
+    if (link === undefined || next === undefined || own === undefined || now === undefined) return
+    // in the axes of the item the scale ratio is read off, which a group link's own axes needn't be
+    const axes = own.before.rotation
+    const step = rotateVec(quatConjugate(axes), vecSub(next.pivot, link.pivot))
+    const joint = vecAdd(at, rotateVec(axes, vecMul(step, scaleRatio(own.before, own.after))))
+    const shift = vecSub(joint, now.pivot)
+    if (vecLength(shift) > 1e-9) {
+      applyTo(out, next.keys, transforms, (t) => ({ ...t, translation: vecAdd(t.translation, shift) }))
+    }
+    at = joint
+  }
+}
+
+/** `r` to the power `k`, keeping its sign: a mirror stays one. */
+const signedPow = (r: number, k: number) => Math.sign(r) * Math.abs(r) ** k
+
+/**
+ * A chain scaled in Each from link `from` to its end: each link by the scale the edit gives the first, in its own
+ * axes about its own pivot, grown by `growth` as a power, and the links after pushed so every joint still meets.
+ */
+const scaleDown = (
+  out: Map<string, UeTransform>,
+  links: ReadonlyArray<Unit>,
+  from: number,
+  ratio: Vec3,
+  transforms: ReadonlyMap<string, UeTransform>,
+  growth: ChainGrowth | undefined
+) => {
+  links.slice(from).forEach((link, i) => {
+    const g = growthOf(growth, i)
+    const factor = { x: signedPow(ratio.x, g), y: signedPow(ratio.y, g), z: signedPow(ratio.z, g) }
+    applyTo(out, link.keys, transforms, (t) => {
+      const scaled = vecMul(t.scale3D, factor)
+      return scaleAbout(t, { x: clampScale(scaled.x), y: clampScale(scaled.y), z: clampScale(scaled.z) }, link.pivot)
+    })
+  })
+  keepJoints(out, links, from, transforms)
+}
+
+/**
+ * A chain moved in Each from link `from` to its end: each link moves by the move from the link before it, so the
+ * moves add up down the chain the way a bend's turns do, grown by `growth`. The first link takes the move as the gizmo
+ * shows it, and every link after takes it in the axes of the link before, its parent, read as the first link reads it.
+ * So a drag along a chain opens every joint alike, along a curve too, and a drag up a pile stacks it.
+ */
+const moveDown = (
+  out: Map<string, UeTransform>,
+  links: ReadonlyArray<Unit>,
+  from: number,
+  offset: Vec3,
+  transforms: ReadonlyMap<string, UeTransform>,
+  growth: ChainGrowth | undefined
+) => {
+  const head = links[from]
+  if (head === undefined) return
+  const local = rotateVec(quatConjugate(head.transform.rotation), offset)
+  let moved = ORIGIN
+  links.slice(from).forEach((link, i) => {
+    const parent = i === 0 ? head : links[from + i - 1] ?? head
+    moved = vecAdd(moved, vecScale(rotateVec(parent.transform.rotation, local), growthOf(growth, i)))
+    const by = moved
+    applyTo(out, link.keys, transforms, (t) => ({ ...t, translation: vecAdd(t.translation, by) }))
+  })
+}
+
+/**
+ * The pass down a chain in Each, from the first selected link to its end, selected or not, as the edit takes that
+ * link. A turn bends it (`bend`), a move adds up down it (`moveDown`), and a scale resizes every link and keeps the joints
+ * meeting (`scaleDown`); growth grows each, link by link.
  */
 const chainPass = (
   out: Map<string, UeTransform>,
@@ -337,23 +548,21 @@ const chainPass = (
   const from = links.findIndex(selected)
   const head = links[from]
   if (head === undefined) return
-  const turn = motionOf(edit(head), head.pivot)
-  if (turn !== undefined && turn !== "move") {
-    bend(out, links.slice(from), turn.q, transforms, growth)
+  const f = edit(head)
+  const motion = motionOf(f, head.pivot)
+  if (motion === "move") {
+    moveDown(out, links, from, vecSub(f(identityTransform(head.pivot)).translation, head.pivot), transforms, growth)
     return
   }
-  let carried = IDENTITY
-  for (const link of links.slice(from)) {
-    if (!selected(link)) {
-      if (!isIdentity(carried)) applyTo(out, link.keys, transforms, (t) => rigidTransform(carried, t))
-      continue
-    }
-    const own = edit(link)
-    applyTo(out, link.keys, transforms, own)
-    // a move is the link's own, not on top of what an earlier moved link passed down
-    const probe = own(identityTransform(link.pivot))
-    if (!sameVec(probe.translation, link.pivot)) carried = { q: IDENTITY.q, t: vecSub(probe.translation, link.pivot) }
+  if (motion !== undefined) {
+    bend(out, links.slice(from), motion.q, transforms, growth)
+    return
   }
+  const [key] = head.keys
+  const before = key === undefined ? undefined : transforms.get(key)
+  if (before === undefined) return
+  const ratio = scaleRatio(before, f(before))
+  if (!nearVec(ratio, { x: 1, y: 1, z: 1 })) scaleDown(out, links, from, ratio, transforms, growth)
 }
 
 /** The items one motion of the whole selection takes: every unit's, and inside an entered chain the links it carries. */
@@ -381,9 +590,12 @@ export const applyUnitEdit = (
   if (effectivePivotMode(mode, selection) === "together") {
     const unit = pivotUnitOf(selection, mode)
     const f = edit(unit)
-    // a move or turn of a link carries the links after it; a scale stays with its link
+    // a move or turn of a link carries the links after it rigidly
     const carries = chain !== undefined && motionOf(f, unit.pivot) !== undefined
     applyTo(out, carries ? carriedKeys(selection) : units.flatMap((u) => u.keys), transforms, f)
+    // a scale resizes the selected links, and the links after them follow so the joints meet
+    const first = chain?.findIndex((link) => selected.has(link.id)) ?? -1
+    if (chain !== undefined && first >= 0 && !carries) keepJoints(out, chain, first, transforms)
     return out
   }
   if (chain !== undefined) {
@@ -433,13 +645,31 @@ export const applyUnitOffsets = (
   return out
 }
 
+/** The items of a unit that take an edit in Each as the gizmo shows it: a chain's first link, since the links after it
+ * take it more than once as it runs down; a plain unit's own. */
+const leaderOf = (unit: Unit): ReadonlyArray<string> => unit.links?.[0]?.keys ?? unit.keys
+
 /**
  * The items snapping measures an edit by `mode` on: those that take it as the gizmo shows it. In Together that is every
- * unit, and in Each only the active one, as the others go along their own axes or about their own pivots. A link carried
- * along inside an entered chain isn't one of them, since nothing about it was asked for.
+ * unit, and in Each only the active one, as the others go along their own axes or about their own pivots. A chain in
+ * Each passes the edit down from its first link (inside an entered chain, the first selected), so that link alone
+ * leads: the links after take it again and again. A link carried along inside an entered chain isn't one either.
  */
-export const leadingKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> =>
-  effectivePivotMode(mode, selection) === "each" ? selection.active.keys : selection.units.flatMap((unit) => unit.keys)
+export const leadingKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> => {
+  if (effectivePivotMode(mode, selection) !== "each") return selection.units.flatMap((unit) => unit.keys)
+  return passHeadOf(selection)?.keys ?? leaderOf(selection.active)
+}
+
+/**
+ * The items that take a move along the world's axes as dragged, so any of them can lead it: every unit in Together, and
+ * in Each every plain unit and a chain's first link (`leadingKeys`).
+ */
+export const movedAlikeKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> =>
+  effectivePivotMode(mode, selection) !== "each"
+    ? selection.units.flatMap((unit) => unit.keys)
+    : selection.chain === undefined
+    ? selection.units.flatMap(leaderOf)
+    : leadingKeys(selection, mode)
 
 /** Whether a turn by `mode` runs down a chain, so the active unit can end up turned by more than the angle dragged. */
 export const turnAccumulates = (selection: SelectionUnits, mode: PivotMode): boolean =>

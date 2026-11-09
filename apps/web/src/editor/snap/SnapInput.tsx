@@ -9,7 +9,7 @@ import type { UeTransform, Vec3 } from "../../domain/coords"
 import { chordOf, mouseChordOf } from "../../domain/Keybinds"
 import type { Constraint } from "../../domain/snapFrame"
 import { shownMarks } from "../../domain/snapRelation"
-import { applyDelta, leadingKeys, type PivotMode, type SelectionUnits } from "../../domain/units"
+import { applyDelta, movedAlikeKeys, type PivotMode, type SelectionUnits } from "../../domain/units"
 import { transformSelection } from "../actions"
 import { type PaneCamera, panePointer } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
@@ -134,8 +134,8 @@ export function SnapInput() {
       const { transforms } = target
       const pointer = panePointer(el, from.e, from.slot)
       raycaster.setFromCamera(pointer.ndc, pointer.pane.camera)
-      // a body drag goes along the world's axes, so every unit takes it alike and any of them can lead it
-      const selection = selectionSnapStart(s, transforms, leadingKeys(target.selection, "together"))
+      // a body drag goes along the world's axes, so any unit that takes it as dragged can lead it
+      const selection = selectionSnapStart(s, transforms, movedAlikeKeys(target.selection, s.pivotMode))
       const session = new MoveSession({
         pane: pointer.pane,
         keys: new Set(transforms.keys()),

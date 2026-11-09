@@ -61,8 +61,8 @@ export type GroupPivot = typeof GroupPivot.Type
 /**
  * How much more each link of a chain turns than the one before when it bends (docs/DESKTOP.md § Group pivots and
  * chains): `linear` adds `percent` of the first link's turn per link, so the curve tightens steadily (a clothoid);
- * `compound` multiplies by `1 + percent / 100` per link, so it tightens faster and faster. Absent, every link turns
- * alike.
+ * `compound` multiplies by `1 + percent / 100` per link, so it tightens faster and faster. A move's joint openings
+ * grow the same way, and a scale takes the share as a power. Absent, every link takes the same.
  */
 export const ChainGrowth = Schema.Struct({
   curve: Schema.Literals(["linear", "compound"]),

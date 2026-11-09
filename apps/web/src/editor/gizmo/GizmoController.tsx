@@ -9,7 +9,14 @@ import { gizmoScaleOf } from "../../domain/Settings"
 import { type SnapTransform, turnSnapOf } from "../../domain/snapConfig"
 import { type ScaleStop, snappedScale, turnLanding, turnReach, type TurnStop } from "../../domain/snapRotate"
 import { quatFromAxisAngle } from "../../domain/ueMath"
-import { applyDelta, leadingKeys, type PivotMode, type SelectionUnits, turnAccumulates } from "../../domain/units"
+import {
+  applyDelta,
+  leadingKeys,
+  movedAlikeKeys,
+  type PivotMode,
+  type SelectionUnits,
+  turnAccumulates
+} from "../../domain/units"
 import { transformSelection } from "../actions"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
@@ -288,8 +295,10 @@ export function GizmoController() {
       const config = snapConfigOf(s)
       const { pivotMode } = s
       const frame = localFrameOf(start)
-      // a move along world axes is the same for every unit, so any of them can lead it
-      const leads = leadingKeys(target.selection, isTranslate(spec) && frame === undefined ? "together" : pivotMode)
+      // a move along world axes is the same for every unit that takes it as dragged, so any of them can lead it
+      const leads = isTranslate(spec) && frame === undefined
+        ? movedAlikeKeys(target.selection, pivotMode)
+        : leadingKeys(target.selection, pivotMode)
       const selection = selectionSnapStart(s, target.transforms, leads)
       const view = snapViewOf(pointer.pane)
       const rangeCm = config.threshold * view.cmPerPixelAt(target.pivot)

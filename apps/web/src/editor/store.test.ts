@@ -1718,6 +1718,24 @@ describe("groups and the selection", () => {
     assert.deepStrictEqual(linksOf(chain.id), [c, b, d, a], "Group as chain")
   })
 
+  it("lays a chain along a shape as one undo step, and nothing that isn't a chain", () => {
+    mapWithCubes(0, 1000, 2000)
+    const [a = "", b = "", c = ""] = state().doc.ids.slice(1)
+    state().select([a, b, c])
+    state().chainSelection()
+    const { id } = state().doc.structure.tree.find((n) => n.kind === "group")!
+    const before = [a, b, c].map(transformOf)
+    const steps = state().past.length
+    assert.isTrue(state().layChain(id, { kind: "helix", axis: { x: 0, y: 0, z: 1 }, turn: 90, rise: 100 }))
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.deepStrictEqual(transformOf(a).translation, before[0]!.translation, "the first link stays")
+    assert.closeTo(transformOf(b).translation.z - transformOf(a).translation.z, 100, 1e-6, "and the next climbs")
+    assert.closeTo(transformOf(c).translation.z, 200, 1e-6)
+    state().undo()
+    assert.deepStrictEqual([a, b, c].map(transformOf), before)
+    assert.isFalse(state().layChain(a, { kind: "straight" }))
+  })
+
   it("chains one whole group selected in place, and bends it in Each without entering it", () => {
     const { a, b, c, outer } = nestedMap()
     state().select([a, b, c])

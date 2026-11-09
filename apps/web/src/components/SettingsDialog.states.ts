@@ -21,5 +21,6 @@ export default states({
   "settings/camera": page("camera"),
   "settings/keybinds": page("keybinds"),
   "settings/appearance": page("appearance", { anchor: true }),
+  "settings/beta": page("beta"),
   "settings/game": page("game", { target: "desktop" })
 })
