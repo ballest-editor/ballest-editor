@@ -29,6 +29,7 @@ import { CollectClient } from "./usage/CollectClient"
 import { UsageStats } from "./usage/UsageStats"
 import { DesktopWindow } from "./window/DesktopWindow"
 import { WindowLauncher } from "./window/WindowLauncher"
+import { WindowStage } from "./window/WindowStage"
 
 // The Electron main process (docs/DESKTOP.md § Main process). Electron only grants scheme privileges before
 // `ready`, so this runs synchronously at load, before the runtime starts.
@@ -50,6 +51,7 @@ const layerElectron = Layer.mergeAll(
   ElectronUpdater.layer,
   ElectronWindow.layer,
   ElectronProtocol.layer,
+  WindowStage.layer,
   DesktopIpc.layer(Electron.ipcMain)
 )
 

@@ -10,7 +10,7 @@ import { SettingsStore } from "../../services/SettingsStore"
 import { useEditor } from "../store"
 import { loadUsageStatsEffect } from "./feedback"
 import { checkGameLinkEffect, findCreatorEffect } from "./gameLink"
-import { followOpenMapEffect, openStartingMap } from "./maps"
+import { followOpenMapsEffect, startOnProject } from "./maps"
 import { checkPrefabs } from "./prefabs"
 import { offerRecovery } from "./recovery"
 import { followRecovery } from "./recoverySnapshots"
@@ -91,7 +91,8 @@ export const setWindowTheme = (dark: boolean) =>
 
 /**
  * What the platform offers, the project with its maps (desktop) and the creator name it finds, into the store, then
- * the map to start on (`openStartingMap`). A browser, which has no project, keeps its one map.
+ * the maps a project had open, or its overview, when the window starts on one (`startOnProject`). A browser, which has
+ * no project, keeps its one map.
  */
 export const loadPlatform = () =>
   run(
@@ -105,8 +106,8 @@ export const loadPlatform = () =>
       yield* findCreatorEffect
       yield* checkPrefabs
       if (capabilities.projects) {
-        yield* openStartingMap
-        yield* followOpenMapEffect
+        yield* startOnProject
+        yield* followOpenMapsEffect
         yield* followRecovery
       }
       if (capabilities.exportToGame) yield* checkGameLinkEffect

@@ -159,14 +159,21 @@ export const RecentProject = Schema.Struct({ ...ProjectInfo.fields, lastOpened: 
 export type RecentProject = typeof RecentProject.Type
 
 /**
+ * The map tabs a project had open when it was last used, in tab order, and the active one's map (null when the active
+ * tab wasn't one of them): what opening it again reopens (docs/DESKTOP.md § Document tabs).
+ */
+export const OpenMaps = Schema.Struct({ files: Schema.Array(MapFileName), active: Schema.NullOr(MapFileName) })
+export type OpenMaps = typeof OpenMaps.Type
+
+/**
  * The project in use and the ones used before it, most recent first. `current` is null while there is none: the
  * window is then Untitled Project, nothing on disk, and the first Save names one (docs/PROJECTS.md § Shell).
  */
 export const ProjectState = Schema.Struct({
   current: Schema.NullOr(ProjectInfo),
   recent: Schema.Array(RecentProject),
-  /** The map last open in the current project (its file name), for the next launch to open again; null when none was. */
-  lastOpenMap: Schema.NullOr(MapFileName),
+  /** The current project's map tabs as it was left; none open while there is no project. */
+  openMaps: OpenMaps,
   /** Where New project makes its folders: `Documents/Ballest Editor`. */
   projectsFolder: FilePath,
   /**
@@ -242,9 +249,6 @@ const ReimportMapPayload = Schema.Struct({
   kept: Schema.optionalKey(Schema.Struct({ text: FileText, gameHash: FileHash }))
 })
 export type ReimportMapPayload = typeof ReimportMapPayload.Type
-
-/** `rememberOpenMap`: the map now open in the project, or null for a map that isn't in it. */
-const OpenMapPayload = Schema.Struct({ fileName: Schema.NullOr(MapFileName) })
 
 /** `createMap` and `saveMap`: the map's file name in the project and its text. */
 const WriteMapPayload = Schema.Struct({ fileName: MapFileName, text: FileText })
@@ -857,10 +861,12 @@ export const DesktopMethods = {
   revealRecentProject: { payload: ProjectPathPayload, result: Schema.Boolean },
   /** Takes a project off the recent ones. Nothing on disk changes. */
   forgetRecentProject: { payload: ProjectPathPayload, result: ProjectState },
+  /** The projects in the projects folder, by name, recent or not; each can then be opened as a recent one can. */
+  listProjectsFolder: { payload: noPayload, result: Schema.Array(RecentProject) },
   /** Renames the project in `ballest-project.json`; the folder keeps its name. */
   renameProject: { payload: RenameProjectPayload, result: ProjectState },
-  /** Keeps which map is open in the project, so the next launch opens it again (`ProjectState.lastOpenMap`). */
-  rememberOpenMap: { payload: OpenMapPayload, result: Schema.Void },
+  /** Keeps the map tabs open in the project, so opening it again reopens them (`ProjectState.openMaps`). */
+  rememberOpenMaps: { payload: OpenMaps, result: Schema.Void },
   /** The project's maps, most recently changed first; empty when the project isn't on disk yet. */
   listMaps: { payload: noPayload, result: ProjectMaps },
   /** Reads a project map. */
@@ -933,6 +939,8 @@ export const DesktopMethods = {
   readBackup: { payload: BackupRef, result: MapBackupFile },
   /** The page's resolved theme: the window controls drawn over its top bar, and the window background, follow it. */
   setWindowTheme: { payload: WindowThemePayload, result: Schema.Void },
+  /** The page has its project open and shows the editor next: the welcome window grows first, and this waits for it. */
+  showEditor: { payload: noPayload, result: Schema.Void },
   /** The native Save / Don't save / Cancel box, modal to the window. */
   confirmUnsaved: { payload: UnsavedPrompt, result: UnsavedChoice },
   /** Opens an http(s) URL in the default browser; false when it is refused or fails to open. */

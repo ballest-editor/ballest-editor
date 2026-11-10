@@ -42,7 +42,7 @@ describe("Projects", () => {
     runScoped(Effect.gen(function*() {
       const { at, open } = yield* machine(["one"])
       const first = yield* open(1)
-      // the second start finds "one" open, so it chooses
+      yield* first.use(at("one"))
       const second = yield* open(2)
       yield* second.use(at("two"))
       assert.strictEqual(Option.getOrNull(yield* first.current), at("one"))
@@ -51,47 +51,36 @@ describe("Projects", () => {
       assert.deepStrictEqual((yield* first.state).recent.map((p) => p.path), [at("two")])
     })))
 
-  it.effect("leaves an Untitled Project window untitled when another window picks a project", () =>
+  it.effect("leaves a window on the welcome window when another window picks a project", () =>
     runScoped(Effect.gen(function*() {
       const { at, open } = yield* machine([])
       const first = yield* open(1)
       const second = yield* open(2)
       yield* second.use(at("two"))
       assert.isTrue(Option.isNone(yield* first.current))
-      assert.isNull((yield* first.state).current)
+      assert.isTrue((yield* first.state).chooserRequired)
     })))
 })
 
 describe("starting a window", () => {
-  it.effect("the first window takes the last project, or Untitled Project, and needs no chooser", () =>
+  it.effect("every window starts on the welcome window, with nothing in use, whatever was used last", () =>
     runScoped(Effect.gen(function*() {
-      const { at, open } = yield* machine(["one"])
-      const state = yield* (yield* open(1)).state
-      assert.strictEqual(state.current?.path, at("one"))
-      assert.isFalse(state.chooserRequired)
-      const untitled = yield* machine([])
-      const alone = yield* (yield* untitled.open(1)).state
-      assert.isNull(alone.current)
-      assert.isFalse(alone.chooserRequired)
+      for (const recent of [["one"], []]) {
+        const { open } = yield* machine(recent)
+        const window = yield* open(1)
+        const state = yield* window.state
+        assert.isTrue(state.chooserRequired)
+        assert.isNull(state.current)
+        assert.isTrue(Option.isNone(yield* window.current))
+        // no project in use: main refuses anything that would write a map
+        assert.match(yield* refusalOf(window.ensure), /no project yet/)
+      }
     })))
 
-  it.effect("a second window beside Untitled Project shows the chooser, with nothing in use", () =>
-    runScoped(Effect.gen(function*() {
-      const { open } = yield* machine([])
-      yield* open(1)
-      const second = yield* open(2)
-      const state = yield* second.state
-      assert.isTrue(state.chooserRequired)
-      assert.isNull(state.current)
-      assert.isTrue(Option.isNone(yield* second.current))
-      // no project in use: main refuses anything that would write a map
-      assert.match(yield* refusalOf(second.ensure), /no project yet/)
-    })))
-
-  it.effect("a second window on the project already open shows the chooser, which lists it as open elsewhere", () =>
+  it.effect("a second window lists the project the first has open as open elsewhere", () =>
     runScoped(Effect.gen(function*() {
       const { at, open } = yield* machine(["one", "two"])
-      yield* open(1)
+      yield* (yield* open(1)).use(at("one"))
       const state = yield* (yield* open(2)).state
       assert.isTrue(state.chooserRequired)
       assert.isNull(state.current)
@@ -99,20 +88,10 @@ describe("starting a window", () => {
       assert.deepStrictEqual(state.openElsewhere, [at("one")])
     })))
 
-  it.effect("a window in the chooser isn't Untitled Project: the next one starts as usual", () =>
+  it.effect("two copies starting together on one --project don't both take it: the lower pid keeps it", () =>
     runScoped(Effect.gen(function*() {
-      const { at, fs, open } = yield* machine([])
-      yield* open(1)
-      const choosing = yield* open(2)
-      // the Untitled Project window quits; the chooser beside it stays, and holds nothing back
-      yield* fs.remove(at("windows/1.json"))
-      assert.isTrue((yield* choosing.state).chooserRequired)
-      assert.isFalse((yield* (yield* open(3)).state).chooserRequired)
-    })))
-
-  it.effect("two copies starting together don't both take the project: the lower pid keeps it", () =>
-    runScoped(Effect.gen(function*() {
-      const { at, start } = yield* machine(["one"])
+      const { at, fs, start } = yield* machine(["one"])
+      yield* fs.makeDirectory(at("one"))
       // Each looked before the other announced, so the first look is empty and the rival only shows on the second.
       const racing = (pid: number, rival: number) =>
         Effect.gen(function*() {
@@ -125,7 +104,8 @@ describe("starting a window", () => {
               others,
               announce: (entry) => Effect.sync(() => void announced.push(entry)),
               leave: Effect.void
-            })
+            }),
+            Option.some(at("one"))
           )
           return { announced, state: yield* projects.state }
         })
@@ -145,6 +125,7 @@ describe("starting a window", () => {
     runScoped(Effect.gen(function*() {
       const { at, open } = yield* machine(["one", "two"])
       const first = yield* open(1)
+      yield* first.use(at("one"))
       const second = yield* open(2)
       const picked = yield* second.switchTo(at("two"))
       assert.isFalse(picked.chooserRequired)
@@ -158,6 +139,7 @@ describe("a project open in another window", () => {
     runScoped(Effect.gen(function*() {
       const { at, fs, open, path } = yield* machine(["one", "two"])
       const first = yield* open(1)
+      yield* first.use(at("one"))
       const second = yield* open(2)
       yield* second.use(at("two"))
 
@@ -177,16 +159,15 @@ describe("a project open in another window", () => {
   it.effect("compares folders the way the platform does", () =>
     runScoped(Effect.gen(function*() {
       const { at, open, path } = yield* machine(["one"], "win32")
-      const first = yield* open(1)
+      yield* (yield* open(1)).use(at("one"))
       const second = yield* open(2)
       assert.match(yield* refusalOf(second.use(path.join(path.dirname(at("one")), "ONE"))), /is open in another window/)
-      assert.isFalse((yield* first.state).chooserRequired)
     })))
 
   it.effect("is free again once its window is gone", () =>
     runScoped(Effect.gen(function*() {
       const { at, fs, open } = yield* machine(["one"])
-      yield* open(1)
+      yield* (yield* open(1)).use(at("one"))
       const second = yield* open(2)
       yield* fs.remove(at("windows/1.json"))
       assert.strictEqual((yield* second.switchTo(at("one"))).current?.path, at("one"))
@@ -198,15 +179,7 @@ describe("a window started with --project", () => {
     runScoped(Effect.gen(function*() {
       const { at, fs, open } = yield* machine(["one"])
       yield* fs.makeDirectory(at("two"))
-      // beside Untitled Project it would otherwise have to choose
-      const empty = yield* machine([])
-      yield* empty.fs.makeDirectory(empty.at("two"))
-      yield* empty.open(1)
-      const beside = yield* (yield* empty.open(2, Option.some(empty.at("two")))).state
-      assert.strictEqual(beside.current?.path, empty.at("two"))
-      assert.isFalse(beside.chooserRequired)
-
-      yield* open(1)
+      yield* (yield* open(1)).use(at("one"))
       const state = yield* (yield* open(2, Option.some(at("two")))).state
       assert.strictEqual(state.current?.path, at("two"))
       assert.isFalse(state.chooserRequired)
@@ -215,7 +188,7 @@ describe("a window started with --project", () => {
       assert.strictEqual((yield* (yield* open(3)).state).recent[0]?.path, at("two"))
     })))
 
-  it.effect("refuses the game's maps folder, what isn't an absolute folder, and starts as it would have", () =>
+  it.effect("refuses the game's maps folder, what isn't an absolute folder, and starts on the welcome window", () =>
     runScoped(Effect.gen(function*() {
       const { at, fs, open, path, steam } = yield* machine(["one"])
       yield* fs.writeFileString(at("a file"), "")
@@ -232,7 +205,8 @@ describe("a window started with --project", () => {
       for (const [folder, refusal] of refusals) {
         const window = yield* open(1, Option.some(folder))
         const state = yield* window.state
-        assert.strictEqual(state.current?.path, at("one"))
+        assert.isNull(state.current)
+        assert.isTrue(state.chooserRequired)
         assert.match(state.startRefused ?? "", refusal)
       }
     })))
@@ -241,7 +215,7 @@ describe("a window started with --project", () => {
     runScoped(Effect.gen(function*() {
       const { at, fs, open } = yield* machine(["one"])
       yield* fs.makeDirectory(at("one"))
-      yield* open(1)
+      yield* (yield* open(1)).use(at("one"))
       const state = yield* (yield* open(2, Option.some(at("one")))).state
       assert.isTrue(state.chooserRequired)
       assert.isNull(state.current)
@@ -356,5 +330,73 @@ describe("preparing a new window", () => {
       yield* window.pick(at("random"))
       assert.strictEqual(yield* window.prepareWindow({ _tag: "Existing", path: at("random") }), at("random"))
       assert.strictEqual((yield* window.switchTo(at("random"))).current?.path, at("random"))
+    })))
+})
+
+describe("the open maps", () => {
+  const big = "Map_LevelEditorMain&Big Loop_me.balledit"
+  const hairpin = "Map_LevelEditorMain&Hairpin_me.balledit"
+
+  it.effect("are kept per project, for opening it again; with no project there is nothing to keep", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, open } = yield* machine(["one", "two"])
+      const window = yield* open(1)
+      yield* window.rememberOpenMaps({ files: [big], active: big })
+      assert.deepStrictEqual((yield* window.state).openMaps, { files: [], active: null })
+
+      yield* window.use(at("one"))
+      assert.deepStrictEqual((yield* window.state).openMaps, { files: [], active: null })
+      yield* window.rememberOpenMaps({ files: [big, hairpin], active: hairpin })
+      yield* window.use(at("two"))
+      assert.deepStrictEqual((yield* window.state).openMaps, { files: [], active: null })
+      assert.deepStrictEqual((yield* window.use(at("one"))).openMaps, { files: [big, hairpin], active: hairpin })
+
+      // all closed: nothing to reopen
+      yield* window.rememberOpenMaps({ files: [], active: null })
+      assert.deepStrictEqual((yield* (yield* open(2)).switchTo(at("two"))).openMaps, { files: [], active: null })
+      assert.deepStrictEqual((yield* window.state).openMaps, { files: [], active: null })
+    })))
+
+  it.effect("refuse what isn't a map file name, and an active map that isn't one of them", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, open } = yield* machine(["one"])
+      const window = yield* open(1)
+      yield* window.use(at("one"))
+      assert.match(
+        yield* refusalOf(window.rememberOpenMaps({ files: ["../x"], active: null })),
+        /isn't a map file name/
+      )
+      assert.match(
+        yield* refusalOf(window.rememberOpenMaps({ files: [big], active: hairpin })),
+        /isn't a map file name/
+      )
+    })))
+})
+
+describe("the projects folder", () => {
+  it.effect("lists the projects in it by name, recent or not, and those can be opened as recent ones can", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, dir, fs, open, path } = yield* machine(["Zebra"])
+      const window = yield* open(1)
+      assert.deepStrictEqual(yield* window.listFolder, [])
+      for (const name of ["Zebra", "alpha"]) {
+        yield* fs.makeDirectory(at(name))
+        yield* fs.writeFileString(
+          path.join(at(name), "ballest-project.json"),
+          JSON.stringify({ formatVersion: 1, name: `${name} tracks`, exportTarget: "game" })
+        )
+      }
+      // a folder that isn't a project, and a file, aren't listed
+      yield* fs.makeDirectory(at("just a folder"))
+      yield* fs.writeFileString(path.join(dir, "notes.txt"), "")
+
+      const listed = yield* window.listFolder
+      assert.deepStrictEqual(listed.map((p) => [p.path, p.name]), [
+        [at("alpha"), "alpha tracks"],
+        [at("Zebra"), "Zebra tracks"]
+      ])
+      assert.isNull(listed[0]?.lastOpened)
+      assert.strictEqual((yield* window.switchTo(at("alpha"))).current?.path, at("alpha"))
+      assert.match(yield* refusalOf(window.switchTo(at("just a folder"))), /picked/)
     })))
 })

@@ -1,6 +1,6 @@
 import { CHARACTERS_PER_FILE, type PlayResult, PlaySessionEnded, PushChannels } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Fiber, FileSystem, Layer, Schema, Stream } from "effect"
+import { Effect, Fiber, FileSystem, Layer, Option, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { vi } from "vitest"
 import { ElectronShell } from "../electron/ElectronShell"
@@ -35,11 +35,12 @@ const setup = Effect.gen(function*() {
   const progress: Array<unknown> = []
   const reads = { corrupt: false }
   const settings = path.join(dir, "desktop-settings.json")
-  // the project in use is remembered in the settings; `dir` is where New project would make its siblings
-  yield* fs.writeFileString(settings, JSON.stringify({ project: { recent: [path.join(dir, "project")] } }))
+  // the window started on the project (`--project`); `dir` is where New project would make its siblings
+  const project = path.join(dir, "project")
+  yield* fs.makeDirectory(project)
   const base = Layer.mergeAll(
     Layer.effect(GameLink, GameLink.make(bundle)),
-    layerProjectsAt(dir, "linux", path.join(dir, "userData", "backups"))
+    layerProjectsAt(dir, "linux", path.join(dir, "userData", "backups"), Option.some(project))
   ).pipe(
     Layer.provideMerge(layerFakeGamePaths(steam.host, settings)),
     Layer.provideMerge(Layer.effect(WindowRegistry, WindowRegistry.make(path.join(dir, "windows"), 1, () => true))),

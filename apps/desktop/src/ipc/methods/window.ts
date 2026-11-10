@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import { ElectronDialog } from "../../electron/ElectronDialog"
 import { ElectronWindow } from "../../electron/ElectronWindow"
 import { popoutOverlay, titleBarOverlay, windowBackground } from "../../window/chrome"
+import { WindowStage } from "../../window/WindowStage"
 import type { DesktopIpcHandlers } from "../DesktopIpc"
 
 /** The buttons in the order they are drawn, each with the answer it gives; Cancel is also Escape. */
@@ -21,6 +22,8 @@ export const windowHandlers = {
       background: windowBackground(dark)
     })
   }),
+  /** Grows the welcome window into the editor, and completes once it has. */
+  showEditor: () => Effect.flatMap(Effect.service(WindowStage), (stage) => stage.showEditor),
   /** The unsaved-changes prompt, modal to the sender's window: before a close, a reload or replacing the open map. */
   confirmUnsaved: Effect.fn("ipc.confirmUnsaved")(function*({ message, detail }, event) {
     const picked = yield* (yield* ElectronDialog).showMessageBox({

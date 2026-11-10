@@ -19,6 +19,7 @@ import { GameProcess } from "../game/GameProcess"
 import { SteamLibrary } from "../game/SteamLibrary"
 import { NotificationLog } from "../notifications/NotificationLog"
 import { layerProjectsAt } from "../project/layers"
+import { Projects } from "../project/Projects"
 import { Recovery } from "../project/Recovery"
 import { type WindowEntry, WindowRegistry } from "../project/WindowRegistry"
 import { DesktopSettings, DesktopSettingsFile } from "../settings/DesktopSettings"
@@ -26,6 +27,7 @@ import { DesktopUpdates } from "../updates/DesktopUpdates"
 import { CollectClient } from "../usage/CollectClient"
 import { UsageStats } from "../usage/UsageStats"
 import { WindowLauncher, WindowLaunchError } from "../window/WindowLauncher"
+import { WindowStage } from "../window/WindowStage"
 import { DesktopIpc, type DesktopIpcHandleListener, type DesktopIpcMain } from "./DesktopIpc"
 import { installDesktopIpcHandlers } from "./DesktopIpcHandlers"
 
@@ -202,7 +204,7 @@ export const withHandlers = <A, E>(
     readonly otherWindow: (project: string | null) => Effect.Effect<void>
   }) => Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>,
   machine: Parameters<typeof makeFakeSteam>[1] = { game: "steam", ran: true },
-  /** `current`: `project` is the project in use already (remembered in the settings, not yet on disk); `none`: Untitled Project. */
+  /** `current`: `project` is the project in use already (picked on the welcome window, not yet on disk); `none`: the welcome window. */
   start: "current" | "none" = "current"
 ) =>
   Effect.gen(function*() {
@@ -259,6 +261,7 @@ export const withHandlers = <A, E>(
         windowLayer,
         updatesLayer,
         launcher.layer,
+        WindowStage.layer,
         Layer.effect(NotificationLog, NotificationLog.make(path.join(dir, "notifications.json"))),
         DesktopIpc.layer(fake.ipcMain)
       ))
@@ -266,6 +269,8 @@ export const withHandlers = <A, E>(
     yield* Effect.scoped(
       Effect.gen(function*() {
         yield* installDesktopIpcHandlers()
+        // every launch starts on the welcome window, so the project in use is the one it picked
+        if (start === "current") yield* Effect.flatMap(Effect.service(Projects), (service) => service.use(project))
         yield* body({ fake, dialogs, dir, project, steam, launcher, otherWindow })
       })
     ).pipe(Effect.provide(services))

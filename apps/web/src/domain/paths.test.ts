@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { folderLabelOf, lastSegmentOf, parentFolderName, pathInFolder, shortFolderName } from "./paths"
+import { folderLabelOf, lastSegmentOf, parentFolderName, parentPathOf, pathInFolder, shortFolderName } from "./paths"
 
 describe("pathInFolder", () => {
   it("uses the folder's own separator", () => {
@@ -37,5 +37,13 @@ describe("short ways to say where a folder is", () => {
   it("keep a path too short to have a parent", () => {
     assert.strictEqual(parentFolderName("/Golf"), "/Golf")
     assert.strictEqual(shortFolderName("/Golf"), "Golf")
+  })
+})
+
+describe("parentPathOf", () => {
+  it("is the folder a path is in, whole, on either platform", () => {
+    assert.strictEqual(parentPathOf("/home/me/Documents/Ballest Editor/Seeded"), "/home/me/Documents/Ballest Editor")
+    assert.strictEqual(parentPathOf("C:\\Users\\me\\maps\\Seeded\\"), "C:\\Users\\me\\maps")
+    assert.strictEqual(parentPathOf("/Seeded"), "/")
   })
 })

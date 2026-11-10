@@ -14,14 +14,20 @@ import { PathAction } from "./PathText"
 /** What's wrong with a field, under it. */
 export const FIELD_ERROR = "text-body text-destructive"
 
-/** The project the Save map dialog makes in Untitled Project: its name, and a folder the user may have chosen. */
+/**
+ * A project about to be made, by New project… or the first Save in Untitled Project: its name, offered free of the
+ * recent projects', and a folder the user may have chosen.
+ */
 export const useNewProjectDraft = () => {
   const state = useEditor((s) => s.project)
-  const offered = () => defaultProjectNameOf((state?.recent ?? []).map((p) => p.name))
+  const known = [state?.current ?? null, ...state?.recent ?? []].flatMap((p) => p === null ? [] : [p.name])
+  const offered = () => defaultProjectNameOf(known)
   const [name, setName] = useState(offered)
   // the folder Choose… picked; null: `<projectsFolder>/<name>`
   const [chosen, setChosen] = useState<ProjectInfo | null>(null)
   const trimmed = name.trim()
+  // in the usual folder, a recent project's name is its folder's: main would refuse it
+  const taken = chosen === null && known.some((other) => other.toLowerCase() === trimmed.toLowerCase())
   return {
     name,
     setName,
@@ -32,7 +38,8 @@ export const useNewProjectDraft = () => {
       setChosen(null)
     },
     // whether a project can be asked for: main has the last word (`canMakeProject`)
-    ok: isProjectName(trimmed) && chosen?.exists !== true,
+    ok: isProjectName(trimmed) && chosen?.exists !== true && !taken,
+    taken,
     project: { name: trimmed, ...(chosen !== null && { folder: chosen.path }) }
   }
 }
@@ -56,10 +63,18 @@ export function ProjectFolderLine({ actions, path }: { readonly actions?: ReactN
   )
 }
 
-/** What the first Save in Untitled Project adds to the Save map dialog: the project's name, and where it goes. */
-export function NewProjectFields({ draft }: { readonly draft: ReturnType<typeof useNewProjectDraft> }) {
+/**
+ * A new project's name, and where it goes, with Change… for another folder: New project…, and what the first Save in
+ * Untitled Project adds to the Save map dialog. The name offered is selected, so typing replaces it.
+ */
+export function NewProjectFields({ autoFocus = false, draft, id = "saveAs-project", label = "Project name" }: {
+  readonly draft: ReturnType<typeof useNewProjectDraft>
+  readonly id?: string
+  readonly label?: string
+  readonly autoFocus?: boolean
+}) {
   const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "")
-  const { chosen, name, setChosen, setName } = draft
+  const { chosen, name, setChosen, setName, taken } = draft
   const trimmed = name.trim()
   const badName = trimmed !== "" && !isProjectName(trimmed)
   const choose = async () => {
@@ -68,14 +83,17 @@ export function NewProjectFields({ draft }: { readonly draft: ReturnType<typeof 
   }
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor="saveAs-project">Project name</Label>
+      <Label htmlFor={id}>{label}</Label>
       <Input
-        id="saveAs-project"
+        id={id}
+        autoFocus={autoFocus}
         value={name}
-        aria-invalid={badName}
+        aria-invalid={badName || taken}
+        onFocus={(e) => e.currentTarget.select()}
         onChange={(e) => setName(e.target.value)}
       />
       {badName && <span className={FIELD_ERROR}>{PROJECT_NAME_RULE}</span>}
+      {taken && <span className={FIELD_ERROR}>A recent project has that name already.</span>}
       <ProjectFolderLine
         path={chosen?.path ?? pathInFolder(projectsFolder, trimmed)}
         actions={

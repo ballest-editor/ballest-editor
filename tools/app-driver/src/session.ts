@@ -272,7 +272,8 @@ export const buildDesktop = () => {
 
 /**
  * The desktop app against this worktree's dev server, in a throwaway home: its settings, profile and documents all live
- * under `dir`, so a driven save never reaches the user's real folders.
+ * under `dir`, so a driven save never reaches the user's real folders. It starts on a project there (`--project`), past
+ * the welcome window every other launch shows.
  */
 export const launchDesktop = async (serverUrl: string, dir: string): Promise<DesktopApp> => {
   const display = await ensureDisplay()
@@ -282,7 +283,8 @@ export const launchDesktop = async (serverUrl: string, dir: string): Promise<Des
   const userData = path.join(dir, "user-data")
   const config = path.join(dir, "config")
   const documents = path.join(dir, "Documents")
-  for (const folder of [userData, config, documents]) fs.mkdirSync(folder, { recursive: true })
+  const project = path.join(documents, "Ballest Editor", "Driver")
+  for (const folder of [userData, config, project]) fs.mkdirSync(folder, { recursive: true })
   fs.writeFileSync(path.join(config, "user-dirs.dirs"), `XDG_DOCUMENTS_DIR="${documents}"\n`)
   const dialogs = path.join(dir, "dialogs.json")
   const { ELECTRON_RUN_AS_NODE: _node, WAYLAND_DISPLAY: _wayland, ...env } = process.env
@@ -297,7 +299,8 @@ export const launchDesktop = async (serverUrl: string, dir: string): Promise<Des
       ...SOFTWARE_GL,
       ...STABLE_RENDER,
       ...(process.env["CI"] === undefined ? [] : ["--no-sandbox"]),
-      "."
+      ".",
+      `--project=${project}`
     ],
     {
       cwd: desktopDir,

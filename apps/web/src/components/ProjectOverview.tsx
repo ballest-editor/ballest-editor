@@ -1,25 +1,20 @@
 import type { PrefabInfo, PrefabTier } from "@ballest/contracts"
-import { IconBoxMultiple, IconMapPlus } from "@tabler/icons-react"
-import { Button } from "@workspace/ui/components/button"
+import { IconBoxMultiple, IconDownload, IconMapPlus, IconSettings } from "@tabler/icons-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { counted } from "../domain/groupSelection"
+import type { KeybindAction } from "../domain/Keybinds"
 import { PREFAB_TIER_HINTS, prefabTierLabel } from "../domain/prefab"
-import { openPrefab, startNewMap, startNewPrefab } from "../editor/actions"
+import { importMap, openPrefab, startNewMap, startNewPrefab } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { HeroBand } from "./HeroBand"
 import { PathName } from "./PathText"
-import { EmptySection, PrefabThumbnail } from "./PrefabsPanel"
+import { PrefabThumbnail } from "./PrefabsPanel"
 import { MapRow } from "./ProjectPanel"
 import { SectionTitle } from "./SectionTitle"
 import { START_CARD } from "./startCard"
-
-const EmptyRow = ({ line }: { readonly line: string }) => (
-  <li>
-    <EmptySection line={line} />
-  </li>
-)
+import { CappedList, StartAction, StartList, StartSection } from "./startLists"
 
 /** One prefab: a click opens its definition, where the Prefabs panel's click places it, as no map is open to place it in. */
 function PrefabEntry({ prefab }: { readonly prefab: PrefabInfo }) {
@@ -44,8 +39,8 @@ function PrefabEntry({ prefab }: { readonly prefab: PrefabInfo }) {
   )
 }
 
-/** A tier's prefabs, under its name. */
-function PrefabTierCard({ tier }: { readonly tier: PrefabTier }) {
+/** A tier's prefabs, under its name, the hint on hover. */
+function PrefabTierList({ tier }: { readonly tier: PrefabTier }) {
   const prefabs = useEditor((s) => s.prefabs).filter((prefab) => prefab.tier === tier)
   return (
     <section className="flex min-w-0 flex-col gap-2">
@@ -55,56 +50,74 @@ function PrefabTierCard({ tier }: { readonly tier: PrefabTier }) {
         </TooltipTrigger>
         <TooltipContent side="right">{PREFAB_TIER_HINTS[tier]}</TooltipContent>
       </Tooltip>
-      <ul className={cn("flex flex-col gap-0.5 p-1", START_CARD)}>
-        {prefabs.length > 0
-          ? prefabs.map((prefab) => <PrefabEntry key={prefab.name} prefab={prefab} />)
-          : <EmptyRow line="No prefabs yet." />}
-      </ul>
+      <CappedList
+        rows={prefabs.map((prefab) => <PrefabEntry key={prefab.name} prefab={prefab} />)}
+        empty={<p className="text-fg-tertiary">No prefabs yet.</p>}
+      />
     </section>
   )
 }
 
+/** The project's first key for `action`, for a start action's chip. */
+const useBinding = (action: KeybindAction) => useEditor((s) => s.keybinds[action][0])
+
 /**
- * What the centre group shows with no tab open (docs/DESKTOP.md § Document tabs): the project's maps and prefabs, laid out
- * like the start screen. Only a named project gets here, so it has a name and a folder.
+ * The project's welcome page (docs/DESKTOP.md § Document tabs), after VS Code's: what the centre group shows with no
+ * tab open, which is how a project opens when it was left with no map open, and what closing its last map leaves. Start
+ * has the ways in, each with its key, and Recent the maps most recently edited; the prefabs are on the right. Only a
+ * named project gets here, so it has a name and a folder.
  */
 export function ProjectOverview() {
   const project = useEditor((s) => s.project?.current ?? null)
   const maps = useEditor((s) => s.projectMaps)
   const projectPrefabs = useEditor((s) => s.prefabs).filter((prefab) => prefab.tier === "project")
+  const newMapKey = useBinding("newMap")
+  const importKey = useBinding("openMap")
   const now = useNow()
   return (
-    <div className="absolute inset-0 flex @container flex-col overflow-y-auto bg-background bg-linear-to-b from-primary/6 to-transparent to-60% p-4 text-foreground">
+    <div className="absolute inset-0 flex @container flex-col overflow-y-auto bg-background bg-linear-to-b from-primary/6 to-transparent to-60% p-6 text-foreground">
       {/* `m-auto`, not `justify-center`: a list too long for the group scrolls from its top, where centring would clip it */}
-      <div className="m-auto grid w-full max-w-4xl grid-cols-1 gap-x-8 gap-y-6 @2xl:grid-cols-[minmax(0,1fr)_18rem]">
-        {/* the track runs under the buttons in a narrow group, so it waits for the room the start screen always has */}
-        <HeroBand className={cn("p-6 @2xl:col-span-2 [&>svg]:hidden @2xl:[&>svg]:block", START_CARD)}>
+      <div className="m-auto grid w-full max-w-4xl grid-cols-1 gap-x-12 gap-y-8 @2xl:grid-cols-[minmax(0,1fr)_18rem]">
+        {/* the track runs under the text in a narrow group, so it waits for the room the start screen always has */}
+        <HeroBand className={cn("p-5 @2xl:col-span-2 [&>svg]:hidden @2xl:[&>svg]:block", START_CARD)}>
           <PathName name={project?.name ?? ""} path={project?.path ?? null} className="block w-fit text-title" />
           <p className="text-fg-secondary">
             {counted(maps.length, "map")} · {counted(projectPrefabs.length, "prefab")}
           </p>
-          <div className="mt-4 flex items-center gap-2">
-            <Button onClick={() => void startNewMap()}>
-              <IconMapPlus data-icon="inline-start" />
-              New map
-            </Button>
-            <Button variant="outline" onClick={() => void startNewPrefab()}>
-              <IconBoxMultiple data-icon="inline-start" />
-              New prefab
-            </Button>
-          </div>
         </HeroBand>
-        <section className="flex min-w-0 flex-col gap-2">
-          <SectionTitle>Maps</SectionTitle>
-          <ul className={cn("flex flex-col gap-0.5 p-1", START_CARD)}>
-            {maps.length > 0
-              ? maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)
-              : <EmptyRow line="No maps yet." />}
-          </ul>
-        </section>
-        <div className="flex min-w-0 flex-col gap-6">
-          <PrefabTierCard tier="project" />
-          <PrefabTierCard tier="user" />
+        <div className="flex min-w-0 flex-col gap-8">
+          <StartSection title="Start">
+            <StartList>
+              <StartAction
+                icon={<IconMapPlus />}
+                label="New map"
+                binding={newMapKey}
+                onClick={() => void startNewMap()}
+              />
+              <StartAction icon={<IconBoxMultiple />} label="New prefab" onClick={() => void startNewPrefab()} />
+              <StartAction
+                icon={<IconDownload />}
+                label="Import map…"
+                binding={importKey}
+                onClick={() => void importMap()}
+              />
+              <StartAction
+                icon={<IconSettings />}
+                label="Project settings…"
+                onClick={() => useEditor.getState().openDialog({ id: "projectSettings" })}
+              />
+            </StartList>
+          </StartSection>
+          <StartSection title="Recent">
+            <CappedList
+              rows={maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)}
+              empty={<p className="text-fg-tertiary">No maps yet. New map starts one.</p>}
+            />
+          </StartSection>
+        </div>
+        <div className="flex min-w-0 flex-col gap-8">
+          <PrefabTierList tier="project" />
+          <PrefabTierList tier="user" />
         </div>
       </div>
     </div>

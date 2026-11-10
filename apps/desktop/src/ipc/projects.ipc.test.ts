@@ -2,7 +2,7 @@ import { InvokeChannels, ProjectState } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Exit, FileSystem, Option, Path } from "effect"
 import { vi } from "vitest"
-import { readSettings, withHandlers } from "./handlersHarness"
+import { withHandlers } from "./handlersHarness"
 
 // The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
 // (requiring the real package from Node would download the binary).
@@ -10,40 +10,38 @@ vi.mock("electron", () => ({}))
 
 describe("Projects over IPC", () => {
   it.effect(
-    "Untitled Project until the first Save names it; the open map is kept per project",
+    "the welcome window, with no project, until one is made",
     () =>
       withHandlers(
-        ({ dir, fake, project }) =>
+        ({ fake, project }) =>
           Effect.gen(function*() {
             const fs = yield* FileSystem.FileSystem
             const path = yield* Path.Path
             const name = "Map_LevelEditorMain&Track_me.balledit"
             const text = "{\r\n\t\"items\": [ \"é\" ]\r\n}"
 
-            // No project yet: Untitled Project. Nothing is listed or revealed, remembering an open map is a no-op, and
-            // writing a map is refused until a project is named.
+            // No project yet: the welcome window. Nothing is listed or revealed, and writing a map is refused until a
+            // project is made.
             assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.projectState), {
               current: null,
               recent: [],
-              lastOpenMap: null,
+              openMaps: { files: [], active: null },
               projectsFolder: path.dirname(project),
-              chooserRequired: false,
+              chooserRequired: true,
               openElsewhere: [],
               startRefused: null
             })
             assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.listMaps), [])
             assert.isFalse(yield* fake.invoke(InvokeChannels.revealProject, { which: "maps" }))
-            yield* fake.invoke(InvokeChannels.rememberOpenMap, { fileName: name })
-            assert.isNull((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).lastOpenMap)
             const unnamed = yield* Effect.flip(fake.invoke(InvokeChannels.createMap, { fileName: name, text }))
             assert.match(String(unnamed.cause), /no project yet/)
 
-            // The first Save names the project; it is on disk from then on.
+            // New project makes it; it is on disk from then on.
             const named = yield* fake.invokeAs(ProjectState, InvokeChannels.createProject, { name: "My maps" })
             assert.deepStrictEqual(named, {
               current: { path: project, name: "My maps", exists: true },
               recent: [],
-              lastOpenMap: null,
+              openMaps: { files: [], active: null },
               projectsFolder: path.dirname(project),
               chooserRequired: false,
               openElsewhere: [],
@@ -66,16 +64,16 @@ describe("Projects over IPC", () => {
             const blank = yield* Effect.flip(fake.invoke(InvokeChannels.renameProject, { name: "  " }))
             assert.match(String(blank.cause), /can't name a folder/)
 
-            // the open map is kept per project for the next launch; a name that isn't a map file's is refused
-            yield* fake.invoke(InvokeChannels.rememberOpenMap, { fileName: name })
-            assert.strictEqual((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).lastOpenMap, name)
-            assert.deepInclude((yield* readSettings(fs, dir)).project?.lastOpenMap, { [project]: name })
-            assert.match(
-              String((yield* Effect.flip(fake.invoke(InvokeChannels.rememberOpenMap, { fileName: "../x" }))).cause),
-              /isn't a map file name/
+            // the open maps are kept per project for opening it again; a name that isn't a map file's is refused
+            yield* fake.invoke(InvokeChannels.rememberOpenMaps, { files: [name], active: name })
+            assert.deepStrictEqual((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).openMaps, {
+              files: [name],
+              active: name
+            })
+            const badName = yield* Effect.flip(
+              fake.invoke(InvokeChannels.rememberOpenMaps, { files: ["../x"], active: null })
             )
-            yield* fake.invoke(InvokeChannels.rememberOpenMap, { fileName: null })
-            assert.isNull((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).lastOpenMap)
+            assert.match(String(badName.cause), /isn't a map file name|Expected/)
           }),
         undefined,
         "none"

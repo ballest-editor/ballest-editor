@@ -1,9 +1,9 @@
 /**
- * The project's maps in the editor (docs/PROJECTS.md): New map, reading and showing a map, the map the app starts on,
+ * The project's maps in the editor (docs/PROJECTS.md): New map, reading and showing a map, where a window starts,
  * what Project settings reads and writes of a map, and the project's own name and folders. Opening, Import and switching
  * projects are in `project`.
  */
-import type { CreateProjectPayload, ProjectFolder } from "@ballest/contracts"
+import type { CreateProjectPayload, OpenMaps, ProjectFolder } from "@ballest/contracts"
 import { Effect, Option } from "effect"
 import { creatorOf, usableCreatorName } from "../../domain/creator"
 import { currentCreatedAt, newMapFile, untitledNameOf } from "../../domain/factory"
@@ -12,7 +12,17 @@ import type { MapPrefs } from "../../domain/MapPrefs"
 import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { Platform, PlatformError } from "../../services/Platform"
-import { tabLabels, type TabTarget, tabWithFile, useEditor } from "../store"
+import {
+  blankTabs,
+  type EditorState,
+  inNamedProject,
+  noTabOpen,
+  tabLabels,
+  tabStateOf,
+  type TabTarget,
+  tabWithFile,
+  useEditor
+} from "../store"
 import { notifyFailure, run } from "./run"
 import { fileOf, loadProjectMapFile, prefsOf, refreshProject, saveTabPrefs, showMap, writeProjectMap } from "./shared"
 
@@ -84,49 +94,80 @@ export const newMapEffect = Effect.gen(function*() {
 export const startNewMap = () => run(newMapEffect)
 
 /**
- * The map the desktop app starts on (docs/DESKTOP.md § Document tabs): the one open when it last ran, else the project's
- * most recently edited one, else a fresh unsaved map. One that can't be read any more is reported, and the next
- * choice is taken.
+ * Where a window starts on a project, at launch or after a switch (docs/DESKTOP.md § Document tabs): the map tabs it had
+ * open when it was last used, in their order and with the same one active, and the project overview when it had none.
+ * Blank tabs hold nothing, so they go; a map with edits, or with no file yet, stays open. A map gone from the project is
+ * passed over, and one that won't read is reported. Nothing happens without a project: a browser keeps its one map, and
+ * the welcome window its blank one.
  */
-export const openStartingMap = Effect.gen(function*() {
-  const { project, projectMaps } = useEditor.getState()
-  const last = project?.lastOpenMap ?? null
-  const candidates = [
-    ...(last !== null && projectMaps.some((m) => m.fileName === last) ? [last] : []),
-    ...projectMaps.filter((m) => m.fileName !== last).map((m) => m.fileName)
-  ]
-  for (const fileName of candidates) {
-    const opened = yield* readProjectMapIntoEditor(fileName, "active").pipe(
-      Effect.as(true),
-      Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause)).pipe(Effect.as(false)))
-    )
-    if (opened) return
-    // only the kept map and the most recent one are tried: the rest are the user's to pick
-    if (fileName !== last) break
+export const startOnProject = Effect.gen(function*() {
+  const s = useEditor.getState()
+  if (!inNamedProject(s)) return
+  for (const id of blankTabs(s)) s.closeTab(id)
+  const { active, files } = s.project?.openMaps ?? { files: [], active: null }
+  const listed = new Set(s.projectMaps.map((map) => map.fileName))
+  for (const fileName of files.filter((file) => listed.has(file))) {
+    yield* openProjectMapFile(fileName).pipe(Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause))))
   }
-  yield* freshMapEffect
+  const activeTab = active === null ? undefined : tabWithFile(useEditor.getState(), active)
+  if (activeTab !== undefined) useEditor.getState().activateTab(activeTab)
 })
 
+/** The map tabs open in the project, as `rememberOpenMaps` keeps them: those with a file, in tab order. */
+const openMapsOf = (s: EditorState): OpenMaps => {
+  const files = s.tabIds.flatMap((id) => {
+    const tab = tabStateOf(s, id)
+    return tab?.document.kind === "map" && tab.file !== null ? [tab.file.name] : []
+  })
+  const active = noTabOpen(s) || s.document.kind !== "map" ? null : s.file?.name ?? null
+  return { files, active: active !== null && files.includes(active) ? active : null }
+}
+
+// While above 0, the open maps aren't kept: a switch of projects passes through tabs that belong to neither project.
+let openMapsHeld = 0
+// The follower's catch-up, for once a hold ends; null while nothing follows.
+let catchUpOpenMaps: (() => void) | null = null
+
+/** Runs `effect` without keeping the open maps as the store passes through it, then keeps what it ends on. */
+export const holdingOpenMaps = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => void openMapsHeld++),
+    () => effect,
+    () =>
+      Effect.sync(() => {
+        openMapsHeld--
+        if (openMapsHeld === 0) catchUpOpenMaps?.()
+      })
+  )
+
 /**
- * Keeps which map is open in the project (`Platform.rememberOpenMap`) as it changes, from now on: the next launch
- * opens it again. Started once the starting map is open, so the memory isn't wiped before it is read. The returned
- * function stops it.
+ * Keeps the map tabs open in the project (`Platform.rememberOpenMaps`) as they change, from now on: opening the project
+ * again reopens them (`startOnProject`). Started once the startup load has opened them, so the memory isn't wiped before
+ * it is read. The returned function stops it.
  */
-export const followOpenMapEffect = Effect.gen(function*() {
+export const followOpenMapsEffect = Effect.gen(function*() {
   const platform = yield* Platform
   const runFork = Effect.runForkWith(yield* Effect.context())
-  let known = useEditor.getState().file?.name ?? null
-  return useEditor.subscribe((s) => {
-    const fileName = s.file?.name ?? null
-    // a definition's tab isn't a map to come back to
-    if (fileName === known || s.document.kind === "prefab") return
-    known = fileName
+  let known = JSON.stringify(openMapsOf(useEditor.getState()))
+  const keep = () => {
+    const s = useEditor.getState()
+    if (openMapsHeld > 0 || !inNamedProject(s)) return
+    const openMaps = openMapsOf(s)
+    const key = JSON.stringify(openMaps)
+    if (key === known) return
+    known = key
     runFork(
-      platform.rememberOpenMap(fileName).pipe(
-        Effect.catch((error) => Effect.logWarning("Couldn't keep which map is open", error))
+      platform.rememberOpenMaps(openMaps).pipe(
+        Effect.catch((error) => Effect.logWarning("Couldn't keep which maps are open", error))
       )
     )
-  })
+  }
+  catchUpOpenMaps = keep
+  const stop = useEditor.subscribe(keep)
+  return () => {
+    stop()
+    if (catchUpOpenMaps === keep) catchUpOpenMaps = null
+  }
 })
 
 /** A project map as Project settings edits it: the file decoded, with the prefs kept for it. */
