@@ -16,3 +16,10 @@ export const shortFolderName = (path: string): string => segmentsOf(path).slice(
 
 /** A folder as the user knows it: its own name and the one it is in. The whole path is for a tooltip. */
 export const folderLabelOf = (path: string): string => segmentsOf(path).slice(-2).join(" › ")
+
+/** The whole path of the folder `path` is in, as a recent project's row shows where it is. */
+export const parentPathOf = (path: string): string => {
+  const trimmed = path.replace(/[\\/]+$/, "")
+  const end = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"))
+  return end <= 0 ? trimmed.slice(0, 1) || path : trimmed.slice(0, end)
+}

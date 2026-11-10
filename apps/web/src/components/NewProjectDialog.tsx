@@ -1,57 +1,32 @@
 import { Button } from "@workspace/ui/components/button"
 import { DialogFooter } from "@workspace/ui/components/dialog"
-import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
-import { useState } from "react"
-import { pathInFolder } from "../domain/paths"
-import { isProjectName, PROJECT_NAME_RULE } from "../domain/project"
 import { newProject } from "../editor/actions"
-import { useEditor } from "../editor/store"
-import { FIELD_ERROR, ProjectFolderLine } from "./NewProjectFields"
+import { NewProjectFields, useNewProjectDraft } from "./NewProjectFields"
 import { TitledDialog } from "./TitledDialog"
 
-/** The name a new project goes by, and where that puts it under `projectsFolder` (`Documents/Ballest Editor`). */
+/** A new project's name, offered free and selected, and where its folder goes, with Change… for another. */
 function NewProjectForm({ onCancel }: { readonly onCancel: () => void }) {
-  const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "")
-  const recent = useEditor((s) => s.project)
-  const [name, setName] = useState("")
-  const trimmed = name.trim()
-  const valid = isProjectName(trimmed)
-  const taken = recent !== null &&
-    [recent.current, ...recent.recent].some((p) => p !== null && p.name.toLowerCase() === trimmed.toLowerCase())
+  const draft = useNewProjectDraft()
   return (
     <form
       className="contents"
       onSubmit={(e) => {
         e.preventDefault()
-        if (valid && !taken) void newProject(trimmed)
+        if (draft.ok) void newProject(draft.project.name, draft.project.folder)
       }}
     >
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="new-project-name">Name</Label>
-        <Input
-          id="new-project-name"
-          autoFocus
-          value={name}
-          placeholder="Season 3 tracks"
-          aria-invalid={trimmed !== "" && (!valid || taken)}
-          onChange={(e) => setName(e.target.value)}
-        />
-        {taken || (trimmed !== "" && !valid)
-          ? <span className={FIELD_ERROR}>{taken ? "A recent project has that name already." : PROJECT_NAME_RULE}</span>
-          : <ProjectFolderLine path={trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed)} />}
-      </div>
+      <NewProjectFields draft={draft} id="new-project-name" label="Name" autoFocus />
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" disabled={!valid || taken}>Create</Button>
+        <Button type="submit" disabled={!draft.ok}>Create</Button>
       </DialogFooter>
     </form>
   )
 }
 
 /**
- * File › New project… (desktop): the folder's name is all it asks, and where it opens comes next (`newProject`). A name
- * main refuses leaves the dialog up, so it can be changed. Open project… is the way to use a folder elsewhere.
+ * New project… (desktop: File, and the welcome window's Start): a name and a folder, and where it opens comes next
+ * (`newProject`). A project main refuses leaves the dialog up, so it can be changed.
  */
 export function NewProjectDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   return (

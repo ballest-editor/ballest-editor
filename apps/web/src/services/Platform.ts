@@ -25,6 +25,7 @@ import type {
   NotificationRecords,
   OpenedMapFile,
   OpenInGameResult,
+  OpenMaps,
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
@@ -43,6 +44,7 @@ import type {
   ProjectMaps,
   ProjectState,
   ProjectTarget,
+  RecentProject,
   RecoveryEntry,
   ReimportMapPayload,
   RenamePrefabPayload,
@@ -72,6 +74,7 @@ export type {
   NotificationCommand,
   NotificationRecord,
   OpenInGameResult,
+  OpenMaps,
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
@@ -161,10 +164,12 @@ export class Platform extends Context.Service<Platform, {
   readonly revealRecentProject: (path: string) => Effect.Effect<void, PlatformError>
   /** Takes a project off the recent ones; its folder stays as it is. */
   readonly forgetRecentProject: (path: string) => Effect.Effect<ProjectState, PlatformError>
+  /** The projects in the projects folder, by name; always none in a browser. */
+  readonly listProjectsFolder: Effect.Effect<ReadonlyArray<RecentProject>, PlatformError>
   /** Renames the project (its file's name; the folder keeps its name). */
   readonly renameProject: (name: string) => Effect.Effect<ProjectState, PlatformError>
-  /** Keeps which map is open in the project (null: one that isn't in it), so the next launch opens it again. */
-  readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, PlatformError>
+  /** Keeps the map tabs open in the project, so opening it again reopens them. */
+  readonly rememberOpenMaps: (openMaps: OpenMaps) => Effect.Effect<void, PlatformError>
   /** The project's maps, most recently changed first; always empty in a browser. */
   readonly listMaps: Effect.Effect<ProjectMaps, PlatformError>
   readonly readMap: (fileName: string) => Effect.Effect<ProjectMapFile, PlatformError>
@@ -259,6 +264,8 @@ export class Platform extends Context.Service<Platform, {
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>
   /** Tells the desktop window the page's resolved theme (its window controls follow it); nothing in a browser. */
   readonly setWindowTheme: (dark: boolean) => Effect.Effect<void, PlatformError>
+  /** Grows the welcome window into the editor; completes once it has. Nothing in a browser. */
+  readonly showEditor: Effect.Effect<void, PlatformError>
   /** The game's install, maps and plugins folders and how each was found (desktop). */
   readonly gamePaths: Effect.Effect<GamePaths, PlatformError>
   /** Asks for a folder to use as `which` instead of the one found; none when the user cancels. */
@@ -421,8 +428,9 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     revealRecentProject: (path) =>
       bridgeCheck(call("revealRecentProject", { path }), "That folder isn't there anymore."),
     forgetRecentProject: (path) => call("forgetRecentProject", { path }),
+    listProjectsFolder: call("listProjectsFolder"),
     renameProject: (name) => call("renameProject", { name }),
-    rememberOpenMap: (fileName) => call("rememberOpenMap", { fileName }),
+    rememberOpenMaps: (openMaps) => call("rememberOpenMaps", openMaps),
     listMaps: call("listMaps"),
     readMap: (fileName) => call("readMap", { fileName }),
     createMap: (file) => call("createMap", file),
@@ -453,6 +461,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     writeRecovery: (entry) => call("writeRecovery", entry),
     removeRecovery: (key) => call("removeRecovery", { key }),
     setWindowTheme: (dark) => call("setWindowTheme", { dark }),
+    showEditor: call("showEditor"),
     confirmUnsaved: (action, map) => call("confirmUnsaved", unsavedPromptOf(action, map)),
     unloadRequests: pushed((listener) => bridge.onUnloadRequest(listener)),
     leave,
@@ -612,8 +621,9 @@ const makeBrowser = (): Platform["Service"] => {
     revealProject: () => noProject,
     revealRecentProject: () => noProject,
     forgetRecentProject: () => noProject,
+    listProjectsFolder: Effect.succeed([]),
     renameProject: () => noProject,
-    rememberOpenMap: () => Effect.void,
+    rememberOpenMaps: () => Effect.void,
     listMaps: Effect.succeed([]),
     readMap: () => noProject,
     createMap: () => noProject,
@@ -638,6 +648,7 @@ const makeBrowser = (): Platform["Service"] => {
     writeRecovery: () => Effect.void,
     removeRecovery: () => Effect.void,
     setWindowTheme: () => Effect.void,
+    showEditor: Effect.void,
     confirmUnsaved: (action, map) =>
       Effect.sync(() => window.confirm(discardQuestionOf(action, map)) ? "discard" : "cancel"),
     unloadRequests: Stream.empty,

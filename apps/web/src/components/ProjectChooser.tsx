@@ -1,5 +1,5 @@
-import { type ProjectInfo, type RecentProject, RELEASES_URL } from "@ballest/contracts"
-import { IconDots, IconExternalLink, IconFolder, IconFolderOpen, IconPlus } from "@tabler/icons-react"
+import { type RecentProject, RELEASES_URL } from "@ballest/contracts"
+import { IconDots, IconExternalLink, IconFolderOpen, IconLoader2, IconPlus } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
@@ -8,32 +8,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
-import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
+import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { useState } from "react"
-import { parentFolderName, pathInFolder, shortFolderName } from "../domain/paths"
-import { isProjectName, PROJECT_NAME_RULE, sharedProjectNames } from "../domain/project"
+import { useEffect, useState } from "react"
+import { parentPathOf } from "../domain/paths"
 import { formatAgo, formatDateTime } from "../domain/time"
 import {
   chooseProject,
   forgetRecentProject,
-  newProject,
+  listProjectsFolder,
   openExternalLink,
   openRecentInNewWindow,
-  pickProjectFolder,
   revealRecentProject,
   switchProject
 } from "../editor/actions"
 import { useEditor, useUpdateState } from "../editor/store"
 import { HeroBand } from "./HeroBand"
 import { Logo } from "./Logo"
-import { SectionTitle } from "./SectionTitle"
+import { NewProjectDialog } from "./NewProjectDialog"
 import { START_CARD } from "./startCard"
+import { StartAction, StartList, StartSection } from "./startLists"
 
-/** A recent project's "…": what a click on its row doesn't do. */
-function RecentMenu({ project, elsewhere }: { readonly project: RecentProject; readonly elsewhere: boolean }) {
+/** A project row's "…": what a click on it doesn't do. Remove from recent only for a recent one. */
+function RecentMenu({ elsewhere, project, recent }: {
+  readonly project: RecentProject
+  readonly elsewhere: boolean
+  readonly recent: boolean
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -46,25 +48,31 @@ function RecentMenu({ project, elsewhere }: { readonly project: RecentProject; r
           Open in new window
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => void revealRecentProject(project.path)}>Reveal in folder</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => void forgetRecentProject(project.path)}>Remove from recent</DropdownMenuItem>
+        {recent && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => void forgetRecentProject(project.path)}>
+              Remove from recent
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 
 /**
- * One recent project: its name and when it was last opened, the whole path and the exact time on hover. Its parent
- * folder shows only when another recent project has the same name. A click opens it here. One open in another window
- * can't be picked, and says so where the time would be.
+ * One project, as VS Code's Welcome page lists one: its name, then `detail` dimmed (where a recent one is, when one in
+ * the projects folder was last opened). The whole path and when it was last opened are on hover. A click opens it
+ * here. One open in another window can't be picked, and says so in the detail's place.
  */
-function RecentRow({ project, elsewhere, first, nameShared, now }: {
+function RecentRow({ detail, elsewhere, first, project, recent }: {
   readonly project: RecentProject
+  readonly detail: string
   readonly elsewhere: boolean
   /** The row Enter opens: it takes the focus. */
   readonly first: boolean
-  readonly nameShared: boolean
-  readonly now: number
+  readonly recent: boolean
 }) {
   const { lastOpened, name, path } = project
   // Chromium counts autofocus as :focus-visible, so the first row would look hovered until the focus leaves it once.
@@ -90,7 +98,7 @@ function RecentRow({ project, elsewhere, first, nameShared, now }: {
               // not `disabled`: that would take the tooltip, and the path, away from the row
               aria-disabled={elsewhere}
               className={cn(
-                "flex h-full min-w-0 flex-1 items-center gap-2 pl-2 text-left focus-visible:outline-none",
+                "flex h-full min-w-0 flex-1 items-center gap-3 pl-2 text-left focus-visible:outline-none",
                 elsewhere && "cursor-default"
               )}
               onClick={elsewhere ? undefined : () => void switchProject(path)}
@@ -104,183 +112,227 @@ function RecentRow({ project, elsewhere, first, nameShared, now }: {
           <span className={cn("max-w-1/2 shrink-0 truncate text-body-strong", elsewhere && "text-fg-secondary")}>
             {name}
           </span>
-          <span className="min-w-0 flex-1 truncate text-fg-tertiary">{nameShared && parentFolderName(path)}</span>
-          {elsewhere
-            ? <span className="shrink-0 text-fg-disabled">Open in another window</span>
-            : lastOpened !== null && <span className="shrink-0 text-fg-tertiary">{formatAgo(lastOpened, now)}</span>}
+          <span className={cn("min-w-0 flex-1 truncate", elsewhere ? "text-fg-disabled" : "text-fg-tertiary")}>
+            {elsewhere ? "Open in another window" : detail}
+          </span>
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="start">
-          <div>{path}</div>
-          {lastOpened !== null && <div>Last opened {formatDateTime(lastOpened)}</div>}
+        {/* the path whole, on one line where it fits and broken anywhere where it doesn't, then when, quieter */}
+        <TooltipContent side="bottom" align="start" className="max-w-md">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="[overflow-wrap:anywhere]">{path}</span>
+            <span className="opacity-70">
+              {lastOpened === null ? "Not opened here yet" : `Last opened ${formatDateTime(lastOpened)}`}
+            </span>
+          </div>
         </TooltipContent>
       </Tooltip>
-      <RecentMenu project={project} elsewhere={elsewhere} />
+      <RecentMenu project={project} elsewhere={elsewhere} recent={recent} />
     </li>
   )
 }
 
-/** The projects used before, the one Enter opens first. */
+const ALL_PROJECTS_KEY = "ballest-editor.welcome.allProjects"
+
+/** Whether this machine's welcome window last listed all the projects folder's projects; a convenience, so never sure. */
+const readAllProjects = () => {
+  try {
+    return localStorage.getItem(ALL_PROJECTS_KEY) === "1"
+  } catch {
+    return false
+  }
+}
+
+const keepAllProjects = (all: boolean) => {
+  try {
+    localStorage.setItem(ALL_PROJECTS_KEY, all ? "1" : "0")
+  } catch {
+    // only a convenience: the next launch shows Recent
+  }
+}
+
+/** The projects in the projects folder, by name, read again each time they are shown; null until they are. */
+const useProjectsFolder = (shown: boolean) => {
+  const [projects, setProjects] = useState<ReadonlyArray<RecentProject> | null>(null)
+  useEffect(() => {
+    if (!shown) return
+    let current = true
+    void listProjectsFolder().then((listed) => {
+      if (current) setProjects(listed ?? [])
+    })
+    return () => {
+      current = false
+    }
+  }, [shown])
+  return projects
+}
+
+/**
+ * Recent: the projects used before, most recent first, each with the folder it is in; or, switched to, every project
+ * in the projects folder by name, each with when it was last opened. Enter opens the first that can be; a long list
+ * scrolls in the space it has. Which of the two shows is kept for the next launch.
+ */
 function RecentProjects() {
   const state = useEditor((s) => s.project)
   const recent = state?.recent ?? []
   const openElsewhere = state?.openElsewhere ?? []
+  const projectsFolder = state?.projectsFolder ?? ""
+  const [all, setAll] = useState(readAllProjects)
+  const inFolder = useProjectsFolder(all)
   const [now] = useState(Date.now)
-  const firstPickable = recent.find(({ path }) => !openElsewhere.includes(path))?.path
-  const sharedNames = sharedProjectNames(recent)
+  const shown = all ? inFolder ?? [] : recent
+  const firstPickable = shown.find(({ path }) => !openElsewhere.includes(path))?.path
+  const recentPaths = new Set(recent.map((p) => p.path))
+  const toggle = () => {
+    keepAllProjects(!all)
+    setAll(!all)
+  }
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <SectionTitle>Recent projects</SectionTitle>
-      <ul className={cn("flex flex-col gap-0.5 p-1", START_CARD)}>
-        {recent.map((project) => (
-          <RecentRow
-            key={project.path}
-            project={project}
-            elsewhere={openElsewhere.includes(project.path)}
-            first={project.path === firstPickable}
-            nameShared={sharedNames.has(project.name.toLowerCase())}
-            now={now}
-          />
-        ))}
-      </ul>
-    </div>
+    <StartSection
+      className="min-h-0 flex-1"
+      title={all ? "All projects" : "Recent"}
+      action={
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                className="rounded-control px-1 text-caption text-fg-secondary transition-colors focus-ring hover:text-foreground"
+                onClick={toggle}
+              />
+            }
+          >
+            {all ? "Show recent" : "Show all"}
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="end">
+            {all ? "Projects used before, most recent first" : `Every project in ${projectsFolder}`}
+          </TooltipContent>
+        </Tooltip>
+      }
+    >
+      {all && inFolder === null ? <p className="text-fg-tertiary">Looking in {projectsFolder}…</p> : (
+        shown.length === 0
+          ? (
+            <p className="text-fg-tertiary">
+              {all
+                ? `No projects in ${projectsFolder} yet.`
+                : "No recent projects yet. Start a new one, or open a project folder."}
+            </p>
+          )
+          : (
+            // the list takes what the column has left and scrolls in it: the window itself never scrolls or grows
+            // its bottom edge fades rather than cuts a row in half, and the end clears the fade once scrolled to
+            // one per list: a scroll area measures its content once, and kept its scrollbar for a shorter list
+            <ScrollArea
+              key={all ? "all" : "recent"}
+              className="-mx-2 min-h-0 flex-1 [mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]"
+            >
+              <div className="pr-3 pb-8 pl-2">
+                <StartList>
+                  {shown.map((project) => (
+                    <RecentRow
+                      key={project.path}
+                      project={project}
+                      detail={all
+                        ? project.lastOpened === null
+                          ? "Not opened here yet"
+                          : `Opened ${formatAgo(project.lastOpened, now)}`
+                        : parentPathOf(project.path)}
+                      elsewhere={openElsewhere.includes(project.path)}
+                      first={project.path === firstPickable}
+                      recent={recentPaths.has(project.path)}
+                    />
+                  ))}
+                </StartList>
+              </div>
+            </ScrollArea>
+          )
+      )}
+    </StartSection>
   )
 }
 
 /**
- * The start screen's right column. A project's maps would belong here, but `listMaps` answers for the project in use,
- * and this screen has none. The version comes from the updater, which a browser doesn't have.
+ * The start screen's right column, where VS Code's Welcome page has its walkthroughs. The version comes from the
+ * updater, which a browser doesn't have.
  */
 function WhatsNew() {
   const update = useUpdateState()
   return (
-    <aside className="flex flex-col gap-2 self-start">
-      <SectionTitle>What's new</SectionTitle>
-      <div className={cn("flex flex-col items-start gap-2 p-dialog", START_CARD)}>
-        {update !== null && <p className="text-body-strong tabular-nums">Version {update.currentVersion}</p>}
-        <p className="text-fg-tertiary">Each release lists what it added and fixed.</p>
-        <Button variant="outline" onClick={() => void openExternalLink(RELEASES_URL)}>
-          <IconExternalLink data-icon="inline-start" />
-          Release notes
-        </Button>
-      </div>
-    </aside>
+    <StartSection title="What's new" className="self-start">
+      {update !== null && <p className="text-body-strong tabular-nums">Version {update.currentVersion}</p>}
+      <p className="text-fg-tertiary">Each release lists what it added and fixed.</p>
+      <Button variant="outline" className="self-start" onClick={() => void openExternalLink(RELEASES_URL)}>
+        <IconExternalLink data-icon="inline-start" />
+        Release notes
+      </Button>
+    </StartSection>
   )
 }
 
 /**
- * Starts a project: a name, and the folder that makes it, which Change… replaces with one from a dialog. `onBack` goes
- * back to the recent projects; without any there, Open project… takes its place.
- */
-function NewProjectForm({ onBack }: { readonly onBack: (() => void) | null }) {
-  const state = useEditor((s) => s.project)
-  const projectsFolder = state?.projectsFolder ?? ""
-  const recent = state?.recent ?? []
-  const [name, setName] = useState("")
-  // the folder Change… picked; null: `<projectsFolder>/<name>`
-  const [chosen, setChosen] = useState<ProjectInfo | null>(null)
-  const trimmed = name.trim()
-  const badName = trimmed !== "" && !isProjectName(trimmed)
-  const taken = chosen === null && recent.some((p) => p.name.toLowerCase() === trimmed.toLowerCase())
-  const holdsProject = chosen?.exists === true
-  const folder = chosen?.path ?? (trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed))
-  const problem = badName
-    ? PROJECT_NAME_RULE
-    : taken
-    ? "A recent project has that name already."
-    : holdsProject
-    ? "That folder already holds a project."
-    : null
-  const canCreate = isProjectName(trimmed) && problem === null
-  const change = async () => {
-    const picked = await pickProjectFolder()
-    if (picked !== undefined && picked !== null) setChosen(picked)
-  }
-  return (
-    <form
-      className={cn("flex flex-col gap-4 p-dialog", START_CARD)}
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (canCreate) void newProject(trimmed, chosen?.path)
-      }}
-    >
-      <h2 className="text-title">Start a new project</h2>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="start-project-name">Name</Label>
-        <Input
-          id="start-project-name"
-          autoFocus
-          value={name}
-          placeholder="Season 3 tracks"
-          aria-invalid={badName || taken}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-      <div className="flex items-center gap-2">
-        <IconFolder className="size-4 shrink-0 text-fg-secondary" />
-        <Tooltip>
-          <TooltipTrigger render={<span className="min-w-0 flex-1 truncate text-fg-secondary" />}>
-            {shortFolderName(folder)}
-          </TooltipTrigger>
-          <TooltipContent side="bottom" align="start">{folder}</TooltipContent>
-        </Tooltip>
-        <Button type="button" variant="outline" className="shrink-0" onClick={() => void change()}>Change…</Button>
-      </div>
-      {problem !== null && <p className="text-destructive">{problem}</p>}
-      <div className="flex justify-end gap-2">
-        {onBack === null
-          ? <Button type="button" variant="outline" onClick={() => void chooseProject()}>Open project…</Button>
-          : <Button type="button" variant="outline" onClick={onBack}>Back</Button>}
-        <Button type="submit" disabled={!canCreate}>Create</Button>
-      </div>
-    </form>
-  )
-}
-
-/**
- * What a window shows when it can't start on a project of its own (docs/DESKTOP.md § Other windows): the whole window,
- * in the editor's place, until a project is in use. Leaving it some other way would make a second Untitled Project, so
- * there is nothing to dismiss; closing the window is the way out. The strip along the top is the window's title bar:
- * it drags the window, and Electron draws the window controls over one end of it.
+ * The welcome window (docs/DESKTOP.md § Other windows), after VS Code's Welcome page: Start and Recent down the left,
+ * What's new on the right. New project… asks in a dialog of the window's own. Every launch shows it, in a small window of its own, until a project is in use. Leaving it
+ * some other way would make a second Untitled Project, so there is nothing to dismiss; closing the window is the way
+ * out. The strip along the top is the window's title bar: it drags the window, and Electron draws the window controls
+ * over one end of it.
  */
 export function ProjectChooser() {
-  const noRecent = useEditor((s) => (s.project?.recent ?? []).length === 0)
   const [naming, setNaming] = useState(false)
-  const showForm = naming || noRecent
+  const entering = useEditor((s) => s.enteringProject)
   return (
-    <div className="flex h-svh flex-col bg-background bg-linear-to-b from-primary/6 to-transparent to-60% text-foreground">
+    <div
+      className={cn(
+        "flex h-svh flex-col bg-background text-foreground",
+        // empty, the editor's own background, for the moment the window grows into the editor
+        entering?.phase !== "showing" && "bg-linear-to-b from-primary/6 to-transparent to-60%"
+      )}
+    >
       <div className="h-10 shrink-0 [-webkit-app-region:drag]" />
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-10">
-        {/* `m-auto`, not `justify-center`: a list too long for the window scrolls from its top, where centring would clip it */}
-        <div className="m-auto grid w-full max-w-4xl grid-cols-[minmax(0,1fr)_16rem] gap-x-8 gap-y-6">
-          <HeroBand className={cn("col-span-2 p-6", START_CARD)}>
+      {/* a fixed frame: only Recent's list scrolls, so switching lists or a long one never moves the rest */}
+      <main
+        aria-busy={entering !== null}
+        className={cn(
+          "flex min-h-0 flex-1 justify-center px-8 pt-4 pb-8",
+          entering?.phase === "showing" && "invisible"
+        )}
+      >
+        <div className="grid min-h-0 w-full max-w-3xl grid-cols-[minmax(0,1fr)_13rem] grid-rows-[auto_minmax(0,1fr)] gap-x-12 gap-y-8">
+          <HeroBand className={cn("col-span-2 p-5", START_CARD)}>
             <div className="flex items-center gap-3">
-              <Logo className="size-12 shrink-0" />
+              <Logo className="size-11 shrink-0" />
               <div>
                 <h1 className="text-title">Ballest Editor</h1>
-                <p className="text-fg-secondary">A map editor for Ballest of Them All.</p>
+                {entering === null
+                  ? <p className="text-fg-secondary">A map editor for Ballest of Them All.</p>
+                  : (
+                    <p className="flex items-center gap-1.5 text-fg-secondary" role="status">
+                      <IconLoader2 className="size-4 animate-spin" />
+                      Opening {entering.name}…
+                    </p>
+                  )}
               </div>
             </div>
-            {!showForm && (
-              <div className="mt-4 flex items-center gap-2">
-                <Button onClick={() => setNaming(true)}>
-                  <IconPlus data-icon="inline-start" />
-                  New project
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    void chooseProject()}
-                >
-                  <IconFolderOpen data-icon="inline-start" />
-                  Open project…
-                </Button>
-              </div>
-            )}
           </HeroBand>
-          {showForm ? <NewProjectForm onBack={noRecent ? null : () => setNaming(false)} /> : <RecentProjects />}
+          {/* nothing else can be picked while a pick opens */}
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-col gap-8 transition-opacity",
+              entering !== null && "pointer-events-none opacity-50"
+            )}
+          >
+            <StartSection title="Start">
+              <StartList>
+                <StartAction icon={<IconPlus />} label="New project…" onClick={() => setNaming(true)} />
+                <StartAction icon={<IconFolderOpen />} label="Open project…" onClick={() => void chooseProject()} />
+              </StartList>
+            </StartSection>
+            <RecentProjects />
+          </div>
           <WhatsNew />
         </div>
       </main>
+      {/* the window's own: the store opens no dialog over the chooser */}
+      <NewProjectDialog open={naming} onClose={() => setNaming(false)} />
     </div>
   )
 }

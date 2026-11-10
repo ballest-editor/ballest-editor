@@ -102,7 +102,7 @@ const drawnAndModelled = (state: Partial<EditorState>) =>
 const projects = (names: ReadonlyArray<string>) => ({
   current: { path: "/projects/Demo", name: "Demo", exists: true },
   recent: names.map((name) => ({ path: `/projects/${name}`, name, exists: true, lastOpened: null })),
-  lastOpenMap: null,
+  openMaps: { files: [], active: null },
   projectsFolder: "/projects",
   chooserRequired: false,
   openElsewhere: [],

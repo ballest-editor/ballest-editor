@@ -27,8 +27,13 @@ export const ProjectSettings = Schema.Struct({
   recent: Schema.optional(Schema.Array(Schema.String)),
   /** When each recent project was last opened (ISO 8601), by project folder. */
   lastOpened: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-  /** The map last open in each project (its file name), by project folder, for the next launch to open again. */
-  lastOpenMap: Schema.optional(Schema.Record(Schema.String, Schema.String))
+  /** The map tabs each project had open (`ProjectState.openMaps`), by project folder, for opening it again. */
+  openMaps: Schema.optional(
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({ files: Schema.Array(Schema.String), active: Schema.NullOr(Schema.String) })
+    )
+  )
 })
 export type ProjectSettings = typeof ProjectSettings.Type
 

@@ -1,4 +1,5 @@
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
+import { cn } from "@workspace/ui/lib/utils"
 import { useEffect } from "react"
 import { MOTION_SCALE } from "../domain/Settings"
 import {
@@ -22,7 +23,7 @@ import {
 } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
-import { APP_TITLE, type Dialog, isChooserRequired, useEditor, windowTitleOf } from "../editor/store"
+import { APP_TITLE, type Dialog, isChooserRequired, isWelcomeShown, useEditor, windowTitleOf } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { AboutDialog } from "./AboutDialog"
@@ -120,6 +121,7 @@ export function Editor() {
   const settingsCategory = useEditor((s) => s.settingsCategory)
   const setSettingsCategory = useEditor((s) => s.setSettingsCategory)
   const close = useEditor((s) => s.closeDialog)
+  const welcome = useEditor(isWelcomeShown)
   const choosing = useEditor(isChooserRequired)
   const waitingToChoose = useEditor((s) => s.project === null) && startsOnChooser()
 
@@ -158,17 +160,26 @@ export function Editor() {
 
   return (
     <TooltipProvider>
-      {choosing ?
-        <ProjectChooser /> :
-        waitingToChoose ?
-        <ChooserSkeleton /> :
-        (
+      {
+        /*
+         * While a pick opens (`enteringProject`), the editor mounts under the welcome window, which covers it until the
+         * window has grown: the editor is ready the moment it shows. The welcome window keeps its place, so it doesn't
+         * mount again when it starts covering.
+         */
+      }
+      {welcome && (
+        <div className={cn(!choosing && "fixed inset-0 z-40")}>
+          <ProjectChooser />
+        </div>
+      )}
+      {!choosing &&
+        (waitingToChoose ? <ChooserSkeleton /> : (
           <div className="flex h-svh flex-col bg-background text-foreground">
             <TopBar />
             <Dock />
             <StatusBar />
           </div>
-        )}
+        ))}
       <NameMapDialog mode="saveAs" open={dialog === "saveAs"} onClose={close} />
       <NameMapDialog mode="rename" open={dialog === "rename"} onClose={close} />
       <NameMapDialog mode="duplicate" open={dialog === "duplicate"} onClose={close} />

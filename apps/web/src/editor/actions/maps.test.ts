@@ -9,19 +9,23 @@ import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { makeTestDisk, projectFile, TEST_PROJECT } from "../../test/desktopBridge"
 import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s, twoMaps } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
+import { tabStateOf } from "../store"
 import {
-  followOpenMapEffect,
-  freshMapEffect,
+  followOpenMapsEffect,
   newMapEffect,
   openProjectMapAtGap,
   openProjectMapBehind,
   openProjectMapFile,
-  openStartingMap,
-  patchProjectMapEffect
+  patchProjectMapEffect,
+  startOnProject
 } from "./maps"
 import { openProjectMap } from "./project"
-import { refreshProject, saveTabPrefs } from "./shared"
+import { saveTabPrefs } from "./shared"
+import { closeTabEffect } from "./unsaved"
 import { followViewLayouts } from "./viewLayouts"
+
+/** The file of each tab, in tab order. */
+const openFiles = () => s().tabIds.map((id) => tabStateOf(s(), id)?.file?.name ?? null)
 
 describe("view layouts", () => {
   const disk = () => {
@@ -219,49 +223,65 @@ describe("map actions", () => {
     ).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("starts on the map last open, else the most recently edited one, else a fresh map, and keeps the open one", () => {
+  it.effect("a window starts on the project overview: no map opens, a blank tab goes, an edited one stays", () => {
+    const { disk } = twoMaps()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* startOnProject
+      assert.deepStrictEqual(s().tabIds, [])
+      assert.isNull(s().file)
+
+      yield* reset
+      edit()
+      yield* newMapEffect
+      yield* startOnProject
+      assert.lengthOf(s().tabIds, 1)
+      assert.isTrue(s().dirty)
+
+      // no project, as on the welcome window: the blank map stays
+      disk.project.current = null
+      yield* reset
+      yield* startOnProject
+      assert.lengthOf(s().tabIds, 1)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a window starts on the maps the project had open, in their order, with the active one active", () => {
+    const { first, second, disk } = twoMaps()
+    disk.project.openMaps[TEST_PROJECT] = {
+      files: [second, "Map_LevelEditorMain&Gone_me.balledit", first],
+      active: second
+    }
+    return Effect.gen(function*() {
+      yield* reset
+      yield* startOnProject
+      // a map gone from the project is passed over
+      assert.deepStrictEqual(openFiles(), [second, first])
+      assert.strictEqual(s().file?.name, second)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("keeps the maps open in the project as they change, saved ones only, from the startup load on", () => {
     const { first, second, disk } = twoMaps()
     return Effect.gen(function*() {
       yield* reset
-      yield* refreshProject
-      // nothing kept: the first of the list (the most recently changed)
-      yield* openStartingMap
-      assert.strictEqual(s().file?.name, s().projectMaps[0]?.fileName)
-
-      // the kept map wins
-      disk.project.lastOpenMap = { [TEST_PROJECT]: second }
-      yield* refreshProject
-      yield* openStartingMap
-      assert.strictEqual(s().file?.name, second)
-
-      // a kept map that is gone from the project is passed over
-      disk.project.lastOpenMap = { [TEST_PROJECT]: "Map_LevelEditorMain&Gone_me.balledit" }
-      yield* refreshProject
-      yield* openStartingMap
-      assert.strictEqual(s().file?.name, s().projectMaps[0]?.fileName)
-
-      // an empty project starts on a fresh unsaved map, named Untitled with the creator in use
-      disk.files.clear()
-      disk.project.lastOpenMap = {}
-      yield* refreshProject
-      yield* openStartingMap
-      assert.include(s(), { file: null, dirty: false })
-      assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Untitled")
-
-      // what is open is kept for the next launch, from the startup load on
-      disk.files.set(projectFile(first), readSample(balledits[0]!))
-      disk.files.set(projectFile(second), readSample(balledits[1]!))
-      disk.project.lastOpenMap = { [TEST_PROJECT]: first }
-      yield* refreshProject
-      yield* openStartingMap
-      const stop = yield* followOpenMapEffect
-      assert.strictEqual(s().file?.name, first)
+      yield* startOnProject
+      const stop = yield* followOpenMapsEffect
+      yield* openProjectMapFile(first)
       yield* openProjectMapFile(second)
       yield* Effect.yieldNow
-      assert.deepStrictEqual(disk.project.lastOpenMap, { [TEST_PROJECT]: second })
-      yield* freshMapEffect
+      assert.deepStrictEqual(disk.project.openMaps[TEST_PROJECT], { files: [first, second], active: second })
+
+      // an unsaved map isn't one to reopen
+      yield* newMapEffect
       yield* Effect.yieldNow
-      assert.deepStrictEqual(disk.project.lastOpenMap, {})
+      assert.deepStrictEqual(disk.project.openMaps[TEST_PROJECT], { files: [first, second], active: null })
+
+      // every tab closed: the project opens on its overview next time
+      for (const id of s().tabIds) yield* closeTabEffect(id)
+      yield* Effect.yieldNow
+      assert.deepStrictEqual(s().tabIds, [])
+      assert.deepStrictEqual(disk.project.openMaps[TEST_PROJECT], { files: [], active: null })
       stop()
     }).pipe(Effect.provide(layerFor(disk)))
   })

@@ -110,7 +110,7 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
 - **`.ballest/thumbnails/<SHA-256 of the map's file>.png`** is the map's tile in the Project panel, 64px square, rendered by the page after a Save ([DESKTOP.md § Project panel](DESKTOP.md#project-panel)). Main refuses one for bytes no map has any more, which a slow render can be by the time it is done, and each write drops the ones no map has. It's a cache: deleting the folder costs only the tiles until each map's next Save.
 - **`.ballest/backups/<time> <file name>`** holds the project's copy of a map, sidecar or prefab before anything wrote over it, and the old file after a Rename. The game's copy before an export wrote over it goes to `<userData>/backups/` instead, since it belongs to this machine and not to the project. [DESKTOP.md § Backups](DESKTOP.md#backups) has the rules.
 
-`desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the last one used first. An empty list means Untitled Project. A window has one project, kept in memory, so another running copy changing the list doesn't move it. A project opens in one window at a time. [DESKTOP.md § Other windows](DESKTOP.md#other-windows) has where a window starts and how windows know about each other.
+`desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the last one used first. A window has one project, kept in memory, so another running copy changing the list doesn't move it. A project opens in one window at a time. [DESKTOP.md § Other windows](DESKTOP.md#other-windows) has where a window starts and how windows know about each other.
 
 A project is never the game's maps folder. The game loads only from `UserSavedMaps`, so a map must be exported to be played, and a project inside that folder would let the game edit project files behind the editor's back. Picking the maps folder, or a folder under it, as a project is refused with that explanation.
 
@@ -171,7 +171,7 @@ The wireframes in [mockups/](mockups/) are rough. Use [mockups/welcome.html](moc
 
 The rest of the design is still to come:
 
-- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. It shows from the second launch on and when the last project window closes. The required chooser ([DESKTOP.md § Other windows](DESKTOP.md#other-windows)) is that screen without the thumbnails, but only a window that can't start on a project of its own shows it. **This window / New window** ([mockups/welcome.html](mockups/welcome.html) § 2) is built.
+- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. The chooser ([DESKTOP.md § Other windows](DESKTOP.md#other-windows)) is that screen without the thumbnails, and every launch starts on it. Still to come: the thumbnails, and showing it when the last project window closes. **This window / New window** ([mockups/welcome.html](mockups/welcome.html) § 2) is built.
 - **Close project** and **Save project…** in the File menu. Close project needs the Welcome window to go back to.
 - **Project settings** ([mockups/welcome.html](mockups/welcome.html) § 5), IntelliJ's Project Structure shape, gains a creator, a choice of export target, and git.
 - **The Project panel** gains folders, sub-assemblies and the rest of what a project can hold, beyond its flat list of maps.

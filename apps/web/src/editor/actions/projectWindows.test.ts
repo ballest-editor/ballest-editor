@@ -10,7 +10,8 @@ import {
 } from "../../test/desktopBridge"
 import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
-import { isChooserRequired, isModalOpen, windowTitleOf } from "../store"
+import { isChooserRequired, isModalOpen, isWelcomeShown, tabStateOf, useEditor, windowTitleOf } from "../store"
+import { followOpenMapsEffect, openProjectMapFile } from "./maps"
 import {
   chooseProjectEffect,
   forgetRecentProjectEffect,
@@ -436,7 +437,7 @@ describe("the required chooser", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("a pick is always this window: nothing asked, the chooser ends, and the project's map opens", () => {
+  it.effect("a pick is always this window: nothing asked, the chooser ends, and the project overview shows", () => {
     const sample = balledits[0]!
     const name = fileNameOf(sample)
     const disk = chooserDisk({ [projectFile(name, OTHER)]: readSample(sample) })
@@ -447,7 +448,57 @@ describe("the required chooser", () => {
       assert.deepStrictEqual(disk.project.windows, [])
       assert.strictEqual(inUse(disk), OTHER)
       assert.isFalse(isChooserRequired(s()))
-      assert.strictEqual(s().file?.name, name)
+      // none of its maps opens on its own: the project overview, which lists it
+      assert.deepStrictEqual(s().tabIds, [])
+      assert.deepStrictEqual(s().projectMaps.map((m) => m.fileName), [name])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a pick shows the editor only once the project's tabs are open and the window has grown", () => {
+    const sample = balledits[0]!
+    const name = fileNameOf(sample)
+    const disk = chooserDisk({ [projectFile(name, OTHER)]: readSample(sample) })
+    disk.project.openMaps[OTHER] = { files: [name], active: name }
+    return Effect.gen(function*() {
+      yield* reset
+      // every state the editor shows in, from the pick on: never the blank map the welcome window held, never empty
+      const shown: Array<ReadonlyArray<string | null>> = []
+      const stop = useEditor.subscribe((state) => {
+        if (!isWelcomeShown(state)) shown.push(state.tabIds.map((id) => tabStateOf(state, id)?.file?.name ?? null))
+      })
+      const notices = yield* noticesWhile((texts) => switchProjectEffect(OTHER).pipe(Effect.as(texts)))
+      stop()
+      assert.isAbove(shown.length, 0)
+      for (const files of shown) assert.deepStrictEqual(files, [name])
+      assert.strictEqual(disk.project.editorShown, 1)
+      assert.isNull(s().enteringProject)
+      // the welcome window said which project it opened: no notice says it again
+      assert.isFalse(notices.some((text) => text.startsWith("Using the project")))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a switch reopens the maps the project had open, and each project keeps its own", () => {
+    const here = fileNameOf(balledits[0]!)
+    const there = fileNameOf(balledits[1]!)
+    const disk = makeTestDisk({
+      [projectFile(here)]: readSample(balledits[0]!),
+      [projectFile(there, OTHER)]: readSample(balledits[1]!)
+    })
+    disk.project.recent = [OTHER]
+    disk.project.openMaps[OTHER] = { files: [there], active: there }
+    return Effect.gen(function*() {
+      yield* reset
+      const stop = yield* followOpenMapsEffect
+      yield* openProjectMapFile(here)
+      yield* Effect.yieldNow
+      yield* noticesWhile(() => switchProjectEffect(OTHER))
+      yield* Effect.yieldNow
+      assert.strictEqual(s().file?.name, there)
+      assert.deepStrictEqual(disk.project.openMaps, {
+        [TEST_PROJECT]: { files: [here], active: here },
+        [OTHER]: { files: [there], active: there }
+      })
+      stop()
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -477,6 +528,6 @@ describe("the required chooser", () => {
 describe("the web review build", () => {
   it("has no project, so there is no chooser and nothing to ask", () => {
     assert.isFalse(isChooserRequired({ project: null }))
-    assert.isFalse(isModalOpen({ dialog: null, project: null }))
+    assert.isFalse(isModalOpen({ dialog: null, project: null, enteringProject: null }))
   })
 })

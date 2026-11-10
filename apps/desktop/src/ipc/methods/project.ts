@@ -53,11 +53,11 @@ export const projectHandlers = {
   revealRecentProject: ({ path }) =>
     Effect.flatMap(Effect.service(Projects), (projects) => projects.knownFolder(path)).pipe(Effect.flatMap(reveal)),
   forgetRecentProject: ({ path }) => Effect.flatMap(Effect.service(Projects), (projects) => projects.forget(path)),
+  listProjectsFolder: () => Effect.flatMap(Effect.service(Projects), (projects) => projects.listFolder),
   /** Project settings › General: the project's name. */
   renameProject: ({ name }) => Effect.flatMap(Effect.service(Projects), (projects) => projects.setName(name)),
-  /** Keeps which map is open in the project, so the next launch opens it again. */
-  rememberOpenMap: ({ fileName }) =>
-    Effect.flatMap(Effect.service(Projects), (projects) => projects.rememberOpenMap(fileName)),
+  rememberOpenMaps: (openMaps) =>
+    Effect.flatMap(Effect.service(Projects), (projects) => projects.rememberOpenMaps(openMaps)),
   listRecovery: () => Effect.flatMap(Effect.service(Recovery), (recovery) => recovery.list),
   writeRecovery: (entry) => Effect.flatMap(Effect.service(Recovery), (recovery) => recovery.write(entry)),
   removeRecovery: ({ key }) => Effect.flatMap(Effect.service(Recovery), (recovery) => recovery.remove(key)),

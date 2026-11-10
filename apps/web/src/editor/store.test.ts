@@ -1085,7 +1085,7 @@ describe("document tabs", () => {
     const NAMED: ProjectState = {
       current: { path: "/projects/Season 3", name: "Season 3", exists: true },
       recent: [],
-      lastOpenMap: null,
+      openMaps: { files: [], active: null },
       chooserRequired: false,
       openElsewhere: [],
       projectsFolder: "/projects",

@@ -4,11 +4,13 @@ import {
   isMapFileName,
   isProjectName,
   MAP_EXTENSIONS,
+  type OpenMaps,
   PREFAB_NAME_RULE,
   type ProjectFolder,
   type ProjectInfo,
   type ProjectState,
-  type ProjectTarget
+  type ProjectTarget,
+  type RecentProject
 } from "@ballest/contracts"
 import { Context, DateTime, Effect, FileSystem, Option, Path, Ref, Schema } from "effect"
 import { GamePaths } from "../game/GamePaths"
@@ -29,6 +31,15 @@ const ProjectFile = Schema.Struct({
 type ProjectFile = typeof ProjectFile.Type
 
 const PROJECT_FILE = "ballest-project.json"
+
+const NO_OPEN_MAPS: OpenMaps = { files: [], active: null }
+
+/** What the settings keep of a project's open maps, without anything a hand edit left that isn't a map file name. */
+const validOpenMaps = (kept: { readonly files: ReadonlyArray<string>; readonly active: string | null } | undefined) => {
+  const files = (kept?.files ?? []).filter(isMapFileName)
+  const active = kept?.active ?? null
+  return { files, active: active !== null && files.includes(active) ? active : null } satisfies OpenMaps
+}
 const RECENT_LIMIT = 8
 
 /** The error of every project operation: `Projects`, `MapFiles`, `Prefabs` and `MapExports` alike. */
@@ -140,10 +151,15 @@ export class Projects extends Context.Service<Projects, {
   readonly prepareWindow: (target: ProjectTarget) => Effect.Effect<string, ProjectError>
   /** A recent or picked folder, when it exists; any other folder is refused. */
   readonly knownFolder: (folder: string) => Effect.Effect<Option.Option<string>, ProjectError>
+  /** Keeps the map tabs open in the current project (`ProjectState.openMaps`); nothing without a project. */
+  readonly rememberOpenMaps: (openMaps: OpenMaps) => Effect.Effect<void, ProjectError>
+  /**
+   * The projects in the projects folder (`Documents/Ballest Editor`), by name: each folder in it that holds a
+   * `ballest-project.json`. Listed, a folder can be opened as a recent one can.
+   */
+  readonly listFolder: Effect.Effect<ReadonlyArray<RecentProject>>
   /** Takes `folder` off the recent projects; nothing on disk changes. */
   readonly forget: (folder: string) => Effect.Effect<ProjectState, ProjectError>
-  /** Keeps which map is open in the current project (`ProjectState.lastOpenMap`); null forgets it. */
-  readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, ProjectError>
   /**
    * Makes a project called `name` and uses it: in `folder`, one `pick` took, or `<projectsFolder>/<name>` without one.
    * Fails when the folder holds a project already.
@@ -231,9 +247,7 @@ export class Projects extends Context.Service<Projects, {
         )
     })
 
-    const lastUsed = (yield* remembered).recent?.[0] ?? null
-    const startWith = (others: ReadonlyArray<WindowEntry>) =>
-      decideStart({ requested: launch.requested, lastUsed, others, same })
+    const startWith = (others: ReadonlyArray<WindowEntry>) => decideStart({ requested: launch.requested, others, same })
     const looked = startWith(yield* windows.others)
     yield* windows.announce({ project: looked.project, choosing: looked.chooser })
     // A copy starting at this very moment may have looked before this one announced, and this one before it. Each sees
@@ -268,18 +282,17 @@ export class Projects extends Context.Service<Projects, {
       )
 
     const state = Effect.gen(function*() {
-      const { recent = [], lastOpened = {}, lastOpenMap: kept = {} } = yield* remembered
+      const { recent = [], lastOpened = {}, openMaps = {} } = yield* remembered
       const folder = Option.getOrUndefined(yield* current)
       const others = folder === undefined ? recent : recent.filter((p) => !same(p, folder))
-      const lastOpenMap = folder === undefined ? null : kept[folder] ?? null
       const open = yield* windows.others
       return {
         current: folder === undefined ? null : yield* info(folder),
+        openMaps: folder === undefined ? NO_OPEN_MAPS : validOpenMaps(openMaps[folder]),
         recent: yield* Effect.forEach(
           others,
           (p) => Effect.map(info(p), (found) => ({ ...found, lastOpened: lastOpened[p] ?? null }))
         ),
-        lastOpenMap: lastOpenMap !== null && isMapFileName(lastOpenMap) ? lastOpenMap : null,
         projectsFolder,
         chooserRequired: yield* Ref.get(chooserRequired),
         openElsewhere: others.filter((p) => isOpenIn(open, p)),
@@ -287,16 +300,17 @@ export class Projects extends Context.Service<Projects, {
       } satisfies ProjectState
     })
 
-    const rememberOpenMap = Effect.fn("Projects.rememberOpenMap")(function*(fileName: string | null) {
-      if (fileName !== null && !isMapFileName(fileName)) return yield* projectError("fileName", fileName)()
+    const rememberOpenMaps = Effect.fn("Projects.rememberOpenMaps")(function*(openMaps: OpenMaps) {
+      const bad = [...openMaps.files, ...openMaps.active === null ? [] : [openMaps.active]].find((name) =>
+        !isMapFileName(name) || !openMaps.files.includes(name)
+      )
+      if (bad !== undefined) return yield* projectError("fileName", bad)()
       const project = Option.getOrNull(yield* current)
-      // nothing to remember it in: Untitled Project has one map and no folder
       if (project === null) return
-      yield* settings.update((s) => {
-        const { [project]: _previous, ...others } = s.project?.lastOpenMap ?? {}
-        const lastOpenMap = fileName === null ? others : { ...others, [project]: fileName }
-        return { ...s, project: { ...s.project, lastOpenMap } }
-      }).pipe(Effect.mapError(projectError("write", project)))
+      yield* settings.update((s) => ({
+        ...s,
+        project: { ...s.project, openMaps: { ...s.project?.openMaps, [project]: openMaps } }
+      })).pipe(Effect.mapError(projectError("write", project)))
     })
 
     const use = Effect.fn("Projects.use")(function*(raw: string) {
@@ -335,6 +349,25 @@ export class Projects extends Context.Service<Projects, {
       yield* known(raw)
       const found = yield* fs.exists(raw).pipe(Effect.orElseSucceed(() => false))
       return found ? Option.some(raw) : Option.none()
+    })
+
+    const listFolder = Effect.gen(function*() {
+      const entries = yield* fs.readDirectory(projectsFolder).pipe(Effect.orElseSucceed((): Array<string> => []))
+      const { lastOpened = {} } = yield* remembered
+      const found = yield* Effect.forEach(entries, (entry) => {
+        const folder = path.join(projectsFolder, entry)
+        return fs.exists(path.join(folder, PROJECT_FILE)).pipe(
+          Effect.orElseSucceed(() => false),
+          Effect.flatMap((isProject) => isProject ? Effect.map(info(folder), (p) => [p]) : Effect.succeed([]))
+        )
+      })
+      const projects = found.flat().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+      // a folder main listed is one the page may name, as a picked one is
+      yield* Ref.update(picked, (folders) => [...folders, ...projects.map((p) => p.path)])
+      return projects.map((p): RecentProject => ({
+        ...p,
+        lastOpened: Object.entries(lastOpened).find(([folder]) => same(folder, p.path))?.[1] ?? null
+      }))
     })
 
     const forget = Effect.fn("Projects.forget")(function*(raw: string) {
@@ -445,7 +478,8 @@ export class Projects extends Context.Service<Projects, {
       prepareWindow,
       knownFolder,
       forget,
-      rememberOpenMap,
+      listFolder,
+      rememberOpenMaps,
       createNew,
       setName,
       folderOf,

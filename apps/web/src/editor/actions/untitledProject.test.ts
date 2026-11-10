@@ -394,7 +394,7 @@ describe("This window, leaving Untitled Project", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("a recent project, with only blank tabs: they give way to the map it opens on", () => {
+  it.effect("a recent project, with only blank tabs: they give way to the project overview, and no map opens", () => {
     const sample = balledits[0]!
     const name = fileNameOf(sample)
     const disk = untitledDisk({ [projectFile(name, project)]: readSample(sample) })
@@ -404,19 +404,18 @@ describe("This window, leaving Untitled Project", () => {
       yield* newMapEffect
       yield* here(switchProjectEffect(project))
       assert.deepStrictEqual(disk.prompts, [])
-      assert.lengthOf(s().tabIds, 1)
-      assert.strictEqual(s().file?.name, name)
+      assert.deepStrictEqual(s().tabIds, [])
+      assert.deepStrictEqual(listed(), [name])
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("an empty project, with only blank tabs: one blank Untitled is left, since there is always a map", () => {
+  it.effect("an empty project, with only blank tabs: they go too, and its overview shows", () => {
     const disk = untitledDisk()
     return Effect.gen(function*() {
       yield* reset
       yield* newMapEffect
       yield* here(newProjectEffect("My tracks"))
-      assert.deepStrictEqual(tabLabels(s()), ["Untitled"])
-      assert.deepStrictEqual(dirtyTabs(s()), [])
+      assert.deepStrictEqual(s().tabIds, [])
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })

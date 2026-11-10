@@ -579,6 +579,12 @@ interface TabOptions {
   readonly document?: TabDocument
 }
 
+/** The project the welcome window's pick is opening, and how far it has got (`EditorState.enteringProject`). */
+export interface EnteringProject {
+  readonly name: string
+  readonly phase: "opening" | "showing"
+}
+
 export interface EditorState extends TabState {
   /** The document tabs, in order. Empty in a named project once its last tab closes (`noTabOpen`). */
   readonly tabIds: ReadonlyArray<string>
@@ -646,6 +652,11 @@ export interface EditorState extends TabState {
   readonly settingsCategory: SettingsCategory
   /** The keybind cheat sheet: shown while its binding is held. */
   readonly cheatSheet: boolean
+  /**
+   * The project the welcome window's pick is opening, while it does: the welcome window stays up, saying so, until the
+   * project's tabs are open (`opening`) and the window has grown into the editor (`showing`).
+   */
+  readonly enteringProject: EnteringProject | null
   readonly catalog: LoadedCatalog | null
   /** Lookups over `catalog`, built once per catalog load. */
   readonly catalogIndex: CatalogIndex | null
@@ -912,6 +923,7 @@ export interface EditorState extends TabState {
   readonly setGameWrite: (gameWrite: GameWrite | null) => void
   readonly setOpenedInGame: (fileName: string | null) => void
   readonly setCheatSheet: (cheatSheet: boolean) => void
+  readonly setEnteringProject: (entering: EnteringProject | null) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
   readonly setPreview: (preview: EditorState["preview"], landing?: RigidDelta) => void
   readonly setLightingPreview: (lighting: Lighting | null) => void
@@ -1309,6 +1321,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     openedInGame: null,
     settingsCategory: "general",
     cheatSheet: false,
+    enteringProject: null,
     catalog: null,
     catalogIndex: null,
     booting: true,
@@ -1930,6 +1943,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setGameWrite: (gameWrite) => set({ gameWrite }),
     setOpenedInGame: (openedInGame) => set({ openedInGame }),
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
+    setEnteringProject: (enteringProject) => set({ enteringProject }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview, landing) => set({ preview, previewLanding: landing ?? null }),
     setLightingPreview: (lightingPreview) => set({ lightingPreview }),
@@ -2159,9 +2173,13 @@ export const exportProblemOf = (s: Pick<EditorState, "tabIds" | "document">): st
 /** Whether this window must pick a project before anything else (docs/DESKTOP.md § Other windows). */
 export const isChooserRequired = (s: Pick<EditorState, "project">): boolean => s.project?.chooserRequired === true
 
+/** Whether the welcome window shows: while it must, and while its pick is opening (`enteringProject`). */
+export const isWelcomeShown = (s: Pick<EditorState, "project" | "enteringProject">): boolean =>
+  isChooserRequired(s) || s.enteringProject !== null
+
 /** Whether a modal is up, so the editor's keys are off. */
-export const isModalOpen = (s: Pick<EditorState, "dialog" | "project">): boolean =>
-  s.dialog !== null || isChooserRequired(s)
+export const isModalOpen = (s: Pick<EditorState, "dialog" | "project" | "enteringProject">): boolean =>
+  s.dialog !== null || isWelcomeShown(s)
 
 /** The window's title on desktop: the project; null without a project state. */
 export const projectTitleOf = (s: Pick<EditorState, "project">): string | null =>
@@ -2179,7 +2197,7 @@ export const APP_TITLE = "Ballest Editor"
  * has neither.
  */
 export const windowTitleOf = (s: EditorState): string => {
-  if (isChooserRequired(s)) return APP_TITLE
+  if (isWelcomeShown(s)) return APP_TITLE
   const unsaved = s.project === null ? s.dirty : projectUnsavedOf(s)
   return `${unsaved ? "• " : ""}${projectTitleOf(s) ?? tabLabelOf(s)} – ${APP_TITLE}`
 }

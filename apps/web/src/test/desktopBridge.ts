@@ -12,6 +12,7 @@ import type {
   MapLink,
   NotificationRecords,
   OpenedMapFile,
+  OpenMaps,
   PlaySessionEnded,
   PluginStatus,
   PrefabBackup,
@@ -88,18 +89,20 @@ export interface TestDisk {
    */
   gameLink: { last: GameLinkResult | null; muted: Array<string> }
   /**
-   * The project in use, the recent ones, and the map last open in each (as `desktop-settings.json` keeps them).
+   * The project in use, the recent ones, and the map tabs each had open (as `desktop-settings.json` keeps them).
    * `chooserRequired`: this window must pick a project, as main decides at start; `openElsewhere`: the folders other
    * windows have open. `windows`: the projects `openProjectWindow` started a window on, and what it fails with next.
    */
   project: {
     current: string | null
     recent: Array<string>
-    lastOpenMap: Record<string, string>
+    openMaps: Record<string, OpenMaps>
     chooserRequired: boolean
     openElsewhere: Array<string>
     windows: Array<string>
     windowFailure: string | null
+    /** How many times the page asked main to grow the welcome window into the editor (`showEditor`). */
+    editorShown: number
   }
   /** Names set through `renameProject`, by project folder (what its `ballest-project.json` would say). */
   projectNames: Map<string, string>
@@ -219,11 +222,12 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   project: {
     current: TEST_PROJECT,
     recent: [],
-    lastOpenMap: {},
+    openMaps: {},
     chooserRequired: false,
     openElsewhere: [],
     windows: [],
-    windowFailure: null
+    windowFailure: null,
+    editorShown: 0
   },
   projectNames: new Map(),
   game: {
@@ -310,7 +314,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       ...info(p),
       lastOpened: TIME
     })),
-    lastOpenMap: disk.project.lastOpenMap[current()] ?? null,
+    openMaps: disk.project.openMaps[current()] ?? { files: [], active: null },
     projectsFolder: TEST_PROJECTS_FOLDER,
     chooserRequired: disk.project.chooserRequired,
     openElsewhere: disk.project.recent.filter((p) => disk.project.openElsewhere.includes(p)),
@@ -445,17 +449,23 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.project.recent = disk.project.recent.filter((p) => p !== path)
       return Promise.resolve(state())
     },
+    listProjectsFolder: () => {
+      const folders = new Set([...disk.files.keys()].flatMap((file) => {
+        const [project] = file.split("/maps/")
+        return project !== undefined && project !== file && project.startsWith(`${TEST_PROJECTS_FOLDER}/`)
+          ? [project]
+          : []
+      }))
+      return Promise.resolve([...folders].sort().map((p) => ({ ...info(p), lastOpened: null })))
+    },
     renameProject: ({ name }) => {
       const project = disk.project.current
       if (project === null) return fail(NO_PROJECT)
       disk.projectNames.set(project, name.trim())
       return Promise.resolve(state())
     },
-    rememberOpenMap: ({ fileName }) => {
-      const project = disk.project.current
-      if (project === null) return Promise.resolve()
-      const { [project]: _previous, ...others } = disk.project.lastOpenMap
-      disk.project.lastOpenMap = fileName === null ? others : { ...others, [project]: fileName }
+    rememberOpenMaps: (openMaps) => {
+      if (disk.project.current !== null) disk.project.openMaps[disk.project.current] = openMaps
       return Promise.resolve()
     },
     listMaps: () => {
@@ -710,6 +720,10 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     writeRecovery: ({ key, text }) => Promise.resolve(void disk.recovery.set(key, text)),
     removeRecovery: ({ key }) => Promise.resolve(void disk.recovery.delete(key)),
     setWindowTheme: () => Promise.resolve(),
+    showEditor: () => {
+      disk.project.editorShown++
+      return Promise.resolve()
+    },
     confirmUnsaved: (prompt) => {
       disk.prompts.push(prompt)
       return Promise.resolve(disk.promptAnswers.shift() ?? "cancel")

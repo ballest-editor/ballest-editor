@@ -10,13 +10,14 @@ import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { type OpenedMap, Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
 import type { AppServices } from "../../services/runtime"
-import { blankTabs, dirtyTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
+import { dirtyTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
 import {
+  holdingOpenMaps,
   openProjectMapAtGap,
   openProjectMapBehind,
   openProjectMapFile,
-  openStartingMap,
-  readProjectMapIntoEditor
+  readProjectMapIntoEditor,
+  startOnProject
 } from "./maps"
 import { checkPrefabs } from "./prefabs"
 import { offerRecovery } from "./recovery"
@@ -170,48 +171,66 @@ export const importAsCopyEffect = Effect.gen(function*() {
 
 export const importAsCopy = () => run(importAsCopyEffect)
 
-/**
- * After a switch of projects, blank tabs have nothing to carry over: they go, without a word. With nothing else open the
- * window starts on the project the way a launch does, in the blank tab's place, which is also how a pick in the required
- * chooser ends.
- */
-const dropBlankTabs = Effect.gen(function*() {
-  const s = useEditor.getState()
-  const blank = blankTabs(s)
-  const onlyBlank = blank.length === s.tabIds.length
-  for (const id of blank) if (!onlyBlank || id !== s.tabId) s.closeTab(id)
-  if (onlyBlank) yield* openStartingMap
+/** Waits for the page to paint what the store holds now: a browser's next frame (the next turn, without one). */
+const nextFrame = Effect.callback<void>((resume) => {
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => resume(Effect.void))
+  else setTimeout(() => resume(Effect.void), 0)
 })
 
 /**
- * Uses another project from now on, asking what docs/DESKTOP.md § Window says. The open maps stay open, and those that
- * belonged to the old project are unsaved here.
+ * Uses another project, called `name`, from now on, asking what docs/DESKTOP.md § Window says. The open maps stay
+ * open, and those that belonged to the old project are unsaved here. From the welcome window, the welcome window stays
+ * up, saying what it opens, until the project's tabs are open; then it empties, the window grows into the editor
+ * (`showEditor`) and the editor shows: no view comes between the two (`EditorState.enteringProject`).
  */
-const changeProject = (change: (platform: Platform["Service"]) => Effect.Effect<ProjectState, PlatformError>) => {
-  const use = Effect.gen(function*() {
-    const before = useEditor.getState().project?.current?.path ?? null
-    const { current: after } = yield* change(yield* Platform)
-    if (after === null || after.path !== before) useEditor.getState().detachFiles()
-    yield* refreshProject
-    yield* checkPrefabs
-    yield* dropBlankTabs
-    useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
-      kind: "projectChanged",
-      actions: [revealIn("project")]
-    })
-    yield* offerRecovery
-  })
-  return Effect.suspend(() => hasProject() ? unlessAnyCancelled("switchProject", use) : use)
+const changeProject = (
+  change: (platform: Platform["Service"]) => Effect.Effect<ProjectState, PlatformError>,
+  name: string
+) => {
+  // the old project's maps are kept as it was left, and the new one's as it opens on them
+  const use = (fromWelcome: boolean) =>
+    holdingOpenMaps(Effect.gen(function*() {
+      const before = useEditor.getState().project?.current?.path ?? null
+      const { current: after } = yield* change(yield* Platform)
+      if (after === null || after.path !== before) useEditor.getState().detachFiles()
+      yield* refreshProject
+      yield* checkPrefabs
+      yield* startOnProject
+      // the welcome window said which project it opened, and the editor is that project's
+      if (!fromWelcome) {
+        useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
+          kind: "projectChanged",
+          actions: [revealIn("project")]
+        })
+      }
+      yield* offerRecovery
+    }))
+  const fromWelcome = Effect.gen(function*() {
+    useEditor.getState().setEnteringProject({ name, phase: "opening" })
+    yield* use(true)
+    useEditor.getState().setEnteringProject({ name, phase: "showing" })
+    yield* nextFrame
+    yield* Effect.flatMap(Effect.service(Platform), (platform) => platform.showEditor).pipe(
+      Effect.catch((error) => Effect.logWarning("Couldn't grow the welcome window into the editor", error))
+    )
+  }).pipe(Effect.ensuring(Effect.sync(() => useEditor.getState().setEnteringProject(null))))
+  return Effect.suspend(() =>
+    isChooserRequired(useEditor.getState())
+      ? fromWelcome
+      : hasProject()
+      ? unlessAnyCancelled("switchProject", use(false))
+      : use(false)
+  )
 }
 
 /** New project… in this window: its folder is made, once any unsaved edits are answered, and becomes the project. */
 export const createProjectEffect = (project: CreateProjectPayload) =>
-  changeProject((platform) => platform.createProject(project))
+  changeProject((platform) => platform.createProject(project), project.name)
 
-const openHere = (target: ProjectTarget) =>
+const openHere = (target: ProjectTarget, name: string) =>
   target._tag === "New"
     ? createProjectEffect(target)
-    : changeProject((platform) => platform.switchProject(target.path))
+    : changeProject((platform) => platform.switchProject(target.path), name)
 
 /** What main refuses about opening `target`; a refusal may mean the recent projects are out of date. */
 const checkProject = (target: ProjectTarget) =>
@@ -240,7 +259,7 @@ const openProjectEffect = Effect.fn("openProjectEffect")(function*(target: Proje
     return
   }
   state.closeDialog()
-  yield* opensIn === "newWindow" ? openInWindow(target, name) : openHere(target)
+  yield* opensIn === "newWindow" ? openInWindow(target, name) : openHere(target, name)
 })
 
 export const chooseProjectEffect = Effect.gen(function*() {
@@ -288,6 +307,10 @@ export const forgetRecentProjectEffect = (path: string) =>
   Effect.flatMap(Effect.service(Platform), (platform) => platform.forgetRecentProject(path)).pipe(
     Effect.andThen(refreshProject)
   )
+
+/** The projects in the projects folder, by name, for the welcome window's All projects; empty when it can't be read. */
+export const listProjectsFolder = () =>
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.listProjectsFolder))
 
 /** Remove from recent: only the list changes, and the project's folder stays. */
 export const forgetRecentProject = (path: string) => run(forgetRecentProjectEffect(path))
