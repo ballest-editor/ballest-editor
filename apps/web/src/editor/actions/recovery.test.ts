@@ -31,7 +31,7 @@ import { PREFAB_TEXT } from "../../test/prefabs"
 import { listSamples, readSample, repoRoot } from "../../test/samples"
 import { isUnsavedTab, tabLabelOf, tabStateOf, useEditor } from "../store"
 import { newMapEffect, openProjectMapFile } from "./maps"
-import { checkPrefabs, newPrefabEffect, openPrefabEffect } from "./prefabs"
+import { checkPrefabs, newPrefabEffect, openPrefabEffect, saveNewPrefabEffect } from "./prefabs"
 import { switchProjectEffect } from "./project"
 import { discardUnsavedEffect, offerRecovery, restoreUnsavedEffect } from "./recovery"
 import { followRecovery, syncRecovery } from "./recoverySnapshots"
@@ -235,7 +235,7 @@ describe("what a crash leaves", () => {
       })
     ))
 
-  it.effect("a new prefab too short to save comes back, and its first Save names a file", () =>
+  it.effect("a new prefab too short to save comes back, and its first Save asks for a name", () =>
     inSession((disk, crash) =>
       Effect.gen(function*() {
         yield* newPrefabEffect
@@ -251,7 +251,10 @@ describe("what a crash leaves", () => {
 
         s().placePiece(cube, placementTransform(cube, { x: 500, y: 0, z: 0 }))
         yield* saveMapFile
-        assert.isTrue(disk.files.has(projectPrefabFile("Untitled_prefab")))
+        assert.strictEqual(s().dialog?.id, "namePrefab")
+        s().closeDialog()
+        yield* saveNewPrefabEffect("Twin_cubes")
+        assert.isTrue(disk.files.has(projectPrefabFile("Twin_cubes")))
       })
     ))
 

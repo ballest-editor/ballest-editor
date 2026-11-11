@@ -14,7 +14,14 @@ import {
   PREFAB_TIER_HINTS,
   prefabTierLabel
 } from "../domain/prefab"
-import { deletePrefab, renamePrefab, saveSelectionAsPrefab, suggestPrefabName } from "../editor/actions"
+import {
+  deletePrefab,
+  renamePrefab,
+  saveNewPrefab,
+  saveSelectionAsPrefab,
+  suggestNewPrefabName,
+  suggestPrefabName
+} from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { TitledDialog } from "./TitledDialog"
 import { useOnOpen } from "./useOnOpen"
@@ -110,7 +117,7 @@ export function SavePrefabDialog({ open, onClose }: DialogProps) {
       onClose={onClose}
       title="Save selection as prefab"
       // with no Stored in to say so
-      description={projects ? undefined : "This build keeps prefabs in memory, until the page closes."}
+      description={projects ? undefined : SESSION_TIER_NOTE}
     >
       <PrefabNameForm
         name={name}
@@ -144,6 +151,45 @@ export function SavePrefabDialog({ open, onClose }: DialogProps) {
   )
 }
 
+/** The browser's one tier, which Stored in would otherwise say. */
+const SESSION_TIER_NOTE = "This build keeps prefabs in memory, until the page closes."
+
+/** "There is already a prefab called ..." when the tier has `name`. */
+const takenProblem = (taken: boolean, name: string) => taken ? `There is already a prefab called ${name}.` : undefined
+
+/**
+ * A new prefab's first Save, as `NameMapDialog`'s `saveAs` is a new map's: its name, which starts on what its items read
+ * as, in the tab's tier. A name the tier has is refused, as Rename refuses it. Submit saves and goes on to `afterSave`
+ * (the unsaved-changes prompt's next step); Cancel drops it.
+ */
+export function NamePrefabDialog({ open, onClose }: DialogProps) {
+  const projects = useEditor((s) => s.capabilities.projects)
+  const tier = useEditor((s) => s.document.kind === "prefab" ? s.document.tier : null)
+  const prefabs = useEditor((s) => s.prefabs)
+  const afterSave = useEditor((s) => s.dialog?.id === "namePrefab" ? s.dialog.afterSave : undefined)
+  const [name, setName] = useState("")
+  useOnOpen(open, () => setName(suggestNewPrefabName(useEditor.getState())))
+  const taken = tier !== null && prefabs.some((p) => isSamePrefab(p, { tier, name }))
+  return (
+    <TitledDialog
+      open={open}
+      onClose={onClose}
+      title="Save prefab"
+      description={!projects ? SESSION_TIER_NOTE : tier === null ? undefined : PREFAB_TIER_HINTS[tier]}
+    >
+      <PrefabNameForm
+        name={name}
+        onChange={setName}
+        nameProblem={takenProblem(taken, name)}
+        canSubmit={tier !== null && isPrefabName(name) && !taken}
+        submitLabel="Save"
+        onClose={onClose}
+        onSubmit={() => void saveNewPrefab(name, afterSave)}
+      />
+    </TitledDialog>
+  )
+}
+
 /** The Prefabs panel's Rename…; the form is keyed by the prefab, so it starts on that name. */
 function RenameForm({ from, onClose, tier }: {
   readonly from: string
@@ -158,7 +204,7 @@ function RenameForm({ from, onClose, tier }: {
     <PrefabNameForm
       name={name}
       onChange={setName}
-      nameProblem={taken ? `There is already a prefab called ${name}.` : undefined}
+      nameProblem={takenProblem(taken, name)}
       canSubmit={valid}
       submitLabel="Rename"
       onClose={onClose}

@@ -12,6 +12,7 @@ import {
   deleteSelection,
   duplicateSelection,
   importMap,
+  pasteClipboard,
   playMap,
   saveMap,
   selectAll,
@@ -25,6 +26,12 @@ import { noTabOpen, useEditor } from "./store"
 export const lookAlong = (projection: ViewProjection) => {
   const { activePane, setPaneProjection } = useEditor.getState()
   setPaneProjection(activePane, projection)
+}
+
+/** Rolls the active pane's orthographic view by quarter turns, clockwise for a positive number. */
+export const rollActivePane = (turns: number) => {
+  const { activePane, rollPane } = useEditor.getState()
+  rollPane(activePane, turns)
 }
 
 /** A command that has nothing to act on with no tab open. */
@@ -54,7 +61,7 @@ export const actionCommands = {
   duplicateSelection,
   copySelection: () => useEditor.getState().copySelection(),
   cutSelection: () => useEditor.getState().cutSelection(),
-  paste: () => useEditor.getState().paste(),
+  paste: pasteClipboard,
   focusSelection: () => useEditor.getState().requestFocus(),
   selectAll,
   deselect: () => useEditor.getState().deselect(),
@@ -83,6 +90,8 @@ export const actionCommands = {
   viewRight: () => lookAlong("right"),
   viewLeft: () => lookAlong("left"),
   toggleOrthographic: () => lookAlong(sceneRegistry.toggledProjection()),
+  rollViewCounterClockwise: () => rollActivePane(-1),
+  rollViewClockwise: () => rollActivePane(1),
   frameAll: onOpenTab(() => useEditor.getState().requestFrameAll()),
   hideSelection: () => useEditor.getState().toggleSelectionFlag("hidden"),
   showAll: () => useEditor.getState().clearFlag("hidden"),

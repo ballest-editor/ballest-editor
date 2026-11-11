@@ -110,13 +110,14 @@ export const followUnloadRequests = () =>
   )
 
 /**
- * Closes a tab, asking about its unsaved edits first (it is made the active tab to ask). Closing the last tab leaves the
- * project overview in a named project, and elsewhere, with nothing to list, a fresh, unsaved map in its place.
+ * Closes a tab, asking about its unsaved edits first (it is made the active tab to ask), then runs `then`. Closing the
+ * last tab leaves the project overview in a named project, and elsewhere, with nothing to list, a fresh, unsaved map in
+ * its place. A Cancel runs nothing more, and a Save that names the document first runs the rest once its dialog saves.
  */
-export const closeTabEffect = (tabId: string) =>
+export const closeTabEffect = <E = never, R = never>(tabId: string, then: Effect.Effect<void, E, R> = Effect.void) =>
   Effect.suspend(() => {
     const { tabIds, activateTab } = useEditor.getState()
-    if (!tabIds.includes(tabId)) return Effect.void
+    if (!tabIds.includes(tabId)) return then
     activateTab(tabId)
     return unlessCancelled(
       "closeTab",
@@ -124,26 +125,29 @@ export const closeTabEffect = (tabId: string) =>
         const s = useEditor.getState()
         if (s.tabIds.length > 1 || inNamedProject(s)) return Effect.sync(() => s.closeTab(tabId))
         return freshMapEffect
-      })
+      }).pipe(Effect.andThen(then))
     )
   })
 
 export const closeTab = (tabId: string) => run(closeTabEffect(tabId))
 
+/**
+ * Closes `tabIds` one after the other (`closeTabEffect` each), then makes `keep` active. A Cancel stops there, on the
+ * tab it asked about, and a tab being named first goes on once its dialog has saved.
+ */
+export const closeTabsBesideEffect = (keep: string, tabIds: ReadonlyArray<string>) =>
+  tabIds.reduceRight<Closing>(
+    (rest, id) => closeTabEffect(id, rest),
+    Effect.sync(() => useEditor.getState().activateTab(keep))
+  )
+
+/** What closing a tab fails with and needs. */
+type Closing = ReturnType<typeof closeTabEffect<never, never>>
+
+const closeTabsBeside = (keep: string, tabIds: ReadonlyArray<string>) => run(closeTabsBesideEffect(keep, tabIds))
+
 /** Closes the active tab (`closeTab`). */
 export const closeActiveTab = () => closeTab(useEditor.getState().tabId)
-
-/** Closes `tabIds` one after the other (`closeTabEffect` each), a Cancel stopping there; `keep` is left active. */
-const closeTabsBeside = (keep: string, tabIds: ReadonlyArray<string>) =>
-  run(
-    Effect.gen(function*() {
-      for (const id of tabIds) {
-        const before = useEditor.getState().tabIds.length
-        yield* closeTabEffect(id)
-        if (useEditor.getState().tabIds.length === before) return
-      }
-    }).pipe(Effect.ensuring(Effect.sync(() => useEditor.getState().activateTab(keep))))
-  )
 
 /** Closes every tab but `tabId`, asking about each one's unsaved edits in turn; `tabId` is left active. */
 export const closeOtherTabs = (tabId: string) =>
