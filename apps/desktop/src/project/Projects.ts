@@ -1,6 +1,7 @@
 import {
   CHARACTERS_PER_FILE,
   type CreateProjectPayload,
+  type FileLimit,
   isMapFileName,
   isProjectName,
   MAP_EXTENSIONS,
@@ -65,7 +66,9 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
     "openElsewhere",
     "notFolder"
   ]),
-  cause: Schema.optional(Schema.Defect())
+  cause: Schema.optional(Schema.Defect()),
+  /** `tooLarge`: the characters the file was held to. */
+  limit: Schema.optional(Schema.Finite)
 }) {
   override get message(): string {
     switch (this.reason) {
@@ -92,7 +95,9 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
       case "extension":
         return `${this.path} isn't a map file (${MAP_EXTENSIONS.join(", ")}).`
       case "tooLarge":
-        return `${this.path} has more characters than the game loads (${CHARACTERS_PER_FILE}), so it can't be a map.`
+        return `${this.path} has more characters than the game loads (${
+          this.limit ?? CHARACTERS_PER_FILE
+        }), so it can't be a map.`
       case "read":
         return `Couldn't read ${this.path}.`
       case "write":
@@ -112,6 +117,10 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
 /** A `ProjectError` about `file`, from the failure's cause (if any): `Effect.mapError(projectError("read", file))`. */
 export const projectError = (reason: ProjectError["reason"], file: string) => (cause?: unknown) =>
   new ProjectError({ path: file, reason, ...(cause === undefined ? {} : { cause }) })
+
+/** The `ProjectError` of a file past `limit`, which it can't be a map with. */
+export const tooLargeError = (file: string, { charactersPerFile }: FileLimit) =>
+  new ProjectError({ path: file, reason: "tooLarge", limit: charactersPerFile })
 
 /** The `ProjectError` of a file that wouldn't read: it has gone, or something else went wrong. */
 export const readError = (file: string) => (cause: { readonly reason: { readonly _tag: string } }) =>

@@ -1,6 +1,6 @@
 import {
+  FileLimit,
   isPrefabName,
-  MAX_FILE_BYTES,
   type PrefabBackup,
   type PrefabBackupRef,
   type PrefabBackups,
@@ -21,7 +21,7 @@ import { type GamePathError, GamePaths } from "../game/GamePaths"
 import { prefabsFolderBeside } from "../game/locations"
 import { type BackupError, Backups, parseBackupId } from "./Backups"
 import { sha256 } from "./files"
-import { backupsFolderIn, type ProjectError, projectError, Projects, readError } from "./Projects"
+import { backupsFolderIn, type ProjectError, projectError, Projects, readError, tooLargeError } from "./Projects"
 
 const prefabsFolderIn = (path: Path.Path, project: string) => path.join(project, "prefabs")
 
@@ -60,6 +60,7 @@ export class Prefabs extends Context.Service<Prefabs, {
     const projects = yield* Projects
     const game = yield* GamePaths
     const backups = yield* Backups
+    const limit = yield* FileLimit
 
     /** A folder of the project in use, while there is one. */
     const inProject = (folderIn: (path: Path.Path, project: string) => string) =>
@@ -90,7 +91,7 @@ export class Prefabs extends Context.Service<Prefabs, {
 
     const infoAt = Effect.fnUntraced(function*(tier: PrefabTier, name: string, file: string) {
       const stat = yield* fs.stat(file).pipe(Effect.mapError(readError(file)))
-      if (Number(stat.size) > MAX_FILE_BYTES) return yield* projectError("tooLarge", file)()
+      if (Number(stat.size) > limit.maxFileBytes) return yield* tooLargeError(file, limit)
       const modifiedAt = Option.getOrElse(stat.mtime, () => new Date(0)).toISOString()
       const stamp = `${modifiedAt} ${stat.size}`
       const known = stamps.get(file)

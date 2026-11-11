@@ -65,6 +65,7 @@ Use one name per thing, in code comments and docs alike.
 
 - Before committing, run `pnpm check:changed`. While you iterate, run the tests beside your change (`pnpm --filter <package> exec vitest run <file>`). Don't run `pnpm check:everything` by hand unless asked: push and CI own the full suite.
 - Test at one layer, the lowest that fails on `main`. Extend an existing test or table before adding one.
+- What a test shouldn't pay for (a 64 Mi file, the Electron binary) sits behind a service or `Context.Reference` the test replaces, like `FileLimit` in `packages/contracts/src/limits.ts`; one test, in a file of its own, checks the real thing.
 - A logic, data or state bug gets a failing test first, then the fix. A purely visual bug gets a before and after in the integrated pass.
 - When work is split across agents, a delegated agent proves its change with tests and says what needs looking at. It doesn't start a dev server or a browser unless its brief says to. The agent that integrates does one pass in the running app, with the `test-ballest-app` skill, which also has the only browser automation to use.
 - Never `pkill -f`, `pgrep -f` or kill a process found by matching a name or path: your own shell has that text in its command line, and other agents share this machine. Stop what you started, by its PID or port.
