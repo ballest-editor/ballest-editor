@@ -1668,13 +1668,16 @@ export const useEditor = create<EditorState>()((set, get) => {
       let doc = s.doc
       let collapsedGroups = s.collapsedGroups
       const selectedIds: Array<string> = []
+      // each pass copies the one before it, so it goes in after those copies rather than before them
+      let sources: ClipSources = clip
       for (const offset of repeatOffsets(options)) {
-        const next = withClip({ ...s, doc, collapsedGroups }, clip)
+        const next = withClip({ ...s, doc, collapsedGroups }, { ...clip, ...sources })
         const moved = next === undefined ? undefined : withClipMoved(s, clip, next, offset)
         if (next === undefined || moved === undefined) return
         collapsedGroups = next.collapsedGroups
         doc = moved
         selectedIds.push(...next.added)
+        sources = clipSources({ collapsedGroups, doc }, next.added)
       }
       commit(doc, { selectedIds, collapsedGroups }, undefined, "Repeat selection")
     },
@@ -2262,14 +2265,21 @@ const withoutItems = (doc: Doc, indices: ReadonlyArray<number>): Doc => {
 }
 
 /** The items at `indices`, in that order, with what the doc holds of them and which of their groups are collapsed. */
-const clipOf = (
+const clipOf = (s: Pick<TabState, "collapsedGroups" | "doc">, indices: ReadonlyArray<number>): DocClip => ({
+  ...copyItems(s.doc.map, indices),
+  ...clipSources(s, indices.flatMap((i) => s.doc.ids[i] ?? []))
+})
+
+type ClipSources = Omit<DocClip, keyof Clip>
+
+/** What a clip holds of the items `keys` beyond the map: the keys, their structure and its collapsed groups. */
+const clipSources = (
   { collapsedGroups, doc }: Pick<TabState, "collapsedGroups" | "doc">,
-  indices: ReadonlyArray<number>
-): DocClip => {
-  const keys = indices.flatMap((i) => doc.ids[i] ?? [])
+  keys: ReadonlyArray<string>
+): ClipSources => {
   const structure = copyStructure(doc.structure, new Set(keys))
   const collapsed = new Set(treeGroupIds(structure.tree).filter((id) => collapsedGroups.has(id)))
-  return { ...copyItems(doc.map, indices), keys, structure, collapsed }
+  return { keys, structure, collapsed }
 }
 
 /** The entered group, while it is still in `doc`'s tree. */

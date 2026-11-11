@@ -1492,6 +1492,43 @@ describe("document structure", () => {
     assert.deepStrictEqual(copiedFolds(sources), expected)
   })
 
+  it("puts copies after the last copied link in chain order, and Repeat's copies in order", () => {
+    mapWithCubes(0, 100, 200, 300, 400)
+    const sources = state().doc.ids.slice(1)
+    const [, l2 = "", l3 = "", l4 = ""] = sources
+    state().select(sources)
+    state().chainSelection()
+    const chain = tree().find((node) => node.kind === "group")!
+    state().enterGroup(chain.id)
+    /** The chain's links in order: a source by its number, a copy by its x. */
+    const links = () =>
+      treeKeys(findGroup(tree(), chain.id)!.children).map((key) =>
+        sources.includes(key) ? `${sources.indexOf(key) + 1}` : `x${transformOf(key).translation.x}`
+      )
+
+    state().select([l4, l2])
+    state().duplicateSelection()
+    assert.deepStrictEqual(links(), ["1", "2", "3", "4", "x100", "x300", "5"])
+    state().undo()
+
+    state().select([l2, l3])
+    state().duplicateSelection()
+    assert.deepStrictEqual(links(), ["1", "2", "3", "x100", "x200", "4", "5"])
+    state().undo()
+
+    state().select([l2])
+    state().repeatSelection({ count: { x: 4, y: 1, z: 1 }, spacing: { x: 1000, y: 0, z: 0 } })
+    assert.deepStrictEqual(links(), ["1", "2", "x1100", "x2100", "x3100", "3", "4", "5"])
+
+    // outside a chain, the Outline lists them in order too
+    const { a } = threeCubes()
+    state().select([a])
+    state().repeatSelection({ count: { x: 4, y: 1, z: 1 }, spacing: { x: 1000, y: 0, z: 0 } })
+    const rows = treeKeys(tree())
+    const xs = rows.slice(rows.indexOf(a), rows.indexOf(a) + 4).map((key) => transformOf(key).translation.x)
+    assert.deepStrictEqual(xs, [0, 1000, 2000, 3000])
+  })
+
   it("loads what a sidecar gives, keeping keys and structure", () => {
     const { a, b } = threeCubes()
     state().groupItems([a, b], "G")
