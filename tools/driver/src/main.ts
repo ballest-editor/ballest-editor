@@ -108,7 +108,7 @@ const tool = Command.make(
       const result = yield* runTool(DriverToolkit, name, decoded).pipe(Effect.provide(DriverToolsLayer))
       yield* Console.log(JSON.stringify(result, null, 2))
     }).pipe(
-      // One line on stderr and a failed exit, not a stack: the message is the whole story (bad JSON, bad parameters).
+      // The message on stderr and a failed exit, not a stack: the message is the whole story (bad JSON, bad parameters).
       Effect.catchTag("DriverError", (e) =>
         Console.error(e.message).pipe(Effect.andThen(Effect.sync(() => {
           process.exitCode = 1

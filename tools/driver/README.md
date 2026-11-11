@@ -38,7 +38,7 @@ pnpm driver serve                 # the MCP server over stdio
 
 Use the driver only when the task needs the real game; the editor itself is checked in the browser. Nothing in the
 repo registers `serve`, so no session starts it: an agent runs the tools through `pnpm driver tool`, which decodes the
-JSON with the tool's own schema and runs the server's own handler, exits non-zero with one line on a bad name or bad
+JSON with the tool's own schema and runs the server's own handler, exits non-zero with the reason on a bad name or bad
 parameters, and needs nothing beyond `pnpm build` and `pnpm driver setup`. Start one slot, and stop it when done. The
 driver patches the Wine override into each slot's prefix, so only the player's
 own game needs it set, and `setup --host` can supply the host.
