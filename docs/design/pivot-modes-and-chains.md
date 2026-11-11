@@ -81,23 +81,21 @@ Together with `c_u = c` is `applyGroupDelta` as it stands. In Each an item unit 
 
 ## Inspector
 
-Today a scrub is a delta about the shared pivot, and a typed rotation or location sets the axis on every item about its own pivot. The game has only typed values and treats all three as a change from the panel's value, applied as a drag would be, rigid for a turn ([qa/joins-and-typed-rotation.md](../qa/joins-and-typed-rotation.md)). That measurement makes the choice: **typed and scrubbed edits are both deltas from the active unit's value, applied by the setting**, so `selectionAxisEdit` loses its "set" branch for rotation and location. A pasted row (`setSelectionField`) still sets every item, which keeps the one job "set" did.
+The fields follow the editor's rules (2026-11-11, § 4), like Unity's and Maya's, and not the game's panel, which takes a typed value as a change from the active piece applied rigidly ([qa/joins-and-typed-rotation.md](../qa/joins-and-typed-rotation.md)). Neither the pivot setting nor Local/World changes what a field does (`domain/fieldEdit.ts`).
 
-| Field    | Together                                                             | Each                                            |
-| -------- | -------------------------------------------------------------------- | ----------------------------------------------- |
-| Location | Every item moves by the change (the game)                            | The same; a typed location is a world move      |
-| Rotation | The change about the active rotator axis, rigid about `c` (the game) | The change about each unit's own axis and pivot |
-| Scale    | The ratio, about `c` (the game, as now)                              | The ratio, about each unit's pivot              |
+- **Things.** A field edits the selected units one by one: a loose piece, a whole group, a whole chain, an instance, or a link inside an entered chain. Each reads its own value, and a field shows the value they all hold, or Multiple where they differ.
+- **Plain numbers set.** A number, or plain arithmetic, is worked out for every thing as that value, and each is taken there whole about its own pivot (`fieldTo`): a group moves until its Location lands, turns until its Rotation does, scales by the ratio its value makes. A field never pulls a group apart.
+- **Relative entries.** `+=`, `-=`, `*=` and `/=`, or the shorthands `+`, `*` and `/`, are worked out for each thing from its own value. A bare negative number is a value: `-20` sets -20.
+- **Sequences.** `L(a, b)` spreads a to b evenly across the things in selection order, chain order for links; `$i` is a thing's place from 0 and `$prev` the value just worked out for the thing before, which the first thing has none of, so it keeps its own. `$prev + 300` spaces things evenly from the first, `+= 300 * 1.2^$i` grows the gaps, `$prev * 1.2` is a geometric series (`workOutEntry`).
+- **Scrubs and pastes.** A scrub changes every thing by the same amount from its own value. A pasted row is its three values typed.
+- **Links carry nothing.** Inside an entered chain each selected link takes exactly its own value; the links after it stay. The gizmo and the chain tools keep the carry.
+- **The Pivot section's Position** is where the setting shows. In Together it is the combined pivot, where the gizmo sits, shown with two or more things or where it isn't the Location, and an edit there moves everything as one by what it takes to bring it there. In Each every thing has its own, shown where any isn't its Location, and it takes an entry as the other rows do.
 
-This changes behaviour for anyone who typed "90" to set every piece's yaw to 90. I think that's right: the game doesn't do it, and Each makes "turn each by 90" one typed value away.
+Numeric fields also accept parentheses, powers (`^`) and scientific notation. Invalid expressions and division by zero leave the value unchanged, and a thing whose value works out to nothing finite keeps its own.
 
-**What the rows show.** The unit's value, which is the active piece's, with a Mixed mark on the row when the other pieces differ on an axis. A blank Mixed field gave nothing to type a change from; the active piece's value does, and it is where the gizmo sits. The Pivot section's Position row (#225) shows the pivot point itself, the game's Location, and an edit there is the same move.
+Every unit has the same rows: Location, Rotation, Scale (Factor or Size) and Flip. A unit's Location is its transform's translation: a piece's origin, a group's pivot, or the origin of the member a group pivots on (a chain's first link, an Item pivot). Size needs every thing to take an item's transform (`Unit.anchor`, `unitExtentOf`): a group's own frame has none, since its items scale along their own axes and the box around turned items doesn't scale by the factor. A size keeps a flipped axis flipped. The Pivot section keeps its choices in place for every selection: item presets only when every selected unit is an item, a group's own when it is selected alone, and otherwise the same grid greyed with why under it (a chain, an instance, a group among pieces).
 
-Numeric fields accept arithmetic with `+`, `-`, `*`, `/`, parentheses and scientific notation. A negative number is an absolute value: replacing -100 with -200 sets -200. Relative edits use `+=50`, `-=20`, `*2` or `/2`; the existing `+50` shorthand still adds. Invalid expressions and division by zero leave the value unchanged.
-
-The Transform rows always edit the gizmo's unit: a piece, a whole group, the first selected link inside a chain in Each, or a group selected among pieces. Every unit has the same rows: Location, Rotation, Scale (Factor or Size) and Flip. A unit's Location is its transform's translation: a piece's origin, a group's pivot, or the origin of the member a group pivots on (a chain's first link, an Item pivot). The Pivot section's Position row shows only where the pivot isn't that Location, so a piece's off-origin pivot has one and a group's own frame never does (`shownPivotPoint`). Size needs a unit that takes an item's transform (`Unit.anchor`, `unitExtentOf`): a group's own frame has none, since its items scale along their own axes and the box around turned items doesn't scale by the factor. The Pivot section keeps its choices in place for every selection: item presets only when every selected unit is an item, a group's own when it is selected alone, and otherwise the same grid greyed with why under it (a chain, an instance, a group among pieces).
-
-**Groups and instances.** A whole group is one unit, so it has Transform rows of its own, over its frame: Location is its pivot and a change moves the group; Rotation reads the group's own turn (§ Group pivot) and Scale reads 1, since a group holds no scale, and a value typed there is a change about the pivot, the way the game's panel treats a joined set. With an Item pivot (below) the rows read that item's values, Size included. A group's Paint and Properties sit in the open under its rows, as several loose pieces' do; they edit every member. On an instance the Instance section says that an edit there changes the instance away from its definition, which the unit rows never do: every edit of theirs is about the instance's origin.
+**Groups and instances.** A whole group is one unit, so it has Transform rows of its own, over its frame: Location is its pivot and a change moves the group; Rotation reads the group's own turn (§ Group pivot) and Scale reads 1, since a group holds no scale, so a value there scales it by that much about the pivot. With an Item pivot (below) the rows read that item's values, Size included. A group's Paint and Properties sit in the open under its rows, as several loose pieces' do; they edit every member. On an instance the Instance section says that an edit there changes the instance away from its definition, which the unit rows never do: every edit of theirs is about the instance's origin.
 
 ## Showing it
 
@@ -166,11 +164,11 @@ Everything the game can't do, so nothing here was measured against it:
 
 - Each, in every tool. The game is always Together.
 - A pivot on a group other than its frame's translation, and the Item, Point and face choices.
-- Typed values that follow a setting. The game's panel is Together.
+- Fields that edit each thing from its own value, with `L()`, `$prev` and `$i`. The game's panel takes a change from the active piece.
 - Chains, link order, rotation that accumulates, and a link carrying the links after it.
 - Pivot dots. The game shows one gizmo and no other pivot.
 
-What the game does and the editor copies: Together's maths, the no-shear scale rule, the frame as the group's pivot, and typed values as deltas.
+What the game does and the editor copies: Together's maths, the no-shear scale rule and the frame as the group's pivot.
 
 ## Bending, after use (2026-11-08)
 
@@ -217,7 +215,7 @@ A review of the words the chain feature shows turned up one problem underneath t
 
 ## Decided here, not by the user
 
-- Typed rotation and location become deltas, matching the game and the scrub. Pasting a row still sets. Rows show the active piece, not a blank Mixed.
+- Typed rotation and location became deltas, matching the game and the scrub, and rows showed the active piece, not a blank Mixed. The user's rules of 2026-11-11 replaced that with per-thing fields that show Multiple (§ Inspector).
 - A whole group has Transform rows over its frame; its items' editor loses theirs.
 - Chains propagate rotation only. Scale and move act per link.
 - A chain's pivot is its first link's; the group pivot choice is hidden on it, and stays stored, so Unchain gives it back.

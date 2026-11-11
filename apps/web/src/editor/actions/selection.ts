@@ -1,37 +1,21 @@
 /** Selection edits: each is one undo step, however many items it touches. */
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
+import { editThings, type FieldView } from "../../domain/fieldEdit"
 import { canSetItemPivots, soleGroupOf } from "../../domain/groupSelection"
-import {
-  applyGroupDelta,
-  type Axis,
-  type AxisEdit,
-  clampScale,
-  type GroupDelta,
-  readField,
-  scaleAbout,
-  selectionAxisEdit,
-  type TransformField,
-  writeField,
-  writeFieldAbout
-} from "../../domain/groupTransform"
-import { extentOf, scaleForSize } from "../../domain/itemBounds"
+import type { Axis } from "../../domain/groupTransform"
 import type { PropertyChange } from "../../domain/itemProperties"
-import type { Item } from "../../domain/MapFile"
 import type { FlipAxis } from "../../domain/mirror"
+import { type NumberEntry, offsetEntry, setEntry } from "../../domain/numberEntry"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
 import type { RepeatOptions } from "../../domain/repeat"
 import { indexOfKey } from "../../domain/structure"
-import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
-import { applyUnitEdit, pivotModeFor, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
 import { pickableSelection } from "../../domain/visibility"
 import {
-  editedKeys,
   fitTransforms,
   lockRefusalOf,
   pickableOf,
-  pivotOf,
-  selectionPivot,
+  selectionThings,
   type SlotPaint,
   type TransformOptions,
   useEditor
@@ -87,131 +71,67 @@ const docTransform = (id: string): UeTransform | undefined => {
   return item === undefined ? undefined : editTransform(item)
 }
 
-/** An item's own pivot, local and unscaled. */
-const localPivotOf = (id: string): Vec3 => pivotOf(useEditor.getState(), id).localPosition
-
-/** The selected items' document transforms, each put through `edit` (with the item's own pivot and the item). */
-const withSelectionEdit = (
-  edit: (t: UeTransform, localPivot: Vec3, item: Item) => UeTransform
+/**
+ * The items' transforms once `entries` are worked out for every selected thing in the row `view` (`editThings`), from
+ * the document, never a live preview, so a scrub's steps don't compound.
+ */
+const withFieldEdit = (
+  view: FieldView,
+  entries: Partial<Readonly<Record<Axis, NumberEntry>>>
 ): ReadonlyMap<string, UeTransform> => {
   const s = useEditor.getState()
-  return fitTransforms(
-    s,
-    new Map(
-      s.selectedIds.flatMap((id) => {
-        const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
-        return item === undefined ? [] : [[id, edit(editTransform(item), localPivotOf(id), item)] as const]
-      })
-    )
-  )
-}
-
-/**
- * The document transforms through an edit of the selection's units, applied by the pivot setting like a gizmo drag:
- * Together takes every item through the active unit's edit about its pivot; Each takes each unit through its own.
- * `edit` gets the active unit (the active item, or a whole group's frame) to measure the change on.
- */
-const withUnitEdit = (edit: (active: Unit) => UnitEdit): ReadonlyMap<string, UeTransform> => {
-  const s = useEditor.getState()
-  const target = selectionPivot(s, docTransform)
-  if (target === undefined) return new Map()
-  // inside an entered chain the links after a selected one come along
-  const transforms = new Map(
-    editedKeys(s).flatMap((id) => {
-      const t = docTransform(id)
-      return t === undefined ? [] : [[id, t] as const]
+  const things = selectionThings(s, docTransform) ?? []
+  const transforms = new Map(things.flatMap(({ unit }) =>
+    unit.keys.flatMap((key) => {
+      const t = docTransform(key)
+      return t === undefined ? [] : [[key, t] as const]
     })
-  )
-  const mode = pivotModeFor(s, target.selection)
-  const active = pivotUnitOf(target.selection, mode)
-  return fitTransforms(s, applyUnitEdit(target.selection, mode, transforms, edit(active)))
-}
-
-/** An axis edit: the change it makes to the active unit's axis, which every unit then takes about its own pivot. */
-const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) =>
-  withUnitEdit((active) => {
-    const from = readField(active.transform, field)[axis]
-    const to = edit.kind === "set" ? edit.value : from + edit.by
-    // a scale is a ratio of the active unit's value, which every unit takes; a move or turn is the same change
-    const forUnit = (unit: Unit): AxisEdit =>
-      field === "scale3D" && from !== 0
-        ? { kind: "set", value: readField(unit.transform, field)[axis] * to / from }
-        : { kind: "offset", by: to - from }
-    return (unit) => selectionAxisEdit(unit.transform, field, axis, forUnit(unit), unit.pivot)
-  })
-
-/**
- * Takes the active unit's `field` to `value` on all three axes at once, every unit following by the same change
- * about its own pivot (pasting a row onto a group): a move by the difference, the turn from the unit's rotation to
- * the value's, or each axis scaled by its ratio.
- */
-export const setSelectionUnitField = (field: TransformField, value: Vec3): boolean =>
-  transformSelection(withUnitEdit((active) => {
-    switch (field) {
-      case "translation": {
-        const delta: GroupDelta = { kind: "translate", offset: vecSub(value, active.transform.translation) }
-        return (unit) => (t) => applyGroupDelta(t, unit.pivot, delta)
-      }
-      case "rotation": {
-        const to = writeField(active.transform, "rotation", value).rotation
-        const delta: GroupDelta = {
-          kind: "rotate",
-          rotation: quatNormalize(quatMul(to, quatConjugate(active.transform.rotation)))
-        }
-        return (unit) => (t) => applyGroupDelta(t, unit.pivot, delta)
-      }
-      case "scale3D": {
-        const from = active.transform.scale3D
-        const ratio = (axis: Axis) => (from[axis] === 0 ? 1 : value[axis] / from[axis])
-        return (unit) => (t) =>
-          scaleAbout(t, {
-            x: clampScale(t.scale3D.x * ratio("x")),
-            y: clampScale(t.scale3D.y * ratio("y")),
-            z: clampScale(t.scale3D.z * ratio("z"))
-          }, unit.pivot)
-      }
-    }
-  }))
-
-/** Moves the selection by `offset` in the world (pasting a pivot's Position): one undo step. */
-export const moveSelectionBy = (offset: Vec3): boolean => {
-  const delta: GroupDelta = { kind: "translate", offset }
-  return transformSelection(withUnitEdit(() => (unit) => (t) => applyGroupDelta(t, unit.pivot, delta)))
+  ))
+  return fitTransforms(s, editThings(things, view, entries, transforms))
 }
 
 /**
- * Sets all three axes of `field` on every selected item (pasting a copied row), about each one's pivot: the one edit
- * that sets items to a value rather than changing them together.
+ * Entries for any of the row `view`'s axes, worked out for every selected thing from its own value and taken to each
+ * whole: one undo step.
  */
-export const setSelectionField = (field: TransformField, value: Vec3): boolean =>
-  transformSelection(withSelectionEdit((t, localPivot) => writeFieldAbout(t, field, value, localPivot)))
+export const editSelectionFields = (view: FieldView, entries: Partial<Readonly<Record<Axis, NumberEntry>>>): boolean =>
+  transformSelection(withFieldEdit(view, entries))
+
+/** An entry typed into one field of the row `view` (`editSelectionFields`). */
+export const editSelectionField = (view: FieldView, axis: Axis, entry: NumberEntry): boolean =>
+  editSelectionFields(view, { [axis]: entry })
 
 /**
- * Gives every selected item the `size` (cm) along its own axes (pasting a copied Size row), each scaled about its pivot.
- * An item whose size isn't known (`extentOf`) keeps its scale.
+ * Shows an entry live (a scrub) without committing it; null ends the preview. The entry is the whole scrub so far, from
+ * the document, not a step on top of the last preview.
  */
-export const setSelectionSize = (size: Vec3): boolean => {
-  const { catalogIndex } = useEditor.getState()
-  return transformSelection(withSelectionEdit((t, localPivot, item) => {
-    const extent = extentOf(item, catalogIndex)
-    return extent === undefined ? t : writeFieldAbout(t, "scale3D", scaleForSize(extent, t.scale3D, size), localPivot)
-  }))
-}
-
-/** Applies an axis edit (an inspector field) to the selection. */
-export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit): boolean =>
-  transformSelection(withAxisEdit(field, axis, edit))
-
-/**
- * Shows an axis edit live (a scrub) without committing it; null ends the preview. The edit is
- * the whole scrub so far, from the document, not a step on top of the last preview.
- */
-export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit | null): void => {
+export const previewSelectionField = (view: FieldView, axis: Axis, entry: NumberEntry | null): void => {
   const s = useEditor.getState()
-  // a scrub that would carry a locked piece shows nothing; letting go says why
-  const locked = lockRefusalOf(s, editedKeys(s)) !== undefined
-  s.setPreview(edit === null || locked ? null : withAxisEdit(field, axis, edit))
+  // a scrub that would move a locked piece shows nothing; letting go says why
+  const locked = lockRefusalOf(s, s.selectedIds) !== undefined
+  s.setPreview(entry === null || locked ? null : withFieldEdit(view, { [axis]: entry }))
 }
+
+/**
+ * A field's scrub over the selection, as `NumberField` takes it: every thing changed by the same amount, live as it
+ * goes, then one undo step.
+ */
+export const scrubSelectionField = (view: FieldView, axis: Axis) => ({
+  onScrub: (value: number | null, from: number) =>
+    previewSelectionField(view, axis, value === null ? null : offsetEntry(value - from)),
+  onScrubCommit: (value: number, from: number) => editSelectionField(view, axis, offsetEntry(value - from))
+})
+
+/**
+ * A copied row pasted onto the row `view`, in stored units (cm, degrees, factor): the same as typing its three values,
+ * so every thing takes them, one undo step.
+ */
+export const pasteSelectionField = (view: FieldView, stored: Vec3): boolean =>
+  editSelectionFields(view, {
+    x: setEntry(stored.x / view.perUnit),
+    y: setEntry(stored.y / view.perUnit),
+    z: setEntry(stored.z / view.perUnit)
+  })
 
 /**
  * Sets the pivot `choice` on every selected item, measured on each one's own bounds (one

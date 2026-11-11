@@ -2,20 +2,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { memo } from "react"
+import { memo, useMemo } from "react"
 import { useShallow } from "zustand/react/shallow"
-import type { Vec3 } from "../domain/coords"
+import { type FieldView, sharedValue } from "../domain/fieldEdit"
 import { canSetItemPivots, soleGroupOf } from "../domain/groupSelection"
 import type { Axis } from "../domain/groupTransform"
 import { GROUP_PIVOT_FACES, type GroupNode, type GroupPivot } from "../domain/MapSidecar"
+import { applyNumberEntry, type NumberEntry, offsetEntry } from "../domain/numberEntry"
 import { PIVOT_CHOICES, pivotBoundsOf } from "../domain/pivot"
 import { documentOrigin } from "../domain/prefab"
 import { gridScrubOf } from "../domain/snapConfig"
 import { indexOfKey, pieceNameOf, treeKeys } from "../domain/structure"
-import { vecAdd, vecSub } from "../domain/ueMath"
-import { editSelectionAxis, moveSelectionBy, previewSelectionAxis, setSelectionPivot } from "../editor/actions"
+import { ORIGIN, vecSub } from "../domain/ueMath"
+import {
+  editSelectionField,
+  editSelectionFields,
+  pasteSelectionField,
+  scrubSelectionField,
+  setSelectionPivot
+} from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { pivotOf, shownPivotPoint, snapConfigOf, useEditor } from "../editor/store"
+import { pivotOf, type PivotRow, pivotRowOf, snapConfigOf, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
 import { FIELD_LABEL, Section } from "./InspectorLayout"
 import { NumberField } from "./NumberField"
@@ -26,20 +33,48 @@ export const IN_USE_CLASSES = "data-[in-use]:bg-foreground/10 data-[in-use]:text
 
 const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
 
+/** The Position row as shown (`pivotRowOf`), worked out again only when something it is made of changes. */
+function usePivotRow(): PivotRow | undefined {
+  const doc = useEditor((s) => s.doc)
+  const preview = useEditor((s) => s.preview)
+  const previewLanding = useEditor((s) => s.previewLanding)
+  const selectedIds = useEditor((s) => s.selectedIds)
+  const enteredGroupId = useEditor((s) => s.enteredGroupId)
+  const pivotMode = useEditor((s) => s.pivotMode)
+  const chainMode = useEditor((s) => s.chainMode)
+  const catalogIndex = useEditor((s) => s.catalogIndex)
+  return useMemo(
+    () => pivotRowOf(useEditor.getState()),
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the row is built from, read inside
+    [doc, preview, previewLanding, selectedIds, enteredGroupId, pivotMode, chainMode, catalogIndex]
+  )
+}
+
 /**
  * Where the pivot is in the world, which is what the game's Location field shows: the Transform section's Location stays
  * the piece's origin, as the map stores it, so a scale moves that one and holds this one. A whole group has no origin,
- * so this is its one position. An edit moves the selection by what it takes to bring the pivot there, in one step like
- * a scrubbed Location. Like Location, it reads from the document's origin (`documentOrigin`).
+ * so this is its one position. In Together it is the combined pivot, and an edit moves every thing as one by what it
+ * takes to bring it there; in Each every thing has its own, which takes an entry as the Transform rows do, each thing
+ * moving whole until its pivot lands (the editor's rules § 4).
  */
-function PivotPosition({ point }: { readonly point: Vec3 }) {
+function PivotPosition({ row }: { readonly row: PivotRow }) {
   const units = useEditor((s) => s.settings.general.units)
+  // a definition's tab reads its positions from the prefab's frame, where the origin marker is
   const origin = useEditor((s) => documentOrigin(s.document))
-  const shown = vecSub(point, origin)
   const snapping = useEditor(snapConfigOf)
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
-  const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
+  const digits = units === "m" ? 3 : 1
+  const view: FieldView = { kind: "pivot", perUnit, origin }
+  const { each } = row
+  // as the row reads them, from the document's origin, in centimetres
+  const points = row.points.map((point) => vecSub(point, origin))
+  const [combined = ORIGIN] = points
+  // Together: the entry worked out on the combined pivot, and every thing moved by the change it makes
+  const moveBy = (axis: Axis, entry: NumberEntry) => {
+    const from = combined[axis] / perUnit
+    return offsetEntry(applyNumberEntry(entry, from) - from)
+  }
   return (
     <div className="flex @container flex-col gap-0.5">
       <div className="flex h-6 items-center justify-between gap-2">
@@ -47,32 +82,39 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
           <TooltipTrigger render={<span className={FIELD_LABEL} />}>
             Position <span className="text-caption text-fg-tertiary">{units}</span>
           </TooltipTrigger>
-          <TooltipContent side="left">Where the pivot is: the gizmo's point, and the game's Location</TooltipContent>
+          <TooltipContent side="left">
+            {each
+              ? "Where each one's pivot is: a number moves every one so its pivot lands there"
+              : "Where the pivot is: the gizmo's point, and the game's Location. A change moves everything as one"}
+          </TooltipContent>
         </Tooltip>
-        {/* a pasted position moves the selection so the pivot lands there */}
+        {/* a pasted position is its three values typed */}
         <RowClipboard
           clipKey="pivot"
           label="Position"
-          value={shown}
-          onPaste={(v) => moveSelectionBy(vecSub(vecAdd(v, origin), point))}
+          value={points[row.active] ?? combined}
+          onPaste={(v) =>
+            each ? pasteSelectionField(view, v) : editSelectionFields(view, {
+              x: offsetEntry((v.x - combined.x) / perUnit),
+              y: offsetEntry((v.y - combined.y) / perUnit),
+              z: offsetEntry((v.z - combined.z) / perUnit)
+            })}
         />
       </div>
       <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
         {AXES.map((axis) => {
-          const value = shown[axis] / perUnit
           const lattice = gridScrubOf(snapping, axis, origin)
           return (
             <NumberField
               key={axis}
               label={`Pivot ${axis.toUpperCase()}`}
-              value={value}
-              onCommit={(v) => editSelectionAxis("translation", axis, offset(v, value))}
-              onScrub={(v, from) => previewSelectionAxis("translation", axis, v === null ? null : offset(v, from))}
-              onScrubCommit={(v, from) => editSelectionAxis("translation", axis, offset(v, from))}
+              value={sharedValue(points.map((point) => point[axis] / perUnit), 10 ** -digits / 2)}
+              onEntry={(entry) => editSelectionField(view, axis, each ? entry : moveBy(axis, entry))}
+              {...scrubSelectionField(view, axis)}
               step={units === "m" ? 0.01 : 1}
               snap={lattice === undefined ? undefined : lattice.step / perUnit}
               snapFrom={lattice === undefined ? undefined : lattice.from / perUnit}
-              digits={units === "m" ? 3 : 1}
+              digits={digits}
               handleClassName={AXIS_BG_CLASSES[axis]}
               handleText={axis.toUpperCase()}
             />
@@ -134,13 +176,13 @@ const GROUP_PIVOT_HINT =
  * A pivot nothing here can set: the choices stay where they always are, greyed, with why under them, and the pivot's
  * world position still moves the selection.
  */
-function FixedPivotSection({ choices, columns, hint, point, reason }: {
+function FixedPivotSection({ choices, columns, hint, reason }: {
   readonly choices: ReadonlyArray<string>
   readonly columns: 3 | 4
   readonly hint: string
-  readonly point: Vec3 | undefined
   readonly reason: string
 }) {
+  const row = usePivotRow()
   return (
     <Section id="pivot" title="Pivot" actions={<InfoHint>{hint}</InfoHint>} className="gap-1.5">
       <PivotChoices
@@ -153,7 +195,7 @@ function FixedPivotSection({ choices, columns, hint, point, reason }: {
         onPick={() => undefined}
       />
       <p className="text-caption text-fg-tertiary">{reason}</p>
-      {point !== undefined && <PivotPosition point={point} />}
+      {row !== undefined && <PivotPosition row={row} />}
     </Section>
   )
 }
@@ -185,7 +227,7 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
       return [key, names.get(key)?.name ?? (item === undefined ? key : pieceNameOf(item, catalogIndex))]
     }))
   ))
-  const point = useEditor(useShallow(shownPivotPoint))
+  const row = usePivotRow()
   const choice = groupChoiceOf(group.pivot)
   const pick = (next: GroupChoice) => {
     if (next === "Center") setGroupPivot(group.id, undefined)
@@ -203,7 +245,6 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
         choices={GROUP_CHOICES}
         columns={3}
         hint={GROUP_PIVOT_HINT}
-        point={point}
         reason={group.prefab !== undefined
           ? "An instance pivots on its definition's origin, so it stays a placement of its prefab."
           : "A chain pivots on its first link."}
@@ -246,7 +287,7 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
           Frozen here. It moves with the group and stays put through turns.
         </p>
       )}
-      {point !== undefined && <PivotPosition point={point} />}
+      {row !== undefined && <PivotPosition row={row} />}
     </Section>
   )
 }
@@ -267,7 +308,7 @@ export const PivotSection = memo(function PivotSection() {
     })
   )
   const group = useEditor((s) => soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId))
-  const point = useEditor(useShallow(shownPivotPoint))
+  const row = usePivotRow()
   const canSet = useEditor((s) => canSetItemPivots(s.doc.structure.tree, s.selectedIds, s.enteredGroupId))
   const used = new Set(choices)
   const mixed = used.size > 1
@@ -278,7 +319,6 @@ export const PivotSection = memo(function PivotSection() {
         choices={PIVOT_CHOICES}
         columns={4}
         hint={PIECE_PIVOT_HINT}
-        point={point}
         reason="A group is selected with these pieces: enter it to set its members' pivots, or select it alone for its own."
       />
     )
@@ -310,7 +350,7 @@ export const PivotSection = memo(function PivotSection() {
         // clicking the pressed choice keeps it
         onPick={setSelectionPivot}
       />
-      {point !== undefined && <PivotPosition point={point} />}
+      {row !== undefined && <PivotPosition row={row} />}
     </Section>
   )
 })

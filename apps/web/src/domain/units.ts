@@ -352,7 +352,7 @@ export const pivotModeFor = (settings: PivotSettings, selection: SelectionUnits)
 /**
  * What an edit does to the items of one unit: a function of the unit (its pivot and axes) that maps each item's
  * transform from before the edit. A gizmo drag is `(unit) => (t) => applyGroupDelta(t, unit.pivot, forUnit(delta,
- * unit.transform.rotation))`; an Inspector edit is `selectionAxisEdit` about the unit.
+ * unit.transform.rotation))`; an Inspector field takes each thing to its value with `fieldTo` (`editThings`).
  */
 export type UnitEdit = (unit: Unit) => (t: UeTransform) => UeTransform
 

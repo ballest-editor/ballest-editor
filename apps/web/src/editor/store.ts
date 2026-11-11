@@ -40,6 +40,7 @@ import {
 } from "../domain/edits"
 import { editTransform, fitEditTransform, isDecal } from "../domain/editTransform"
 import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
+import { type Thing, thingsInOrder } from "../domain/fieldEdit"
 import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
@@ -2733,6 +2734,38 @@ export const shownPivotPoint = (s: EditorState): Vec3 | undefined => {
   return sameVec(target.pivot, target.unit.translation) ? undefined : target.pivot
 }
 
+/** The Pivot section's Position row: the points it shows, and the one a copy reads. */
+export interface PivotRow {
+  /** Whether every thing has its own pivot (Each), or the selection one combined pivot (Together). */
+  readonly each: boolean
+  /** Each thing's pivot in selection order (Each), or the combined pivot alone (Together). */
+  readonly points: ReadonlyArray<Vec3>
+  /** The index in `points` of the active thing's. */
+  readonly active: number
+}
+
+/**
+ * The Position row as shown (the editor's rules § 4), undefined when there is none. In Together it is the combined
+ * pivot, where the gizmo sits, shown with two or more things (it is how they move as one) or where it isn't the
+ * Location already (`shownPivotPoint`). In Each it is every thing's own, shown where any one isn't its Location.
+ */
+export const pivotRowOf = (s: EditorState): PivotRow | undefined => {
+  const target = selectionPivot(s, (id) => shownTransform(s, id))
+  if (target === undefined) return undefined
+  const { selection } = target
+  if (effectivePivotMode(pivotModeFor(s, selection), selection) === "together") {
+    const several = selection.units.length > 1
+    return several || shownPivotPoint(s) !== undefined ? { each: false, points: [target.pivot], active: 0 } : undefined
+  }
+  const units = thingsInOrder(selection, s.selectedIds)
+  if (units.every((unit) => sameVec(unit.pivot, unit.transform.translation))) return undefined
+  return {
+    each: true,
+    points: units.map((unit) => unit.pivot),
+    active: Math.max(0, units.findIndex((unit) => unit.id === selection.active.id))
+  }
+}
+
 /**
  * A unit's own size along its axes at scale 1 (cm): what the Scale row's Size mode shows and a size snap keeps on the
  * grid. The extent of the item it takes its transform from (a decal's scale is its size already). A group's frame has
@@ -2743,6 +2776,20 @@ export const unitExtentOf = (s: EditorState, unit: Unit): Vec3 | undefined => {
   const item = s.doc.map.items[indexOfKey(s.doc.ids, unit.anchor)]
   if (item === undefined) return undefined
   return isDecal(item) ? { x: 1, y: 1, z: 1 } : extentOf(item, s.catalogIndex)
+}
+
+/**
+ * The selection's things in selection order (`thingsInOrder`), read through `transformOf`, each with its size at scale 1
+ * (`unitExtentOf`): what the Inspector's fields read and edit one by one.
+ */
+export const selectionThings = (
+  s: EditorState,
+  transformOf: (id: string) => UeTransform | undefined
+): ReadonlyArray<Thing> | undefined => {
+  const selection = selectionUnits(s, transformOf)
+  return selection === undefined
+    ? undefined
+    : thingsInOrder(selection, s.selectedIds).map((unit) => ({ unit, extent: unitExtentOf(s, unit) }))
 }
 
 /** Edit transforms as the game would take them, so a drag stops at a decal's limits as it happens. */

@@ -14,7 +14,7 @@ import { catalogWithEnds, endAlongX, grouped, loadPieces, lookDown, openAsDefini
 import { activePaneCamera } from "../paneCameras"
 import { pickerSkips } from "../snap/pickTarget"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
-import { flipSelection, setSelectionUnitField } from "./selection"
+import { flipSelection, pasteSelectionField } from "./selection"
 import {
   addWorldAxis,
   addWorldPlane,
@@ -501,7 +501,7 @@ describe("mirror", () => {
     assert.isTrue(flipped(a) && flipped(b))
     flipSelection("x")
     // turned a quarter, the group's X is the world's Y: it mirrors along that, not the world's X
-    setSelectionUnitField("rotation", { x: 0, y: 0, z: 90 })
+    pasteSelectionField({ kind: "rotation", perUnit: 1 }, { x: 0, y: 0, z: 90 })
     const [ya, yb] = [yOf(a), yOf(b)]
     flipSelection("x")
     assert.closeTo(yOf(a), yb, 1e-6, "a goes where b was")
