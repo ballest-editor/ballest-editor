@@ -8,6 +8,7 @@ import { placementTransform } from "../domain/factory"
 import { nodeKeys } from "../domain/groupSelection"
 import { applyGroupDelta, type RigidDelta } from "../domain/groupTransform"
 import { isPlayerStart } from "../domain/MapFile"
+import type { TreeNode } from "../domain/MapSidecar"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
 import { prefabOfItems } from "../domain/prefab"
@@ -1439,6 +1440,56 @@ describe("document structure", () => {
     assert.deepStrictEqual(shape(), [start, ["G", [a, b]], ["G", [copyA, copyB]], c])
     state().undo()
     assert.strictEqual(state().doc, before)
+  })
+
+  it("keeps a copy of a collapsed group collapsed, and an open one open, however it's duplicated", () => {
+    /** The groups of the copy that isn't the source, outermost first, and whether each is collapsed. */
+    const copiedFolds = (sources: ReadonlySet<string>) => {
+      const groups: Array<readonly [string, boolean]> = []
+      const walk = (nodes: ReadonlyArray<TreeNode>) => {
+        for (const node of nodes) {
+          if (node.kind !== "group") continue
+          if (!sources.has(node.id)) groups.push([node.name, state().collapsedGroups.has(node.id)])
+          walk(node.children)
+        }
+      }
+      walk(tree())
+      return groups
+    }
+    // `Outer` stays open; `Inner` inside it is collapsed
+    const { a, b, c, inner } = nestedGroups()
+    const [outer = ""] = tree().flatMap((node) => node.kind === "group" ? [node.id] : [])
+    const sources = new Set([outer, inner])
+    state().setGroupCollapsed(inner, true)
+    const expected: ReadonlyArray<readonly [string, boolean]> = [["Outer", false], ["Inner", true]]
+    const fresh = () => {
+      state().undo()
+      state().select([a, b, c])
+    }
+
+    state().select([a, b, c])
+    state().duplicateSelection()
+    assert.deepStrictEqual(copiedFolds(sources), expected)
+    fresh()
+
+    const copies = state().beginDuplicateDrag()!
+    const moved = new Map([...copies.values()].map((id) => [id, transformOf(id)]))
+    assert.isTrue(state().endDuplicateDrag(moved))
+    assert.deepStrictEqual(copiedFolds(sources), expected)
+    fresh()
+
+    state().repeatSelection({ count: { x: 3, y: 1, z: 1 }, spacing: { x: 1000, y: 0, z: 0 } })
+    assert.deepStrictEqual(copiedFolds(sources), [...expected, ...expected])
+    fresh()
+
+    state().copySelection()
+    state().paste()
+    assert.deepStrictEqual(copiedFolds(sources), expected)
+
+    // the clip remembers the folds, so a paste into another tab keeps them too
+    state().loadMap(startOnlyMap(), null, undefined, { into: "newTab" })
+    state().paste()
+    assert.deepStrictEqual(copiedFolds(sources), expected)
   })
 
   it("loads what a sidecar gives, keeping keys and structure", () => {

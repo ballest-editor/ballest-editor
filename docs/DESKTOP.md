@@ -231,7 +231,7 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 - The button beside the filter folds every group, and opens them all once they are folded. It is there when the map has groups, and off while filtering.
 - Each row ends in a padlock and an eye (§ Hide, isolate and lock), shown while any of its items is locked or hidden, faint when only some are, and under the pointer otherwise. A press locks or hides all of the row's items, or unlocks or shows them when all are, as one undo step, and leaves the selection alone. A hidden item's name is muted and in italics; rows an isolation leaves out are dimmed as rows outside an entered group are.
 - The filter matches names, classes and tags, needing every word. It shows matching rows with the groups around them, whatever is collapsed. A group's items show only if they match too.
-- Which groups are collapsed is kept per tab in the store, outside the sidecar and the history, so undo leaves it alone.
+- Which groups are collapsed is kept per tab in the store, outside the sidecar and the history, so undo leaves it alone. A copy of a collapsed group starts collapsed, nested groups too, however it was made: Duplicate, Paste (into any tab, since the clipboard remembers), an Alt+drag copy or Repeat.
 
 ### Groups and selection
 

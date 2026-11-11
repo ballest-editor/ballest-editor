@@ -110,6 +110,7 @@ import {
   type NumberedName,
   sameStrings,
   type Structure,
+  treeGroupIds,
   treeKeys,
   withAnnotations,
   withChain,
@@ -220,12 +221,17 @@ interface DocValidation {
   readonly result: MapValidation
 }
 
-/** Copied items, and what the document held of them beyond the map: their keys (one per item) and structure. */
+/**
+ * Copied items, and what the document held of them beyond the map: their keys (one per item) and structure. The tab's
+ * view goes too: which of the copied groups the Outline showed collapsed, by their source ids, so the copies of those
+ * groups start collapsed in whichever tab they land.
+ */
 export interface DocClip extends Clip {
   readonly keys: ReadonlyArray<string>
   readonly structure: Structure
   /** The tab it was copied or cut from: a paste there keeps the copied place, anywhere else is placed anew (`pasteClipboard`). */
   readonly source?: string
+  readonly collapsed: ReadonlySet<string>
 }
 
 /**
@@ -1154,7 +1160,10 @@ export const useEditor = create<EditorState>()((set, get) => {
     return fits
   }
 
-  /** The doc with the clip's items added, their fresh keys and each source key's copy; undefined when there's no room. */
+  /**
+   * The doc with the clip's items added, their fresh keys, each source key's copy, and the tab's collapsed groups with
+   * the copies of the clip's collapsed ones; undefined when there's no room.
+   */
   const withClip = (s: EditorState, clip: DocClip) => {
     if (clip.items.length === 0 || !hasRoomFor(s, clip.items.length)) return undefined
     const added = freshKeys(clip.items.length)
@@ -1162,12 +1171,18 @@ export const useEditor = create<EditorState>()((set, get) => {
       const copy = added[n]
       return copy === undefined ? [] : [[key, copy] as const]
     }))
+    const collapsedGroups = new Set(s.collapsedGroups)
+    const groupIdOf = (source: string) => {
+      const id = freshKey()
+      if (clip.collapsed.has(source)) collapsedGroups.add(id)
+      return id
+    }
     const doc: Doc = {
       map: pasteItems(s.doc.map, clip),
       ids: [...s.doc.ids, ...added],
-      structure: withPasted(s.doc.structure, clip.structure, keyOf)
+      structure: withPasted(s.doc.structure, clip.structure, keyOf, groupIdOf)
     }
-    return { doc, added, keyOf }
+    return { doc, added, keyOf, collapsedGroups }
   }
 
   /**
@@ -1647,30 +1662,32 @@ export const useEditor = create<EditorState>()((set, get) => {
         s.notify("error", problem)
         return
       }
-      const clip = clipOf(s.doc, copyableIndices(s))
+      const clip = clipOf(s, copyableIndices(s))
       const copies = repeatCopies(options)
       if (clip.items.length === 0 || copies === 0 || !hasRoomFor(s, copies * clip.items.length)) return
       let doc = s.doc
+      let collapsedGroups = s.collapsedGroups
       const selectedIds: Array<string> = []
       for (const offset of repeatOffsets(options)) {
-        const next = withClip({ ...s, doc }, clip)
+        const next = withClip({ ...s, doc, collapsedGroups }, clip)
         const moved = next === undefined ? undefined : withClipMoved(s, clip, next, offset)
         if (next === undefined || moved === undefined) return
+        collapsedGroups = next.collapsedGroups
         doc = moved
         selectedIds.push(...next.added)
       }
-      commit(doc, { selectedIds }, undefined, "Repeat selection")
+      commit(doc, { selectedIds, collapsedGroups }, undefined, "Repeat selection")
     },
 
     duplicateSelection: () => {
       const s = get()
-      const next = withClip(s, clipOf(s.doc, copyableIndices(s)))
-      if (next !== undefined) commit(next.doc, { selectedIds: next.added })
+      const next = withClip(s, clipOf(s, copyableIndices(s)))
+      if (next !== undefined) commit(next.doc, { selectedIds: next.added, collapsedGroups: next.collapsedGroups })
     },
 
     copySelection: () => {
       const s = get()
-      const clip = clipOf(s.doc, copyableIndices(s))
+      const clip = clipOf(s, copyableIndices(s))
       if (clip.items.length > 0) set({ clipboard: { ...clip, source: s.tabId } })
     },
 
@@ -1681,7 +1698,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (indices.length === 0) return
       commit(withoutItems(s.doc, indices), {
         selectedIds: [],
-        clipboard: { ...clipOf(s.doc, indices), source: s.tabId }
+        clipboard: { ...clipOf(s, indices), source: s.tabId }
       })
     },
 
@@ -1691,16 +1708,16 @@ export const useEditor = create<EditorState>()((set, get) => {
       const next = clip === null ? undefined : withClip(s, clip)
       if (clip === null || next === undefined) return
       const doc = offset === undefined ? next.doc : withClipMoved(s, clip, next, offset)
-      if (doc !== undefined) commit(doc, { selectedIds: next.added })
+      if (doc !== undefined) commit(doc, { selectedIds: next.added, collapsedGroups: next.collapsedGroups })
     },
 
     beginDuplicateDrag: () => {
       const s = get()
       if (strokeUnderway()) return undefined
-      const next = withClip(s, clipOf(s.doc, copyableIndices(s)))
+      const next = withClip(s, clipOf(s, copyableIndices(s)))
       if (next === undefined) return undefined
       duplicateDragBase = { doc: s.doc, selectedIds: s.selectedIds }
-      set({ doc: next.doc, selectedIds: next.added })
+      set({ doc: next.doc, selectedIds: next.added, collapsedGroups: next.collapsedGroups })
       return next.keyOf
     },
 
@@ -2244,10 +2261,15 @@ const withoutItems = (doc: Doc, indices: ReadonlyArray<number>): Doc => {
   }
 }
 
-/** The items at `indices`, in that order, with what the doc holds of them. */
-const clipOf = (doc: Doc, indices: ReadonlyArray<number>): DocClip => {
+/** The items at `indices`, in that order, with what the doc holds of them and which of their groups are collapsed. */
+const clipOf = (
+  { collapsedGroups, doc }: Pick<TabState, "collapsedGroups" | "doc">,
+  indices: ReadonlyArray<number>
+): DocClip => {
   const keys = indices.flatMap((i) => doc.ids[i] ?? [])
-  return { ...copyItems(doc.map, indices), keys, structure: copyStructure(doc.structure, new Set(keys)) }
+  const structure = copyStructure(doc.structure, new Set(keys))
+  const collapsed = new Set(treeGroupIds(structure.tree).filter((id) => collapsedGroups.has(id)))
+  return { ...copyItems(doc.map, indices), keys, structure, collapsed }
 }
 
 /** The entered group, while it is still in `doc`'s tree. */
