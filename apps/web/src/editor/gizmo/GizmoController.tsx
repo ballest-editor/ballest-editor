@@ -373,6 +373,7 @@ export function GizmoController() {
           ends: selection.ends,
           rotation: target.rotation,
           frame,
+          lockFrame: start.space === "local" ? target.rotation : undefined,
           constraint,
           stepAxes: stepAxesOf(start),
           ray: gameRayOf({ origin: start.pointer.rayOrigin, direction: start.pointer.rayDir }),

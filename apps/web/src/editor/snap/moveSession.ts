@@ -40,7 +40,7 @@ import type { SnappedAs, TurnStop } from "../../domain/snapRotate"
 import { nearEndsOf } from "../../domain/snapTargets"
 import { selectionBases } from "../../domain/snapTools"
 import { annotationsOf } from "../../domain/structure"
-import { ORIGIN, vecAdd } from "../../domain/ueMath"
+import { ORIGIN, rotateVec, vecAdd } from "../../domain/ueMath"
 import type { PaneCamera } from "../paneCameras"
 import {
   connectorAt,
@@ -84,6 +84,8 @@ export interface MoveStart {
   readonly rotation: Quat4
   /** The gizmo's local axes, for a handle that follows them: each unit takes the move along its own in Each. */
   readonly frame?: Quat4 | undefined
+  /** The gizmo's local axes with Local on, which a lock goes along as the gizmo's handles do; the grid's without. */
+  readonly lockFrame?: Quat4 | undefined
   /** What the handle allows; a drag by the body slides on a surface. */
   readonly constraint: Constraint
   /**
@@ -100,11 +102,23 @@ export interface MoveStart {
 
 const LOCK_INDEX = { x: 0, y: 1, z: 2 } as const
 
-/** The grid's axis a lock means, which is the world's until the grid is turned. */
-const lockConstraint = (config: SnapConfig, { axis, plane }: MoveLock): Constraint => {
-  const direction = gridAxes(config)[LOCK_INDEX[axis]]
+const BASIS = [{ x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }] as const
+
+/** The axes a lock goes along: the gizmo's local ones in Local, else the grid's, which are the world's until it's turned. */
+const lockAxes = (config: SnapConfig, frame: Quat4 | undefined): readonly [Vec3, Vec3, Vec3] =>
+  frame === undefined
+    ? gridAxes(config)
+    : [rotateVec(frame, BASIS[0]), rotateVec(frame, BASIS[1]), rotateVec(frame, BASIS[2])]
+
+/** The axis, or the plane square to it, a lock means. */
+const lockConstraint = (axes: readonly [Vec3, Vec3, Vec3], { axis, plane }: MoveLock): Constraint => {
+  const direction = axes[LOCK_INDEX[axis]]
   return plane ? { kind: "plane", normal: direction } : { kind: "line", direction }
 }
+
+/** The axes a lock in Local takes whole grid steps along: its axis, or the two in its plane. */
+const lockStepAxes = (axes: readonly [Vec3, Vec3, Vec3], { axis, plane }: MoveLock): ReadonlyArray<Vec3> =>
+  plane ? axes.filter((_, i) => i !== LOCK_INDEX[axis]) : [axes[LOCK_INDEX[axis]]]
 
 const plural = (n: number) => n === 1 ? "1 item" : `${n} items`
 
@@ -153,7 +167,16 @@ export class MoveSession {
 
   /** The constraint under the lock, if one is set. */
   private get constraint(): Constraint {
-    return this.lock === undefined ? this.start.constraint : lockConstraint(this.config, this.lock)
+    return this.lock === undefined
+      ? this.start.constraint
+      : lockConstraint(lockAxes(this.config, this.start.lockFrame), this.lock)
+  }
+
+  /** Whole grid steps along these: a local handle's axes, or a lock's in Local. A lock in World has the grid's lines. */
+  private get stepAxes(): ReadonlyArray<Vec3> | undefined {
+    const { lock, start } = this
+    if (lock === undefined) return start.stepAxes
+    return start.lockFrame === undefined ? undefined : lockStepAxes(lockAxes(this.config, start.lockFrame), lock)
   }
 
   /** Toggles a lock: pressing the same key again unlocks, and the move goes back to the handle's constraint. */
@@ -178,7 +201,7 @@ export class MoveSession {
     const slip = moved === undefined ? { x: 0, y: 0 } : { x: px.x - moved.x, y: px.y - moved.y }
     const s = useEditor.getState()
     const { construction, measurements } = annotationsOf(s.doc.structure)
-    const stepAxes = this.lock === undefined ? start.stepAxes : undefined
+    const { stepAxes } = this
     return {
       config,
       prefs: s.settings.snapPrefs,
@@ -239,12 +262,10 @@ export class MoveSession {
     return rotation === undefined ? this.moveBy(offset) : { kind: "rigid", rotation, about, offset }
   }
 
-  /** A move by `offset`, along the gizmo's local axes unless a lock has put it on the grid's. */
+  /** A move by `offset`, along the gizmo's local axes when a handle or a lock in Local went along them. */
   private moveBy(offset: Vec3): GroupDelta {
-    const { frame } = this.start
-    return frame === undefined || this.lock !== undefined
-      ? { kind: "translate", offset }
-      : { kind: "translate", offset, frame }
+    const frame = this.lock === undefined ? this.start.frame : this.start.lockFrame
+    return frame === undefined ? { kind: "translate", offset } : { kind: "translate", offset, frame }
   }
 
   /** How the move commits: what it joined, and what the history calls it. */
