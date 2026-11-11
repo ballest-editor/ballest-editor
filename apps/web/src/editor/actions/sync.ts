@@ -92,9 +92,10 @@ export const checkExports = () => run(checkExportsEffect)
 
 /**
  * Re-import: the game's version of a map replaces the project's (which goes to the project's backups), and the link
- * records it as in sync. Its sidecar is re-matched against it, as on any open. A tab that has the map open is made
- * active and reloaded from it, after asking about its unsaved edits. It waits for any gesture under way to end, and
- * loads only into that map's own tab, whichever is active by then (docs/DESKTOP.md § Sync).
+ * records it as in sync. Its sidecar is re-matched against it (`loadGameStructure`). A tab that has the map open is
+ * made active and reloaded from it, after asking about its unsaved edits, and keeps its isolation and closed groups. It
+ * waits for any gesture under way to end, and loads only into that map's own tab, whichever is active by then
+ * (docs/DESKTOP.md § Sync).
  */
 export const reimportMapEffect = (fileName: string) =>
   afterGestures.pipe(Effect.andThen(unlessCancelledFor(fileName, "reimport", () =>
@@ -105,7 +106,7 @@ export const reimportMapEffect = (fileName: string) =>
       // a gesture may have started while main wrote the files
       yield* afterGestures
       const tabId = tabWithFile(useEditor.getState(), fileName)
-      if (tabId !== undefined) yield* showMap(map, fileOf(file), { loaded, into: { tabId } })
+      if (tabId !== undefined) yield* showMap(map, fileOf(file), { loaded, into: { tabId }, keepView: true })
       useEditor.getState().notify("info", `Re-imported ${mapLabelOf(fileName)} from the game`, {
         kind: "mapReimported",
         body: "The project's previous version is in the backups (the map's menu › Backups…).",

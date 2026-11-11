@@ -6,6 +6,7 @@ import type { CreateProjectPayload } from "@ballest/contracts"
 import { Effect, Option } from "effect"
 import { setLevelNames } from "../../domain/edits"
 import { copyNameOf, mapFileNameOf, mapLabelOf } from "../../domain/factory"
+import { loadGameStructure } from "../../domain/sidecar"
 import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { type OpenedMap, Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
@@ -72,8 +73,15 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
     useEditor.getState().openDialog({ id: "importClash", ...pending })
     return
   }
-  // from the project, which keeps what a map imported from the project itself has in its sidecar
-  yield* readProjectMapIntoEditor(result.map.fileName, open ? "active" : "newTab")
+  // From the project, which keeps what a map imported from the project itself has in its sidecar, and what the sidecar
+  // of a map replaced still matches. The map's own copy in the game's maps folder is a version the game saved.
+  const { link } = result.map
+  const fromGame = replace && link !== null && link.export !== null && link.export.path === link.origin?.path
+  yield* readProjectMapIntoEditor(
+    result.map.fileName,
+    open ? "active" : "newTab",
+    fromGame ? loadGameStructure : undefined
+  )
   yield* refreshProject
   useEditor.getState().notify(
     "info",

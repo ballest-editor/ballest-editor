@@ -5,11 +5,12 @@
  */
 import type { CatalogIndex } from "./Catalog"
 import { endsOf } from "./connectors"
+import type { Quat4, Vec3 } from "./coords"
 import { editTransform } from "./editTransform"
-import { structureFromGame } from "./gameGroups"
+import { structureFromGame, withGroupsFromGame } from "./gameGroups"
 import { jointsAfterMove } from "./joints"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
-import type { Annotations, MapSidecar, SidecarItem } from "./MapSidecar"
+import type { Annotations, MapSidecar, SidecarItem, TreeNode } from "./MapSidecar"
 import type { SnapConfig } from "./snapConfig"
 import {
   annotationsOf,
@@ -19,8 +20,10 @@ import {
   itemNode,
   rewriteTree,
   type Structure,
+  treeKeys,
   withAnnotations
 } from "./structure"
+import { quatConjugate, quatMul, quatNormalize, rotateVec, vecAdd, vecDistance, vecSub } from "./ueMath"
 
 /** The rounding in a fingerprint: 0.01 cm, and four places for a rotation or scale. */
 const TRANSLATION_PLACES = 2
@@ -36,7 +39,7 @@ const rounded = (value: number, places: number) => {
 }
 
 /** `q` with the sign the two equal rotations `q` and `-q` agree on. */
-const canonicalRotation = ({ w, x, y, z }: Item["itemTransform"]["rotation"]): ReadonlyArray<number> => {
+const canonicalRotation = ({ w, x, y, z }: Quat4): ReadonlyArray<number> => {
   const sign = ([w, x, y, z].find((part) => Math.abs(part) > 1e-6) ?? 1) < 0 ? -1 : 1
   return [x, y, z, w].map((part) => part * sign)
 }
@@ -159,8 +162,53 @@ const matchNearest = (
   }
 }
 
-/** Each item's key by fingerprint: the same class and transform first, in document order, then the nearest. */
-const keysByFingerprint = (map: MapFile, entries: ReadonlyArray<Entry>): ReadonlyArray<string | undefined> => {
+const classOfPrint = (print: string | undefined) => print?.split("|")[0]
+
+/**
+ * Gives `keys`' free places to the entries left over by order, for a file whose items kept theirs (the game's): between
+ * two items already matched, the entries that were between them take the free items of their class in turn, however
+ * far each moved. Nothing is matched across an item already matched, so a delete and an add of one class stay apart.
+ */
+const matchInOrder = (
+  entries: ReadonlyArray<Entry>,
+  prints: ReadonlyArray<string>,
+  keys: Array<string | undefined>
+) => {
+  const fromOf = new Map(entries.map(([key, { index }]) => [key, index]))
+  const taken = new Set(keys.flatMap((key) => key ?? []))
+  const free = entries.filter(([key]) => !taken.has(key))
+  let after = -1
+  let start = 0
+  for (let index = 0; index <= keys.length; index++) {
+    const key = keys[index]
+    if (index < keys.length && key === undefined) continue
+    const before = key === undefined ? Infinity : fromOf.get(key) ?? Infinity
+    if (start < index) {
+      const byClass = new Map<string | undefined, Array<string>>()
+      for (const [entry, { fingerprint, index: from }] of free) {
+        if (from > after && from < before && !taken.has(entry)) addTo(byClass, classOfPrint(fingerprint), entry)
+      }
+      for (let at = start; at < index; at++) {
+        const entry = byClass.get(classOfPrint(prints[at]))?.shift()
+        if (entry === undefined) continue
+        keys[at] = entry
+        taken.add(entry)
+      }
+    }
+    after = Math.max(after, before)
+    start = index + 1
+  }
+}
+
+/**
+ * Each item's key by fingerprint: the same class and transform first, in document order, then the nearest, then by
+ * order (`matchInOrder`) when the file kept its items' order.
+ */
+const keysByFingerprint = (
+  map: MapFile,
+  entries: ReadonlyArray<Entry>,
+  inOrder: boolean
+): ReadonlyArray<string | undefined> => {
   const prints = map.items.map(fingerprintOf)
   const free = new Map<string, Array<number>>()
   // last first, so `pop` hands out items of the same fingerprint in document order
@@ -173,6 +221,7 @@ const keysByFingerprint = (map: MapFile, entries: ReadonlyArray<Entry>): Readonl
     return false
   })
   matchNearest(left, prints, keys)
+  if (inOrder) matchInOrder(entries, prints, keys)
   return keys
 }
 
@@ -231,21 +280,91 @@ export const structureOfMap = (map: MapFile, catalog: CatalogIndex | null = null
   return { ids, structure: structureFromGame(map, ids, catalog), unmatched: 0, rematched: false, snap: null }
 }
 
+/** A rotation from a fingerprint's `canonicalRotation`. */
+const rotationOf = ([x = 0, y = 0, z = 0, w = 1]: ReadonlyArray<number>): Quat4 => ({ x, y, z, w })
+
+const vecOf = ([x = 0, y = 0, z = 0]: ReadonlyArray<number>): Vec3 => ({ x, y, z })
+
+/** How far a carried point may be off where an item went, in cm: 1, and the fingerprint's rounding of a turn at `lever`. */
+const carryTolerance = (lever: number) => TOLERANCE.translation + 2e-4 * lever
+
 /**
- * Puts a map's `.balledit` (of hash `mapHash`) and its sidecar together. The hash the sidecar was written for means its
- * indices are right. Otherwise the file was rewritten, and each entry finds its item by fingerprint; items left over
- * get fresh keys, and entries left over are dropped and counted. Without a sidecar the map stands on its own.
+ * The one move and turn that took each of `keys` from its sidecar entry to its item in `map`, as what it does to a
+ * point; undefined when they didn't move together, rigidly, or nothing moved. A scale breaks it, as does an item that
+ * moved on its own.
  */
-export const loadStructure = (
+const rigidMotionOf = (
+  keys: ReadonlyArray<string>,
+  sidecar: MapSidecar,
   map: MapFile,
-  mapHash: string,
-  sidecar: MapSidecar | null,
-  catalog: CatalogIndex | null = null
+  indexOf: ReadonlyMap<string, number>
+): ((point: Vec3) => Vec3) | undefined => {
+  const pairs = keys.flatMap((key) => {
+    const entry = sidecar.items[key]
+    const item = map.items[indexOf.get(key) ?? -1]
+    const before = entry === undefined ? undefined : parseFingerprint(entry.fingerprint)
+    if (item === undefined || before === undefined) return []
+    return [{ before, after: parseFingerprint(fingerprintOf(item)), item }]
+  })
+  const [first] = pairs
+  if (
+    first === undefined ||
+    pairs.every(({ after, before }) => after !== undefined && distanceBetween(before, after) === 0)
+  ) {
+    return undefined
+  }
+  const from = vecOf(first.before.translation)
+  const to = first.item.itemTransform.translation
+  const turn = quatNormalize(
+    quatMul(first.item.itemTransform.rotation, quatConjugate(rotationOf(first.before.rotation)))
+  )
+  const carried = (point: Vec3) => vecAdd(to, rotateVec(turn, vecSub(point, from)))
+  const together = pairs.every(({ after, before, item }) => {
+    if (after === undefined || largestDifference(before.scale, after.scale) > TOLERANCE.scale) return false
+    const lever = vecDistance(vecOf(before.translation), from)
+    const moved = vecDistance(carried(vecOf(before.translation)), item.itemTransform.translation)
+    const turned = canonicalRotation(quatMul(turn, rotationOf(before.rotation)))
+    return moved <= carryTolerance(lever) &&
+      Math.min(largestDifference(turned, after.rotation), largestDifference(turned, after.rotation, -1)) <=
+        2 * TOLERANCE.rotation
+  })
+  return together ? carried : undefined
+}
+
+/**
+ * `tree` with each Point pivot carried by the move and turn its group made as one, in a file rewritten behind the
+ * editor's back: the point was frozen in the world, and the group took it along. A group whose items moved apart keeps
+ * the point where it was.
+ */
+const withPointPivotsCarried = (
+  tree: ReadonlyArray<TreeNode>,
+  sidecar: MapSidecar,
+  map: MapFile,
+  ids: ReadonlyArray<string>
+): ReadonlyArray<TreeNode> => {
+  const indexOf = new Map(ids.map((key, index) => [key, index]))
+  return rewriteTree(tree, (node) => {
+    if (node.kind !== "group" || node.pivot?.choice !== "point") return [node]
+    const carried = rigidMotionOf(treeKeys(node.children), sidecar, map, indexOf)
+    return carried === undefined ? [node] : [{ ...node, pivot: { choice: "point", world: carried(node.pivot.world) } }]
+  })
+}
+
+const entriesOf = (sidecar: MapSidecar): ReadonlyArray<Entry> =>
+  Object.entries(sidecar.items).sort(([, a], [, b]) => a.index - b.index)
+
+/**
+ * A map and its sidecar put together, each item's key being `keys`' (or fresh). In a file rewritten behind the
+ * editor's back, the Point pivots go where their groups went, and the groups made in the game come in.
+ */
+const assembled = (
+  map: MapFile,
+  sidecar: MapSidecar,
+  keys: ReadonlyArray<string | undefined>,
+  rewritten: boolean,
+  catalog: CatalogIndex | null
 ): LoadedStructure => {
-  if (sidecar === null) return structureOfMap(map, catalog)
-  const entries = Object.entries(sidecar.items).sort(([, a], [, b]) => a.index - b.index)
-  const byIndex = sidecar.mapHash === mapHash ? keysByIndex(map, entries) : undefined
-  const keys = byIndex ?? keysByFingerprint(map, entries)
+  const entries = entriesOf(sidecar)
   const matched = new Set(keys.flatMap((key) => key ?? []))
   const ids = keys.map((key) => key ?? freshKey())
   const items = new Map(entries.flatMap(([key, { connectAt, hidden, locked, name, tags }]) => {
@@ -258,16 +377,37 @@ export const loadStructure = (
     }
     return matched.has(key) && Object.keys(meta).length > 0 ? [[key, meta] as const] : []
   }))
-  const structure: Structure = { tree: treeOver(sidecar, ids), items }
+  const tree = treeOver(sidecar, ids)
+  const structure: Structure = {
+    tree: rewritten ? withGroupsFromGame(withPointPivotsCarried(tree, sidecar, map, ids), map, ids, catalog) : tree,
+    items
+  }
   return {
     ids,
     structure: sidecar.annotations === undefined
       ? structure
       : withAnnotations(structure, annotationsOver(sidecar.annotations, matched)),
     unmatched: entries.length - matched.size,
-    rematched: byIndex === undefined,
+    rematched: rewritten,
     snap: sidecar.snap ?? null
   }
+}
+
+/**
+ * Puts a map's `.balledit` (of hash `mapHash`) and its sidecar together. The hash the sidecar was written for means its
+ * indices are right. Otherwise the file was rewritten, and each entry finds its item by fingerprint; items left over
+ * get fresh keys, and entries left over are dropped and counted. Without a sidecar the map stands on its own.
+ */
+export const loadStructure = (
+  map: MapFile,
+  mapHash: string,
+  sidecar: MapSidecar | null,
+  catalog: CatalogIndex | null = null
+): LoadedStructure => {
+  if (sidecar === null) return structureOfMap(map, catalog)
+  const entries = entriesOf(sidecar)
+  const byIndex = sidecar.mapHash === mapHash ? keysByIndex(map, entries) : undefined
+  return assembled(map, sidecar, byIndex ?? keysByFingerprint(map, entries, false), byIndex === undefined, catalog)
 }
 
 /**
@@ -291,8 +431,6 @@ const withStandingJoints = (
   })
 }
 
-const classOfPrint = (print: string | undefined) => print?.split("|")[0]
-
 /**
  * Whether `map` holds the items `sidecar` was written for, in their order: the same class at every place, and no item
  * that left its place showing up unchanged at another's, which is a delete and an add of that class and not a move.
@@ -310,7 +448,8 @@ const sameItemsInOrder = (map: MapFile, sidecar: MapSidecar) => {
 
 /**
  * `loadStructure` for a version the game saved. The game keeps items in their order, so the same items in the same order
- * are those items wherever they moved to, and they keep their keys, names and groups. Otherwise it is any rewritten file.
+ * are those items wherever they moved to, and they keep their keys, names and groups. Otherwise each entry finds its
+ * item by fingerprint, then by order between the items found (`matchInOrder`). Joints the game took apart go.
  */
 export const loadGameStructure = (
   map: MapFile,
@@ -318,7 +457,13 @@ export const loadGameStructure = (
   sidecar: MapSidecar | null,
   catalog: CatalogIndex | null = null
 ): LoadedStructure => {
-  if (sidecar === null || !sameItemsInOrder(map, sidecar)) return loadStructure(map, mapHash, sidecar, catalog)
-  const loaded = loadStructure(map, sidecar.mapHash, sidecar, catalog)
-  return { ...loaded, structure: withStandingJoints(map, loaded, catalog), rematched: true }
+  if (sidecar === null) return structureOfMap(map, catalog)
+  const entries = entriesOf(sidecar)
+  if (sidecar.mapHash === mapHash) {
+    const byIndex = keysByIndex(map, entries)
+    if (byIndex !== undefined) return assembled(map, sidecar, byIndex, false, catalog)
+  }
+  const inOrder = sameItemsInOrder(map, sidecar) ? keysByIndex(map, entries) : undefined
+  const loaded = assembled(map, sidecar, inOrder ?? keysByFingerprint(map, entries, true), true, catalog)
+  return { ...loaded, structure: withStandingJoints(map, loaded, catalog) }
 }

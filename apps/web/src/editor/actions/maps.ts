@@ -9,6 +9,7 @@ import { creatorOf, usableCreatorName } from "../../domain/creator"
 import { currentCreatedAt, newMapFile, untitledNameOf } from "../../domain/factory"
 import { type MapFile, PLAYER_START_CLASS } from "../../domain/MapFile"
 import type { MapPrefs } from "../../domain/MapPrefs"
+import type { loadStructure } from "../../domain/sidecar"
 import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { Platform, PlatformError } from "../../services/Platform"
@@ -28,9 +29,9 @@ import { fileOf, loadProjectMapFile, prefsOf, refreshProject, saveTabPrefs, show
 
 /** Reads one of the project's maps into the editor, in the tab `into` says. */
 export const readProjectMapIntoEditor = Effect.fn("readProjectMapIntoEditor")(
-  function*(fileName: string, into: TabTarget) {
+  function*(fileName: string, into: TabTarget, load?: typeof loadStructure) {
     const file = yield* (yield* Platform).readMap(fileName)
-    const { loaded, map } = yield* loadProjectMapFile(file)
+    const { loaded, map } = yield* loadProjectMapFile(file, load)
     yield* showMap(map, fileOf(file), { into, loaded })
   }
 )

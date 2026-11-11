@@ -5,7 +5,7 @@ import { catalogWithEnds } from "../test/snapFixtures"
 import { indexCatalog } from "./Catalog"
 import { defaultEditorState, identityTransform, itemFromPiece, newMapFile, playerStartItem } from "./factory"
 import { type Item, MapFile } from "./MapFile"
-import { MapSidecar } from "./MapSidecar"
+import { type GroupNode, MapSidecar, type TreeNode } from "./MapSidecar"
 import { fingerprintOf, loadGameStructure, loadStructure, sidecarOf, structureOfMap } from "./sidecar"
 import { defaultSnapConfig } from "./snapConfig"
 import {
@@ -411,5 +411,128 @@ describe("a version the game saved", () => {
 
   it("keeps a joint it can't read the ends of, before the catalog has loaded", () => {
     assert.deepStrictEqual(loadGameStructure(pulledApart, OTHER_HASH, sidecar).structure.annotations?.joints, joined)
+  })
+})
+
+describe("editor data across a round trip through the game", () => {
+  /** `authored`, with k2 hidden, k3 locked and a Point pivot on g1. */
+  const flagged = () => {
+    const base = authored()
+    let structure = withFlag(base.structure, [base.keys.k2], "hidden", true)!
+    structure = withFlag(structure, [base.keys.k3], "locked", true)!
+    structure = withGroupPivot(structure, "g1", { choice: "point", world: { x: 150, y: 50, z: 0 } })!
+    return { ...base, structure, sidecar: sidecarOf(base.map, base.ids, structure, HASH) }
+  }
+  const groupOf = (structure: Structure, id: string): GroupNode => {
+    const group = structure.tree.find((node) => node.kind === "group" && node.id === id)
+    if (group?.kind !== "group") throw new Error(`no group ${id} at the root`)
+    return group
+  }
+  /** A root node as the game's groups give it: a group's name and children, or an item. */
+  const madeOf = (node: TreeNode | undefined) =>
+    node?.kind === "group" ? { name: node.name, children: node.children } : node
+  const withGroups = (map: MapFile, groups: ReadonlyArray<{ members: Array<number>; name: string }>): MapFile => ({
+    ...map,
+    editorState: { ...defaultEditorState(), groups: groups.map((group) => ({ ...group, frame: identityTransform() })) }
+  })
+
+  it("keeps a moved item's name, group, flags and pivot when the game also added one", () => {
+    const { keys, map, sidecar, structure } = flagged()
+    const items = map.items.map((item, index) => index === 1 || index === 2 || index === 3 ? nudged(item, 5000) : item)
+    const loaded = loadGameStructure(mapOf([...items, at(900)]), OTHER_HASH, sidecar)
+    assert.deepStrictEqual(loaded.ids.slice(0, 5), Object.values(keys))
+    assert.strictEqual(loaded.unmatched, 0)
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k1), { name: "Named" })
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k2), { tags: ["tagged"], hidden: true })
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k3), { connectAt: { 0: "bottomLeft" }, locked: true })
+    assert.deepStrictEqual(loaded.structure.tree.slice(0, 4), [
+      structure.tree[0],
+      { ...groupOf(structure, "g1"), pivot: { choice: "point", world: { x: 5150, y: 50, z: 0 } } },
+      groupOf(structure, "g2"),
+      structure.tree[3]
+    ])
+    assert.deepStrictEqual(loaded.structure.tree[4], itemNode(loaded.ids[5]!))
+  })
+
+  it("keeps the others' data when the game deleted one and moved another", () => {
+    const { keys, map, sidecar } = flagged()
+    const [, second, third, fourth, fifth] = map.items
+    const loaded = loadGameStructure(mapOf([second!, nudged(third!, 3000), fourth!, fifth!]), OTHER_HASH, sidecar)
+    assert.deepStrictEqual(loaded.ids, [keys.k1, keys.k2, keys.k3, keys.k4])
+    assert.strictEqual(loaded.unmatched, 1)
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k2), { tags: ["tagged"], hidden: true })
+  })
+
+  it("matches by order only between the items it is sure of, and only within a class", () => {
+    const { keys, map, sidecar } = authored()
+    const other: Item = { ...at(100), actorToSpawn: "/Script/Engine.Blueprint'/Game/BP_Other.BP_Other_C'" }
+    const [first, second, third, fourth, fifth] = map.items
+    // the second item moved, one of another class came in before it, and one of its class at the end
+    const loaded = loadGameStructure(
+      mapOf([first!, other, nudged(second!, 2000), third!, fourth!, fifth!, at(7000)]),
+      OTHER_HASH,
+      sidecar
+    )
+    assert.deepStrictEqual(loaded.ids.slice(0, 6).filter((_, index) => index !== 1), Object.values(keys))
+    assert.notInclude(Object.values(keys), loaded.ids[1])
+    assert.notInclude(Object.values(keys), loaded.ids[6])
+  })
+
+  it("merges in the groups made in the game, and keeps those it exported", () => {
+    const { keys, map, sidecar, structure } = flagged()
+    const loaded = loadGameStructure(
+      withGroups(mapOf(map.items.map((item, index) => index === 4 ? nudged(item, 10) : item)), [
+        { members: [1, 2], name: "Inner" },
+        { members: [0, 4], name: "Ends" }
+      ]),
+      OTHER_HASH,
+      sidecar
+    )
+    const [ends, ...rest] = loaded.structure.tree
+    assert.deepStrictEqual(madeOf(ends), { name: "Ends", children: [itemNode(keys.k0), itemNode(keys.k4)] })
+    assert.deepStrictEqual(rest, [groupOf(structure, "g1"), groupOf(structure, "g2")])
+  })
+
+  it("wraps whole groups a game group took in, and takes out the items it took from a group", () => {
+    const { keys, map, sidecar, structure } = flagged()
+    const loaded = loadGameStructure(
+      withGroups(map, [{ members: [0, 1], name: "" }, { members: [3, 4], name: "Tail" }]),
+      OTHER_HASH,
+      sidecar
+    )
+    assert.deepStrictEqual(loaded.ids, Object.values(keys))
+    const [taken, g1, tail] = loaded.structure.tree
+    assert.deepStrictEqual(madeOf(taken), { name: "Group", children: [itemNode(keys.k0), itemNode(keys.k1)] })
+    assert.deepStrictEqual(g1, { ...groupOf(structure, "g1"), children: [itemNode(keys.k2)] })
+    assert.deepStrictEqual(madeOf(tail), { name: "Tail", children: [groupOf(structure, "g2"), itemNode(keys.k4)] })
+    assert.lengthOf(loaded.structure.tree, 3)
+  })
+
+  it("carries a Point pivot by the turn and move its group made in the game, and only then", () => {
+    const { map, sidecar } = flagged()
+    // a quarter turn about z, about (100, 0, 0), then 1000 along y: (x, y) goes to (100 - y, x - 100 + 1000)
+    const quarter = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
+    const turned = (item: Item): Item => {
+      const { x, y, z } = item.itemTransform.translation
+      return {
+        ...item,
+        itemTransform: { ...item.itemTransform, rotation: quarter, translation: { x: 100 - y, y: x - 100 + 1000, z } }
+      }
+    }
+    const pivotOf = (items: ReadonlyArray<Item>) => {
+      return groupOf(loadGameStructure(mapOf(items), OTHER_HASH, sidecar).structure, "g1").pivot
+    }
+    const point = pivotOf(map.items.map((item, index) => index === 1 || index === 2 ? turned(item) : item))
+    assert.strictEqual(point?.choice, "point")
+    if (point?.choice === "point") {
+      assert.closeTo(point.world.x, 50, 1e-6)
+      assert.closeTo(point.world.y, 1050, 1e-6)
+      assert.strictEqual(point.world.z, 0)
+    }
+    // one member moved on its own: the point stays where it was frozen
+    assert.deepStrictEqual(pivotOf(map.items.map((item, index) => index === 1 ? nudged(item, 500) : item)), {
+      choice: "point",
+      world: { x: 150, y: 50, z: 0 }
+    })
   })
 })

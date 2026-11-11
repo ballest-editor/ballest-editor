@@ -157,7 +157,8 @@ export const prefsOf = (map: MapFile) =>
 
 /**
  * Puts a map into the editor, with the prefs saved for it, in the tab `into` says (the active one by default); `dirty`
- * opens it as unsaved edits of `file`, and `backup` marks it as a restored backup. `loaded` is what its sidecar gave.
+ * opens it as unsaved edits of `file`, and `backup` marks it as a restored backup. `loaded` is what its sidecar gave, and
+ * `keepView` keeps what the tab left out and closed, for a new version of its map.
  */
 export const showMap = Effect.fn("showMap")(function*(
   map: MapFile,
@@ -167,6 +168,7 @@ export const showMap = Effect.fn("showMap")(function*(
     readonly backup?: boolean
     readonly into?: TabTarget
     readonly loaded?: LoadedStructure
+    readonly keepView?: boolean
   }
 ) {
   const prefs = yield* prefsOf(map)
@@ -176,7 +178,8 @@ export const showMap = Effect.fn("showMap")(function*(
     dirty: options?.dirty === true,
     backup: options?.backup === true,
     into: options?.into,
-    loaded: options?.loaded
+    loaded: options?.loaded,
+    keepView: options?.keepView === true
   })
   const state = useEditor.getState()
   const into = options?.into

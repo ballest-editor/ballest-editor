@@ -2,7 +2,8 @@ import { assert, describe, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Schema } from "effect"
 import fixture from "../../domain/bundledCatalog.json"
 import { Catalog } from "../../domain/Catalog"
-import { placementTransform } from "../../domain/factory"
+import { defaultEditorState, placementTransform } from "../../domain/factory"
+import type { EditorGroup, Item } from "../../domain/MapFile"
 import { MapSidecar } from "../../domain/MapSidecar"
 import { treeKeys } from "../../domain/structure"
 import { initialMap, useEditor } from "../../editor/store"
@@ -61,6 +62,34 @@ const authored = Effect.gen(function*() {
 /** The tree as nested lists: an item's key, or a group's name and children. */
 const shapeOf = (nodes = s().doc.structure.tree): ReadonlyArray<unknown> =>
   nodes.map((node) => node.kind === "item" ? node.key : [node.name, shapeOf(node.children)])
+
+/**
+ * `authored`, exported, then saved in the game: the named cube moved 50 m and a cube came in at the end, and the game
+ * got `groups` beside the one it was given.
+ */
+const editedInGame = (disk: TestDisk, groups: ReadonlyArray<EditorGroup> = []) =>
+  Effect.gen(function*() {
+    const keys = yield* authored
+    yield* exportToGameEffect
+    const inGame = `${TEST_MAPS_FOLDER}/${NAME}`
+    const codec = yield* MapCodec
+    const map = yield* codec.decode(disk.files.get(inGame)!)
+    const [, , named = map.items[0]!, , last = map.items[0]!] = map.items
+    const atX = (item: Item, x: number): Item => ({
+      ...item,
+      itemTransform: { ...item.itemTransform, translation: { x, y: 0, z: 0 } }
+    })
+    const editorState = map.editorState ?? defaultEditorState()
+    disk.files.set(
+      inGame,
+      yield* codec.encode({
+        ...map,
+        items: [...map.items.with(2, atX(named, 6000)), atX(last, 9000)],
+        editorState: { ...editorState, groups: [...editorState.groups, ...groups] }
+      })
+    )
+    return { ...keys, inGame }
+  })
 
 describe("the sidecar", () => {
   it.effect("is written with the map's hash, and reopening gives back the keys and structure", () => {
@@ -197,6 +226,23 @@ describe("the sidecar", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
+  it.effect("Re-import keeps names and groups through moves, adds and a group made in the game", () => {
+    const disk = diskWithPlugin()
+    return Effect.gen(function*() {
+      // in the game, the third cube and the new one were grouped too
+      const { a, b, c, group } = yield* editedInGame(disk, [{ members: [4, 5], name: "Tail", frame: {} }])
+      yield* checkExportsEffect
+      yield* reimportMapEffect(NAME)
+      const fresh = s().doc.ids[5]!
+      assert.deepStrictEqual(s().doc.ids.slice(2, 5), [a, b, c])
+      assert.deepStrictEqual(shapeOf().slice(2), [["Bridge 1", [a, b]], ["Tail", [c, fresh]]])
+      assert.deepStrictEqual(s().doc.structure.items.get(a), { name: "Left ramp" })
+      const bridge = sidecarOn(disk).tree[2]
+      assert.strictEqual(bridge?.kind === "group" ? bridge.id : undefined, group)
+      assert.lengthOf(notices("sidecarUnmatched"), 0)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
   it.effect("a map with no sidecar opens on its own, and its first Save writes one", () => {
     const { text } = playSample()
     const name = playSample().name
@@ -281,21 +327,52 @@ describe("the sidecar", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("Import makes a tree group of each game group, and Replace leaves the old sidecar behind", () => {
+  it.effect("Import's Replace keeps what the sidecar still matches, and sends the old one to the backups", () => {
     const disk = makeTestDisk()
     return Effect.gen(function*() {
-      yield* authored
+      const { a, b, c, group } = yield* authored
+      const before = disk.files.get(sidecarFile(NAME))!
       const elsewhere = "/somewhere/Map_LevelEditorMain&Big Loop_Isaac.balledit"
-      disk.files.set(elsewhere, disk.files.get(projectFile(NAME))!)
+      const codec = yield* MapCodec
+      const map = yield* codec.decode(disk.files.get(projectFile(NAME))!)
+      // the same map, rewritten elsewhere: its third cube moved 2 cm
+      disk.files.set(
+        elsewhere,
+        yield* codec.encode({
+          ...map,
+          items: map.items.map((item, index) =>
+            index === 4
+              ? { ...item, itemTransform: { ...item.itemTransform, translation: { x: 3002, y: 0, z: 0 } } }
+              : item
+          )
+        })
+      )
       disk.answers.push(elsewhere)
       yield* importMapFile
       assert.strictEqual(s().dialog?.id, "importClash")
       yield* replaceOnImportEffect
-      assert.isFalse(disk.files.has(sidecarFile(NAME)))
-      assert.deepStrictEqual(shapeOf().filter((node) => typeof node !== "string"), [["Bridge1", [
-        s().doc.ids[2],
-        s().doc.ids[3]
-      ]]])
+      assert.deepStrictEqual(s().doc.ids.slice(2, 4), [a, b])
+      assert.deepStrictEqual(shapeOf().filter((node) => typeof node !== "string"), [["Bridge 1", [a, b]]])
+      assert.deepStrictEqual(s().doc.structure.items.get(a), { name: "Left ramp" })
+      assert.strictEqual(s().doc.ids.includes(c), false)
+      assert.lengthOf(notices("sidecarUnmatched"), 1)
+      assert.strictEqual(sidecarOn(disk).items[group] ?? null, null)
+      assert.strictEqual(sidecarOn(disk).mapHash, testHash(disk.files.get(projectFile(NAME))!))
+      assert.isTrue(disk.backups.some((backup) => backup.sidecar === before))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Import's Replace from the game's maps folder matches as Re-import does", () => {
+    const disk = diskWithPlugin()
+    return Effect.gen(function*() {
+      const { a, b, inGame } = yield* editedInGame(disk)
+      disk.answers.push(inGame)
+      yield* importMapFile
+      yield* replaceOnImportEffect
+      assert.strictEqual(s().doc.ids[2], a)
+      assert.deepStrictEqual(shapeOf()[2], ["Bridge 1", [a, b]])
+      assert.deepStrictEqual(s().doc.structure.items.get(a), { name: "Left ramp" })
+      assert.lengthOf(notices("sidecarUnmatched"), 0)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })
