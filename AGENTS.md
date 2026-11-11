@@ -89,5 +89,5 @@ We use **Effect v4** (`effect@^4`). Before writing Effect code, read `repos/effe
 - Errors are `Schema.TaggedError` classes; no thrown exceptions across service boundaries.
 - Map file I/O goes through a single `MapFile` schema (`Schema.Opaque`) that decodes the game JSON and encodes it back; the catalog through a `Catalog` schema. Add a round-trip test against every file in `samples/` when touching either.
 - Docs say what's true now, each fact has one home, and other files link to it. Use the names in § Terms.
-- Commit only when asked. Commit messages, PR titles and issue titles follow Conventional Commits (`commitlint` in `package.json`); PRs are squash-merged with the PR title as the commit on `main`. `main` only changes through PRs that pass CI.
+- Commit only when asked. Commit messages, PR titles and issue titles follow Conventional Commits (`commitlint` in `package.json`); PRs are squash-merged with the PR title as the commit on `main`, through GitHub's merge queue, which runs CI on each PR on top of `main` and the PRs ahead of it. `main` only changes through PRs that pass CI.
 - Git hooks (husky): pre-commit formats and lints staged files (lint-staged), commit-msg runs commitlint. There is no pre-push hook: a push runs no checks, and CI runs `pnpm check:everything`.
