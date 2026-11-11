@@ -362,7 +362,7 @@ Snapping is set in two places, by whom it is about. The snap menu (§ The snap m
 
 Each row has the help it had in the snap menu behind its (i). A save from before these moved takes them from the map defaults it kept them in. The drag keys' hint in the status bar waits a fixed 150 ms (`DRAG_KEYS_DELAY_MS`).
 
-What a new map starts on is kept in the editor's settings too, and set from a map: the snap menu's Save as defaults makes all of the open map's snap settings the defaults, and Reset to defaults gives a map them back. The Snapping group's **Reset snapping defaults** puts those defaults back to the factory's; a map with snapping of its own keeps it. A map's own settings, once changed, live in its sidecar and override the defaults.
+What a new map starts on is kept in the editor's settings too, and set from a map: the snap menu's Save as defaults makes all of the open map's snap settings the defaults, and Reset to defaults gives a map them back. The Snapping group's **Reset snapping defaults** puts those defaults back to the factory's; a map with snapping of its own keeps it. A map's own settings, once changed, live in its sidecar and override the defaults. The defaults count the grid's origin from where a tab's positions read 0 (`documentOrigin`), so in a prefab definition's tab the grid runs through its origin marker, and Save as defaults there stores it back from the world's origin (`defaultSnapOf`).
 
 Keybinds for the modifiers (§ Modifiers) sit with the other editor keybinds and can be rebound, since the game's own keybinds take some keys.
 

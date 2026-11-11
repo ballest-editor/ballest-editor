@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { identityTransform } from "../domain/factory"
 import type { RigidDelta } from "../domain/groupTransform"
 import type { GroupPivot } from "../domain/MapSidecar"
+import { PREFAB_TAB_FRAME } from "../domain/prefab"
 import { PrefabFile } from "../domain/PrefabFile"
 import { defaultSettings } from "../domain/Settings"
 import { defaultSnapConfig } from "../domain/snapConfig"
@@ -64,7 +65,7 @@ describe("a map's snap settings", () => {
     assert.isFalse(useEditor.getState().dirty)
   })
 
-  it("doesn't dirty a definition, which keeps them in the editor's prefs", () => {
+  const openDefinition = () =>
     useEditor.setState({
       document: {
         kind: "prefab",
@@ -75,8 +76,23 @@ describe("a map's snap settings", () => {
         sources: new Map()
       }
     })
+
+  it("doesn't dirty a definition, which keeps them in the editor's prefs", () => {
+    openDefinition()
     useEditor.getState().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
     assert.isFalse(useEditor.getState().dirty)
+  })
+
+  it("runs a definition's grid through its origin marker until it has its own settings", () => {
+    openDefinition()
+    useEditor.setState({ snap: null })
+    const { grid } = snapConfigOf(useEditor.getState()).targets
+    assertVec(grid.origin, PREFAB_TAB_FRAME, "the grid counts from where the tab's positions read 0")
+    const { snapping } = useEditor.getState().settings
+    assert.deepStrictEqual(
+      { ...snapConfigOf(useEditor.getState()).targets, grid: snapping.targets.grid },
+      snapping.targets
+    )
   })
 })
 

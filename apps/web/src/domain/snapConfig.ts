@@ -6,7 +6,7 @@
 import { Effect, Schema } from "effect"
 import type { Vec3 } from "./coords"
 import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, DEFAULT_SCALE_STEP, formatGridSize } from "./snap"
-import { ORIGIN } from "./ueMath"
+import { ORIGIN, vecAdd } from "./ueMath"
 
 export const SNAP_TARGETS = ["grid", "connectors", "mesh", "construction", "tracking", "alignment"] as const
 export type SnapTarget = (typeof SNAP_TARGETS)[number]
@@ -209,6 +209,12 @@ export const snapsRotation = (config: SnapConfig, off = false): boolean =>
 
 /** Whether a scale snaps to its step, as `snapsRotation` does a turn. */
 export const snapsScale = (config: SnapConfig, off = false): boolean => config.enabled && !off && config.scaleEnabled
+
+/** `config` with its grid's origin moved by `by`. */
+export const withGridMoved = (config: SnapConfig, by: Vec3): SnapConfig => ({
+  ...config,
+  targets: { ...config.targets, grid: { ...config.targets.grid, origin: vecAdd(config.targets.grid.origin, by) } }
+})
 
 export const withPreset = (config: SnapConfig, preset: SnapPreset): SnapConfig => ({
   ...config,

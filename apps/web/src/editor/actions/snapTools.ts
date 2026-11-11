@@ -15,13 +15,15 @@ import type { Item } from "../../domain/MapFile"
 import { prefabSnapKeyOf } from "../../domain/MapPrefs"
 import type { Construction, EndRef } from "../../domain/MapSidecar"
 import { withMirrorMesh } from "../../domain/mirror"
+import { documentOrigin } from "../../domain/prefab"
 import {
   defaultSnapConfig,
   isPreset,
   SNAP_PRESETS,
   type SnapConfig,
   type SnapPreset,
-  type SnapTarget
+  type SnapTarget,
+  withGridMoved
 } from "../../domain/snapConfig"
 import {
   angleBetweenFaces,
@@ -49,7 +51,7 @@ import {
   type WorldPlane
 } from "../../domain/snapTools"
 import { annotationsOf, freshKey, indexOfKey } from "../../domain/structure"
-import { IDENTITY_QUAT, ORIGIN, rotateVec, vecDot, vecSub } from "../../domain/ueMath"
+import { IDENTITY_QUAT, ORIGIN, rotateVec, vecDot, vecScale, vecSub } from "../../domain/ueMath"
 import {
   applyDelta,
   applyUnitOffsets,
@@ -62,6 +64,7 @@ import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { activePaneCamera } from "../paneCameras"
 import { snapMarks } from "../snap/snapMarks"
 import {
+  defaultSnapOf,
   docTransformOf,
   editedKeys,
   type EditorState,
@@ -137,16 +140,20 @@ export const preferSnap = (preference: SnapPreference) => {
 }
 
 /** Whether the tab's snap settings are what new maps start on. */
-export const snapIsDefault = (s: EditorState): boolean => Equal.equals(snapConfigOf(s), s.settings.snapping)
+export const snapIsDefault = (s: EditorState): boolean => Equal.equals(snapConfigOf(s), defaultSnapOf(s))
 
 /** Makes the tab's snap settings, all of them, what new maps start on (docs/SNAPPING.md § Settings). */
 export const saveSnapDefaults = () => {
   const s = useEditor.getState()
-  return saveSettings({ ...s.settings, snapping: snapConfigOf(s) })
+  // the defaults count the grid from the world's origin, as a map's positions do
+  return saveSettings({
+    ...s.settings,
+    snapping: withGridMoved(snapConfigOf(s), vecScale(documentOrigin(s.document), -1))
+  })
 }
 
 /** Gives the tab the snap settings new maps start on. */
-export const resetSnapToDefaults = () => applySnap(useEditor.getState().settings.snapping)
+export const resetSnapToDefaults = () => applySnap(defaultSnapOf(useEditor.getState()))
 
 /** Whether what new maps start on is the factory's. */
 export const snapDefaultsAreFactory = (s: Pick<EditorState, "settings">): boolean =>

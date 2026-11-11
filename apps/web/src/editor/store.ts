@@ -87,14 +87,14 @@ import {
 } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { localToWorld, type Pivot, pivotAt } from "../domain/pivot"
-import { isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/prefab"
+import { documentOrigin, isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/prefab"
 import type { PrefabFile } from "../domain/PrefabFile"
 import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
 import type { RecoveredTab } from "../domain/recovery"
 import { repeatCopies, repeatOffsets, type RepeatOptions, repeatProblem } from "../domain/repeat"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
-import type { SnapConfig, SnapTarget, SnapTransform } from "../domain/snapConfig"
+import { type SnapConfig, type SnapTarget, type SnapTransform, withGridMoved } from "../domain/snapConfig"
 import type { SnapRelation, TrackedPoint } from "../domain/snapFrame"
 import { type ArrangeOp, type FaceMeeting, mirroredPoint, type MirrorPlane } from "../domain/snapTools"
 import {
@@ -132,7 +132,7 @@ import {
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import { SURFACE_PROPERTY, surfaceOf, type Surfaces } from "../domain/surface"
 import { isSamePoint, trackedIn, trackedOn } from "../domain/trackedPoints"
-import { sameVec, vecAdd, vecSub } from "../domain/ueMath"
+import { ORIGIN, sameVec, vecAdd, vecSub } from "../domain/ueMath"
 import { type MapValidation, validateMap } from "../domain/validateMap"
 import {
   clampSplit,
@@ -2320,8 +2320,25 @@ export const nodeNamesOf = (s: Pick<EditorState, "doc" | "catalogIndex">): Reado
   ])
 
 /** The snap settings in force: the tab's own, else what a new map starts on. */
-export const snapConfigOf = (s: Pick<TabState, "snap"> & Pick<EditorState, "settings">): SnapConfig =>
-  s.snap ?? s.settings.snapping
+/** The last `defaultSnapOf` that moved the grid, so a selector reading it gets the same object while nothing changed. */
+let movedDefaults: { readonly from: SnapConfig; readonly by: Vec3; readonly moved: SnapConfig } | undefined
+
+/**
+ * What a tab without snap settings of its own snaps by: Settings', with the grid counted from where the tab's positions
+ * read 0 (`documentOrigin`), so a definition's grid runs through its origin marker (docs/SNAPPING.md § Settings).
+ */
+export const defaultSnapOf = (s: Pick<EditorState, "settings" | "document">): SnapConfig => {
+  const by = documentOrigin(s.document)
+  const from = s.settings.snapping
+  if (sameVec(by, ORIGIN)) return from
+  if (movedDefaults?.from !== from || !sameVec(movedDefaults.by, by)) {
+    movedDefaults = { from, by, moved: withGridMoved(from, by) }
+  }
+  return movedDefaults.moved
+}
+
+export const snapConfigOf = (s: Pick<TabState, "snap"> & Pick<EditorState, "settings" | "document">): SnapConfig =>
+  s.snap ?? defaultSnapOf(s)
 
 /** The sun as shown: the live preview, else the document. */
 export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? lightingOf(s.doc.map.worldSettings)

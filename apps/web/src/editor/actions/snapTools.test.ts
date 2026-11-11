@@ -1,13 +1,17 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
+import { Schema } from "effect"
 import { indexCatalog } from "../../domain/Catalog"
 import { editTransform } from "../../domain/editTransform"
 import { itemsBoxOf } from "../../domain/itemBounds"
 import { MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "../../domain/mirror"
+import { PREFAB_TAB_FRAME } from "../../domain/prefab"
+import { PrefabFile } from "../../domain/PrefabFile"
 import { defaultSettings } from "../../domain/Settings"
 import { defaultSnapConfig, SNAP_PRESETS, withTargetMoved } from "../../domain/snapConfig"
 import { defaultSnapPrefs } from "../../domain/snapPrefs"
 import { annotationsOf, findGroup } from "../../domain/structure"
 import { rotatorToQuat } from "../../domain/ueMath"
+import { PREFAB_TEXT } from "../../test/prefabs"
 import { catalogWithEnds, endAlongX, grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { activePaneCamera } from "../paneCameras"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
@@ -159,6 +163,32 @@ describe("snap settings", () => {
     assert.strictEqual(snapConfigOf(s()).targets.mesh.offset, defaultSettings.snapping.targets.mesh.offset)
     assert.strictEqual(snapConfigOf(s()).gridSize, 37, "back to the saved defaults")
     assert.isTrue(snapIsDefault(s()))
+    void saveSettings(defaultSettings)
+  })
+
+  it("keeps a definition's grid on its origin marker, and saves the defaults from where its positions read 0", () => {
+    const s = () => useEditor.getState()
+    useEditor.setState({
+      document: {
+        kind: "prefab",
+        tier: "user",
+        name: "P",
+        hash: "",
+        file: Schema.decodeSync(Schema.fromJsonString(PrefabFile))(PREFAB_TEXT),
+        sources: new Map()
+      },
+      snap: null
+    })
+    assert.isTrue(snapIsDefault(s()), "on the defaults, its grid moved to the marker")
+    updateSnap({ gridSize: 37 })
+    assert.deepStrictEqual(snapConfigOf(s()).targets.grid.origin, PREFAB_TAB_FRAME)
+    void saveSnapDefaults()
+    assert.deepStrictEqual(s().settings.snapping.targets.grid.origin, defaultSnapConfig.targets.grid.origin)
+    assert.isTrue(snapIsDefault(s()))
+    updateSnap({ gridSize: 50 })
+    resetSnapToDefaults()
+    assert.deepStrictEqual(snapConfigOf(s()).targets.grid.origin, PREFAB_TAB_FRAME)
+    assert.strictEqual(snapConfigOf(s()).gridSize, 37)
     void saveSettings(defaultSettings)
   })
 
