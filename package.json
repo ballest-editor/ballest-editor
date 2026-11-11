@@ -25,7 +25,7 @@
     "check:changed": "node tools/dev/src/check-changed.ts",
     "check:everything": "node tools/dev/src/run-turbo.ts run format:check lint knip dupes typecheck test build --continue",
     "dupes": "jscpd --config .config/jscpd.json",
-    "prepare": "husky"
+    "prepare": "husky && node tools/dev/src/link-turbo-cache.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",

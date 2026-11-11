@@ -4,20 +4,18 @@
 // nothing they read changed). The build and the full suites stay with CI. Prints a line per check, and the output of
 // what failed.
 //
-// Other agents share the machine. A run waits for one of two slots every worktree of this clone shares (slotLock.ts),
-// then runs its checks side by side within a budget sized from the cores and the memory free (stepBudget.ts). Each
-// check is killed with its process group after CHECK_CHANGED_TIMEOUT seconds (600); CHECK_CHANGED_BUDGET overrides
-// the budget.
+// Other agents share the machine. A run waits for one of two slots every worktree of this clone shares with the root
+// turbo scripts (checkSlot.ts), then runs its checks side by side within a budget sized from the cores and the memory
+// free (stepBudget.ts). Each check is killed with its process group after CHECK_CHANGED_TIMEOUT seconds (600);
+// CHECK_CHANGED_BUDGET overrides the budget.
 import { availableParallelism, totalmem } from "node:os"
-import { join } from "node:path"
 import { formattedFiles, lintedFiles } from "./changedChecks.ts"
-import { git, gitCommonDir } from "./git.ts"
-import { acquireSlot } from "./slotLock.ts"
+import { acquireCheckSlot } from "./checkSlot.ts"
+import { git } from "./git.ts"
 import { defaultBudget, killRunning, runProcess, runSteps, type Step } from "./stepBudget.ts"
-import { sharedTurboCache } from "./turbo.ts"
+import { linkTurboCache, sharedTurboCache } from "./turbo.ts"
 
 const MAX_OUTPUT_LINES = 200
-const SLOTS = 2
 /** Workers one check may run in parallel: turbo's task concurrency, oxlint's threads, vitest's workers. */
 const MAX_WORKERS = 4
 
@@ -40,14 +38,8 @@ if (!anythingChanged) {
 }
 
 const waitStarted = Date.now()
-const slot = await acquireSlot({
-  dir: join(gitCommonDir(), "check-changed"),
-  slots: SLOTS,
-  onWait: (holders) =>
-    console.log(
-      `Waiting for a check slot: ${SLOTS} runs are going in this clone's worktrees\n  ${holders.join("\n  ")}`
-    )
-})
+linkTurboCache()
+const slot = await acquireCheckSlot("pnpm check:changed")
 const waited = (Date.now() - waitStarted) / 1000
 if (waited >= 1) console.log(`Got check slot ${slot.index} after ${waited.toFixed(0)}s.`)
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
