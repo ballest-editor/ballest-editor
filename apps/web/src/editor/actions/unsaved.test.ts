@@ -9,7 +9,7 @@ import { readSample } from "../../test/samples"
 import { dirtyTabs, isBlankTab, isUnsavedTab, noTabOpen, tabLabelOf } from "../store"
 import { newMapEffect, openProjectMapFile } from "./maps"
 import { saveMapAsEffect, saveMapFile } from "./save"
-import { answerUnloadRequest, closeTabEffect, holdsUnload, unlessCancelled } from "./unsaved"
+import { answerUnloadRequest, closeTabEffect, holdsUnload, unlessCancelled, unlessCancelledIn } from "./unsaved"
 
 /** `layerFor`, with the page's close and reload recorded in `left` instead of done. */
 const layerLeavingInto = (disk: TestDisk, left: Array<string>) =>
@@ -144,6 +144,24 @@ describe("unsaved changes", () => {
       assert.strictEqual(disk.prompts.length, 2)
       assert.isTrue(noTabOpen(s()))
       assert.include(s(), { file: null, dirty: false })
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("replacing another tab's map under a gesture leaves it alone, not asking about the active tab", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* createNewMap("Big Loop", "Isaac")
+      yield* createNewMap("Second", "Isaac")
+      const [first, second] = s().tabIds
+      edit()
+      s().setLightingPreview(lightingOf(s().doc.map.worldSettings))
+      let ran = false
+      yield* unlessCancelledIn(first, "reimport", () => Effect.sync(() => void (ran = true)))
+      s().setLightingPreview(null)
+      assert.strictEqual(s().tabId, second)
+      assert.lengthOf(disk.prompts, 0)
+      assert.isFalse(ran)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

@@ -6,9 +6,22 @@ import { MapFile } from "../../domain/MapFile"
 import { MapSidecar } from "../../domain/MapSidecar"
 import { defaultSnapConfig } from "../../domain/snapConfig"
 import { annotationsOf } from "../../domain/structure"
-import { snapConfigOf, useEditor } from "../../editor/store"
+import { lightingOf } from "../../domain/sunlight"
+import { sceneRegistry } from "../../editor/sceneRegistry"
+import { snapConfigOf, tabStateOf, tabWithFile, useEditor } from "../../editor/store"
 import { projectFile, sidecarFile, TEST_MAPS_FOLDER, type TestDisk } from "../../test/desktopBridge"
-import { diskWithPlugin, edit, layerFor, playSample, reset, s, untilTrue } from "../../test/editorActions"
+import {
+  balledits,
+  diskWithPlugin,
+  edit,
+  fileNameOf,
+  layerFor,
+  playSample,
+  reset,
+  s,
+  untilTrue
+} from "../../test/editorActions"
+import { readSample } from "../../test/samples"
 import { exportToGameEffect, openInGameEffect, playEffect } from "./exportPlay"
 import { replaceInGameEffect } from "./gameWrite"
 import { openProjectMapFile } from "./maps"
@@ -410,5 +423,165 @@ describe("sync", () => {
       assert.strictEqual(disk.files.get(inGame), text)
       assert.strictEqual(stateNow(), "inSync")
     }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  describe("a change the game made to map B while a gesture is under way in map A's tab", () => {
+    const a = fileNameOf(balledits[0]!)
+    const b = fileNameOf(balledits[1]!)
+    const bText = readSample(balledits[1]!)
+    const lastId = () => s().doc.ids.at(-1)!
+    const timeOfDayOf = (tabId: string | undefined) =>
+      tabStateOf(s(), tabId ?? "")?.doc.map.worldSettings.directionalLight.timeOfDay
+    /** What the pointer does in tab A: `begin` on the press, `end` on the release; `edits` when it leaves a step. */
+    const gestures: ReadonlyArray<{
+      readonly name: string
+      readonly edits: boolean
+      readonly begin: () => void
+      readonly end: () => void
+    }> = [
+      {
+        name: "a paint stroke",
+        edits: true,
+        begin: () => {
+          assert.isTrue(s().beginPaintStroke())
+          assert.isTrue(s().paintSurface([lastId()], 2))
+        },
+        end: () => s().endPaintStroke()
+      },
+      {
+        name: "a gizmo drag or number scrub",
+        edits: true,
+        begin: () => {
+          const t = s().doc.map.items.at(-1)!.itemTransform
+          s().setPreview(new Map([[lastId(), { ...t, translation: { ...t.translation, z: t.translation.z + 50 } }]]))
+        },
+        end: () => {
+          const preview = s().preview!
+          s().setPreview(null)
+          assert.isTrue(s().transformItems(preview))
+        }
+      },
+      {
+        name: "an Alt+drag duplicate",
+        edits: true,
+        begin: () => {
+          s().select([lastId()])
+          assert.isDefined(s().beginDuplicateDrag())
+        },
+        end: () => {
+          const copy = lastId()
+          const t = s().doc.map.items.at(-1)!.itemTransform
+          const moved = { ...t, translation: { ...t.translation, z: t.translation.z + 50 } }
+          assert.isTrue(s().endDuplicateDrag(new Map([[copy, moved]])))
+        }
+      },
+      {
+        name: "a lighting slider",
+        edits: true,
+        begin: () => s().setLightingPreview({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 20 }),
+        end: () => {
+          const lighting = s().lightingPreview!
+          s().setLightingPreview(null)
+          s().setLighting(lighting)
+        }
+      },
+      {
+        name: "a box select",
+        edits: false,
+        begin: () => void (sceneRegistry.areaDragActive = () => true),
+        end: () => void (sceneRegistry.areaDragActive = () => false)
+      },
+      {
+        name: "a press on the selection a body drag would take",
+        edits: false,
+        begin: () => void (sceneRegistry.bodyDragPending = () => true),
+        end: () => void (sceneRegistry.bodyDragPending = () => false)
+      }
+    ]
+
+    /** No gesture left held by a case that failed half way. */
+    const noGesture = Effect.sync(() => {
+      s().endPaintStroke()
+      s().endDuplicateDrag(null)
+      s().setPreview(null)
+      s().setLightingPreview(null)
+      sceneRegistry.areaDragActive = () => false
+      sceneRegistry.bodyDragPending = () => false
+    })
+
+    const twoMapsDisk = () => diskWithPlugin({ [projectFile(a)]: readSample(balledits[0]!), [projectFile(b)]: bText })
+
+    /** A and B open in tabs of their own, B exported to the game and A the active tab. */
+    const bExportedAActive = Effect.gen(function*() {
+      yield* noGesture
+      yield* reset
+      yield* openProjectMapFile(b)
+      yield* exportToGameEffect
+      yield* checkExportsEffect
+      const bTab = s().tabId
+      yield* openProjectMapFile(a)
+      const aTab = s().tabId
+      assert.notStrictEqual(aTab, bTab)
+      return { aTab, bTab }
+    })
+
+    for (const gesture of gestures) {
+      it.live(`waits for ${gesture.name} to end, then re-imports B into B's own tab`, () => {
+        const disk = twoMapsDisk()
+        return Effect.gen(function*() {
+          const { aTab, bTab } = yield* bExportedAActive
+          const bTimeOfDay = timeOfDayOf(bTab)
+          const aDoc = s().doc
+          const aSteps = s().past.length
+
+          gesture.begin()
+          disk.files.set(`${TEST_MAPS_FOLDER}/${b}`, savedInGame(bText, 3.5))
+          const checks = disk.exportChecks
+          const check = yield* Effect.forkChild(checkExportsEffect)
+          yield* untilTrue(() => disk.exportChecks > checks)
+          yield* Effect.sleep("50 millis")
+          // held: nothing has been written anywhere yet
+          assert.strictEqual(s().tabId, aTab)
+          assert.strictEqual(tabWithFile(s(), a), aTab)
+          assert.strictEqual(timeOfDayOf(bTab), bTimeOfDay)
+          assert.strictEqual(disk.files.get(projectFile(b)), bText)
+
+          gesture.end()
+          yield* Fiber.join(check)
+          assert.lengthOf(disk.prompts, 0)
+          // B's tab holds the game's version, clean
+          assert.strictEqual(tabWithFile(s(), b), bTab)
+          assert.strictEqual(timeOfDayOf(bTab), 3.5)
+          assert.isFalse(tabStateOf(s(), bTab)!.dirty)
+          // A's tab still holds A, with the gesture as its one new step
+          assert.strictEqual(tabWithFile(s(), a), aTab)
+          const aNow = tabStateOf(s(), aTab)!
+          assert.strictEqual(aNow.past.length, aSteps + (gesture.edits ? 1 : 0))
+          assert.strictEqual(aNow.dirty, gesture.edits)
+          assert.strictEqual(aNow.past.at(-1)?.doc ?? aDoc, aDoc)
+        }).pipe(Effect.provide(layerFor(disk)))
+      })
+    }
+
+    it.live("asks about B's tab, not A's, when A has unsaved edits", () => {
+      const disk = twoMapsDisk()
+      return Effect.gen(function*() {
+        const { aTab, bTab } = yield* bExportedAActive
+        edit()
+        const aDoc = s().doc
+
+        s().setLightingPreview({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 20 })
+        disk.files.set(`${TEST_MAPS_FOLDER}/${b}`, savedInGame(bText, 3.5))
+        const check = yield* Effect.forkChild(checkExportsEffect)
+        yield* Effect.sleep("50 millis")
+        s().setLightingPreview(null)
+        yield* Fiber.join(check)
+        // B had nothing to lose: no prompt, and A's edits stay in A's tab
+        assert.lengthOf(disk.prompts, 0)
+        assert.strictEqual(timeOfDayOf(bTab), 3.5)
+        assert.strictEqual(tabStateOf(s(), aTab)!.doc, aDoc)
+        assert.isTrue(tabStateOf(s(), aTab)!.dirty)
+      }).pipe(Effect.provide(layerFor(disk)))
+    })
   })
 })

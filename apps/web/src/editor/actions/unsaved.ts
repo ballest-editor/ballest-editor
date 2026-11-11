@@ -61,7 +61,8 @@ export const unlessAnyCancelled = <E, R>(
 
 /**
  * Runs `next` for what tab `tabId` has open, which is about to be replaced: that tab is made active and asked about first
- * (`unlessCancelled`), and `next` hears `true`. With no such tab it runs at once with `false`.
+ * (`unlessCancelled`), and `next` hears `true`. With no such tab it runs at once with `false`. A tab a gesture under way
+ * keeps from being made active is left alone, as on Cancel: the prompt would ask about the active one.
  */
 export const unlessCancelledIn = <E, R>(
   tabId: string | undefined,
@@ -71,6 +72,7 @@ export const unlessCancelledIn = <E, R>(
   Effect.suspend(() => {
     if (tabId === undefined) return next(false)
     useEditor.getState().activateTab(tabId)
+    if (useEditor.getState().tabId !== tabId) return Effect.void
     return unlessCancelled(action, next(true))
   })
 

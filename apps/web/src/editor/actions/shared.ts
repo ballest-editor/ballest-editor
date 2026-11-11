@@ -16,6 +16,7 @@ import { isDefaultViewLayout } from "../../domain/viewLayout"
 import { MapCodec } from "../../services/MapCodec"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { type NotificationAction, Platform, type ProjectMap } from "../../services/Platform"
+import { sceneRegistry } from "../sceneRegistry"
 import {
   type Doc,
   fileTabOf,
@@ -38,6 +39,22 @@ export const refreshProject = Effect.gen(function*() {
 })
 
 export const fileOf = (map: ProjectMap): OpenFile => ({ name: map.fileName, path: map.path })
+
+/**
+ * Whether a gesture is under way: a drag, scrub, slider or paint stroke holding its change back (the store's), a box or
+ * lasso, or a press on the selection that a body drag would take.
+ */
+const gestureUnderway = () =>
+  useEditor.getState().gestureUnderway() || sceneRegistry.gizmoDragActive() || sceneRegistry.bodyDragPending()
+  || sceneRegistry.areaDragActive() || sceneRegistry.paintStrokeActive()
+
+/**
+ * Waits until no gesture is under way (`gestureUnderway`), looking again every 50 ms: what the game changed comes into
+ * a tab only between gestures, never under one (docs/DESKTOP.md § Sync).
+ */
+export const afterGestures: Effect.Effect<void> = Effect.suspend(() =>
+  gestureUnderway() ? Effect.sleep("50 millis").pipe(Effect.andThen(afterGestures)) : Effect.void
+)
 
 /** A notification's Reveal: the project's maps folder, or the game's. */
 export const revealIn = (where: "project" | "game"): NotificationAction => ({
@@ -162,8 +179,13 @@ export const showMap = Effect.fn("showMap")(function*(
     loaded: options?.loaded
   })
   const state = useEditor.getState()
+  const into = options?.into
   // a background tab is the one just added, which has the file
-  const tabId = options?.into === "backgroundTab" && file !== null ? tabWithFile(state, file.name) : state.tabId
+  const tabId = typeof into === "object"
+    ? into.tabId
+    : into === "backgroundTab" && file !== null
+    ? tabWithFile(state, file.name)
+    : state.tabId
   if (tabId !== undefined) yield* followDefinitionsIn(tabId)
 })
 
