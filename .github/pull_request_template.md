@@ -4,4 +4,4 @@
 
 ## Testing
 
-- `pnpm check:everything`
+- `pnpm check:changed` (CI runs `pnpm check:everything`)

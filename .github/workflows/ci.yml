@@ -20,6 +20,9 @@ jobs:
     env:
       TURBO_TELEMETRY_DISABLED: "1"
       HUSKY: "0"
+      # Vercel Remote Cache (turbo.json's remoteCache): tasks a worktree or an earlier run already did replay here.
+      # Unset on forks' pull requests, where turbo uses only the cache step below.
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

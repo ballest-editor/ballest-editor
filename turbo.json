@@ -2,6 +2,9 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
   "cacheDir": "node_modules/.cache/turbo",
+  // Vercel Remote Cache, shared by CI and every machine with a token: TURBO_TOKEN in CI, `turbo login` locally.
+  // Without a token turbo uses only the local cache.
+  "remoteCache": { "teamId": "team_Gzvt95jCGuNmUHVYHwN7N7K6" },
   "tasks": {
     // No script: lets a package's hash include its dependencies' sources without
     // waiting for their tasks (typecheck/test run in parallel across packages).
@@ -17,6 +20,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.config/tsconfig.base.json",
+        "$TURBO_ROOT$/.config/vitest.ts",
         "$TURBO_ROOT$/samples/**",
         "$TURBO_ROOT$/assets/**"
       ]
