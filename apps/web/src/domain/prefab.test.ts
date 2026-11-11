@@ -9,6 +9,7 @@ import { itemFromPiece, placementTransform } from "./factory"
 import { DEFAULT_PLAYER_START } from "./level"
 import { type Item, objectPathOf } from "./MapFile"
 import {
+  documentOrigin,
   freePrefabName,
   isPrefabName,
   itemOfPrefab,
@@ -127,6 +128,14 @@ describe("a definition's tab", () => {
       y: DEFAULT_PLAYER_START.y,
       z: DEFAULT_PLAYER_START.z - 250.5
     })
+  })
+
+  it("reads its positions from the prefab's frame, as the file stores them, where a map reads the world's", () => {
+    const origin = documentOrigin({ kind: "prefab" })
+    const { x, y, z } = map.items[0]!.itemTransform.translation
+    const [fx, fy, fz] = prefab.items[0]!.transform.location
+    expectVec({ x: x - origin.x, y: y - origin.y, z: z - origin.z }, { x: fx, y: fy, z: fz })
+    assert.deepStrictEqual(documentOrigin({ kind: "map" }), ORIGIN)
   })
 
   it("writes untouched items back as they came, paint and all", () => {

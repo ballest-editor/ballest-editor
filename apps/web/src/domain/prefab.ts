@@ -183,6 +183,13 @@ export const prefabOfItems = (items: ReadonlyArray<Item>, catalog: CatalogIndex 
  */
 export const PREFAB_TAB_FRAME: Vec3 = DEFAULT_PLAYER_START
 
+/**
+ * The world point a document's positions are read from and typed against: a definition's tab measures from the prefab's
+ * frame, where its origin marker sits, and a map from the world's origin. Positions in the store stay world positions.
+ */
+export const documentOrigin = (document: { readonly kind: "map" | "prefab" }): Vec3 =>
+  document.kind === "prefab" ? PREFAB_TAB_FRAME : ORIGIN
+
 /** A definition as a tab holds it: a map-like document with the prefab's items and nothing else. */
 export const mapOfPrefab = (name: string, prefab: PrefabFile, catalog: CatalogIndex | null): MapFile => ({
   ...newMapFile({ displayName: name, creatorName: "", createdAt: "" }),
