@@ -97,8 +97,9 @@ const steps: ReadonlyArray<Step> = [
   {
     name: "tests",
     weight: MAX_WORKERS,
+    // One package's suite at a time, with every slot as a vitest worker: several at once would multiply the workers.
     run: (slots) =>
-      turbo(slots, "test", "--affected", "--", `--changed=${base}`, "--passWithNoTests", `--maxWorkers=${slots}`)
+      turbo(1, "test", "--affected", "--", `--changed=${base}`, "--passWithNoTests", `--maxWorkers=${slots}`)
   }
 ]
 
