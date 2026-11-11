@@ -3,9 +3,9 @@ import { indexCatalog } from "../../domain/Catalog"
 import { editTransform } from "../../domain/editTransform"
 import { itemsBoxOf } from "../../domain/itemBounds"
 import { MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "../../domain/mirror"
-import { PREFAB_TAB_FRAME } from "../../domain/prefab"
+import { documentOrigin, PREFAB_TAB_FRAME } from "../../domain/prefab"
 import { defaultSettings } from "../../domain/Settings"
-import { defaultSnapConfig, SNAP_PRESETS, withTargetMoved } from "../../domain/snapConfig"
+import { defaultSnapConfig, gridScrubOf, SNAP_PRESETS, withTargetMoved } from "../../domain/snapConfig"
 import { nearestGridPoint } from "../../domain/snapGrid"
 import { defaultSnapPrefs } from "../../domain/snapPrefs"
 import { annotationsOf, findGroup } from "../../domain/structure"
@@ -553,6 +553,9 @@ describe("a definition's grid", () => {
     assert.deepStrictEqual(config.targets.grid.origin, PREFAB_TAB_FRAME)
     assert.deepStrictEqual(nearestGridPoint(config, PREFAB_TAB_FRAME), PREFAB_TAB_FRAME)
     assert.strictEqual(snapConfigOf(s()), config, "the same object while nothing changes, as a selector needs")
+    // the Inspector's Location reads 0 on the marker, and a scrub steps from there
+    pickGridSize(50)
+    assert.deepStrictEqual(gridScrubOf(snapConfigOf(s()), "x", documentOrigin(s().document)), { step: 50, from: 0 })
   })
 
   it("keeps a picked origin where it was picked, and World puts it back on the prefab's origin", () => {
