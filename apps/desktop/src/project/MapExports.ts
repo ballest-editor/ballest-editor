@@ -2,6 +2,7 @@ import {
   type ExportChecks,
   type ExportMapPayload,
   type ExportMapResult,
+  FileLimit,
   fileTextProblems,
   isMapFileName,
   type MapLink,
@@ -77,6 +78,7 @@ export class MapExports extends Context.Service<MapExports, {
     const links = yield* MapLinks
     const game = yield* GamePaths
     const backupStore = yield* Backups
+    const limit = yield* FileLimit
     const windows = yield* ElectronWindow
     const gameProcess = yield* GameProcess
     // A check looks at a game file and then at its link, and an Export writes one and then the other: run together,
@@ -136,7 +138,7 @@ export class MapExports extends Context.Service<MapExports, {
       const bytes = yield* fs.readFile(source).pipe(
         Effect.mapError((cause) => projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", source)(cause))
       )
-      const problems = fileTextProblems(new TextDecoder().decode(bytes))
+      const problems = fileTextProblems(new TextDecoder().decode(bytes), limit.charactersPerFile)
       if (problems.length > 0) return yield* new MapRefusedError({ message: problems.join(" ") })
       const file = path.join(yield* game.mapsFolderForWrite, fileName)
 

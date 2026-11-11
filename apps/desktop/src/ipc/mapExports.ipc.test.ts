@@ -1,13 +1,13 @@
 import {
-  CHARACTERS_PER_FILE,
   ExportChecks,
   ExportMapResult,
+  FileLimit,
+  fileLimitOf,
   GameMaps,
   ImportMapResult,
   InvokeChannels,
   MapBackupFile,
   MapBackups,
-  MAX_FILE_BYTES,
   OpenedMapFile,
   ProjectMapFile,
   ProjectMaps
@@ -384,8 +384,11 @@ describe("MapExports over IPC", () => {
       })
     ))
 
-  // `truncate` grows a file with holes, so these write nothing to disk until Export copies one.
-  it.effect("refuses a file past the game's character limit, as the file is now, and writes nothing", () =>
+  const limit = fileLimitOf(64)
+
+  // A small limit, so the rule is proved without reading the game's (fileLimit.ipc.test.ts proves that one). `truncate`
+  // grows a file with NULs, one byte and one character each.
+  it.effect("refuses a file past the character limit, as the file is now, and writes nothing", () =>
     withHandlers(({ fake, project, steam }) =>
       Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
@@ -406,23 +409,23 @@ describe("MapExports over IPC", () => {
         const linked = yield* linkOf
 
         // Grown by hand after the app read it: the open tab still shows a clean map, so nothing goes through Save.
-        yield* fs.truncate(path.join(project, "maps", name), CHARACTERS_PER_FILE + 1)
+        // 65 characters in 66 bytes, as `é` is two.
+        const file = path.join(project, "maps", name)
+        yield* fs.writeFileString(file, "é")
+        yield* fs.truncate(file, limit.charactersPerFile + 2)
         const refused = yield* Effect.flip(exportIt)
-        assert.match(
-          String(refused.cause),
-          /^MapRefusedError: The map's file has 67108865 characters \(maximum 67108864\)/
-        )
+        assert.match(String(refused.cause), /^MapRefusedError: The map's file has 65 characters \(maximum 64\)/)
         assert.strictEqual(yield* fs.readFileString(inGame), "{}")
         assert.deepStrictEqual((yield* linkOf)?.export, linked?.export)
         // Nor could it be opened again: only a tab from before it grew gets as far as Export.
         // Counted once read, and by its size first when no count could bring it under.
-        for (const bytes of [CHARACTERS_PER_FILE + 1, MAX_FILE_BYTES + 1]) {
-          yield* fs.truncate(path.join(project, "maps", name), bytes)
+        for (const bytes of [limit.charactersPerFile + 2, limit.maxFileBytes + 1]) {
+          yield* fs.truncate(file, bytes)
           const unread = yield* Effect.flip(fake.invoke(InvokeChannels.readMap, { fileName: name }))
-          assert.match(String(unread.cause), /more characters than the game loads \(67108864\)/)
+          assert.match(String(unread.cause), /more characters than the game loads \(64\)/)
         }
       })
-    ))
+    ).pipe(Effect.provideService(FileLimit, limit)))
 
   it.effect(
     "counts characters, not bytes: a file at the limit in characters but past it in bytes goes everywhere",
@@ -433,14 +436,14 @@ describe("MapExports over IPC", () => {
           const path = yield* Path.Path
           // `é` is two bytes and one character, and a BOM isn't a character of the text the game reads.
           const files = [
-            { name: "Map_LevelEditorMain&Wide_me.balledit", text: "é", bytes: CHARACTERS_PER_FILE + 1 },
-            { name: "Map_LevelEditorMain&Marked_me.balledit", text: "\uFEFFé", bytes: CHARACTERS_PER_FILE + 4 }
+            { name: "Map_LevelEditorMain&Wide_me.balledit", text: "é", bytes: limit.charactersPerFile + 1 },
+            { name: "Map_LevelEditorMain&Marked_me.balledit", text: "\uFEFFé", bytes: limit.charactersPerFile + 4 }
           ]
           for (const { bytes, name, text } of files) {
             yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text })
             yield* fs.truncate(path.join(project, "maps", name), bytes)
             const opened = yield* fake.invokeAs(ProjectMapFile, InvokeChannels.readMap, { fileName: name })
-            assert.strictEqual(opened.text.length, CHARACTERS_PER_FILE)
+            assert.strictEqual(opened.text.length, limit.charactersPerFile)
 
             yield* fake.invoke(InvokeChannels.exportMap, {
               fileName: name,
@@ -454,11 +457,10 @@ describe("MapExports over IPC", () => {
             const listed = yield* fake.invokeAs(GameMaps, InvokeChannels.listGameMaps)
             assert.include(listed.map((map) => map.fileName), name)
             const picked = yield* fake.invokeAs(OpenedMapFile, InvokeChannels.pickGameMap, { fileName: name })
-            assert.strictEqual(picked.text.length, CHARACTERS_PER_FILE)
+            assert.strictEqual(picked.text.length, limit.charactersPerFile)
           }
         })
-      ),
-    30_000
+      ).pipe(Effect.provideService(FileLimit, limit))
   )
 
   it.effect("drops no link while the game's maps folder isn't there", () =>

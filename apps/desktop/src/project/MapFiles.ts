@@ -1,5 +1,6 @@
 import {
   type BackupRef,
+  FileLimit,
   fileTextProblems,
   type GameMap,
   type GameMaps,
@@ -12,7 +13,6 @@ import {
   type MapBackups,
   type MapLink,
   type MapThumbnailPng,
-  MAX_FILE_BYTES,
   type OpenedMapFile,
   type ProjectMap,
   type ProjectMapFile,
@@ -33,7 +33,8 @@ import {
   projectError,
   Projects,
   readError,
-  thumbnailsFolderIn
+  thumbnailsFolderIn,
+  tooLargeError
 } from "./Projects"
 
 const PublishedIdFields = Schema.Struct({
@@ -139,6 +140,7 @@ export class MapFiles extends Context.Service<MapFiles, {
     const links = yield* MapLinks
     const game = yield* GamePaths
     const backupStore = yield* Backups
+    const limit = yield* FileLimit
 
     const picked = new Set<string>()
     const same = (a: string, b: string) => isSamePath(path, a, b, platform)
@@ -203,11 +205,14 @@ export class MapFiles extends Context.Service<MapFiles, {
      */
     const readMapFile = (file: string) =>
       fs.stat(file).pipe(
-        Effect.filterOrFail((stat) => Number(stat.size) <= MAX_FILE_BYTES, () => projectError("tooLarge", file)()),
+        Effect.filterOrFail((stat) => Number(stat.size) <= limit.maxFileBytes, () => tooLargeError(file, limit)),
         Effect.andThen(fs.readFile(file)),
         Effect.catchTag("PlatformError", (cause) => Effect.fail(readError(file)(cause))),
         Effect.map((bytes) => ({ bytes, text: new TextDecoder().decode(bytes) })),
-        Effect.filterOrFail(({ text }) => fileTextProblems(text).length === 0, () => projectError("tooLarge", file)())
+        Effect.filterOrFail(
+          ({ text }) => fileTextProblems(text, limit.charactersPerFile).length === 0,
+          () => tooLargeError(file, limit)
+        )
       )
 
     const readBytes = (file: string) => Effect.map(readMapFile(file), ({ bytes }) => bytes)
@@ -336,7 +341,7 @@ export class MapFiles extends Context.Service<MapFiles, {
       const gameMapOf = Effect.fnUntraced(function*(fileName: string) {
         const file = path.join(folder.value, fileName)
         const stat = yield* fs.stat(file)
-        if (stat.type !== "File" || Number(stat.size) > MAX_FILE_BYTES) return Option.none<GameMap>()
+        if (stat.type !== "File" || Number(stat.size) > limit.maxFileBytes) return Option.none<GameMap>()
         const { hash, ...summary } = yield* cached(file, stampOf(stat))
         return Option.some<GameMap>({
           fileName,
