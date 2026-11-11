@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import * as THREE from "three"
 import { threeToUeVector } from "../domain/coords"
-import { axisOf, dot, gridLevels, MAX_GRID_LEVELS, ORTHO_AXES } from "../domain/orthoView"
+import { axisOf, dot, gridLevels, MAX_GRID_LEVELS, orthoAxesOf } from "../domain/orthoView"
 import { gridColorsOf } from "../domain/Settings"
 import { snapsGrid } from "../domain/snapConfig"
 import { gridInView } from "../domain/snapGrid"
@@ -121,7 +121,7 @@ export function OrthoGrid() {
     // Square to the view, the lines belong over the pieces. On the way there the pieces are still turning under them.
     material.depthTest = pane.easing
     uniforms.uDepth.value = pane.easing ? BEHIND_THE_MAP : 0
-    const { right, up } = ORTHO_AXES[view]
+    const { right, up } = orthoAxesOf(view, pane.roll)
     const snapping = snapConfigOf(useEditor.getState())
     const target = threeToUeVector(pane.target)
     const cmPerPixel = pane.cmPerPixel / window.devicePixelRatio
