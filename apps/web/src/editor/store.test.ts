@@ -1720,6 +1720,58 @@ describe("groups and the selection", () => {
     assert.strictEqual(groupPivot()?.choice, "point")
   })
 
+  it("gives a turned group's copies its pivot and axes, from Duplicate, Paste and an Alt+drag", () => {
+    const { a, b, c, outer } = nestedMap()
+    // turn the whole group 30° about z, about x 100: its frame turns with it
+    const half = Math.PI / 12
+    const turn = { x: 0, y: 0, z: Math.sin(half), w: Math.cos(half) }
+    state().transformItems(
+      new Map([a, b, c].map((id) => {
+        const { x, y, z } = transformOf(id).translation
+        const [dx, cos, sin] = [x - 100, Math.cos(2 * half), Math.sin(2 * half)]
+        return [id, { ...transformOf(id), rotation: turn, translation: { x: 100 + dx * cos, y: y + dx * sin, z } }]
+      }))
+    )
+    const frameOf = (keys: ReadonlyArray<string>, shift = 0) => {
+      state().select(keys)
+      const target = selectionPivot(state(), transformOf)!
+      const { x, y, z } = target.pivot
+      return [x - shift, y, z, target.rotation.x, target.rotation.y, target.rotation.z, target.rotation.w]
+    }
+    const sameFrame = (copy: ReadonlyArray<number>, original: ReadonlyArray<number>, what: string) =>
+      original.forEach((v, i) => assert.closeTo(copy[i]!, v, 1e-6, what))
+    const pivots = [
+      { choice: "Top" },
+      { choice: "item", key: b },
+      { choice: "point", world: { x: 40, y: 30, z: 20 } }
+    ] as const
+    for (const pivot of pivots) {
+      state().setGroupPivot(outer, pivot)
+      const original = frameOf([a, b, c])
+      assert.closeTo(original[5]!, turn.z, 1e-6, `${pivot.choice}: the group's own axes, turned`)
+
+      state().duplicateSelection()
+      sameFrame(frameOf(state().selectedIds), original, `${pivot.choice}: Duplicate`)
+      state().undo()
+
+      state().select([a, b, c])
+      state().copySelection()
+      state().paste()
+      sameFrame(frameOf(state().selectedIds), original, `${pivot.choice}: Paste`)
+      state().undo()
+
+      state().select([a, b, c])
+      const copies = [...state().beginDuplicateDrag()!.values()]
+      const moved = new Map(copies.map((id) => {
+        const t = transformOf(id)
+        return [id, { ...t, translation: { ...t.translation, x: t.translation.x + 1000 } }]
+      }))
+      assert.isTrue(state().endDuplicateDrag(moved))
+      sameFrame(frameOf(copies, 1000), original, `${pivot.choice}: Alt+drag`)
+      state().undo()
+    }
+  })
+
   it("shows a Point pivot carried by a live move, and left alone by a live turn or scale", () => {
     const { a, b, c, outer } = nestedMap()
     state().select([a, b, c])
