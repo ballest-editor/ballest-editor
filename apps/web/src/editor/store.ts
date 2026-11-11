@@ -44,6 +44,7 @@ import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
 import {
+  atClickLevel,
   canGroupSelection,
   clickLevelOf,
   enteredLevelOf,
@@ -806,6 +807,8 @@ export interface EditorState extends TabState {
   readonly beginPaintStroke: () => boolean
   /** Ends a paint stroke: everything it painted is one undo step, and a stroke that changed nothing leaves none. */
   readonly endPaintStroke: () => void
+  /** Calls off a paint stroke: the document goes back to where it began, leaving no undo step. */
+  readonly cancelPaintStroke: () => void
   /**
    * Sets properties on every selected item as one undo step (a colour's three channels are
    * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
@@ -891,7 +894,10 @@ export interface EditorState extends TabState {
   readonly doubleClickItem: (key: string) => void
   /** Sets the entered group (null: none), keeping the selection. */
   readonly enterGroup: (groupId: string | null) => void
-  /** Steps out of the entered group, selecting it; with none entered, clears the selection. */
+  /**
+   * One step of Escape's stack once nothing is under way (docs/DESKTOP.md § Escape): restores a maximised pane, or else
+   * steps out of the entered group and selects it, or else clears the selection. Tracking points go with any step.
+   */
   readonly deselect: () => void
   /** Checks the document against the game's format; `shownValidation` has the result until the next edit. */
   readonly validateDoc: () => void
@@ -1251,16 +1257,24 @@ export const useEditor = create<EditorState>()((set, get) => {
   /** A paint edit: its own undo step, or part of the stroke under way. */
   const commitPaint = (doc: Doc) => (paintStrokeBase === null ? commit(doc) : set({ doc }))
 
-  /** Swaps in a history snapshot; its selection is restored for the items that still exist. */
+  /**
+   * Swaps in a history snapshot; its selection is restored for the items that still exist, whole at the click level of
+   * the group entered now, so an undo never leaves part of a group selected.
+   */
   const restore = (s: EditorState, snapshot: Snapshot) => {
     const doc = snapshot.selectionOnly ? s.doc : snapshot.doc
     const existing = new Set(doc.ids)
+    const enteredGroupId = keptEnteredGroup(doc, s.enteredGroupId)
     return {
       doc,
       dirty: doc !== s.savedDoc || s.snap !== s.savedSnap,
       editedAt: snapshot.selectionOnly ? s.editedAt : new Date().toISOString(),
-      selectedIds: snapshot.selectedIds.filter((id) => existing.has(id)),
-      enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
+      selectedIds: atClickLevel(
+        doc.structure.tree,
+        snapshot.selectedIds.filter((id) => existing.has(id)),
+        enteredGroupId
+      ),
+      enteredGroupId,
       // the side being left, for the opposite stack
       current: {
         doc: s.doc,
@@ -1632,6 +1646,12 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (before !== null && doc !== before.doc) commit(doc, {}, before)
     },
 
+    cancelPaintStroke: () => {
+      const before = paintStrokeBase
+      paintStrokeBase = null
+      if (before !== null) set({ doc: before.doc, selectedIds: before.selectedIds })
+    },
+
     setSelectionProperties: (changes) => {
       const s = get()
       const indices = selectedIndices(s)
@@ -1908,7 +1928,14 @@ export const useEditor = create<EditorState>()((set, get) => {
     },
     enterGroup: (enteredGroupId) => set({ enteredGroupId }),
     deselect: () => {
-      const { doc, enteredGroupId, select } = get()
+      const { doc, enteredGroupId, select, togglePaneMaximised, tracked, viewLayout } = get()
+      // tracking points never cost a press of their own (RULES § 7): they go with whichever step this is
+      if (tracked.length > 0) set({ tracked: [] })
+      const maximised = maximisedSlotOf(viewLayout)
+      if (maximised !== undefined) {
+        togglePaneMaximised(maximised)
+        return
+      }
       if (enteredGroupId === null) {
         select([])
         return

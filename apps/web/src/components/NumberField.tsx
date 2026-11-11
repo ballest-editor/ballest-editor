@@ -2,8 +2,10 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react"
+import { cancelsGesture } from "../domain/Keybinds"
 import { applyNumberEntry, parseNumberEntry, scrubbedValue, scrubSpeedOf } from "../domain/numberEntry"
 import { clearStatusHint, showStatusHint, type StatusHint } from "../editor/statusHint"
+import { useEditor } from "../editor/store"
 
 /** Pixels the pointer must travel before a press becomes a scrub (else it's a click). */
 const SCRUB_THRESHOLD = 3
@@ -75,7 +77,7 @@ function useScrub(options: {
       // `onMouseDown` holds the focus where it is, so this has to end another field's typing itself
       if (activeElement instanceof fieldWindow.HTMLElement) activeElement.blur()
       const onKeyDown = (k: KeyboardEvent) => {
-        if (k.code !== "Escape") return
+        if (!cancelsGesture(useEditor.getState().keybinds, "scrub", k)) return
         k.preventDefault()
         k.stopImmediatePropagation() // don't also deselect
         end(false)

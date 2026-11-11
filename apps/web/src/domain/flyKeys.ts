@@ -6,7 +6,8 @@
  * another movement key is already flying the camera, and otherwise is left to its shortcut.
  * Under "nothing" it does both: it always flies, and its shortcut fires on press too.
  */
-import { baseCodeOf, isBoundChord, isOneShotChord, type Keybinds } from "./Keybinds"
+import { actionWhen, baseCodeOf, isBoundChord, isOneShotChord, type Keybinds } from "./Keybinds"
+import { type Drag, matches } from "./keyContext"
 
 /** "all" matches the game: every movement key waits for the look button. */
 export const movementLookModes = ["all", "upDown", "conflicting", "nothing"] as const
@@ -22,17 +23,34 @@ export const needsLook = (mode: MovementLookMode, action: MovementAction): boole
 /** Do movement keys that are also shortcuts fly any time (and fire their shortcut as well)? */
 export const sharedKeysFlyFreely = (mode: MovementLookMode): boolean => mode === "nothing"
 
+/** Does the camera action work during `drag` (`actionWhen`): the fly, look and speed keys, and the wheel with them? */
+export const cameraKeyLive = (action: CameraKeyAction, drag: Drag): boolean =>
+  matches(actionWhen[action], { drag, tool: "select", platform: "desktop" })
+
+export type CameraKeyAction =
+  | MovementAction
+  | "lookLeft"
+  | "lookRight"
+  | "lookUp"
+  | "lookDown"
+  | "fastMove"
+  | "speedFaster"
+
 /**
- * The movement actions that fly the camera, given which bindings are held. `holds` hears `atOnce` for a key that only
- * flies while looking, during a look: no hotkey fires in a camera drag, so a bare modifier has no chord to wait for.
+ * The movement actions that fly the camera during `drag`, given which bindings are held. A look (`camera`) lets the keys
+ * that need it fly. `holds` hears `atOnce` for a key that only flies while looking, during a look: no hotkey fires in a
+ * camera drag, so a bare modifier has no chord to wait for.
  */
 export const flyingActions = (
   keybinds: Keybinds,
   mode: MovementLookMode,
-  looking: boolean,
+  drag: Drag,
   holds: (binding: string, atOnce: boolean) => boolean
 ): ReadonlySet<MovementAction> => {
-  const allowed = movementActions.filter((action) => looking || !needsLook(mode, action))
+  const looking = drag === "camera"
+  const allowed = movementActions.filter((action) =>
+    cameraKeyLive(action, drag) && (looking || !needsLook(mode, action))
+  )
   const heldWhere = (action: MovementAction, shortcut: boolean): boolean =>
     keybinds[action].some((binding) =>
       holds(binding, looking && needsLook(mode, action)) && isOneShotChord(keybinds, binding) === shortcut

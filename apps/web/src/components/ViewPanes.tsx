@@ -32,7 +32,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentProps, type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react"
-import { type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
+import { cancelsGesture, type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
 import {
   cornerPaneOf,
   maximisedSlotOf,
@@ -365,7 +365,7 @@ function PaneCard({ pane, projection, disabled, active, inCorner, drag }: {
   useEffect(() => {
     if (!dragging) return
     const cancel = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return
+      if (!cancelsGesture(useEditor.getState().keybinds, "pane", e)) return
       e.stopPropagation()
       press.current = null
       onCancel()

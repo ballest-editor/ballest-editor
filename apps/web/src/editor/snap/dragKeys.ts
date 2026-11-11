@@ -6,9 +6,9 @@
 import {
   actionWhen,
   bindingHeld,
+  cancelsGesture,
   chordOf,
   duringDragActions,
-  firesHere,
   type KeybindAction,
   keybindActionHints,
   keybindActions,
@@ -174,10 +174,8 @@ export const handleDragKey = (
  * Whether `e` is the drag's cancel key: `cancelDrag`, live in the drags the gizmo and a body drag make. The key counts
  * bare too, so Escape cancels with Shift (hold), Ctrl (snapping off) or Alt (a copy's drag) still down.
  */
-export const cancelsDrag = (state: DragKeyState, e: DragKeyEvent, keybinds: Keybinds): boolean => {
-  const ctx = dragContext(state.transform)
-  return firesHere(keybinds, ctx, "cancelDrag", chordOf(e)) || firesHere(keybinds, ctx, "cancelDrag", e.code)
-}
+export const cancelsDrag = (state: DragKeyState, e: DragKeyEvent, keybinds: Keybinds): boolean =>
+  cancelsGesture(keybinds, state.transform, e)
 
 /** One of the status bar's hints: the keys, and the word for what they do. */
 export interface DragHint {

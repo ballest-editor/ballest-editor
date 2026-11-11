@@ -3,6 +3,7 @@ import { formsChord } from "./flyKeys"
 import {
   actionsFor,
   actionWhen,
+  cancelsGesture,
   clashingChords,
   conflictingBindings,
   defaultKeybinds,
@@ -423,10 +424,12 @@ describe("the caption under an action", () => {
     expect(caption("snapHold")).toBe("While moving or turning")
     expect(caption("snapLockX")).toBe("While moving")
     expect(caption("snapOnlyMesh")).toBe("While moving, turning or scaling")
-    expect(caption("cancelDrag")).toBe("While moving, turning, scaling or selecting")
+    expect(caption("cancelDrag")).toBe(
+      "While moving, turning, scaling, selecting, painting, scrubbing, picking or swapping panes"
+    )
     expect(caption("lassoSelect")).toBe("While selecting")
-    expect(caption("removeFromSelection")).toBe("Select, Move, Rotate and Scale tools")
-    expect(caption("addToSelection")).toBe("Select, Move, Rotate and Scale tools")
+    expect(caption("removeFromSelection")).toBe("Select, Move, Rotate, Scale and Repeat tools")
+    expect(caption("addToSelection")).toBe("Select, Move, Rotate, Scale and Repeat tools")
     expect(caption("pickPaint")).toBe("Paint tool")
     expect(caption("playMap")).toBe("Desktop app")
   })
@@ -472,9 +475,45 @@ describe("resolveChord", () => {
     expect(resolveChord(defaultKeybinds, { ...idle, drag: "move" }, "Escape")).toEqual(["cancelDrag"])
   })
 
+  it("adds to the selection with the Repeat tool's modifiers, as with the other selecting tools", () => {
+    const repeat = { ...idle, tool: "repeat" } as const
+    expect(resolveChord(defaultKeybinds, repeat, "Shift+Mouse0")).toEqual(["addToSelection"])
+    expect(resolveChord(defaultKeybinds, repeat, "Ctrl+Mouse0")).toEqual(["toggleSelection"])
+    expect(resolveChord(defaultKeybinds, repeat, "Ctrl+Shift+Mouse0")).toEqual(["removeFromSelection"])
+  })
+
   it("has Play on the desktop only, so F5 falls through to the browser", () => {
     expect(resolveChord(defaultKeybinds, idle, "F5")).toEqual(["playMap"])
     expect(resolveChord(defaultKeybinds, { ...idle, platform: "browser" }, "F5")).toEqual([])
     expect(actionWhen.playMap).toEqual({ platform: ["desktop"] })
+  })
+})
+
+describe("cancelsGesture", () => {
+  const key = (code: string, mods: Partial<{ ctrlKey: boolean; shiftKey: boolean; altKey: boolean }> = {}) => ({
+    code,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    ...mods
+  })
+  const gestures = ["move", "turn", "scale", "area", "stroke", "scrub", "pick", "pane"] as const
+
+  it("cancels every gesture on the cancel drag key, with the gesture's modifiers still held", () => {
+    for (const drag of gestures) {
+      expect(cancelsGesture(defaultKeybinds, drag, key("Escape"))).toBe(true)
+      expect(cancelsGesture(defaultKeybinds, drag, key("Escape", { shiftKey: true, altKey: true }))).toBe(true)
+      expect(cancelsGesture(defaultKeybinds, drag, key("KeyQ"))).toBe(false)
+    }
+    expect(cancelsGesture(defaultKeybinds, "none", key("Escape"))).toBe(false)
+  })
+
+  it("follows the cancel drag key when it's rebound, and Escape then cancels nothing", () => {
+    const rebound: Keybinds = { ...defaultKeybinds, cancelDrag: ["Backquote"] }
+    for (const drag of gestures) {
+      expect(cancelsGesture(rebound, drag, key("Backquote"))).toBe(true)
+      expect(cancelsGesture(rebound, drag, key("Escape"))).toBe(false)
+    }
   })
 })

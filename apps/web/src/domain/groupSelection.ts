@@ -52,6 +52,25 @@ export const clickLevelOf = (
 }
 
 /**
+ * `selectedIds` made whole at the click level: each item with everything a click on it reaches, so no group is left
+ * part selected. What an undo or redo restores, under the group entered then (RULES § 7). The order is kept, each
+ * item after what it brought in, so the active item stays the last.
+ */
+export const atClickLevel = (
+  tree: ReadonlyArray<TreeNode>,
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
+): ReadonlyArray<string> => {
+  const out = new Set<string>()
+  for (const key of selectedIds) {
+    for (const reached of nodeKeys(tree, clickLevelOf(tree, key, enteredGroupId).nodeId)) out.add(reached)
+    out.delete(key)
+    out.add(key)
+  }
+  return [...out]
+}
+
+/**
  * What the hover outlines with `key` under the pointer: what a click on it would select (its click level's items), less
  * what is selected already, which has its own outline.
  */

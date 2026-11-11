@@ -2,7 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector } from "../domain/coords"
-import { flyingActions, formsChord, type MovementAction } from "../domain/flyKeys"
+import { type CameraKeyAction, cameraKeyLive, flyingActions, formsChord, type MovementAction } from "../domain/flyKeys"
 import {
   type Bindings,
   chordOf,
@@ -14,9 +14,11 @@ import {
   mouseChordOf,
   wheelSpeedStep
 } from "../domain/Keybinds"
+import type { Drag } from "../domain/keyContext"
 import { wheelZoomFactor } from "../domain/orthoView"
 import { placementPoint } from "../domain/placement"
 import { spreadPlacement } from "./actions/placement"
+import { keyContextOf } from "./keyContext"
 import { isEditorKeyEvent } from "./keyTargets"
 import {
   activePaneCamera,
@@ -40,12 +42,12 @@ const CHORD_MODIFIERS = ["ControlLeft", "ControlRight", "MetaLeft", "MetaRight",
 
 type DragMode = "look" | "orbit" | "pan"
 
-/** The movement actions flying the camera now, per the "movement keys need look" setting. */
-const flyingNow = (keybinds: Keybinds, keys: HeldKeys, looking: boolean, now: number) =>
+/** The movement actions flying the camera now, per the "movement keys need look" setting and the drag under way. */
+const flyingNow = (keybinds: Keybinds, keys: HeldKeys, drag: Drag, now: number) =>
   flyingActions(
     keybinds,
     useEditor.getState().settings.camera.movementNeedsLook,
-    looking,
+    drag,
     (binding, atOnce) => keys.holds(binding, now, atOnce)
   )
 
@@ -99,7 +101,7 @@ export function FlyCamera() {
     sceneRegistry.isNavigationChord = (chord) => dragModes.some(([bindings]) => bindings.includes(chord))
     sceneRegistry.lookDragActive = () => drag.current !== null
     sceneRegistry.flyKeysActive = () =>
-      flyingNow(keybinds, pressed.current, drag.current !== null, performance.now()).size > 0
+      flyingNow(keybinds, pressed.current, keyContextOf().drag, performance.now()).size > 0
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditorKeyEvent(e)) {
@@ -211,6 +213,8 @@ export function FlyCamera() {
     }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
+      // a box, a stroke or a scrub keeps the view it began in, as with the fly keys
+      if (!cameraKeyLive("speedFaster", keyContextOf().drag)) return
       const { pane, px } = panePointer(el, e)
       if (pane.view !== undefined) {
         pane.zoomOrthographic(wheelZoomFactor(e.deltaY), px)
@@ -268,15 +272,20 @@ export function FlyCamera() {
     // Non-movement held keys (arrow look, fast) that are also tool shortcuts only count while
     // looking; movement keys follow the "movement keys need look" setting (see flyKeys).
     const looking = drag.current !== null
-    const held = (bindings: Bindings) =>
-      bindings.some((binding) => keys.holds(binding, now, looking) && (looking || !isOneShotChord(keybinds, binding)))
+    // what is dragged decides which camera keys work (`actionWhen`): none of them through a box, a stroke or a scrub
+    const dragged = keyContextOf().drag
+    const held = (action: CameraKeyAction) =>
+      cameraKeyLive(action, dragged) &&
+      keybinds[action].some((binding) =>
+        keys.holds(binding, now, looking) && (looking || !isOneShotChord(keybinds, binding))
+      )
     const dt = Math.min(delta, 0.1)
     const pane = activePaneCamera()
     const camera = pane.perspective
 
     // Arrow-key look (the game's "look right/left/up/down"); an orthographic pane has only the one way to look.
-    const yaw = (held(keybinds.lookLeft) ? 1 : 0) - (held(keybinds.lookRight) ? 1 : 0)
-    const pitch = (held(keybinds.lookUp) ? 1 : 0) - (held(keybinds.lookDown) ? 1 : 0)
+    const yaw = (held("lookLeft") ? 1 : 0) - (held("lookRight") ? 1 : 0)
+    const pitch = (held("lookUp") ? 1 : 0) - (held("lookDown") ? 1 : 0)
     if ((yaw !== 0 || pitch !== 0) && drag.current === null && pane.view === undefined) {
       const eul = euler.current.setFromQuaternion(camera.quaternion, "YXZ")
       const rate = KEY_LOOK_SPEED * cameraSettings.lookSensitivity * dt
@@ -286,7 +295,7 @@ export function FlyCamera() {
       camera.quaternion.setFromEuler(eul)
     }
 
-    const flying = flyingNow(keybinds, keys, looking, now)
+    const flying = flyingNow(keybinds, keys, dragged, now)
     const axis = (plus: MovementAction, minus: MovementAction) =>
       (flying.has(plus) ? 1 : 0) - (flying.has(minus) ? 1 : 0)
     const move = new THREE.Vector3(
@@ -298,7 +307,7 @@ export function FlyCamera() {
     // Keys held together with Ctrl/Alt are chords (Ctrl+S...), not movement.
     if (CHORD_MODIFIERS.some((code) => keys.has(code)) && move.y === 0) return
     const { cameraSpeed } = useEditor.getState()
-    const speed = cameraSettings.flySpeed * cameraSpeed * (held(keybinds.fastMove) ? FAST_MULTIPLIER : 1) * dt
+    const speed = cameraSettings.flySpeed * cameraSpeed * (held("fastMove") ? FAST_MULTIPLIER : 1) * dt
     if (pane.view !== undefined) {
       pane.slide(move.x * speed, move.y * speed)
       if (move.z !== 0) {

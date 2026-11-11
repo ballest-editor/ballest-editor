@@ -18,7 +18,7 @@ import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { findGroup, numberedNameText, treeKeys } from "../domain/structure"
 import { lightingOf } from "../domain/sunlight"
 import { surfaceOf } from "../domain/surface"
-import { defaultViewLayout } from "../domain/viewLayout"
+import { defaultViewLayout, maximisedSlotOf } from "../domain/viewLayout"
 import type { ProjectState } from "../services/Platform"
 import { editSelectionAxis, selectAll, selectAllInGroup } from "./actions/selection"
 import { paintTargetOf, pickedBrushOf } from "./paintTarget"
@@ -234,6 +234,21 @@ describe("editor store", () => {
       assert.deepStrictEqual([slotOf(1), slotOf(2), slotOf(3)], [before, before, before])
       s().redo()
       assert.deepStrictEqual([slotOf(1), slotOf(2), slotOf(3)], [material, material, material])
+    })
+
+    it("goes back to where it started on a cancel, leaving no step", () => {
+      mapWithCubes(0, 100)
+      const ids = s().doc.ids.slice(1)
+      const before = slotOf(1)
+      const steps = s().past.length
+      assert.isTrue(s().beginPaintStroke())
+      for (const id of ids) s().paintSlots([{ id, component: 0, slot: 0, material }])
+      s().cancelPaintStroke()
+      assert.deepStrictEqual([slotOf(1), slotOf(2)], [before, before])
+      assert.strictEqual(s().past.length, steps)
+      // a new one can start
+      assert.isTrue(s().beginPaintStroke())
+      s().endPaintStroke()
     })
 
     it("leaves no step when it painted nothing new", () => {
@@ -1669,10 +1684,18 @@ describe("groups and the selection", () => {
     assert.strictEqual(group?.children[0]?.kind, "group")
   })
 
-  it("steps out one level on deselect, then clears", () => {
+  it("steps back one level per press: a maximised pane, then out of the group, then clears", () => {
     const { a, b, c, outer } = nestedMap()
+    state().setViewLayoutKind("quad")
+    state().togglePaneMaximised(2)
     state().doubleClickItem(a)
     state().doubleClickItem(a)
+    // tracking points go along with the press, never costing one of their own
+    useEditor.setState({ tracked: [{ at: { x: 0, y: 0, z: 0 }, label: "corner" }] })
+    state().deselect()
+    assert.isUndefined(maximisedSlotOf(state().viewLayout))
+    assert.deepStrictEqual(state().tracked, [])
+    assert.deepStrictEqual(selected(), [a])
     state().deselect()
     assert.strictEqual(state().enteredGroupId, outer)
     assert.deepStrictEqual(selected(), sorted(a, b))
@@ -1681,6 +1704,24 @@ describe("groups and the selection", () => {
     assert.deepStrictEqual(selected(), sorted(a, b, c))
     state().deselect()
     assert.deepStrictEqual(selected(), [])
+    state().setViewLayoutKind("single")
+  })
+
+  it("never leaves part of a group selected after an undo: the selection takes the click level then", () => {
+    const { a, b, c } = nestedMap()
+    state().doubleClickItem(a)
+    state().doubleClickItem(a)
+    moveItem(a, { x: 0, y: 500, z: 0 })
+    state().deselect()
+    state().deselect()
+    assert.isNull(state().enteredGroupId)
+    state().undo()
+    assert.isNull(state().enteredGroupId)
+    assert.deepStrictEqual(selected(), sorted(a, b, c))
+    // the item the undo selected stays the active one
+    assert.strictEqual(state().selectedIds.at(-1), a)
+    state().redo()
+    assert.deepStrictEqual(selected(), sorted(a, b, c))
   })
 
   it("forgets an entered group that goes, and one undo brings back", () => {
