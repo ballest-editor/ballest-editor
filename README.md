@@ -43,7 +43,8 @@ pnpm dev:desktop
 | `pnpm build`                           | Builds every package                                          |
 | `pnpm --filter @ballest/desktop start` | Runs the desktop app from that build, without packaging it    |
 | `pnpm dist:desktop:linux`, `:win`      | Packages an AppImage or a Windows installer into `release/`   |
-| `pnpm check:everything`                | Runs what CI runs; it must pass before you commit             |
+| `pnpm check:changed`                   | Runs the fast checks for what the branch changed              |
+| `pnpm check:everything`                | Runs what CI runs                                             |
 
 Read [AGENTS.md](AGENTS.md) before you change anything. It holds the ground rules, the repository layout and the conventions, for people and coding agents alike.
 

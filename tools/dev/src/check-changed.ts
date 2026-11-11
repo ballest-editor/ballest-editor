@@ -1,22 +1,31 @@
 // `pnpm check:changed [ref]`: the fast checks for what this branch changed, against its merge base with origin/main or
 // with `ref`, uncommitted and untracked files included. Format and lint take the changed files, typecheck the affected
 // packages and their dependents, tests only those the changes reach, knip and dupes the repo (turbo replays them when
-// nothing they read changed). The build and the full suites stay with pre-push and CI. Prints a line per check, and the
-// output of what failed.
-import { execFileSync, spawn } from "node:child_process"
+// nothing they read changed). The build and the full suites stay with CI. Prints a line per check, and the output of
+// what failed.
+//
+// Other agents share the machine. A run waits for one of two slots every worktree of this clone shares (slotLock.ts),
+// then runs its checks side by side within a budget sized from the cores and the memory free (stepBudget.ts). Each
+// check is killed with its process group after CHECK_CHANGED_TIMEOUT seconds (600); CHECK_CHANGED_BUDGET overrides
+// the budget.
+import { availableParallelism, totalmem } from "node:os"
+import { join } from "node:path"
 import { formattedFiles, lintedFiles } from "./changedChecks.ts"
-
-interface Check {
-  readonly name: string
-  readonly args: ReadonlyArray<string>
-}
+import { git, gitCommonDir } from "./git.ts"
+import { acquireSlot } from "./slotLock.ts"
+import { defaultBudget, killRunning, runProcess, runSteps, type Step } from "./stepBudget.ts"
+import { sharedTurboCache } from "./turbo.ts"
 
 const MAX_OUTPUT_LINES = 200
-
-const git = (...args: ReadonlyArray<string>) =>
-  execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()
+const SLOTS = 2
+/** Workers one check may run in parallel: turbo's task concurrency, oxlint's threads, vitest's workers. */
+const MAX_WORKERS = 4
 
 const lines = (text: string) => text.split("\n").filter((line) => line.length > 0)
+const envNumber = (name: string) => {
+  const value = Number(process.env[name])
+  return Number.isInteger(value) && value > 0 ? value : undefined
+}
 
 const base = git("merge-base", "HEAD", process.argv[2] ?? "origin/main")
 const existing = [
@@ -30,41 +39,84 @@ if (!anythingChanged) {
   process.exit(0)
 }
 
-const turbo = ["exec", "turbo", "run", "--continue", "--output-logs=errors-only", "--ui=stream"]
-
-const run = ({ args, name }: Check) =>
-  new Promise<boolean>((resolve) => {
-    const started = Date.now()
-    const child = spawn("pnpm", args, {
-      env: { ...process.env, TURBO_SCM_BASE: base },
-      stdio: ["ignore", "pipe", "pipe"]
-    })
-    let output = ""
-    child.stdout.on("data", (chunk) => (output += String(chunk)))
-    child.stderr.on("data", (chunk) => (output += String(chunk)))
-    child.on("close", (code) => {
-      const ok = code === 0
-      console.log(`${ok ? "pass" : "FAIL"}  ${name}  ${((Date.now() - started) / 1000).toFixed(1)}s`)
-      if (!ok) console.log(lines(output).slice(-MAX_OUTPUT_LINES).join("\n"))
-      resolve(ok)
-    })
+const waitStarted = Date.now()
+const slot = await acquireSlot({
+  dir: join(gitCommonDir(), "check-changed"),
+  slots: SLOTS,
+  onWait: (holders) =>
+    console.log(
+      `Waiting for a check slot: ${SLOTS} runs are going in this clone's worktrees\n  ${holders.join("\n  ")}`
+    )
+})
+const waited = (Date.now() - waitStarted) / 1000
+if (waited >= 1) console.log(`Got check slot ${slot.index} after ${waited.toFixed(0)}s.`)
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+  process.on(signal, () => {
+    killRunning()
+    slot.release()
+    process.exit(130)
   })
+}
+
+// macOS counts its file cache as used, so its available memory would starve a large Mac. Elsewhere
+// process.availableMemory() honours a cgroup limit.
+const available = process.platform === "darwin" ? totalmem() : process.availableMemory()
+const budget = envNumber("CHECK_CHANGED_BUDGET") ?? defaultBudget(availableParallelism(), available)
+const timeoutMs = (envNumber("CHECK_CHANGED_TIMEOUT") ?? 600) * 1000
+const env = { ...process.env, ...sharedTurboCache(), TURBO_SCM_BASE: base }
+
+const pnpm = (args: ReadonlyArray<string>) => runProcess("pnpm", args, { env, timeoutMs })
+const turbo = (slots: number, ...args: ReadonlyArray<string>) =>
+  pnpm([
+    "exec",
+    "turbo",
+    "run",
+    "--continue",
+    "--output-logs=errors-only",
+    "--ui=stream",
+    `--concurrency=${slots}`,
+    ...args
+  ])
 
 const format = formattedFiles(existing)
 const lint = lintedFiles(existing)
 
-const first: ReadonlyArray<Check> = [
-  ...(format.length > 0 ? [{ name: "format", args: ["exec", "dprint", "check", "--allow-no-files", ...format] }] : []),
-  ...(lint.length > 0 ? [{ name: "lint", args: ["lint:files", ...lint] }] : []),
-  { name: "knip and dupes", args: [...turbo, "knip", "dupes"] },
-  { name: "typecheck", args: [...turbo, "typecheck", "--affected"] }
+const steps: ReadonlyArray<Step> = [
+  ...(format.length > 0
+    ? [{
+      name: "format",
+      weight: 1,
+      run: () => pnpm(["exec", "dprint", "check", "--allow-no-files", ...format])
+    }]
+    : []),
+  ...(lint.length > 0
+    ? [{ name: "lint", weight: 2, run: (slots: number) => pnpm(["lint:files", `--threads=${slots}`, ...lint]) }]
+    : []),
+  { name: "knip and dupes", weight: 2, run: (slots) => turbo(slots, "knip", "dupes") },
+  { name: "typecheck", weight: MAX_WORKERS, run: (slots) => turbo(slots, "typecheck", "--affected") },
+  {
+    name: "tests",
+    weight: MAX_WORKERS,
+    // One package's suite at a time, with every slot as a vitest worker: several at once would multiply the workers.
+    run: (slots) =>
+      turbo(1, "test", "--affected", "--", `--changed=${base}`, "--passWithNoTests", `--maxWorkers=${slots}`)
+  }
 ]
-const tests: Check = {
-  name: "tests",
-  args: [...turbo, "test", "--affected", "--", `--changed=${base}`, "--passWithNoTests"]
-}
 
-console.log(`Checking ${existing.length} changed files against ${base.slice(0, 9)}`)
-const results = [...await Promise.all(first.map(run)), await run(tests)]
-console.log("The build and the full test suites run on push and in CI.")
-process.exit(results.every(Boolean) ? 0 : 1)
+const gib = (bytes: number) => (bytes / 1024 ** 3).toFixed(0)
+console.log(
+  `Checking ${existing.length} changed files against ${base.slice(0, 9)}, ${budget} at a time ` +
+    `(${availableParallelism()} cores, ${gib(available)} GiB free)`
+)
+const results = await runSteps(steps, budget, ({ name, outcome, output, seconds, slots }) => {
+  const time = outcome === "TIMEOUT" ? `killed after ${timeoutMs / 1000}s` : `${seconds.toFixed(1)}s`
+  console.log(`${outcome}  ${name}${slots > 1 ? ` (${slots} wide)` : ""}  ${time}`)
+  const tail = lines(output).slice(-MAX_OUTPUT_LINES)
+  if (outcome !== "pass" && tail.length > 0) console.log(tail.join("\n"))
+})
+slot.release()
+if (results.some(({ outcome }) => outcome === "TIMEOUT")) {
+  console.log("TIMEOUT means the check ran out of time, not that it failed. Raise CHECK_CHANGED_TIMEOUT.")
+}
+console.log("The build and the full test suites run in CI.")
+process.exit(results.every(({ outcome }) => outcome === "pass") ? 0 : 1)
