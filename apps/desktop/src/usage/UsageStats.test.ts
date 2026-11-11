@@ -2,12 +2,9 @@ import { UsageBatch } from "@ballest/contracts"
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
-import { vi } from "vitest"
 import { DesktopSettings } from "../settings/DesktopSettings"
 import { CollectClient, type CollectFetch } from "./CollectClient"
 import { ERRORS_PER_SESSION, UsageStats } from "./UsageStats"
-
-vi.mock("electron", () => ({ net: { fetch: () => Promise.reject(new Error("unused")) } }))
 
 const facts = { appVersion: "0.3.0", platform: "linux", osVersion: "6.18" } as const
 

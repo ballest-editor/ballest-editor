@@ -1,11 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Exit, Option } from "effect"
 import { tmpdir } from "node:os"
-import { vi } from "vitest"
 import { launchCommand, spawnDetached } from "./WindowLauncher"
-
-// DesktopEnvironment, which the launcher's layer reads, imports Electron.
-vi.mock("electron", () => ({}))
 
 const running = {
   isPackaged: true,

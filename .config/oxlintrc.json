@@ -176,6 +176,56 @@
         ]
       }
     },
+    // Loading `electron` from Node downloads its binary, so only the Electron-backed layers, main and preload load it;
+    // everything else, tests included, imports its types. `autoUpdater`'s getter loads it too.
+    {
+      "files": ["**/apps/desktop/src/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "electron",
+                "allowTypeImports": true,
+                "message": "Only src/electron/live/, main.ts and preload.ts load electron: put the call in a layer there and import types here."
+              },
+              {
+                "name": "electron-updater",
+                "importNames": ["autoUpdater"],
+                "message": "autoUpdater loads electron: use it in src/electron/live/ElectronUpdater.ts."
+              }
+            ],
+            "patterns": [
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "**/apps/desktop/src/electron/live/**",
+        "**/apps/desktop/src/main.ts",
+        "**/apps/desktop/src/preload.ts"
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
     // Shared by the main process, the sandboxed preload and the renderer: schemas and types over effect, nothing else.
     {
       "files": ["**/packages/contracts/**"],

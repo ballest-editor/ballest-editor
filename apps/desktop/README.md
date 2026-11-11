@@ -53,7 +53,7 @@ flowchart LR
     preload[Preload<br/>src/preload.ts]
   end
   subgraph main [Main process: Node + Electron, an Effect program]
-    protocol[Protocol handler<br/>src/electron/ElectronProtocol.ts]
+    protocol[Protocol handler<br/>src/electron/live/ElectronProtocol.ts]
     ipc[IPC handlers<br/>src/ipc/]
     fs[(disk)]
   end
@@ -109,7 +109,7 @@ The scheme privileges are registered outside Effect because Electron only accept
 
 ## Services
 
-Every Electron API we touch has a thin Effect service around it in `src/electron/` (`ElectronApp`, `ElectronWindow`, `ElectronProtocol`, `ElectronDialog`, `ElectronShell`, `ElectronMenu`, `ElectronUpdater`), and listeners are scoped with `acquireRelease`. `DesktopIpc` in `src/ipc/` does the same for `ipcMain`. Beyond those, only `main.ts`, which wires them up, and the preload import `electron` at runtime. Everything else asks for a service by name and gets a fake in tests. The IPC tests also `vi.mock("electron")`, because requiring `electron` from Node downloads the binary.
+Every Electron API we touch has a thin Effect service around it in `src/electron/` (`ElectronApp`, `ElectronWindow`, `ElectronProtocol`, `ElectronDialog`, `ElectronShell`, `ElectronMenu`, `ElectronUpdater`), and listeners are scoped with `acquireRelease`. `DesktopIpc` in `src/ipc/` does the same for `ipcMain`. Each service's tag imports only Electron's types; its layer, the code that calls Electron, is in `src/electron/live/`. Only those layers, `main.ts`, which wires them up, and the preload load `electron` at runtime, because loading it from Node downloads the binary; a lint rule holds the rest to type imports. Everything else asks for a service by name and gets a fake in tests, and a test that imports `electron` fails at once (`src/test/noElectron.ts`).
 
 The main dependencies, simplified:
 

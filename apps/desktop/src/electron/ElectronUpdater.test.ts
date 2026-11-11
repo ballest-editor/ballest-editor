@@ -3,11 +3,7 @@ import { HttpError } from "builder-util-runtime"
 import { Effect, Exit, Option } from "effect"
 import { AppImageUpdater } from "electron-updater"
 import type { DownloadUpdateOptions } from "electron-updater/out/AppUpdater"
-import { vi } from "vitest"
 import { findRelease } from "./ElectronUpdater"
-
-// `ElectronUpdater.layer` isn't under test, and these updaters are given their own app and HTTP client.
-vi.mock("electron", () => ({}))
 
 const releases = "/ballest-editor/ballest-editor/releases"
 

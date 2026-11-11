@@ -2,13 +2,8 @@ import { InvokeChannels, MapBackupFile, MapBackups, ProjectMaps } from "@ballest
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Path } from "effect"
 import * as Fs from "node:fs"
-import { vi } from "vitest"
 import { sha256 } from "../project/files"
 import { type fakeIpcMain, samplesDir, withHandlers } from "./handlersHarness"
-
-// The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
-// (requiring the real package from Node would download the binary).
-vi.mock("electron", () => ({}))
 
 const sidecarOf = (hash: string) => JSON.stringify({ mapHash: hash })
 

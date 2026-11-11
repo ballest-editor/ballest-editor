@@ -1,12 +1,7 @@
 import { InvokeChannels, ProjectState } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Exit, FileSystem, Option, Path } from "effect"
-import { vi } from "vitest"
 import { withHandlers } from "./handlersHarness"
-
-// The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
-// (requiring the real package from Node would download the binary).
-vi.mock("electron", () => ({}))
 
 describe("Projects over IPC", () => {
   it.effect(

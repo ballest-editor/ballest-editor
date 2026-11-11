@@ -3,13 +3,13 @@ import { Effect, Layer } from "effect"
 import * as Electron from "electron"
 import { program } from "./app/DesktopApp"
 import { DesktopEnvironment } from "./app/DesktopEnvironment"
-import { ElectronApp } from "./electron/ElectronApp"
-import { ElectronDialog } from "./electron/ElectronDialog"
-import { ElectronMenu } from "./electron/ElectronMenu"
-import { ElectronProtocol, registerSchemePrivileges } from "./electron/ElectronProtocol"
-import { ElectronShell } from "./electron/ElectronShell"
-import { ElectronUpdater } from "./electron/ElectronUpdater"
-import { ElectronWindow } from "./electron/ElectronWindow"
+import { layerElectronApp } from "./electron/live/ElectronApp"
+import { layerElectronDialog } from "./electron/live/ElectronDialog"
+import { layerElectronMenu } from "./electron/live/ElectronMenu"
+import { layerElectronProtocol, registerSchemePrivileges } from "./electron/live/ElectronProtocol"
+import { layerElectronShell } from "./electron/live/ElectronShell"
+import { layerElectronUpdater } from "./electron/live/ElectronUpdater"
+import { layerElectronWindow } from "./electron/live/ElectronWindow"
 import { layerScriptedDialogs } from "./electron/ScriptedDialogs"
 import { GameCreator } from "./game/GameCreator"
 import { GameHost } from "./game/GameHost"
@@ -44,13 +44,13 @@ if (userDataDir !== undefined) Electron.app.setPath("userData", userDataDir)
 const scriptedDialogs = Electron.app.isPackaged ? undefined : process.env["BALLEST_APP_DRIVER_DIALOGS"]
 
 const layerElectron = Layer.mergeAll(
-  ElectronApp.layer,
-  scriptedDialogs === undefined ? ElectronDialog.layer : layerScriptedDialogs(scriptedDialogs),
-  ElectronMenu.layer,
-  ElectronShell.layer,
-  ElectronUpdater.layer,
-  ElectronWindow.layer,
-  ElectronProtocol.layer,
+  layerElectronApp,
+  scriptedDialogs === undefined ? layerElectronDialog : layerScriptedDialogs(scriptedDialogs),
+  layerElectronMenu,
+  layerElectronShell,
+  layerElectronUpdater,
+  layerElectronWindow,
+  layerElectronProtocol,
   WindowStage.layer,
   DesktopIpc.layer(Electron.ipcMain)
 )
@@ -74,7 +74,7 @@ const layerDesktopRuntime = Layer.mergeAll(
   GamePlay.layer,
   UsageStats.layer
 ).pipe(
-  Layer.provideMerge(CollectClient.layer),
+  Layer.provideMerge(CollectClient.layer((url, init) => Electron.net.fetch(url, init))),
   Layer.provideMerge(layerProjectsAndGame),
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),

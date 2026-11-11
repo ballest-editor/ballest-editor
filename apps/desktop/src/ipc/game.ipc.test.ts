@@ -8,14 +8,9 @@ import {
 } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
-import { vi } from "vitest"
 import { PlayFile } from "../game/GameLink"
 import { sha256 } from "../project/files"
 import { expectTag, opened, readSettings, withHandlers } from "./handlersHarness"
-
-// The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
-// (requiring the real package from Node would download the binary).
-vi.mock("electron", () => ({}))
 
 describe("the game over IPC", () => {
   it.effect("reports, chooses, resets and reveals the game folders", () =>

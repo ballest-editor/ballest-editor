@@ -1,7 +1,7 @@
-import { Context, Effect, Layer, Option, Schema } from "effect"
-import * as Electron from "electron"
+import { Context, type Effect, type Option, Schema } from "effect"
+import type * as Electron from "electron"
 
-class ElectronDialogError extends Schema.TaggedError<ElectronDialogError>()("ElectronDialogError", {
+export class ElectronDialogError extends Schema.TaggedError<ElectronDialogError>()("ElectronDialogError", {
   kind: Schema.Literals(["open", "save", "folder", "message"]),
   cause: Schema.Defect()
 }) {
@@ -31,26 +31,6 @@ export interface MessageBoxOptions {
   readonly cancelId: number
 }
 
-const ownerWindow = (id: number): Electron.BrowserWindow | undefined => {
-  const contents = Electron.webContents.fromId(id)
-  return contents === undefined ? undefined : Electron.BrowserWindow.fromWebContents(contents) ?? undefined
-}
-
-const dialogOptions = (options: FileDialogOptions) => ({
-  title: options.title,
-  filters: [...options.filters],
-  ...Option.match(options.defaultPath, { onNone: () => ({}), onSome: (defaultPath) => ({ defaultPath }) })
-})
-
-const showOpen = (kind: "open" | "folder", opts: Electron.OpenDialogOptions, ownerId: number) =>
-  Effect.tryPromise({
-    try: () => {
-      const owner = ownerWindow(ownerId)
-      return owner === undefined ? Electron.dialog.showOpenDialog(opts) : Electron.dialog.showOpenDialog(owner, opts)
-    },
-    catch: (cause) => new ElectronDialogError({ kind, cause })
-  }).pipe(Effect.map(({ canceled, filePaths }) => canceled ? Option.none() : Option.fromNullishOr(filePaths[0])))
-
 export class ElectronDialog extends Context.Service<ElectronDialog, {
   /** A blocking native error box; safe to call before `ready`, so fatal startup errors use it. */
   readonly showErrorBox: (title: string, content: string) => Effect.Effect<void>
@@ -62,49 +42,4 @@ export class ElectronDialog extends Context.Service<ElectronDialog, {
   readonly showMessageBox: (options: MessageBoxOptions) => Effect.Effect<number, ElectronDialogError>
   /** The native save dialog (it asks before replacing a file); none when cancelled. */
   readonly showSaveFile: (options: FileDialogOptions) => Effect.Effect<Option.Option<string>, ElectronDialogError>
-}>()("ballest/desktop/electron/ElectronDialog") {
-  static readonly layer = Layer.succeed(
-    ElectronDialog,
-    ElectronDialog.of({
-      showErrorBox: (title, content) => Effect.sync(() => Electron.dialog.showErrorBox(title, content)),
-      showOpenFile: (options) =>
-        showOpen("open", { ...dialogOptions(options), properties: ["openFile"] }, options.owner),
-      showOpenFolder: (options) =>
-        showOpen(
-          "folder",
-          { ...dialogOptions({ ...options, filters: [] }), properties: ["openDirectory"] },
-          options.owner
-        ),
-      showMessageBox: ({ owner: ownerId, buttons, ...options }) =>
-        Effect.tryPromise({
-          try: () => {
-            const owner = ownerWindow(ownerId)
-            // `noLink`: Windows would otherwise turn the buttons into command links.
-            const opts: Electron.MessageBoxOptions = { ...options, buttons: [...buttons], defaultId: 0, noLink: true }
-            return owner === undefined
-              ? Electron.dialog.showMessageBox(opts)
-              : Electron.dialog.showMessageBox(owner, opts)
-          },
-          catch: (cause) => new ElectronDialogError({ kind: "message", cause })
-        }).pipe(Effect.map(({ response }) => response)),
-      showSaveFile: (options) =>
-        Effect.tryPromise({
-          try: () => {
-            const owner = ownerWindow(options.owner)
-            const opts: Electron.SaveDialogOptions = {
-              ...dialogOptions(options),
-              properties: ["createDirectory", "showOverwriteConfirmation"]
-            }
-            return owner === undefined
-              ? Electron.dialog.showSaveDialog(opts)
-              : Electron.dialog.showSaveDialog(owner, opts)
-          },
-          catch: (cause) => new ElectronDialogError({ kind: "save", cause })
-        }).pipe(
-          Effect.map(({ canceled, filePath }) =>
-            canceled || filePath.length === 0 ? Option.none() : Option.some(filePath)
-          )
-        )
-    })
-  )
-}
+}>()("ballest/desktop/electron/ElectronDialog") {}
