@@ -2,7 +2,6 @@ import { CHARACTERS_PER_FILE, type PlayResult, PlaySessionEnded, PushChannels } 
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Fiber, FileSystem, Layer, Option, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { vi } from "vitest"
 import { ElectronShell } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import { layerProjectsAt } from "../project/layers"
@@ -13,9 +12,6 @@ import { layerFakeGamePaths, makeFakePluginBundle, runScoped, tempFakeSteam } fr
 import { GameLink, PlayFile } from "./GameLink"
 import { GamePlay, SESSION_POLL } from "./GamePlay"
 import { GameProcess } from "./GameProcess"
-
-// The shell and the window are fakes below; only the module import needs a stand-in.
-vi.mock("electron", () => ({}))
 
 const mapText = (publishedFileId: number) =>
   JSON.stringify({ worldSettings: { levelData: { levelPublishedFileId: publishedFileId } }, items: [] })

@@ -1,13 +1,8 @@
 import { InvokeChannels, PrefabBackups, PrefabInfo, PrefabInfos, PrefabRead, PrefabSummary } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Path } from "effect"
-import { vi } from "vitest"
 import { sha256 } from "../project/files"
 import { opened, withHandlers } from "./handlersHarness"
-
-// The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
-// (requiring the real package from Node would download the binary).
-vi.mock("electron", () => ({}))
 
 const prefabText = (n: number) =>
   `{"format":"BallestPrefab","items":[${"{\"class\":\"/Game/A.A_C\"},".repeat(n)}{"class":"/Game/B.B_C"}]}`

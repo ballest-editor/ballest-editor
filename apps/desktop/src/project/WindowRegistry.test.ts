@@ -1,12 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Path } from "effect"
 import { spawnSync } from "node:child_process"
-import { vi } from "vitest"
 import { runScoped } from "../game/fakeSteam"
 import { isProcessAlive, WindowRegistry } from "./WindowRegistry"
-
-// DesktopEnvironment, which the registry's layer reads, imports Electron.
-vi.mock("electron", () => ({}))
 
 /** A registry in a temp folder; `dead` lists the pids no longer running. */
 const registry = (dead: ReadonlyArray<number> = []) =>

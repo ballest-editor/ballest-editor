@@ -14,14 +14,9 @@ import {
 } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Fiber, FileSystem, Option, Path, Schema } from "effect"
-import { vi } from "vitest"
 import { sha256 } from "../project/files"
 import { LinkFile } from "../project/MapLinks"
 import { expectTag, withHandlers } from "./handlersHarness"
-
-// The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
-// (requiring the real package from Node would download the binary).
-vi.mock("electron", () => ({}))
 
 /** The newest version main kept of a file it wrote over in the game's maps folder. */
 const exportBackupIn = (fake: Parameters<Parameters<typeof withHandlers>[0]>[0]["fake"]) =>

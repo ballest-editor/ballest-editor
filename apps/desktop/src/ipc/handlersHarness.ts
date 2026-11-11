@@ -1,7 +1,6 @@
 /**
  * The IPC handlers over every main-process service, in a temp folder with a fake Steam: what the `*.ipc.test.ts` files
- * drive. Electron's own services are fakes here; a test file still has to `vi.mock("electron")`, since requiring the
- * real package from Node would download the binary.
+ * drive. Electron's own services are fakes here.
  */
 import { NodeServices } from "@effect/platform-node"
 import { assert } from "@effect/vitest"

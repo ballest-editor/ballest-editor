@@ -1,11 +1,7 @@
 import { InvokeChannels } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Exit, FileSystem } from "effect"
-import { vi } from "vitest"
 import { collectAnswers, collected, readSettings, withHandlers } from "./handlersHarness"
-
-// The services' layers call Electron; these tests replace them, so only the module import needs a stand-in.
-vi.mock("electron", () => ({}))
 
 const form = { kind: "bug", message: "The ramp floats.", discord: "robin#1", creator: "Robin" } as const
 

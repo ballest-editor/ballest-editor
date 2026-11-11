@@ -1,13 +1,12 @@
 import { type AppFacts, COLLECT_URL } from "@ballest/contracts"
 import { Config, Context, Effect, Layer, Option, Schema } from "effect"
-import * as Electron from "electron"
 import * as Os from "node:os"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 
 /** The collect endpoint's routes (apps/collect). */
 export type CollectPath = "/api/feedback" | "/api/events"
 
-/** How main makes a request: `Electron.net.fetch`, or a fake in tests. Only ever a JSON POST. */
+/** How main makes a request: `Electron.net.fetch` (main.ts), or a fake in tests. Only ever a JSON POST. */
 export type CollectFetch = (url: string, init: {
   readonly method: "POST"
   readonly headers: Readonly<Record<string, string>>
@@ -78,21 +77,22 @@ export class CollectClient extends Context.Service<CollectClient, {
         })
     })
 
-  static readonly layer = Layer.effect(
-    CollectClient,
-    Effect.gen(function*() {
-      const { isPackaged, platform, appVersion } = yield* DesktopEnvironment
-      const override = yield* Config.String("BALLEST_COLLECT_URL").pipe(
-        Config.option,
-        Effect.orElseSucceed(Option.none)
-      )
-      const endpoint = Option.orElse(override, () => isPackaged ? Option.some(COLLECT_URL) : Option.none())
-      const facts: AppFacts = {
-        appVersion,
-        platform: platform === "win32" || platform === "darwin" ? platform : "linux",
-        osVersion: Os.release().slice(0, 64)
-      }
-      return CollectClient.make(endpoint, facts, (url, init) => Electron.net.fetch(url, init))
-    })
-  )
+  static readonly layer = (fetch: CollectFetch) =>
+    Layer.effect(
+      CollectClient,
+      Effect.gen(function*() {
+        const { isPackaged, platform, appVersion } = yield* DesktopEnvironment
+        const override = yield* Config.String("BALLEST_COLLECT_URL").pipe(
+          Config.option,
+          Effect.orElseSucceed(Option.none)
+        )
+        const endpoint = Option.orElse(override, () => isPackaged ? Option.some(COLLECT_URL) : Option.none())
+        const facts: AppFacts = {
+          appVersion,
+          platform: platform === "win32" || platform === "darwin" ? platform : "linux",
+          osVersion: Os.release().slice(0, 64)
+        }
+        return CollectClient.make(endpoint, facts, fetch)
+      })
+    )
 }

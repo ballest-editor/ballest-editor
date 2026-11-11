@@ -1,13 +1,9 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
-import { vi } from "vitest"
 import { layerFakeGamePaths, runScoped, tempFakeSteam } from "../game/fakeSteam"
 import { DesktopSettings } from "../settings/DesktopSettings"
 import { Projects } from "./Projects"
 import { type WindowEntry, WindowRegistry } from "./WindowRegistry"
-
-// The services' layers call Electron; these tests replace them, so only the module import needs a stand-in.
-vi.mock("electron", () => ({}))
 
 /**
  * A machine with `recent` projects: `open` starts a window on it, a `Projects` of its own with pid `pid` (the windows

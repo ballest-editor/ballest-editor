@@ -2,15 +2,10 @@ import { PushChannels, UpdateState } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { ConfigProvider, Deferred, Effect, Layer, Option, Schema, type Scope } from "effect"
 import { TestClock } from "effect/testing"
-import { vi } from "vitest"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 import { ElectronUpdater, ElectronUpdaterError, type UpdateInfo } from "../electron/ElectronUpdater"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import { DesktopUpdates } from "./DesktopUpdates"
-
-// The fakes below replace every service that calls Electron; only the module imports need stand-ins.
-vi.mock("electron", () => ({}))
-vi.mock("electron-updater", () => ({}))
 
 const installedBuild = {
   isPackaged: true,

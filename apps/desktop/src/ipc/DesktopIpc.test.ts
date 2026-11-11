@@ -1,14 +1,9 @@
 import { InvokeChannels } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Path } from "effect"
-import { vi } from "vitest"
 import { DesktopIpc, makeIpcMethod } from "./DesktopIpc"
 import { fakeIpcMain, opened, readSettings, recoloured, updateCalls, withHandlers } from "./handlersHarness"
 import { pingHandlers } from "./methods/ping"
-
-// The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
-// (requiring the real package from Node would download the binary).
-vi.mock("electron", () => ({}))
 
 describe("DesktopIpc", () => {
   it.effect("registers every method, and ping round-trips a valid payload and rejects an invalid one", () =>
