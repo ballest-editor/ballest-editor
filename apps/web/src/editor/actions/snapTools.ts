@@ -75,6 +75,7 @@ import {
   type PickerRequest,
   selectionPivot,
   selectionUnits,
+  shownGizmoSpace,
   shownTransform,
   snapConfigOf,
   tabSnapOf,
@@ -319,11 +320,23 @@ const offsetUnits = (
 }
 
 /**
- * The axes Align and Distribute work along: the world's, or with the gizmo in Local the active unit's, as a move's
- * axis handle would run (docs/SNAPPING.md § Align and distribute).
+ * The axes Align and Distribute work along: the world's, or with the axes toggle showing Local the active unit's, as a
+ * move's axis handle would run (docs/SNAPPING.md § Align and distribute).
  */
 const arrangeFrameOf = (s: EditorState, active: Unit): Quat4 =>
-  s.gizmoSpace === "local" ? active.transform.rotation : IDENTITY_QUAT
+  shownGizmoSpace(s) === "local" ? active.transform.rotation : IDENTITY_QUAT
+
+/** Why Align and Distribute are off inside an entered chain: a link moved alone would open its joints. */
+export const ARRANGE_IN_CHAIN = "Links stay joined to their chain. Select whole chains to align them."
+
+/**
+ * Why Align and Distribute are off for two or more units selected, or undefined when they aren't: off for links inside
+ * an entered chain (`ARRANGE_IN_CHAIN`). Whole chains selected from outside are single things and align.
+ */
+export const arrangeOffReason = (s: EditorState): string | undefined => {
+  const selection = selectionUnits(s, (key) => docTransformOf(s, key))
+  return selection?.chain !== undefined && selection.units.length >= 2 ? ARRANGE_IN_CHAIN : undefined
+}
 
 /** What one Align or Distribute does to the selection, which its preview draws and its button runs. */
 export interface ArrangePlan {
@@ -346,7 +359,9 @@ const UNIT_AXES = { x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: 1, z: 0 }, z: { x: 0,
 /** `op` on the selection as it stands; undefined unless two or more units are selected. */
 export const arrangePlanOf = (s: EditorState, op: ArrangeOp): ArrangePlan | undefined => {
   const first = selectedBoxes(s)
-  if (first.selection === undefined || first.selection.units.length < 2) return undefined
+  if (first.selection === undefined || first.selection.units.length < 2 || first.selection.chain !== undefined) {
+    return undefined
+  }
   const frame = arrangeFrameOf(s, first.selection.active)
   const { boxes, selection } = frame === IDENTITY_QUAT ? first : selectedBoxes(s, frame)
   if (selection === undefined || boxes.length < 2) return undefined
@@ -430,9 +445,13 @@ export const screenAlignOf = (s: EditorState, direction: ScreenDirection): Arran
 /** The Align `direction` on screen means in the active pane as it is now. */
 export const screenAlignNow = (direction: ScreenDirection): ArrangeOp => screenAlignOf(useEditor.getState(), direction)
 
-/** Ctrl+Shift+an arrow: lines the selection up on the active unit's side that way on screen. */
-export const alignToScreen = (direction: ScreenDirection) =>
-  arrangeSelection(screenAlignOf(useEditor.getState(), direction))
+/** Ctrl+Shift+an arrow: lines the selection up on the active unit's side that way on screen; inside a chain says why not. */
+export const alignToScreen = (direction: ScreenDirection) => {
+  const s = useEditor.getState()
+  const off = arrangeOffReason(s)
+  if (off !== undefined) s.notify("info", off)
+  else arrangeSelection(screenAlignOf(s, direction))
+}
 
 const round = (value: number) => Math.round(value * 10) / 10
 

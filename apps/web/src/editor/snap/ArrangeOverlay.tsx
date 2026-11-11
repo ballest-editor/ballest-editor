@@ -5,12 +5,13 @@
  * the plane they meet on and the gaps Distribute makes equal as guides. Nothing moves until the button is pressed.
  */
 import { useEffect, useMemo } from "react"
+import { useShallow } from "zustand/react/shallow"
 import { cornersOf } from "../../domain/snapRelation"
 import { type BoxAxis, boxFace } from "../../domain/snapTools"
 import { rotateVec, vecLerp } from "../../domain/ueMath"
 import { arrangePlanOf } from "../actions"
 import { useBeforePaneDraw } from "../PaneRenderer"
-import { useEditor } from "../store"
+import { type EditorState, shownGizmoSpace, useEditor } from "../store"
 import { SNAP_COLORS as COLORS } from "./snapGlyphs"
 import { MarkLayer } from "./SnapOverlay"
 
@@ -25,20 +26,29 @@ const PATH_END = 8
 
 const BOX_AXES: ReadonlyArray<BoxAxis> = ["x", "y", "z"]
 
+/** What an Align or Distribute plan is built from (`arrangePlanOf`): a memo of plans redoes them when any changes. */
+const arrangeInputsOf = (s: EditorState) =>
+  [
+    s.doc,
+    s.selectedIds,
+    s.enteredGroupId,
+    shownGizmoSpace(s),
+    s.arrangeSpacing,
+    s.catalogIndex
+  ] as const
+
+export const useArrangeInputs = () => useEditor(useShallow(arrangeInputsOf))
+
 export function ArrangeOverlay() {
   const op = useEditor((s) => s.arrangeHover)
-  const doc = useEditor((s) => s.doc)
-  const selectedIds = useEditor((s) => s.selectedIds)
-  const space = useEditor((s) => s.gizmoSpace)
-  const spacing = useEditor((s) => s.arrangeSpacing)
-  const catalogIndex = useEditor((s) => s.catalogIndex)
+  const inputs = useArrangeInputs()
   const units = useEditor((s) => s.settings.general.units)
   const layer = useMemo(() => new MarkLayer(), [])
 
   const plan = useMemo(
     () => op === null ? undefined : arrangePlanOf(useEditor.getState(), op),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the plan is built from, read inside
-    [op, doc, selectedIds, space, spacing, catalogIndex]
+    [op, ...inputs]
   )
 
   useEffect(() => {

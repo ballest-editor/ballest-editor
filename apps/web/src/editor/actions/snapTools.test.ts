@@ -13,13 +13,16 @@ import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
 import { catalogWithEnds, endAlongX, grouped, loadPieces, lookDown, openAsDefinition } from "../../test/snapFixtures"
 import { activePaneCamera } from "../paneCameras"
 import { pickerSkips } from "../snap/pickTarget"
-import { type PickedTarget, snapConfigOf, useEditor } from "../store"
+import { docTransformOf, type PickedTarget, selectionPivot, snapConfigOf, useEditor } from "../store"
 import { flipSelection, pasteSelectionField } from "./selection"
 import {
   addWorldAxis,
   addWorldPlane,
   alignSelection,
+  alignToScreen,
   applyFlipOffer,
+  ARRANGE_IN_CHAIN,
+  arrangeOffReason,
   arrangePlanOf,
   distributeSelection,
   gridOriginToSelection,
@@ -72,6 +75,12 @@ const turn = (key: string, yaw: number) => {
   if (item === undefined) return assert.fail("no such item")
   const rotation = rotatorToQuat({ pitch: 0, yaw, roll: 0 })
   useEditor.getState().transformItems(new Map([[key, { ...editTransform(item), rotation }]]))
+}
+
+/** Where the gizmo sits on the selection as it stands, and its axes. */
+const gizmo = () => {
+  const s = useEditor.getState()
+  return selectionPivot(s, (key) => docTransformOf(s, key))
 }
 
 /** The test piece's length along X. */
@@ -373,15 +382,65 @@ describe("align and distribute", () => {
     assert.closeTo(xOf(b), width, 1e-6, "touching it")
   })
 
-  it("works along the active item's own axes with the gizmo in Local", () => {
+  it("works along the active item's own axes when the toggle shows Local, as it always does under Scale", () => {
     const [a = "", b = ""] = loadPieces([{ x: 0, y: 0, z: 0 }, { x: 1000, y: 700, z: 0 }])
     turn(b, 90)
-    useEditor.setState({ gizmoSpace: "local" })
     useEditor.getState().select([a, b])
-    alignSelection("x", "centre", "active")
+    for (const shown of [{ gizmoSpace: "local", tool: "translate" }, { gizmoSpace: "world", tool: "scale" }] as const) {
+      useEditor.setState(shown)
+      const plan = arrangePlanOf(useEditor.getState(), { kind: "align", axis: "x", side: "centre", to: "active" })
+      assert.deepStrictEqual(plan?.frame, gizmo()?.rotation, `the active item's, as the gizmo shows, ${shown.tool}`)
+      alignSelection("x", "centre", "active")
+      assert.closeTo(yOf(a), 700, 1e-6, "along the active item's X, which is the world's Y")
+      assert.closeTo(xOf(a), 0, 1e-6)
+      useEditor.getState().undo()
+    }
+    useEditor.setState({ gizmoSpace: "world", tool: "translate" })
+  })
+
+  it("lines up on the unit the gizmo sits on, the last clicked, in its axes, and only moves", () => {
+    const [a = "", b = "", c = ""] = load([0, 1000, 5000])
+    turn(c, 45)
+    turn(b, 30)
+    grouped([a, b])
+    useEditor.setState({ gizmoSpace: "local" })
+    const align = { kind: "align", axis: "x", side: "min", to: "active" } as const
+    for (const order of [[a, b, c], [c, a, b]]) {
+      useEditor.getState().select(order)
+      const plan = arrangePlanOf(useEditor.getState(), align)
+      const target = gizmo()
+      assert.strictEqual(plan?.selection.active.id, target?.selection.active.id, `the same unit, ${order.join()}`)
+      assert.deepStrictEqual(plan?.frame, target?.rotation, "along the gizmo's axes")
+    }
+    const before = useEditor.getState().doc.map.items.map((item) => editTransform(item).rotation)
+    alignSelection("x", "min", "active")
     useEditor.setState({ gizmoSpace: "world" })
-    assert.closeTo(yOf(a), 700, 1e-6, "along the active item's X, which is the world's Y")
-    assert.closeTo(xOf(a), 0, 1e-6)
+    assert.deepStrictEqual(useEditor.getState().doc.map.items.map((item) => editTransform(item).rotation), before)
+  })
+
+  it("is off inside an entered chain and says why, and aligns whole chains as single things", () => {
+    const [l1 = "", l2 = "", l3 = "", l4 = "", m1 = "", m2 = ""] = load([0, 1000, 2000, 3000, 500, 1500])
+    const chain = grouped([l1, l2, l3, l4], true)
+    grouped([m1, m2], true)
+    useEditor.getState().enterGroup(chain)
+    useEditor.getState().select([l2, l4])
+    const align = { kind: "align", axis: "x", side: "min", to: "active" } as const
+    assert.isUndefined(arrangePlanOf(useEditor.getState(), align))
+    assert.strictEqual(arrangeOffReason(useEditor.getState()), ARRANGE_IN_CHAIN)
+    assert.strictEqual(ARRANGE_IN_CHAIN, "Links stay joined to their chain. Select whole chains to align them.")
+    const before = useEditor.getState().past.length
+    alignToScreen("left")
+    alignSelection("x", "min", "active")
+    assert.lengthOf(useEditor.getState().past, before, "Ctrl+Shift+an arrow and the buttons move nothing")
+    assert.strictEqual(useEditor.getState().toasts[0]?.title, ARRANGE_IN_CHAIN, "and the keys say why")
+    // from outside, each chain is one thing
+    useEditor.getState().enterGroup(null)
+    useEditor.getState().select([m1, m2, l1, l2, l3, l4])
+    assert.isUndefined(arrangeOffReason(useEditor.getState()))
+    alignSelection("x", "max", "active")
+    assert.closeTo(xOf(m1), 2000, 1e-6, "the other chain moved whole")
+    assert.closeTo(xOf(m2), 3000, 1e-6, "its joint kept")
+    assert.deepStrictEqual([l1, l2, l3, l4].map(xOf), [0, 1000, 2000, 3000])
   })
 
   it("previews nothing it wouldn't do, and what it would do in the world", () => {

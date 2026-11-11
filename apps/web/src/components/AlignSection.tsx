@@ -21,6 +21,7 @@ import type { KeybindAction } from "../domain/Keybinds"
 import type { ArrangeOp, BoxAxis, BoxSide, Distribution } from "../domain/snapTools"
 import { vecDot } from "../domain/ueMath"
 import {
+  arrangeOffReason,
   type ArrangePlan,
   arrangePlanOf,
   arrangeSelection,
@@ -31,7 +32,8 @@ import {
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import type { PaneCamera } from "../editor/paneCameras"
-import { useEditor } from "../editor/store"
+import { useArrangeInputs } from "../editor/snap/ArrangeOverlay"
+import { shownGizmoSpace, useEditor } from "../editor/store"
 import { usePaneReading } from "../editor/usePaneReading"
 import { FIELD_LABEL, FieldRow, Section } from "./InspectorLayout"
 import { KeyChip } from "./KeyChip"
@@ -40,7 +42,8 @@ import { NumberField } from "./NumberField"
 /**
  * Align and Distribute in the Inspector (docs/SNAPPING.md § Align and distribute): a row per axis, Min, Centre and Max
  * lining the selection up on the active item, then Gaps and Centres spreading it. Pointing at a button previews it in
- * the panes; the button does it. The axes are the world's, or the active item's with the gizmo in Local.
+ * the panes; the button does it. The axes are the world's, or the active item's with the axes toggle showing Local.
+ * Inside an entered chain it is greyed out, and says why.
  */
 
 const AXES: ReadonlyArray<BoxAxis> = ["x", "y", "z"]
@@ -61,8 +64,8 @@ const opsOf = (axis: BoxAxis): ReadonlyArray<ArrangeOp> => [
   ...DISTRIBUTIONS.map((by): ArrangeOp => ({ kind: "distribute", axis, by }))
 ]
 
-/** What a button does, in words: its title, and what it would do to this selection. */
-const describe = (op: ArrangeOp, plan: ArrangePlan | undefined, fixed: boolean): {
+/** What a button does, in words: its title, and what it would do to this selection, or why it is off. */
+const describe = (op: ArrangeOp, plan: ArrangePlan | undefined, fixed: boolean, off: string | undefined): {
   readonly title: string
   readonly detail: string
 } => {
@@ -70,6 +73,7 @@ const describe = (op: ArrangeOp, plan: ArrangePlan | undefined, fixed: boolean):
   const title = op.kind === "align"
     ? op.side === "centre" ? `Align centres on ${axis}` : `Align ${op.side === "min" ? "−" : "+"}${axis} sides`
     : `Distribute on ${axis}, equal ${op.by === "gaps" ? "gaps" : "centre steps"}`
+  if (off !== undefined) return { title, detail: off }
   const moving = plan?.moving ?? 0
   const count = `${moving} item${moving === 1 ? "" : "s"}`
   if (op.kind === "align") {
@@ -122,12 +126,14 @@ const BUTTON =
 /** A segmented control's track. */
 const TRACK = "flex w-fit items-center gap-0.5 rounded-control bg-muted p-0.5"
 
-function ArrangeButton({ op, plan, fixed }: {
+function ArrangeButton({ op, plan, fixed, reason }: {
   readonly op: ArrangeOp
   readonly plan: ArrangePlan | undefined
   readonly fixed: boolean
+  /** Why every button is off, when one thing turns them all off. */
+  readonly reason: string | undefined
 }) {
-  const { detail, title } = describe(op, plan, fixed)
+  const { detail, title } = describe(op, plan, fixed, reason)
   const off = plan === undefined || plan.moving === 0
   const show = () => setArrangeHover(op)
   const hide = () => setArrangeHover(null)
@@ -226,20 +232,20 @@ function SpacingRow() {
   )
 }
 
-/** The section, with two or more units selected; nothing otherwise. */
+/** The section, with two or more units selected, greyed out inside an entered chain; nothing otherwise. */
 export const AlignSection = memo(function AlignSection() {
-  const doc = useEditor((s) => s.doc)
-  const selectedIds = useEditor((s) => s.selectedIds)
-  const enteredGroupId = useEditor((s) => s.enteredGroupId)
-  const space = useEditor((s) => s.gizmoSpace)
+  const inputs = useArrangeInputs()
+  const space = useEditor(shownGizmoSpace)
   const spacing = useEditor((s) => s.arrangeSpacing)
-  const catalogIndex = useEditor((s) => s.catalogIndex)
   const activePane = useEditor((s) => s.activePane)
-  const plans = useMemo(() => {
+  const { plans, off } = useMemo(() => {
     const s = useEditor.getState()
-    return new Map(AXES.flatMap(opsOf).map((op) => [keyOf(op), arrangePlanOf(s, op)] as const))
+    return {
+      plans: new Map(AXES.flatMap(opsOf).map((op) => [keyOf(op), arrangePlanOf(s, op)] as const)),
+      off: arrangeOffReason(s)
+    }
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the plans are built from, read inside
-  }, [doc, selectedIds, enteredGroupId, space, spacing, catalogIndex])
+  }, inputs)
   const directions = useMemo(
     () =>
       AXES.map((axis) => plans.get(keyOf({ kind: "distribute", axis, by: "gaps" }))?.direction ?? { x: 0, y: 0, z: 0 }),
@@ -250,7 +256,7 @@ export const AlignSection = memo(function AlignSection() {
   useEffect(() => () => setArrangeHover(null), [])
 
   const [any] = plans.values()
-  if (any === undefined) return null
+  if (any === undefined && off === undefined) return null
   const fixed = spacing !== null
   return (
     <Section
@@ -258,6 +264,7 @@ export const AlignSection = memo(function AlignSection() {
       title="Align"
       actions={<span>{space === "local" ? "to the active item, its axes" : "to the active item"}</span>}
     >
+      {off !== undefined && <p className="text-caption text-fg-tertiary">{off}</p>}
       <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1">
         <span />
         <span className={FIELD_LABEL}>Align</span>
@@ -279,20 +286,20 @@ export const AlignSection = memo(function AlignSection() {
             <div className={TRACK}>
               {SIDES.map((side) => {
                 const op: ArrangeOp = { kind: "align", axis, side, to: "active" }
-                return <ArrangeButton key={side} op={op} plan={plans.get(keyOf(op))} fixed={fixed} />
+                return <ArrangeButton key={side} op={op} plan={plans.get(keyOf(op))} fixed={fixed} reason={off} />
               })}
             </div>
             <span />
             <div className={TRACK}>
               {DISTRIBUTIONS.map((by) => {
                 const op: ArrangeOp = { kind: "distribute", axis, by }
-                return <ArrangeButton key={by} op={op} plan={plans.get(keyOf(op))} fixed={fixed} />
+                return <ArrangeButton key={by} op={op} plan={plans.get(keyOf(op))} fixed={fixed} reason={off} />
               })}
             </div>
           </div>
         ))}
       </div>
-      <SpacingRow />
+      {off === undefined && <SpacingRow />}
     </Section>
   )
 })

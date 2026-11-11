@@ -196,7 +196,6 @@ import {
   type PivotDotSpec,
   type PivotMode,
   pivotModeFor,
-  pivotUnitOf,
   reachableKeys,
   type SelectionUnits,
   selectionUnitsOf,
@@ -2694,7 +2693,7 @@ const chainStartFor = perState((s): ChainStartSpec | undefined => {
   const whole = second === undefined && (first?.links?.length ?? 0) >= 2 ? first?.links : undefined
   const at = (selection.chain ?? whole)?.[0]?.pivot
   if (at === undefined) return undefined
-  const pivot = pivotUnitOf(selection, pivotModeFor(s, selection)).pivot
+  const pivot = selection.active.pivot
   const transforming = s.tool === "translate" || s.tool === "rotate" || s.tool === "scale"
   return { at, gizmo: transforming && Math.hypot(pivot.x - at.x, pivot.y - at.y, pivot.z - at.z) < 1 }
 })
@@ -2712,7 +2711,7 @@ export const selectionPivot = (
   const active = activeKey === undefined ? undefined : transformOf(activeKey)
   const selection = selectionUnits(s, transformOf)
   if (activeKey === undefined || active === undefined || selection === undefined) return undefined
-  const unit = pivotUnitOf(selection, pivotModeFor(s, selection))
+  const unit = selection.active
   return {
     active,
     pivot: unit.pivot,

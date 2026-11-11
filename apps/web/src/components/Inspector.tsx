@@ -36,7 +36,7 @@ import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/M
 import { assetNameOf } from "../domain/Materials"
 import { documentOrigin } from "../domain/prefab"
 import { gridScrubOf, scaleSnapStep, snapsGrid, snapsRotation } from "../domain/snapConfig"
-import { idOf, pieceNameOf } from "../domain/structure"
+import { findGroup, idOf, pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
 import { ORIGIN, vecScale } from "../domain/ueMath"
 import type { MapValidation } from "../domain/validateMap"
@@ -674,8 +674,21 @@ const PLAYER_START_HINT =
  * What's selected, at the top: one item, by its own name (edited in place; cleared, it takes its piece's) over its piece
  * and category, or how many items; then anything about it that needs a look, and one item's tags.
  */
+/** What the header calls the active unit `id`: a group's name, or an item's own name or its piece's. */
+const unitNameOf = (s: EditorState, id: string): string | undefined => {
+  const group = findGroup(s.doc.structure.tree, id)
+  if (group !== undefined) return group.name
+  const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+  return s.doc.structure.items.get(id)?.name ?? (item === undefined ? undefined : pieceNameOf(item, s.catalogIndex))
+}
+
 const SelectionIdentity = memo(function SelectionIdentity(
-  { items, itemKey }: { readonly items: ReadonlyArray<Item>; readonly itemKey: string | undefined }
+  { activeId, itemKey, items }: {
+    readonly items: ReadonlyArray<Item>
+    readonly itemKey: string | undefined
+    /** The active unit, the last clicked, which several selected are named by: what the gizmo and Align follow. */
+    readonly activeId: string | undefined
+  }
 ) {
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const renameItem = useEditor((s) => s.renameItem)
@@ -685,6 +698,7 @@ const SelectionIdentity = memo(function SelectionIdentity(
   // a group among pieces moves as one, so say so: the gizmo takes it as one unit
   const units = useEditor((s) => unitSummaryOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId))
   const link = useEditor(linkOf)
+  const active = useEditor((s) => only !== undefined || activeId === undefined ? undefined : unitNameOf(s, activeId))
   const identity = only === undefined || itemKey === undefined
     ? (
       <Identity
@@ -694,7 +708,10 @@ const SelectionIdentity = memo(function SelectionIdentity(
           </span>
         }
         title={<IdentityName>{`${items.length} items`}</IdentityName>}
-        subtitle={units ?? (kinds === 1 ? "All one piece" : `${kinds} kinds of piece`)}
+        subtitle={[
+          units ?? (kinds === 1 ? "All one piece" : `${kinds} kinds of piece`),
+          active === undefined ? undefined : `Active: ${active}`
+        ].filter((part) => part !== undefined).join(" · ")}
         actions={<SelectionActions />}
       />
     )
@@ -1012,7 +1029,11 @@ export function Inspector() {
         {group === undefined
           ? (
             <>
-              <SelectionIdentity items={items} itemKey={items.length === 1 ? ids[0] : undefined} />
+              <SelectionIdentity
+                items={items}
+                itemKey={items.length === 1 ? ids[0] : undefined}
+                activeId={active?.unit.id}
+              />
               {items.length > 1 && <ContentsSection items={items} />}
               {editor}
               {items.length === 1 && <ItemDetails item={first} index={indices[0] ?? -1} />}
