@@ -10,10 +10,11 @@ import { itemCountOf } from "../domain/mapDiff"
 import type { Item } from "../domain/MapFile"
 import type { ChainGrowth, GroupNode, PrefabLink } from "../domain/MapSidecar"
 import { isSamePrefab } from "../domain/prefab"
-import { checkInstance } from "../domain/prefabInstance"
+import { checkInstance, overriddenMembers, overrideSummary } from "../domain/prefabInstance"
+import { findGroup } from "../domain/structure"
 import { vecScale } from "../domain/ueMath"
 import { type GroupFrame, growthOf } from "../domain/units"
-import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
+import { detachInstance, openPrefab, resetOverrides, updateInstance } from "../editor/actions"
 import { shownGroupFrame, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
 import { FIELD_LABEL, FieldRow, Identity, IDENTITY_TILE, IdentityBlock, InlineName, Section } from "./InspectorLayout"
@@ -354,6 +355,7 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
   const doc = useEditor((s) => s.doc)
   const definition = useEditor((s) => s.prefabs.find((p) => isSamePrefab(p, link)))
   const { unmodified } = useMemo(() => checkInstance(doc, group, link), [doc, group, link])
+  const overridden = link.overrides?.length ?? 0
   const found = definition !== undefined
   const current = definition?.hash === link.hash
   return (
@@ -362,7 +364,9 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
         <span className="truncate text-body-strong" title={link.name}>{link.name}</span>
         <span className="text-body text-fg-tertiary">{instanceStatusOf(found, current, unmodified)}</span>
         <span className="text-caption text-fg-tertiary">
-          Its paint and properties below edit its items, so an edit there leaves it no longer following its definition.
+          {overridden === 0
+            ? "Moving, painting or hiding its pieces keeps them as overrides, which it keeps as it follows its definition."
+            : `${counted(overridden, "piece")} ${overridden === 1 ? "overrides" : "override"} its definition.`}
         </span>
       </div>
       <div className="flex flex-wrap gap-1">
@@ -374,6 +378,16 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
         >
           Update
         </Button>
+        {overridden > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!found}
+            onClick={() => void resetOverrides(group.id, link)}
+          >
+            Reset overrides
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={() => detachInstance(group.id)}>Detach</Button>
         <Button
           variant="outline"
@@ -382,6 +396,30 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
           onClick={() => void openPrefab({ tier: link.tier, name: link.name })}
         >
           Open definition
+        </Button>
+      </div>
+    </Section>
+  )
+}
+
+/** One item that is a member of a prefab instance with overrides: what it overrides, and Reset override. */
+export function MemberOverrideSection({ itemKey }: { readonly itemKey: string }) {
+  const doc = useEditor((s) => s.doc)
+  const override = overriddenMembers(doc).get(itemKey)
+  const link = override === undefined ? undefined : findGroup(doc.structure.tree, override.groupId)?.prefab
+  if (override === undefined || link === undefined) return null
+  return (
+    <Section id="override" title="Prefab override">
+      <span className="text-body text-fg-tertiary">
+        Overrides the {overrideSummary(override.fields)} {link.name} gives it. Updates keep it.
+      </span>
+      <div className="flex flex-wrap gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void resetOverrides(override.groupId, link, [override.member])}
+        >
+          Reset override
         </Button>
       </div>
     </Section>

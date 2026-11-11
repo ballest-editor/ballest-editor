@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
-import { changedPrefab, PREFAB_TEXT } from "../test/prefabs"
+import { changedPrefab, overrideFields, PREFAB_TEXT } from "../test/prefabs"
 import { expectVec } from "../test/vec"
 import fixture from "./bundledCatalog.json"
 import { Catalog, indexCatalog } from "./Catalog"
@@ -18,8 +18,11 @@ import {
   instanceOrigin,
   instancesIn,
   instancesOfPrefab,
+  overriddenMembers,
+  overrideSummary,
   reshapedInstances,
   withRecordedOverrides,
+  withResetMembers,
   withUnlinked,
   withUpdatedInstance
 } from "./prefabInstance"
@@ -306,10 +309,19 @@ const materialOf = (doc: Doc, n: number) =>
 const xOfMember = (doc: Doc, n: number) =>
   doc.map.items[doc.ids.indexOf(instanceKeys(doc)[n]!)]?.itemTransform.translation.x ?? NaN
 
+/** The fixture placed 100 along, its first member moved and hidden, its second painted. */
+const overridden = () => {
+  const placed = withDelta(placedDoc(), { kind: "translate", offset: { x: 100, y: 0, z: 0 } })
+  return edit(
+    edit(edit(placed, (d) => painted(d, 1)), (d) => moved(d, instanceKeys(d)[0]!, 500)),
+    (d) => hidden(d, 0)
+  )
+}
+
 describe("an instance's overrides", () => {
   it("records a member's paint, and the instance still follows its definition", () => {
     const doc = edit(placedDoc(), (d) => painted(d, 0))
-    assert.deepStrictEqual(groupOf(doc).prefab?.overrides, [{ member: 0, paint: true }])
+    assert.deepStrictEqual(overrideFields(groupOf(doc).prefab?.overrides), [{ member: 0, fields: ["paint"] }])
     assert.isTrue(check(doc).unmodified)
     expectVec(instanceOrigin(doc, groupOf(doc), groupOf(doc).prefab!)!, FRAME, 2)
   })
@@ -317,7 +329,7 @@ describe("an instance's overrides", () => {
   it("records the member that moved on its own, whichever it is, and not a move of the whole instance", () => {
     for (const n of [0, 1]) {
       const doc = edit(placedDoc(), (d) => moved(d, instanceKeys(d)[n]!, 500))
-      assert.deepStrictEqual(groupOf(doc).prefab?.overrides, [{ member: n, transform: true }])
+      assert.deepStrictEqual(overrideFields(groupOf(doc).prefab?.overrides), [{ member: n, fields: ["transform"] }])
       assert.isTrue(check(doc).unmodified)
       expectVec(instanceOrigin(doc, groupOf(doc), groupOf(doc).prefab!)!, FRAME, 2)
     }
@@ -326,10 +338,18 @@ describe("an instance's overrides", () => {
       (d) => withDelta(d, { kind: "rotate", rotation: rotatorToQuat({ pitch: 0, yaw: 40, roll: 0 }) })
     )
     assert.isUndefined(groupOf(whole).prefab?.overrides)
-    // the overridden member goes along with the rest, and stays its own
     const once = edit(placedDoc(), (d) => moved(d, instanceKeys(d)[1]!, 500))
+    // each member moved on its own in turn: the second isn't the instance moving, and it still stands where it did
+    const both = edit(once, (d) => moved(d, instanceKeys(d)[0]!, 300))
+    assert.deepStrictEqual(overrideFields(groupOf(both).prefab?.overrides), [{ member: 0, fields: ["transform"] }, {
+      member: 1,
+      fields: ["transform"]
+    }])
+    assert.isTrue(check(both).unmodified)
+    expectVec(instanceOrigin(both, groupOf(both), groupOf(both).prefab!)!, FRAME, 2)
+    // the overridden member goes along with the rest, and stays its own
     const twice = edit(once, (d) => withDelta(d, { kind: "translate", offset: { x: 0, y: 300, z: 0 } }))
-    assert.deepStrictEqual(groupOf(twice).prefab?.overrides, [{ member: 1, transform: true }])
+    assert.deepStrictEqual(overrideFields(groupOf(twice).prefab?.overrides), [{ member: 1, fields: ["transform"] }])
     assert.isTrue(check(twice).unmodified)
   })
 
@@ -342,7 +362,7 @@ describe("an instance's overrides", () => {
 
   it("records a hidden member, and drops that once it's shown again", () => {
     const doc = edit(placedDoc(), (d) => hidden(d, 1))
-    assert.deepStrictEqual(groupOf(doc).prefab?.overrides, [{ member: 1, hidden: true }])
+    assert.deepStrictEqual(overrideFields(groupOf(doc).prefab?.overrides), [{ member: 1, fields: ["hidden"] }])
     assert.isUndefined(groupOf(edit(doc, (d) => hidden(d, 1, false))).prefab?.overrides)
   })
 
@@ -356,16 +376,15 @@ describe("an instance's overrides", () => {
   })
 
   it("keeps paint, moves and hiding through an Update, and the rest follows the definition", () => {
-    const placed = withDelta(placedDoc(), { kind: "translate", offset: { x: 100, y: 0, z: 0 } })
-    const doc = edit(
-      edit(edit(placed, (d) => painted(d, 1)), (d) => moved(d, instanceKeys(d)[0]!, 500)),
-      (d) => hidden(d, 0)
-    )
+    const doc = overridden()
     const firstAt = xOfMember(doc, 0)
     const updated = withUpdatedInstance(doc, GROUP, nextDefinition)!
     const link = groupOf(updated).prefab!
     assert.strictEqual(link.hash, NEW_HASH)
-    assert.deepStrictEqual(link.overrides, [{ member: 0, transform: true, hidden: true }, { member: 1, paint: true }])
+    assert.deepStrictEqual(overrideFields(link.overrides), [{ member: 0, fields: ["hidden", "transform"] }, {
+      member: 1,
+      fields: ["paint"]
+    }])
     assert.closeTo(xOfMember(updated, 0), firstAt, 1e-6)
     // the second member's new place in the definition, with its paint
     assert.closeTo(xOfMember(updated, 1), FRAME.x + 100 + 2000, 0.01)
@@ -389,6 +408,42 @@ describe("an instance's overrides", () => {
     const updated = withUpdatedInstance(doc, GROUP, swapped)!
     assert.notStrictEqual(instanceKeys(updated)[1], instanceKeys(doc)[1])
     assert.isUndefined(groupOf(updated).prefab?.overrides)
+  })
+})
+
+describe("resetting overrides", () => {
+  it("lists each member that carries overrides, by key, with what it overrides", () => {
+    const doc = overridden()
+    const [first, second] = instanceKeys(doc)
+    const members = overriddenMembers(doc)
+    assert.deepStrictEqual(members.get(first!), {
+      groupId: GROUP,
+      member: 0,
+      fields: ["transform", "hidden"]
+    })
+    assert.deepStrictEqual(members.get(second!), { groupId: GROUP, member: 1, fields: ["paint"] })
+    assert.strictEqual(overriddenMembers(placedDoc()).size, 0)
+    assert.strictEqual(overrideSummary(["transform", "paint", "hidden"]), "transform, paint and hidden")
+    assert.strictEqual(overrideSummary(["paint"]), "paint")
+  })
+
+  it("puts a member back as its definition has it, shown, and leaves the others' overrides", () => {
+    const doc = overridden()
+    const was = materialOf(doc, 1)
+    const reset = withResetMembers(doc, GROUP, [0], definition)!
+    assert.deepStrictEqual(overrideFields(groupOf(reset).prefab?.overrides), [{ member: 1, fields: ["paint"] }])
+    // where the instance's placement puts the definition's first item, 100 along
+    assert.closeTo(xOfMember(reset, 0), xOfMember(placedDoc(), 0) + 100, 0.01)
+    assert.isUndefined(reset.structure.items.get(instanceKeys(reset)[0]!)?.hidden)
+    assert.strictEqual(materialOf(reset, 1), was)
+    assert.isTrue(check(reset).unmodified)
+  })
+
+  it("puts every member back with none named", () => {
+    const reset = withResetMembers(overridden(), GROUP, undefined, definition)!
+    assert.isUndefined(groupOf(reset).prefab?.overrides)
+    assert.strictEqual(materialOf(reset, 1), materialOf(placedDoc(), 1))
+    assert.closeTo(xOfMember(reset, 0), xOfMember(placedDoc(), 0) + 100, 0.01)
   })
 })
 

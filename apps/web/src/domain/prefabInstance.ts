@@ -27,6 +27,7 @@ import {
 } from "./structure"
 import { SURFACE_PROPERTY } from "./surface"
 import { ORIGIN, quatConjugate, quatMul, quatNormalize, rotateVec, vecAdd, vecSub } from "./ueMath"
+import { withFlag } from "./visibility"
 
 /** A definition as an instance takes it: its items in its own frame, and the link they make. */
 export interface PrefabDefinition {
@@ -74,6 +75,26 @@ const placed = (placement: Placement, t: UeTransform): UeTransform => ({
   rotation: quatNormalize(quatMul(placement.rotation, t.rotation)),
   scale3D: times(placement.scale, t.scale3D)
 })
+
+const over = (a: Vec3, b: Vec3): Vec3 => ({
+  x: b.x === 0 ? a.x : a.x / b.x,
+  y: b.y === 0 ? a.y : a.y / b.y,
+  z: b.z === 0 ? a.z : a.z / b.z
+})
+
+/** Where the definition would have `t` for `placement` to put it there: `placed` the other way. */
+const localOf = (placement: Placement, t: UeTransform): UeTransform => {
+  const turn = quatConjugate(placement.rotation)
+  const rotation = quatNormalize(quatMul(turn, t.rotation))
+  const offset = rotateVec(turn, vecSub(t.translation, placement.translation))
+  return {
+    translation: placement.spread === ONE
+      ? offset
+      : rotateVec(rotation, over(rotateVec(quatConjugate(rotation), offset), placement.spread)),
+    rotation,
+    scale3D: over(t.scale3D, placement.scale)
+  }
+}
 
 /** The rounding in a signature: 0.001 cm, eight places for a rotation, so 0.001 cm across a kilometre, and six for a scale. */
 const PLACES = { translation: 3, rotation: 8, scale: 6 } as const
@@ -192,8 +213,8 @@ const overridesOf = (link: PrefabLink): ReadonlyMap<number, MemberOverride> =>
   new Map((link.overrides ?? []).map((override) => [override.member, override]))
 
 /**
- * Fits the items an instance holds to what its link says was placed, leaving out the members whose transform is an
- * override. Every other item matching means an instance that follows its definition. An edited one takes the placement
+ * Fits the items an instance holds to what its link says was placed, a member whose transform is an override where
+ * that puts it. Every item matching means an instance that follows its definition. An edited one takes the placement
  * most of its items agree on, so an Update leaves it about where it was. `strays` are the members, by place in the
  * definition, that the fit leaves out of line.
  */
@@ -212,14 +233,13 @@ export const checkInstance = (
     const actual = transforms[index]
     return item === undefined || actual === undefined || classNameOf(item.actorToSpawn) !== className
       ? []
-      : [{ index, transform, actual }]
+      : [{ index, transform: overrides.get(index)?.transform ?? transform, actual }]
   })
   const sameClasses = items.length === expected.length && kept.length === expected.length
-  const fitted = kept.filter(({ index }) => overrides.get(index)?.transform !== true)
-  const anchors = fitted.slice(0, ANCHORS)
+  const anchors = kept.slice(0, ANCHORS)
   const scored = anchors.flatMap(({ actual, transform }) => placementsFrom(transform, actual)).map((placement) => {
     const agreeing = new Set(
-      fitted.flatMap(({ actual, index, transform }) => agrees(placement, transform, actual) ? [index] : [])
+      kept.flatMap(({ actual, index, transform }) => agrees(placement, transform, actual) ? [index] : [])
     )
     return { placement, agreeing }
   })
@@ -234,8 +254,8 @@ export const checkInstance = (
   if (best !== undefined) {
     return {
       placement: best.placement,
-      unmodified: sameClasses && best.agreeing.size === fitted.length && sameContent,
-      strays: new Set(fitted.flatMap(({ index }) => best.agreeing.has(index) ? [] : [index]))
+      unmodified: sameClasses && best.agreeing.size === kept.length && sameContent,
+      strays: new Set(kept.flatMap(({ index }) => best.agreeing.has(index) ? [] : [index]))
     }
   }
   return {
@@ -245,8 +265,7 @@ export const checkInstance = (
       scale: ONE,
       spread: ONE
     },
-    // every member's transform is its own, so there is nothing to fit
-    unmodified: sameClasses && kept.length > 0 && sameContent,
+    unmodified: false,
     strays: new Set()
   }
 }
@@ -270,14 +289,17 @@ export const instanceOrigin = (doc: Doc, group: GroupNode, link: PrefabLink): Ve
   return origin
 }
 
-const placedItem = (item: Item, placement: Placement): Item => {
-  const { rotation, scale3D, translation } = placed(placement, editTransform(item))
+/** `item` where `placement` puts `t`, a transform in the instance's frame. */
+const placedAs = (item: Item, placement: Placement, t: UeTransform): Item => {
+  const { rotation, scale3D, translation } = placed(placement, t)
   return withEditTransform(item, {
     rotation: { ...rotation },
     scale3D: { ...scale3D },
     translation: { ...translation }
   }, ORIGIN)
 }
+
+const placedItem = (item: Item, placement: Placement): Item => placedAs(item, placement, editTransform(item))
 
 export const instancesIn = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<GroupNode & { prefab: PrefabLink }> =>
   nodes.flatMap((node) => {
@@ -293,9 +315,14 @@ export const instancesOfPrefab = (nodes: ReadonlyArray<TreeNode>, ref: PrefabRef
 const surfacePropertiesOf = (item: Item) =>
   item.intProperties.filter(({ propertyName }) => propertyName === SURFACE_PROPERTY)
 
-/** `fresh`, a definition's member where its instance puts it, with what the instance's member `was` overrode. */
-const withOverride = (fresh: Item, was: Item, override: MemberOverride): Item => {
-  const moved = override.transform === true ? withEditTransform(fresh, editTransform(was), ORIGIN) : fresh
+/**
+ * `fresh`, a definition's member where `placement` puts it, with what the instance's member `was` overrode: its own
+ * transform in the instance's frame, and its paint.
+ */
+const withOverride = (fresh: Item, was: Item, override: MemberOverride, placement: Placement): Item => {
+  const moved = override.transform === undefined
+    ? fresh
+    : placedAs(fresh, placement, override.transform)
   return override.paint === true
     ? {
       ...moved,
@@ -323,44 +350,62 @@ const sameTransform = (a: UeTransform, b: UeTransform) =>
 /** An instance's members' keys, by place in the definition (document order). */
 const memberKeysOf = (doc: Doc, group: GroupNode) => indicesOf(doc, group).map((index) => doc.ids[index] ?? "")
 
+/** A member's overrides but the one it is changing; nothing left drops the entry. */
+type OverrideFields = Omit<MemberOverride, "member">
+
 /**
- * `link` with what one edit, from `before` to `after`, changed of instance `group`'s members recorded as overrides. A
- * member that moved while another stayed put moved on its own; when every member moved, the ones out of line with the
- * rest did. Paint and hidden are a member's own whatever moves.
+ * `link` with what one edit, from `before` to `after`, changed of instance `group`'s members (`previous` before it)
+ * recorded as overrides. A member that moved while another stayed put, even one already moved on its own, moved on its
+ * own, and keeps where it is in the instance's frame; when every member moved, the instance did, and the ones out of
+ * line with the rest moved on their own too. Paint and hidden are a member's own whatever moves.
  */
-const recordedLink = (before: Doc, after: Doc, group: GroupNode, link: PrefabLink, keys: ReadonlyArray<string>) => {
+const recordedLink = (
+  before: Doc,
+  previous: GroupNode,
+  after: Doc,
+  group: GroupNode,
+  link: PrefabLink,
+  keys: ReadonlyArray<string>
+) => {
   const overrides = new Map(overridesOf(link))
+  const change = (member: number, edit: (was: OverrideFields) => OverrideFields) => {
+    const { member: _, ...was } = overrides.get(member) ?? { member }
+    const next = edit(was)
+    if (next.transform === undefined && next.paint === undefined && next.hidden === undefined) overrides.delete(member)
+    else overrides.set(member, { member, ...next })
+  }
   const itemAt = (doc: Doc, key: string) => doc.map.items[indexOfKey(doc.ids, key)]
-  const free = keys.flatMap((key, member) => overrides.get(member)?.transform === true ? [] : [{ key, member }])
-  const moved = free.filter(({ key }) => {
+  const moved = keys.flatMap((key, member) => {
     const was = itemAt(before, key)
     const now = itemAt(after, key)
     return was !== now && was !== undefined && now !== undefined &&
-      !sameTransform(editTransform(was), editTransform(now))
+        !sameTransform(editTransform(was), editTransform(now))
+      ? [member]
+      : []
   })
-  const ownMoves = moved.length === 0
-    ? []
-    : moved.length < free.length
-    ? moved.map(({ member }) => member)
-    : [...checkInstance(after, group, link).strays]
-  const set = (member: number, field: "transform" | "paint" | "hidden", on: boolean) => {
-    const { member: _, ...was } = overrides.get(member) ?? { member }
-    const { [field]: _gone, ...rest } = was
-    const next = on ? { ...rest, [field]: true as const } : rest
-    if (Object.keys(next).length === 0) overrides.delete(member)
-    else overrides.set(member, { member, ...next })
+  if (moved.length > 0) {
+    const whole = moved.length === keys.length
+    // the members that stayed put still stand where the instance did
+    const { placement, strays } = whole ? checkInstance(after, group, link) : checkInstance(before, previous, link)
+    for (const member of whole ? strays : moved) {
+      const now = itemAt(after, keys[member] ?? "")
+      if (now !== undefined) change(member, (was) => ({ ...was, transform: localOf(placement, editTransform(now)) }))
+    }
   }
-  for (const member of ownMoves) set(member, "transform", true)
   keys.forEach((key, member) => {
     const was = itemAt(before, key)
     const now = itemAt(after, key)
-    if (was !== undefined && now !== undefined && was !== now && paintChanged(was, now)) set(member, "paint", true)
+    if (was !== undefined && now !== undefined && was !== now && paintChanged(was, now)) {
+      change(member, (fields) => ({ ...fields, paint: true }))
+    }
     const hidden = after.structure.items.get(key)?.hidden === true
-    if (hidden !== (overrides.get(member)?.hidden === true)) set(member, "hidden", hidden)
+    if (hidden !== (overrides.get(member)?.hidden === true)) {
+      change(member, ({ hidden: _gone, ...fields }) => hidden ? { ...fields, hidden: true } : fields)
+    }
   })
   const list = [...overrides.values()].sort((a, b) => a.member - b.member)
   const same = list.length === (link.overrides?.length ?? 0) &&
-    list.every((override, n) => JSON.stringify(override) === JSON.stringify(link.overrides?.[n]))
+    list.every((override, n) => override === link.overrides?.[n])
   if (same) return link
   const { overrides: _old, ...rest } = link
   return list.length === 0 ? rest : { ...rest, overrides: list }
@@ -372,7 +417,7 @@ const keptInstances = (before: Doc, after: Doc) =>
     const previous = findGroup(before.structure.tree, group.id)
     return previous === undefined || previous.prefab !== group.prefab
       ? []
-      : [{ group, keys: memberKeysOf(after, group), was: memberKeysOf(before, previous) }]
+      : [{ group, previous, keys: memberKeysOf(after, group), was: memberKeysOf(before, previous) }]
   })
 
 /**
@@ -383,9 +428,9 @@ const keptInstances = (before: Doc, after: Doc) =>
 export const withRecordedOverrides = (before: Doc, after: Doc): Doc => {
   if (before.map.items === after.map.items && before.structure.items === after.structure.items) return after
   let structure = after.structure
-  for (const { group, keys, was } of keptInstances(before, after)) {
+  for (const { group, keys, previous, was } of keptInstances(before, after)) {
     if (keys.length !== was.length || keys.some((key, n) => key !== was[n])) continue
-    const link = recordedLink(before, after, group, group.prefab, keys)
+    const link = recordedLink(before, previous, after, group, group.prefab, keys)
     if (link !== group.prefab) structure = withPrefabLink(structure, group.id, link) ?? structure
   }
   return structure === after.structure ? after : { ...after, structure }
@@ -410,9 +455,15 @@ export const withUnlinked = (doc: Doc, groupIds: ReadonlyArray<string>): Doc => 
 /**
  * The instance `groupId` with its items replaced by `definition`'s, where its placement puts them. The items that stay
  * the same class keep their keys, so their names, tags and places in nested groups stay too. Its link moves on to
- * `definition`, and an item it gained joins the end of the group.
+ * `definition`, and an item it gained joins the end of the group. Its members' overrides carry over, but for those of
+ * the members in `reset`, by place in the definition.
  */
-export const withUpdatedInstance = (doc: Doc, groupId: string, definition: PrefabDefinition): Doc | undefined => {
+export const withUpdatedInstance = (
+  doc: Doc,
+  groupId: string,
+  definition: PrefabDefinition,
+  reset: ReadonlySet<number> = new Set()
+): Doc | undefined => {
   const group = findGroup(doc.structure.tree, groupId)
   if (group?.prefab === undefined) return undefined
   const { placement } = checkInstance(doc, group, group.prefab)
@@ -423,10 +474,10 @@ export const withUpdatedInstance = (doc: Doc, groupId: string, definition: Prefa
   const fresh = definition.items.map((item, n) => {
     const placedOne = placedItem(item, placement)
     const was = doc.map.items[indices[n] ?? -1]
-    const override = overrides.get(n)
+    const override = reset.has(n) ? undefined : overrides.get(n)
     if (was === undefined || override === undefined || was.actorToSpawn !== item.actorToSpawn) return placedOne
     carried.push(override)
-    return withOverride(placedOne, was, override)
+    return withOverride(placedOne, was, override, placement)
   })
   const items = [...doc.map.items]
   const ids = [...doc.ids]
@@ -477,4 +528,72 @@ export const withUpdatedInstance = (doc: Doc, groupId: string, definition: Prefa
       items: new Map([...doc.structure.items].filter(([key]) => !gone.has(key) && !swapped.has(key)))
     }
   }
+}
+
+/** What a member can override, in the order they are named. */
+const OVERRIDE_FIELDS = ["transform", "paint", "hidden"] as const
+export type OverrideField = (typeof OVERRIDE_FIELDS)[number]
+
+/** A member of an instance that carries overrides: its instance, its place in the definition and what it overrides. */
+export interface OverriddenMember {
+  readonly groupId: string
+  readonly member: number
+  readonly fields: ReadonlyArray<OverrideField>
+}
+
+/** Each document's overridden members, since the Outline asks for every row. */
+const overridden = new WeakMap<Doc, ReadonlyMap<string, OverriddenMember>>()
+
+/** The members of `doc`'s instances that carry overrides, by key (docs/DESKTOP.md § Prefabs). */
+export const overriddenMembers = (doc: Doc): ReadonlyMap<string, OverriddenMember> => {
+  const known = overridden.get(doc)
+  if (known !== undefined) return known
+  const found = new Map<string, OverriddenMember>()
+  for (const group of instancesIn(doc.structure.tree)) {
+    if (group.prefab.overrides === undefined) continue
+    const keys = memberKeysOf(doc, group)
+    for (const override of group.prefab.overrides) {
+      const key = keys[override.member]
+      const fields = OVERRIDE_FIELDS.filter((field) => override[field] !== undefined)
+      if (key !== undefined) found.set(key, { groupId: group.id, member: override.member, fields })
+    }
+  }
+  overridden.set(doc, found)
+  return found
+}
+
+/** What the Outline and the Inspector say a member overrides: "transform and paint". */
+export const overrideSummary = (fields: ReadonlyArray<OverrideField>): string =>
+  fields.length < 2 ? fields.join("") : `${fields.slice(0, -1).join(", ")} and ${fields.at(-1)}`
+
+/** `overrideSummary` for item `key` of `members`; undefined for one with no overrides. */
+export const overriddenSummaryOf = (
+  members: ReadonlyMap<string, OverriddenMember>,
+  key: string
+): string | undefined => {
+  const fields = members.get(key)?.fields
+  return fields === undefined ? undefined : overrideSummary(fields)
+}
+
+/**
+ * Reset override: instance `groupId`'s `members`, by place in the definition, or all of them when undefined, put back as
+ * `definition` has them, where the instance stands, and shown; the other members keep their overrides. Undefined for a
+ * group that isn't an instance.
+ */
+export const withResetMembers = (
+  doc: Doc,
+  groupId: string,
+  members: ReadonlyArray<number> | undefined,
+  definition: PrefabDefinition
+): Doc | undefined => {
+  const group = findGroup(doc.structure.tree, groupId)
+  if (group?.prefab === undefined) return undefined
+  const overrides = overridesOf(group.prefab)
+  const chosen = members ?? [...overrides.keys()]
+  const keys = memberKeysOf(doc, group)
+  const updated = withUpdatedInstance(doc, groupId, definition, new Set(chosen))
+  if (updated === undefined) return undefined
+  const shown = chosen.flatMap((member) => overrides.get(member)?.hidden === true ? keys.slice(member, member + 1) : [])
+  const structure = withFlag(updated.structure, shown, "hidden", false)
+  return structure === undefined ? updated : { ...updated, structure }
 }

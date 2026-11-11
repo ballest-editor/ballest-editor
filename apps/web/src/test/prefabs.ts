@@ -32,3 +32,9 @@ export const changedPrefab = (change: (json: PrefabJson) => void): string => {
   change(json)
   return JSON.stringify(json)
 }
+
+/** An instance's overrides as which members override what: `[{ member: 0, fields: ["hidden", "transform"] }]`. */
+export const overrideFields = (
+  overrides: ReadonlyArray<{ readonly member: number }> | undefined
+): ReadonlyArray<{ readonly member: number; readonly fields: ReadonlyArray<string> }> | undefined =>
+  overrides?.map(({ member, ...rest }) => ({ member, fields: Object.keys(rest).sort() }))

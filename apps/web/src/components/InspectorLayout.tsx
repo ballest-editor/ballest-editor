@@ -39,6 +39,7 @@ export type SectionId =
   | "details"
   | "contents"
   | "instance"
+  | "override"
   | "chain"
   | "groupItems"
   | "mapInfo"

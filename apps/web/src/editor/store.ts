@@ -96,6 +96,7 @@ import {
   type PrefabDefinition,
   reshapedInstances,
   withRecordedOverrides,
+  withResetMembers,
   withUnlinked,
   withUpdatedInstance
 } from "../domain/prefabInstance"
@@ -790,6 +791,15 @@ export interface EditorState extends TabState {
    * says of what. Answers the group's id; undefined (with a notice) when the map has no room for them.
    */
   readonly placeGroup: (items: ReadonlyArray<Item>, name: string, link?: PrefabLink) => string | undefined
+  /**
+   * Reset override: instance `groupId`'s `members` (by place in the definition; all of them when undefined) put back as
+   * `definition` has them, as one undo step.
+   */
+  readonly resetOverrides: (
+    groupId: string,
+    members: ReadonlyArray<number> | undefined,
+    definition: PrefabDefinition
+  ) => void
   /** Replaces the instances `groupIds` of tab `tabId` with `definition`, where they stand, as one undo step. */
   readonly updateInstances: (tabId: string, groupIds: ReadonlyArray<string>, definition: PrefabDefinition) => void
   /** Gives groups of tab `tabId` the links paired with them, as one undo step; undefined makes a plain group. */
@@ -1629,6 +1639,11 @@ export const useEditor = create<EditorState>()((set, get) => {
         structure: withPrefabLink(grouped, id, link) ?? grouped
       }, { selectedIds: keys })
       return id
+    },
+
+    resetOverrides: (groupId, members, definition) => {
+      const next = withResetMembers(get().doc, groupId, members, definition)
+      if (next !== undefined) commit(next, {}, undefined, "Reset override")
     },
 
     updateInstances: (tabId, groupIds, definition) =>

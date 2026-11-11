@@ -92,14 +92,23 @@ describe("MapSidecar", () => {
     })
     const good = withLink({
       ...link,
-      overrides: [{ member: 0, transform: true, paint: true }, { member: 3, hidden: true }]
+      overrides: [{
+        member: 0,
+        transform: {
+          translation: { x: -1000, y: 0, z: 12.5 },
+          rotation: { x: 0, y: 0, z: 0.5, w: 0.8660254 },
+          scale3D: { x: 2, y: 1, z: 1 }
+        },
+        paint: true
+      }, { member: 3, hidden: true }]
     })
     const text = JSON.stringify(good)
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(Schema.decodeSync(Codec)(text))), good)
     const old = withLink(link)
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(Schema.decodeSync(Codec)(JSON.stringify(old)))), old)
     assert.isFalse(decodes(withLink({ ...link, overrides: [{ member: -1, paint: true }] })))
-    assert.isFalse(decodes(withLink({ ...link, overrides: [{ member: 0, transform: false }] })))
+    assert.isFalse(decodes(withLink({ ...link, overrides: [{ member: 0, transform: true }] })))
+    assert.isFalse(decodes(withLink({ ...link, overrides: [{ member: 0, paint: false }] })))
   })
 
   it("refuses a sidecar of another format version, or a key that isn't URL-safe", () => {

@@ -23,7 +23,7 @@ import {
 import { createNewMap, layerFor, reset, s } from "../../test/editorActions"
 import { objectAt, parseJson } from "../../test/json"
 import { VIEW_DOWN } from "../../test/placementView"
-import { changedPrefab, PREFAB_TEXT } from "../../test/prefabs"
+import { changedPrefab, overrideFields, PREFAB_TEXT } from "../../test/prefabs"
 import { repoRoot } from "../../test/samples"
 import { sceneRegistry } from "../sceneRegistry"
 import {
@@ -50,6 +50,7 @@ import {
   placePrefabEffect,
   projectMapsUsingPrefabEffect,
   renamePrefabEffect,
+  resetOverridesEffect,
   saveNewPrefabEffect,
   savePrefabTab,
   saveSelectionAsPrefabEffect,
@@ -151,6 +152,15 @@ const moveAll = (id: string, by: number) => {
     )
   )
 }
+
+/** The fixture placed in a started map: the instance, and its two items. */
+const placedPair = (disk: TestDisk) =>
+  Effect.gen(function*() {
+    yield* started(disk)
+    const id = yield* placed
+    const [a = "", b = ""] = treeKeys([instance(id)!])
+    return { id, a, b }
+  })
 
 const openDefinition = Effect.gen(function*() {
   yield* openPrefabEffect(USER)
@@ -302,9 +312,7 @@ describe("instances following their definition", () => {
   it.effect("keeps a member's paint, move and hiding as overrides, in the sidecar too, and still follows", () =>
     withDisk((disk) =>
       Effect.gen(function*() {
-        yield* started(disk)
-        const id = yield* placed
-        const [a = "", b = ""] = treeKeys([instance(id)!])
+        const { a, b, id } = yield* placedPair(disk)
         const materialOf = (key: string) =>
           s().doc.map.items[s().doc.ids.indexOf(key)]?.meshComponents[0]?.materials[0]?.material
         // as the Paint tool does it
@@ -316,8 +324,9 @@ describe("instances following their definition", () => {
         const wasA = xOf(a)
         const wasB = xOf(b)
         s().setItemFlag([a], "hidden", true)
-        const overrides = [{ member: 0, transform: true, hidden: true }, { member: 1, paint: true }] as const
-        assert.deepStrictEqual(instance(id)?.prefab?.overrides, overrides)
+        const overrides = [{ member: 0, fields: ["hidden", "transform"] }, { member: 1, fields: ["paint"] }]
+        const saved = instance(id)?.prefab?.overrides
+        assert.deepStrictEqual(overrideFields(saved), overrides)
 
         // the definition moves both items, the first of which this instance moved itself
         disk.files.set(
@@ -335,11 +344,29 @@ describe("instances following their definition", () => {
         assert.closeTo(xOf(b), wasB + 500, 0.01)
         assert.strictEqual(materialOf(b), red)
         assert.isTrue(s().doc.structure.items.get(a)?.hidden)
-        assert.deepStrictEqual(instance(id)?.prefab?.overrides, overrides)
+        assert.deepStrictEqual(instance(id)?.prefab?.overrides, saved)
 
         yield* saveMapFile
         const node = decodeSidecar(disk.files.get(sidecarFile(MAP))).tree.find((n) => n.kind === "group")
-        assert.deepStrictEqual(node?.kind === "group" ? node.prefab?.overrides : undefined, overrides)
+        assert.deepStrictEqual(node?.kind === "group" ? node.prefab?.overrides : undefined, saved)
+      })
+    ))
+
+  it.effect("resets one member's overrides from its definition, as one undo step, and the rest keep theirs", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        const { a, b, id } = yield* placedPair(disk)
+        const wasA = xOf(a)
+        moveItem(a, 250)
+        moveItem(b, 400)
+        const steps = s().past.length
+        yield* resetOverridesEffect(id, USER, [0])
+        assert.closeTo(xOf(a), wasA, 0.01)
+        assert.deepStrictEqual(overrideFields(instance(id)?.prefab?.overrides), [{ member: 1, fields: ["transform"] }])
+        assert.strictEqual(s().past.length, steps + 1)
+        assert.strictEqual(s().past.at(-1)?.description, "Reset override")
+        yield* resetOverridesEffect(id, USER)
+        assert.isUndefined(instance(id)?.prefab?.overrides)
       })
     ))
 

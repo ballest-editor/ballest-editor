@@ -177,6 +177,8 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
   /** How much of the row's items is hidden, and locked. */
   readonly hidden: FlagState
   readonly locked: FlagState
+  /** What a member of a prefab instance overrides of its definition, as `overrideSummary` says it. */
+  readonly overrides?: string | undefined
   /** A row's items, for its toggles: read when pressed, so a row doesn't redraw for them. */
   readonly keysOf: (id: string) => ReadonlyArray<string>
   readonly dragged: boolean
@@ -186,7 +188,7 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
   readonly onRenamed: (row: OutlineRow, value: string | null) => void
 }) {
   const { row, rowIndex, selected, partial, entered, dimmed, dragged, dropInto, filtering, renaming, onRenamed } = props
-  const { hidden, keysOf, locked } = props
+  const { hidden, keysOf, locked, overrides } = props
   const setGroupCollapsed = useEditor((s) => s.setGroupCollapsed)
   const isGroup = row.kind === "group"
   const FolderIcon = row.instance ? IconBoxMultiple : row.chain ? IconLink : row.collapsed ? IconFolder : IconFolderOpen
@@ -256,6 +258,14 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
               {row.name}
             </span>
             <Ordinal value={row.ordinal} />
+            {overrides !== undefined && (
+              <span
+                role="img"
+                aria-label={`Overrides its prefab's ${overrides}`}
+                title={`Overrides its prefab's ${overrides}`}
+                className="ml-0.5 size-1.5 shrink-0 rounded-full bg-primary"
+              />
+            )}
             <span className="flex-1" />
             {row.tags.length > 0 && <TagChips tags={row.tags} />}
             <FlagToggle row={row} keysOf={keysOf} flag="locked" state={locked} />

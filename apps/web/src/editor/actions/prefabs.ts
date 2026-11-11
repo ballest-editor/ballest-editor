@@ -373,6 +373,18 @@ export const updateInstance = (groupId: string, ref: PrefabRef) =>
   }))
 
 /**
+ * Reset override, from the Outline and the Inspector: instance `groupId`'s `members` (by place in the definition; all of
+ * them when undefined) put back as its definition has them now.
+ */
+export const resetOverridesEffect = (groupId: string, ref: PrefabRef, members?: ReadonlyArray<number>) =>
+  Effect.map(readDefinition(ref), (definition) => {
+    useEditor.getState().resetOverrides(groupId, members, definition)
+  })
+
+export const resetOverrides = (groupId: string, ref: PrefabRef, members?: ReadonlyArray<number>) =>
+  run(resetOverridesEffect(groupId, ref, members))
+
+/**
  * The Prefabs panel's "2 placed": every instance of `ref` in the active tab a click could pick, whole, selected from
  * outside any entered group. One with nothing left to pick (all hidden, locked or isolated out) stays out, as from
  * Select all.
