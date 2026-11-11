@@ -1,7 +1,7 @@
 # tools/driver: the game driver for agents
 
-An MCP server that runs sandboxed copies of _Ballest of Them All_ headless under Proton and drives them through the
-plugin manager's test channel. The design and what was measured are in [docs/DRIVER.md](../../docs/DRIVER.md); this
+An MCP server, and a CLI with the same tools, that runs sandboxed copies of _Ballest of Them All_ headless under Proton
+and drives them through the plugin manager's test channel. The design and what was measured are in [docs/DRIVER.md](../../docs/DRIVER.md); this
 is how to run it.
 
 ## Needs
@@ -28,13 +28,19 @@ pnpm driver setup --host DIR      # ... and lays DIR's version.dll and plugins/ 
 pnpm driver start --slot 1        # a headless copy in its own prefix; prints its status once the menu is up (~25 s)
 pnpm driver start --slot 1 --window   # the same with a window
 pnpm driver run --slot 1 state    # one test channel command, its replies printed
+pnpm driver tools                 # the tools below, with their parameters
+pnpm driver tool slot_status '{"slot":1}'   # one tool, its result printed as JSON
+pnpm driver tool render '{"slot":1,"name":"menu"}'   # {"path": ".../menu.png"}; read the file to look
 pnpm driver status --slot 1
 pnpm driver stop --slot 1
 pnpm driver serve                 # the MCP server over stdio
 ```
 
-`.mcp.json` at the repo root registers `serve`, so an agent in this repo has the tools without any setup beyond
-`pnpm build` and `pnpm driver setup`. The driver patches the Wine override into each slot's prefix, so only the player's
+Use the driver only when the task needs the real game; the editor itself is checked in the browser. Nothing in the
+repo registers `serve`, so no session starts it: an agent runs the tools through `pnpm driver tool`, which decodes the
+JSON with the tool's own schema and runs the server's own handler, exits non-zero with one line on a bad name or bad
+parameters, and needs nothing beyond `pnpm build` and `pnpm driver setup`. Start one slot, and stop it when done. The
+driver patches the Wine override into each slot's prefix, so only the player's
 own game needs it set, and `setup --host` can supply the host.
 
 Everything lives in `~/.cache/ballest-editor/driver/` (`BALLEST_DRIVER_HOME`): `game/`, the copy of the install;

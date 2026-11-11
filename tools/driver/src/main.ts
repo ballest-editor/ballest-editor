@@ -1,11 +1,12 @@
 #!/usr/bin/env -S node --experimental-strip-types
-// The game driver (docs/DRIVER.md): `serve` is the MCP server over stdio; the other commands do the same things from
-// a shell. `node tools/driver/src/main.ts --help`.
+// The game driver (docs/DRIVER.md): `tools` and `tool` run the MCP server's tools from a shell, `serve` is that server
+// over stdio for whoever registers it, and the other commands manage the slots. `node tools/driver/src/main.ts --help`.
 import { NodeRuntime, NodeServices } from "@effect/platform-node"
 import { Console, Effect, Layer, Option } from "effect"
 import { McpProtocol, McpServer } from "effect/ai"
 import { Argument, Command, Flag } from "effect/cli"
 import { Channel } from "./channel.ts"
+import { describeTools, parseParams, runTool } from "./cli.ts"
 import { Handler } from "./handler.ts"
 import { Plugin } from "./plugin.ts"
 import { Probe } from "./probeMap.ts"
@@ -88,8 +89,35 @@ const run = Command.make(
     })
 ).pipe(Command.withDescription("Runs one test channel command in a slot and prints its replies"))
 
+const tools = Command.make("tools", {}, () => Console.log(describeTools(DriverToolkit.tools))).pipe(
+  Command.withDescription("Lists the MCP server's tools with their parameters")
+)
+
+const tool = Command.make(
+  "tool",
+  {
+    name: Argument.String("name").pipe(Argument.withDescription("the tool, as `tools` lists it")),
+    params: Argument.String("params").pipe(
+      Argument.withDescription("its parameters as a JSON object (default {})"),
+      Argument.optional
+    )
+  },
+  ({ name, params }) =>
+    Effect.gen(function*() {
+      const decoded = yield* parseParams(Option.getOrUndefined(params))
+      const result = yield* runTool(DriverToolkit, name, decoded).pipe(Effect.provide(DriverToolsLayer))
+      yield* Console.log(JSON.stringify(result, null, 2))
+    }).pipe(
+      // One line on stderr and a failed exit, not a stack: the message is the whole story (bad JSON, bad parameters).
+      Effect.catchTag("DriverError", (e) =>
+        Console.error(e.message).pipe(Effect.andThen(Effect.sync(() => {
+          process.exitCode = 1
+        }))))
+    )
+).pipe(Command.withDescription("Runs one of the MCP server's tools and prints its result as JSON"))
+
 Command.make("driver").pipe(
-  Command.withSubcommands([serve, setup, start, stop, status, run]),
+  Command.withSubcommands([tools, tool, serve, setup, start, stop, status, run]),
   Command.run({ version: VERSION }),
   Effect.provide(services.pipe(Layer.provideMerge(NodeServices.layer))),
   NodeRuntime.runMain
