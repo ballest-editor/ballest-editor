@@ -182,7 +182,7 @@ The app driver answers "what does this look like now" and "what changed between 
 
 - `pnpm check:everything` runs the coverage test (§ 2) and the states' typecheck. Cheap, every PR, and it is what lets a redesign capture every view before and after.
 - No workflow runs the states. From #228 to #252 a workflow ran `run --smoke` on every PR that touched the app. Every failure in its history was a stale state, a flake or a timeout, never a regression, and at 80 states it ran past its 30-minute limit. Its pictures were compared to nothing.
-- A state that has drifted from the app is found by the next person who runs it, so whoever changes a view runs its states (AGENTS.md "Verifying") and fixes any that can't be reached.
+- A state that has drifted from the app is found by the next person who runs it, and fixed then.
 - `review` (§ 11) never runs in CI.
 
 From T3: `scripts/mobile-behavior`, `mobile-e2e` and `render-metrics.ts` run by hand, never in CI; T3's CI covers the UI with component tests in Vitest's browser mode.
