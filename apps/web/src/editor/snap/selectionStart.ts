@@ -2,6 +2,7 @@
 import { endsOf, type WorldEnd } from "../../domain/connectors"
 import type { UeTransform } from "../../domain/coords"
 import { type Box, placedBoxOf } from "../../domain/itemBounds"
+import { targetOn } from "../../domain/snapConfig"
 import { indexOfKey } from "../../domain/structure"
 import { sceneRegistry } from "../sceneRegistry"
 import {
@@ -67,6 +68,6 @@ export const bodyDrags = (s: EditorState): boolean => {
   const target = dragTargetOf(s)
   if (target === undefined) return false
   if (bodyDrag === "always") return true
-  if (!config.enabled || !config.targets.connectors.enabled) return false
+  if (!targetOn(config, "connectors")) return false
   return selectionSnapStart(s, target.transforms, [...target.transforms.keys()]).ends.length > 0
 }

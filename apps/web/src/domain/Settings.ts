@@ -8,7 +8,7 @@ import { areaRules } from "./areaSelect"
 import { movementLookModes } from "./flyKeys"
 import { PLACE_DISTANCE } from "./placement"
 import { SCENE_COLORS, shadeOf } from "./sceneGround"
-import { defaultSnapConfig, SnapConfig } from "./snapConfig"
+import { defaultSnapConfig, SnapConfig, ungatedSnapping } from "./snapConfig"
 import { defaultSnapPrefs, SNAP_PREFS_BEFORE, SnapPrefs } from "./snapPrefs"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
@@ -199,7 +199,8 @@ const valueAt = (from: unknown, path: ReadonlyArray<string>): unknown =>
  * Older saves kept `undoSelection` under general (it now lives under editor), stored the
  * old fixed grid colours whether or not they were chosen (they become automatic), and stored
  * an unset creator as "" (now null: use the name found), spelled the starred pieces `favouritePieces`,
- * and kept what is now `snapPrefs` in the map defaults (`SNAP_PREFS_BEFORE` says where).
+ * kept what is now `snapPrefs` in the map defaults (`SNAP_PREFS_BEFORE` says where), and had the magnet gate all of
+ * snapping (`ungatedSnapping`).
  */
 const migrate = (stored: unknown): unknown => {
   if (!Predicate.isObject(stored)) return stored
@@ -217,6 +218,7 @@ const migrate = (stored: unknown): unknown => {
     out = { ...out, panels: { ...panels, favoritePieces: panels["favouritePieces"] } }
   }
   const snapping = out["snapping"]
+  if (Predicate.isObject(snapping) && "enabled" in snapping) out = { ...out, snapping: ungatedSnapping(snapping) }
   if (Predicate.isObject(snapping) && !Predicate.isObject(out["snapPrefs"])) {
     const before = Object.entries(SNAP_PREFS_BEFORE).flatMap(([key, path]) => {
       const value = valueAt(snapping, path)

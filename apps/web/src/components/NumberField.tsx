@@ -31,6 +31,7 @@ function useScrub(options: {
   readonly value: number
   readonly step: number
   readonly snap: number | undefined
+  readonly snapFrom: number | undefined
   readonly round: (n: number) => number
   readonly onScrub: ((value: number | null, from: number) => void) | undefined
   readonly onCommit: (value: number, from: number) => void
@@ -102,8 +103,8 @@ function useScrub(options: {
       if (active.value === null && Math.abs(dx) < SCRUB_THRESHOLD) return
       active.x = e.clientX
       active.pixels += dx * scrubSpeedOf(e)
-      const { step, snap, round, onScrub } = latest.current
-      const value = scrubbedValue(active.startValue, active.pixels, step, snap)
+      const { step, snap, snapFrom, round, onScrub } = latest.current
+      const value = scrubbedValue(active.startValue, active.pixels, step, snap, snapFrom)
       // A factor may need more digits than its display to land a dimension on the grid.
       active.value = snap === undefined ? round(value) : value
       onScrub?.(active.value, active.startValue)
@@ -182,8 +183,10 @@ export function NumberField(props: {
   /** The value a finished scrub ends on, and the one it started from; defaults to `onCommit`. */
   readonly onScrubCommit?: (value: number, from: number) => void
   readonly step?: number
-  /** Scrubs land on multiples of this. */
+  /** Scrubs land on multiples of this, */
   readonly snap?: number | undefined
+  /** counted from this value: a grid's origin. */
+  readonly snapFrom?: number | undefined
   readonly digits?: number
   /** Background class for the handle, e.g. an axis colour. */
   readonly handleClassName?: string | undefined
@@ -234,6 +237,7 @@ export function NumberField(props: {
     value: props.value ?? 0,
     step: props.step ?? 1,
     snap: props.snap,
+    snapFrom: props.snapFrom,
     round,
     onScrub: props.onScrub,
     onCommit: props.onScrubCommit ?? props.onCommit,

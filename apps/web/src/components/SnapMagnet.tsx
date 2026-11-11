@@ -38,9 +38,9 @@ const PREFERENCES = { grid: "Grid", pieces: "Pieces" } as const
 const BLOCK = "flex flex-col"
 
 /**
- * The snap menu (docs/SNAPPING.md § The snap menu): snapping as a whole, the three steps, what it snaps to in the
- * user's words, which wins, how close is close, then Advanced for the rest and the defaults. Everything under Snapping
- * stays working but dimmed while it is off.
+ * The snap menu (docs/SNAPPING.md § The snap menu): the magnet, the three steps, what it snaps to in the user's words,
+ * which wins, how close is close, then Advanced for the rest and the defaults. The steps have switches of their own;
+ * what it snaps to and which wins stay working but dimmed while the magnet is off.
  */
 function SnapMenuContent() {
   const config = useEditor(snapConfigOf)
@@ -48,7 +48,7 @@ function SnapMenuContent() {
   const planes = useEditor((s) => annotationsOf(s.doc.structure).construction.length > 0)
   const isDefault = useEditor(snapIsDefault)
   const { alignment, connectors, construction, grid, mesh, tracking } = config.targets
-  const dimmed = !config.enabled
+  const dimmed = !config.magnet
   const preference = snapPreferenceOf(config)
   return (
     // The padding is the scroller's own, so a switch's wider hit area stays inside it and the scrollbar sits at the edge.
@@ -59,15 +59,14 @@ function SnapMenuContent() {
       <SwitchRow
         strong
         label="Snapping"
-        help="Turns all snapping on or off. Hold Ctrl while dragging for the opposite, for that drag."
-        checked={config.enabled}
-        onChange={(enabled) => updateSnap({ enabled })}
+        help="Snaps to the pieces: their ends, faces and guides. Grid, Angle and Scale factor have switches of their own. Hold Ctrl while dragging to snap to nothing, for that drag."
+        checked={config.magnet}
+        onChange={(magnet) => updateSnap({ magnet })}
       />
       <div className={BLOCK}>
         <StepRow
           label="Grid"
           help="World moves land on grid lines; local moves travel in grid increments. At 50 cm, a world position of 137 snaps to 150; a local move advances by 50."
-          dimmed={dimmed}
           step={{
             label: "Grid step",
             value: config.gridSize,
@@ -81,15 +80,14 @@ function SnapMenuContent() {
         />
         <SwitchRow
           label="Snap size to grid"
-          dimmed={dimmed || !grid.enabled}
-          help="Inspector and handles resize to multiples of the grid size along the piece's own axes. Requires Grid and Snapping."
+          dimmed={!grid.enabled}
+          help="Inspector and handles resize to multiples of the grid size along the piece's own axes. Requires Grid."
           checked={config.scaleToGrid}
           onChange={(scaleToGrid) => updateSnap({ scaleToGrid })}
         />
         <StepRow
           label="Angle"
           help="Turns go round in steps of this angle, and still stop where the piece meets another. Example: at 15°, a quarter turn is six steps."
-          dimmed={dimmed}
           step={{
             label: "Angle step",
             value: config.rotationStep,
@@ -104,7 +102,6 @@ function SnapMenuContent() {
         <StepRow
           label="Scale factor"
           help="Absolute scale multiples. Used when size snapping is off or dimensions are unknown. At 10%, scales land on 100%, 110%, 120%."
-          dimmed={dimmed}
           step={{
             label: "Scale step",
             value: config.scaleStep,
@@ -161,7 +158,6 @@ function SnapMenuContent() {
         <Row
           label="Snap distance"
           help="How close the pointer has to get, in pixels on screen, before something snaps."
-          dimmed={dimmed}
         >
           <RowValue>{config.threshold} px</RowValue>
         </Row>
@@ -204,7 +200,7 @@ function SnapMenuContent() {
  * view bar's controls are, so Space after a click still flies.
  */
 export function SnapMagnet({ disabled }: { readonly disabled: boolean }) {
-  const enabled = useEditor((s) => snapConfigOf(s).enabled)
+  const enabled = useEditor((s) => snapConfigOf(s).magnet)
   return (
     <>
       <ViewTip

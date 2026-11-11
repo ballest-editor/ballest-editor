@@ -35,7 +35,7 @@ import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
 import { assetNameOf } from "../domain/Materials"
-import { scaleSnapStep, snapsGrid, snapsRotation } from "../domain/snapConfig"
+import { gridScrubOf, scaleSnapStep, snapsGrid, snapsRotation } from "../domain/snapConfig"
 import { idOf, pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
 import { pivotModeFor, pivotUnitOf } from "../domain/units"
@@ -557,6 +557,8 @@ function TransformRow(props: {
         {axes.map((axis) => {
           const value = readField(props.unit, field)[axis] / perUnit[axis]
           const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit[axis] }) as const
+          // a location lands on the grid's own lines, counted from its origin
+          const lattice = field === "translation" ? gridScrubOf(snapping, axis) : undefined
           return (
             <NumberField
               key={axis}
@@ -572,6 +574,7 @@ function TransformRow(props: {
                   return step === undefined ? undefined : step / Math.abs(perUnit[axis])
                 })()
                 : snap}
+              snapFrom={lattice === undefined ? undefined : lattice.from / perUnit[axis]}
               digits={row.digits}
               handleClassName={AXIS_BG_CLASSES[axis]}
               handleText={AXIS_LABELS[axis]}

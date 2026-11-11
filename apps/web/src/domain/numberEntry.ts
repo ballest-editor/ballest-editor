@@ -8,11 +8,20 @@ const PIXELS_PER_SNAP = 10
 export const scrubSpeedOf = (keys: { readonly shiftKey: boolean; readonly altKey: boolean }): number =>
   (keys.shiftKey ? 10 : 1) * (keys.altKey ? 0.1 : 1)
 
-/** Where a scrub of `pixels` from `start` lands, `step` per pixel; with `snap`, on a multiple of it. */
-export const scrubbedValue = (start: number, pixels: number, step: number, snap: number | undefined): number =>
+/**
+ * Where a scrub of `pixels` from `start` lands, `step` per pixel; with `snap`, on a multiple of it counted from
+ * `snapFrom`.
+ */
+export const scrubbedValue = (
+  start: number,
+  pixels: number,
+  step: number,
+  snap: number | undefined,
+  snapFrom = 0
+): number =>
   snap === undefined
     ? start + pixels * step
-    : snapValue(start + pixels * Math.max(step, snap / PIXELS_PER_SNAP), snap)
+    : snapValue(start + pixels * Math.max(step, snap / PIXELS_PER_SNAP) - snapFrom, snap) + snapFrom
 
 /** What's typed into a field: a value to set, or an operation on the value it holds. */
 type NumberEntry =

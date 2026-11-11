@@ -84,7 +84,7 @@ describe("whether a press on the selection's body drags it", () => {
   }
   const configOf = (enabled: boolean, connectors: boolean): SnapConfig => ({
     ...defaultSnapConfig,
-    enabled,
+    magnet: enabled,
     targets: {
       ...defaultSnapConfig.targets,
       connectors: { ...defaultSnapConfig.targets.connectors, enabled: connectors }
@@ -93,12 +93,12 @@ describe("whether a press on the selection's body drags it", () => {
 
   it.each(
     [
-      ["ends", "snapping on, Connectors on, a piece with ends", true, true, 0, true],
-      ["ends", "snapping off", false, true, 0, false],
+      ["ends", "the magnet on, Connectors on, a piece with ends", true, true, 0, true],
+      ["ends", "the magnet off", false, true, 0, false],
       ["ends", "Connectors off", true, false, 0, false],
       ["ends", "a piece with no ends", true, true, 1, false],
-      ["always", "snapping off, a piece with no ends", false, false, 1, true],
-      ["never", "snapping on, Connectors on, a piece with ends", true, true, 0, false]
+      ["always", "the magnet off, a piece with no ends", false, false, 1, true],
+      ["never", "the magnet on, Connectors on, a piece with ends", true, true, 0, false]
     ] as const
   )("%s, with %s: %s", (bodyDrag, _case, enabled, connectors, piece, drags) => {
     const [a = ""] = loadPieces([{ x: 0, y: 0, z: 0 }], piece)

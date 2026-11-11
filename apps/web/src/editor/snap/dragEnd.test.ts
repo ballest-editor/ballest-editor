@@ -9,7 +9,7 @@ import { defaultSnapPrefs, type SnapPrefs } from "../../domain/snapPrefs"
 import { annotationsOf } from "../../domain/structure"
 import { ORIGIN } from "../../domain/ueMath"
 import { reactRootPerTest } from "../../test/reactRoot"
-import { catalogWithEnds, DOWN_PANE_SIZE, loadPieces, lookDown } from "../../test/snapFixtures"
+import { allSnapping, catalogWithEnds, DOWN_PANE_SIZE, loadPieces, lookDown } from "../../test/snapFixtures"
 import { assertVec } from "../../test/vec"
 import { GizmoController } from "../gizmo/GizmoController"
 import { SIZE } from "../gizmo/handles"
@@ -114,9 +114,8 @@ const setUp = (snap: Partial<SnapConfig> = {}, piece = 0, prefs: Partial<SnapPre
   useEditor.setState((st) => ({ settings: { ...st.settings, snapPrefs: { ...st.settings.snapPrefs, ...prefs } } }))
   const s = useEditor.getState()
   s.setTabSnap({
-    ...defaultSnapConfig,
-    enabled: true,
-    targets: { ...defaultSnapConfig.targets, tracking: TRACKING },
+    ...allSnapping,
+    targets: { ...allSnapping.targets, tracking: TRACKING },
     ...snap
   })
   s.setTool("translate")
@@ -236,8 +235,8 @@ describe("a press and drag on an item's body", () => {
     assert.lengthOf(atCommit, moves ? 1 : 0)
   })
 
-  it("with ends, leaves it be while snapping is off", () => {
-    setUp({ enabled: false })
+  it("with ends, leaves it be while the magnet is off", () => {
+    setUp({ magnet: false })
     assert.isFalse(bodyDrag())
     assert.lengthOf(atCommit, 0)
   })
@@ -248,7 +247,7 @@ describe("a body drag with J held", () => {
 
   /** The item at the origin, and a second whose -X end is at (350, 300, 50), with J held from the press. */
   const joinDrag = () => {
-    setUp({ targets: { ...defaultSnapConfig.targets, tracking: { ...TRACKING, enabled: false } } })
+    setUp({ targets: { ...allSnapping.targets, tracking: { ...TRACKING, enabled: false } } })
     const [a = ""] = useEditor.getState().doc.ids
     const piece = catalogWithEnds().pieces[0] ?? assert.fail("the bundled catalog is empty")
     useEditor.getState().placePiece(piece, identityTransform({ x: 600, y: 300, z: 0 }))
@@ -372,7 +371,7 @@ describe("a turn by the gizmo's ring", () => {
   })
 
   it("stops where it touches the neighbour, and goes on once the pointer is a threshold past", () => {
-    setUpTurn({ enabled: true })
+    setUpTurn({ magnet: true })
     const shown = turnThrough(30)
     // free to 12°, on the touch from a pixel short of it until 12 px along the 78 px ring past it, then free again
     const held = Array.from({ length: 9 }, () => 13.05)
@@ -380,7 +379,7 @@ describe("a turn by the gizmo's ring", () => {
   })
 
   it("says in the history what it stopped on", () => {
-    setUpTurn({ enabled: true })
+    setUpTurn({ magnet: true })
     turnThrough(16)
     at(onRing(0, 0), "pointerup", 0)
     const s = useEditor.getState()
@@ -388,14 +387,22 @@ describe("a turn by the gizmo's ring", () => {
     assert.match(s.past.at(-1)?.description ?? "", /^Turn 1 item touching /)
   })
 
-  it("stops on nothing and takes no step with Snap off, whatever Snap rotation says", () => {
-    setUpTurn({ enabled: false, rotationEnabled: true, rotationStep: 15 })
+  it("stops on nothing and takes no step with the magnet and Snap rotation off", () => {
+    setUpTurn({ magnet: false, rotationEnabled: false })
     const shown = turnThrough(20)
     assert.deepStrictEqual(shown.slice(12, 18), [13, 14, 15, 16, 17, 18])
   })
 
-  it("takes the rotation step between stops with Snap and Snap rotation on", () => {
-    setUpTurn({ enabled: true, rotationEnabled: true, rotationStep: 15 })
+  it("takes the rotation step with the magnet off, and doesn't stop where it touches the neighbour", () => {
+    setUpTurn({ magnet: false, rotationEnabled: true, rotationStep: 15 })
+    const shown = turnThrough(20)
+    assert.deepStrictEqual(shown.slice(0, 7), [0, 0, 0, 0, 0, 0, 0])
+    assert.notInclude(shown, 13.05)
+    assert.include(shown, 15)
+  })
+
+  it("takes the rotation step between stops with the magnet and Snap rotation on", () => {
+    setUpTurn({ magnet: true, rotationEnabled: true, rotationStep: 15 })
     const shown = turnThrough(7)
     assert.deepStrictEqual(shown, [0, 0, 0, 0, 0, 0, 0])
   })

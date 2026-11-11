@@ -3,11 +3,10 @@ import * as THREE from "three"
 import type { Vec3 } from "../../domain/coords"
 import { identityTransform } from "../../domain/factory"
 import type { MeshFace } from "../../domain/meshElements"
-import { defaultSnapConfig } from "../../domain/snapConfig"
 import type { SnapItem } from "../../domain/snapFrame"
 import { cornersOf } from "../../domain/snapRelation"
 import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
-import { boxAt, cubeAt, endAlongX, loadPieces, meshOfBox } from "../../test/snapFixtures"
+import { allSnapping, boxAt, cubeAt, endAlongX, loadPieces, meshOfBox } from "../../test/snapFixtures"
 import { sceneRegistry } from "../sceneRegistry"
 import { useEditor } from "../store"
 import { snapItemsOf } from "./snapScene"
@@ -29,7 +28,7 @@ const turnOf = (pivot: Vec3, own: SnapItem = cubeAt("own", ORIGIN)) => ({
 
 /** Where the turn stops, in degrees to the hundredth, with what it says. */
 const turnStops = (items: ReadonlyArray<SnapItem>, pivot: Vec3 = ORIGIN, rangeCm = 10, own?: SnapItem) =>
-  turnStopsOf(defaultSnapConfig, turnOf(pivot, own), items, rangeCm).map(({ angle, label }) => [
+  turnStopsOf(allSnapping, turnOf(pivot, own), items, rangeCm).map(({ angle, label }) => [
     Math.round(angle * 18000 / Math.PI) / 100 + 0,
     label
   ])
@@ -97,15 +96,16 @@ describe("what a turn and a scale stop on", () => {
 
   it("leaves out what the targets that are off would stop on", () => {
     const off = (target: "mesh" | "grid" | "alignment") => ({
-      ...defaultSnapConfig,
-      targets: { ...defaultSnapConfig.targets, [target]: { ...defaultSnapConfig.targets[target], enabled: false } }
+      ...allSnapping,
+      targets: { ...allSnapping.targets, [target]: { ...allSnapping.targets[target], enabled: false } }
     })
     const near = [cubeAt("a", { x: 110, y: 0, z: 0 })]
-    const kinds = (config: typeof defaultSnapConfig) =>
+    const kinds = (config: typeof allSnapping) =>
       new Set(turnStopsOf(config, turnOf(ORIGIN), near, 10).map(({ kind }) => kind))
     assert.isFalse(kinds(off("mesh")).has("touch"))
     assert.isFalse(kinds(off("grid")).has("grid"))
     assert.isFalse(kinds(off("alignment")).has("aligned"))
+    assert.deepStrictEqual([...kinds({ ...allSnapping, magnet: false })], ["grid"], "the grid alone without the magnet")
   })
 
   it("scales up to a mesh's own faces, its box standing in until it has loaded", () => {
@@ -128,7 +128,7 @@ describe("what a turn and a scale stop on", () => {
   })
 
   it("draws both boxes, a stop's target, the selection's side where the turn puts it, and the glyph", () => {
-    const stops = turnStopsOf(defaultSnapConfig, turnOf(ORIGIN), [cubeAt("a", { x: 110, y: 0, z: 0 })], 10)
+    const stops = turnStopsOf(allSnapping, turnOf(ORIGIN), [cubeAt("a", { x: 110, y: 0, z: 0 })], 10)
     const touch = stops.find((stop) => stop.kind === "touch" && stop.angle > 0)
     assert.strictEqual(touch?.from, "mesh")
     assert.strictEqual(touch?.relation, "onFace")
@@ -151,7 +151,7 @@ describe("what a turn and a scale stop on", () => {
   })
 
   it("keeps the stops of the targets asked for, a held key's", () => {
-    const all = allTurnStopsOf(defaultSnapConfig, turnOf(ORIGIN), [cubeAt("a", { x: 110, y: 0, z: 0 })], 10)
+    const all = allTurnStopsOf(allSnapping, turnOf(ORIGIN), [cubeAt("a", { x: 110, y: 0, z: 0 })], 10)
     assert.deepStrictEqual([...new Set(turnStopsFrom(all, ["grid"]).map(({ kind }) => kind))], ["grid"])
     assert.isFalse(turnStopsFrom(all, ["mesh"]).some(({ kind }) => kind === "grid"))
   })

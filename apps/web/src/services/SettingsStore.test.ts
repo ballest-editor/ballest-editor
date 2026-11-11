@@ -131,11 +131,25 @@ describe("Settings", () => {
 describe("snapping settings", () => {
   it("keeps what an older save chose, and fills in what it never had", () => {
     const merged = mergeSettings({ snapping: { enabled: true, gridSize: 25, rotationEnabled: true, rotationStep: 5 } })
-    assert.strictEqual(merged.snapping.enabled, true)
+    assert.strictEqual(merged.snapping.magnet, true)
     assert.strictEqual(merged.snapping.gridSize, 25)
     assert.strictEqual(merged.snapping.rotationStep, 5)
     assert.deepStrictEqual(merged.snapping.targets, defaultSettings.snapping.targets)
     assert.strictEqual(merged.snapping.scaleStep, defaultSettings.snapping.scaleStep)
+  })
+
+  it("reads snapping saved while the magnet gated all of it as it behaved", () => {
+    const grid = { ...defaultSettings.snapping.targets.grid, enabled: true }
+    const targets = { ...defaultSettings.snapping.targets, grid }
+    const off = mergeSettings({ snapping: { enabled: false, rotationEnabled: true, targets } }).snapping
+    assert.isFalse(off.magnet)
+    assert.isFalse(off.rotationEnabled)
+    assert.isFalse(off.targets.grid.enabled)
+    const on = mergeSettings({ snapping: { enabled: true, rotationEnabled: true, targets } }).snapping
+    assert.isTrue(on.magnet)
+    assert.isTrue(on.rotationEnabled)
+    assert.isTrue(on.targets.grid.enabled)
+    assert.isTrue(mergeSettings({ snapping: { magnet: true } }).snapping.magnet)
   })
 
   it("takes a typed step, and turns down one that can't be", () => {
