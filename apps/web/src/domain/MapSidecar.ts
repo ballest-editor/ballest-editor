@@ -32,6 +32,32 @@ export class SidecarItem extends Schema.Opaque<SidecarItem>()(
   })
 ) {}
 
+const Xyz = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+
+/**
+ * A member's transform in its instance's frame: where the definition would have it for the instance to put it where it
+ * is. UE units, a unit quaternion and the item's own scale, as `itemTransform` has them.
+ */
+const MemberTransform = Schema.Struct({
+  translation: Xyz,
+  rotation: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite, w: Schema.Finite }),
+  scale3D: Xyz
+})
+
+/**
+ * What an instance changed of one of its members, which an Update keeps (docs/DESKTOP.md § Prefabs): its transform, its
+ * paint (its meshes and their materials, and its surface), its other properties and whether it is hidden. `member` is its
+ * place in the definition.
+ */
+export const MemberOverride = Schema.Struct({
+  member: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  transform: Schema.optionalKey(MemberTransform),
+  paint: Schema.optionalKey(Schema.Literal(true)),
+  properties: Schema.optionalKey(Schema.Literal(true)),
+  hidden: Schema.optionalKey(Schema.Literal(true))
+})
+export type MemberOverride = typeof MemberOverride.Type
+
 /**
  * What makes a group a prefab instance: the definition it was placed from. `items` is what each of those items was, in
  * the definition's frame and document order (`signatureOf`), which is how an instance is told from an edited one once
@@ -42,7 +68,9 @@ export const PrefabLink = Schema.Struct({
   name: PrefabName,
   /** The SHA-256 of the definition's file when this was placed or last updated. */
   hash: FileHash,
-  items: Schema.Array(Schema.String)
+  items: Schema.Array(Schema.String),
+  /** The members this instance changed, by place in the definition; absent with none. */
+  overrides: Schema.optionalKey(Schema.Array(MemberOverride))
 })
 export type PrefabLink = typeof PrefabLink.Type
 

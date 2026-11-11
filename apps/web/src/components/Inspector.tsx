@@ -92,7 +92,7 @@ import { PieceThumbnail } from "./PieceThumbnail"
 import { PivotSection } from "./PivotSection"
 import { PrefabSettings } from "./PrefabSettings"
 import { type ClipKey, RowClipboard } from "./RowClipboard"
-import { ChainSection, GroupIdentity, InstanceSection, ItemTags } from "./StructureSection"
+import { ChainSection, GroupIdentity, InstanceSection, ItemTags, MemberOverrideSection } from "./StructureSection"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
 
@@ -1036,6 +1036,7 @@ export function Inspector() {
               />
               {items.length > 1 && <ContentsSection items={items} />}
               {editor}
+              {items.length === 1 && ids[0] !== undefined && <MemberOverrideSection itemKey={ids[0]} />}
               {items.length === 1 && <ItemDetails item={first} index={indices[0] ?? -1} />}
             </>
           )

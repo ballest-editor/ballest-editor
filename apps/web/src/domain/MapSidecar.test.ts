@@ -83,6 +83,34 @@ describe("MapSidecar", () => {
     assert.isFalse(decodes(withGroups({ chain: true, growth: { curve: "linear" } })))
   })
 
+  it("round-trips a prefab link with its members' overrides, and reads one written before overrides", () => {
+    const decodes = (value: unknown) => Option.isSome(Schema.decodeUnknownOption(MapSidecar)(value))
+    const link = { tier: "user", name: "Arch", hash: "b".repeat(64), items: ["a|0,0,0|0,0,0,1|1,1,1|f"] }
+    const withLink = (prefab: Record<string, unknown>) => ({
+      ...sidecar,
+      tree: [{ kind: "group", id: "i", name: "Arch", tags: [], children: [], prefab }]
+    })
+    const good = withLink({
+      ...link,
+      overrides: [{
+        member: 0,
+        transform: {
+          translation: { x: -1000, y: 0, z: 12.5 },
+          rotation: { x: 0, y: 0, z: 0.5, w: 0.8660254 },
+          scale3D: { x: 2, y: 1, z: 1 }
+        },
+        paint: true
+      }, { member: 3, properties: true, hidden: true }]
+    })
+    const text = JSON.stringify(good)
+    assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(Schema.decodeSync(Codec)(text))), good)
+    const old = withLink(link)
+    assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(Schema.decodeSync(Codec)(JSON.stringify(old)))), old)
+    assert.isFalse(decodes(withLink({ ...link, overrides: [{ member: -1, paint: true }] })))
+    assert.isFalse(decodes(withLink({ ...link, overrides: [{ member: 0, transform: true }] })))
+    assert.isFalse(decodes(withLink({ ...link, overrides: [{ member: 0, paint: false }] })))
+  })
+
   it("refuses a sidecar of another format version, or a key that isn't URL-safe", () => {
     const decodes = (value: unknown) => Option.isSome(Schema.decodeUnknownOption(MapSidecar)(value))
     assert.isTrue(decodes(sidecar))

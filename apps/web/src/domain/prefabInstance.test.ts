@@ -1,14 +1,15 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
-import { changedPrefab, PREFAB_TEXT } from "../test/prefabs"
+import { changedPrefab, overrideFields, PREFAB_TEXT } from "../test/prefabs"
 import { expectVec } from "../test/vec"
 import fixture from "./bundledCatalog.json"
 import { Catalog, indexCatalog } from "./Catalog"
 import type { UeTransform } from "./coords"
-import { setSlotMaterials, setTransforms } from "./edits"
+import { setProperties, setSlotMaterials, setTransforms } from "./edits"
 import { editTransform } from "./editTransform"
 import { newMapFile } from "./factory"
 import { applyGroupDelta, type GroupDelta } from "./groupTransform"
+import type { TreeNode } from "./MapSidecar"
 import { itemOfPrefab } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
 import {
@@ -17,6 +18,12 @@ import {
   instanceOrigin,
   instancesIn,
   instancesOfPrefab,
+  overriddenMembers,
+  overrideSummary,
+  reshapedInstances,
+  withRecordedOverrides,
+  withResetMembers,
+  withUnlinked,
   withUpdatedInstance
 } from "./prefabInstance"
 import {
@@ -271,6 +278,234 @@ describe("updating an instance", () => {
 
   it("answers undefined for a group that isn't an instance", () => {
     assert.isUndefined(withUpdatedInstance(placedDoc(), "nothing", definition))
+  })
+})
+
+const RED = "/Game/A/MI_Red.MI_Red"
+
+/** `doc` with the instance's member `n` painted. */
+const painted = (doc: Doc, n: number): Doc => {
+  const index = doc.ids.indexOf(instanceKeys(doc)[n]!)
+  return {
+    ...doc,
+    map: Option.getOrThrow(setSlotMaterials(doc.map, [{ index, component: 0, slot: 0, material: RED }]))
+  }
+}
+
+/** `doc` with the instance's member `n` hidden, or shown. */
+const hidden = (doc: Doc, n: number, on = true): Doc => {
+  const key = instanceKeys(doc)[n]!
+  const items = new Map(doc.structure.items)
+  if (on) items.set(key, { hidden: true })
+  else items.delete(key)
+  return { ...doc, structure: { ...doc.structure, items } }
+}
+
+/** One edit, as the store commits it. */
+const edit = (doc: Doc, change: (doc: Doc) => Doc) => withRecordedOverrides(doc, change(doc))
+
+const materialOf = (doc: Doc, n: number) =>
+  doc.map.items[doc.ids.indexOf(instanceKeys(doc)[n]!)]?.meshComponents[0]?.materials[0]?.material
+const xOfMember = (doc: Doc, n: number) =>
+  doc.map.items[doc.ids.indexOf(instanceKeys(doc)[n]!)]?.itemTransform.translation.x ?? NaN
+
+/** The fixture placed 100 along, its first member moved and hidden, its second painted. */
+const overridden = () => {
+  const placed = withDelta(placedDoc(), { kind: "translate", offset: { x: 100, y: 0, z: 0 } })
+  return edit(
+    edit(edit(placed, (d) => painted(d, 1)), (d) => moved(d, instanceKeys(d)[0]!, 500)),
+    (d) => hidden(d, 0)
+  )
+}
+
+describe("an instance's overrides", () => {
+  it("records a member's paint, and the instance still follows its definition", () => {
+    const doc = edit(placedDoc(), (d) => painted(d, 0))
+    assert.deepStrictEqual(overrideFields(groupOf(doc).prefab?.overrides), [{ member: 0, fields: ["paint"] }])
+    assert.isTrue(check(doc).unmodified)
+    expectVec(instanceOrigin(doc, groupOf(doc), groupOf(doc).prefab!)!, FRAME, 2)
+  })
+
+  it("records the member that moved on its own, whichever it is, and not a move of the whole instance", () => {
+    for (const n of [0, 1]) {
+      const doc = edit(placedDoc(), (d) => moved(d, instanceKeys(d)[n]!, 500))
+      assert.deepStrictEqual(overrideFields(groupOf(doc).prefab?.overrides), [{ member: n, fields: ["transform"] }])
+      assert.isTrue(check(doc).unmodified)
+      expectVec(instanceOrigin(doc, groupOf(doc), groupOf(doc).prefab!)!, FRAME, 2)
+    }
+    const whole = edit(
+      placedDoc(),
+      (d) => withDelta(d, { kind: "rotate", rotation: rotatorToQuat({ pitch: 0, yaw: 40, roll: 0 }) })
+    )
+    assert.isUndefined(groupOf(whole).prefab?.overrides)
+    const once = edit(placedDoc(), (d) => moved(d, instanceKeys(d)[1]!, 500))
+    // each member moved on its own in turn: the second isn't the instance moving, and it still stands where it did
+    const both = edit(once, (d) => moved(d, instanceKeys(d)[0]!, 300))
+    assert.deepStrictEqual(overrideFields(groupOf(both).prefab?.overrides), [{ member: 0, fields: ["transform"] }, {
+      member: 1,
+      fields: ["transform"]
+    }])
+    assert.isTrue(check(both).unmodified)
+    expectVec(instanceOrigin(both, groupOf(both), groupOf(both).prefab!)!, FRAME, 2)
+    // the overridden member goes along with the rest, and stays its own
+    const twice = edit(once, (d) => withDelta(d, { kind: "translate", offset: { x: 0, y: 300, z: 0 } }))
+    assert.deepStrictEqual(overrideFields(groupOf(twice).prefab?.overrides), [{ member: 1, fields: ["transform"] }])
+    assert.isTrue(check(twice).unmodified)
+  })
+
+  it("records the members a scale along one axis about another point leaves out of line", () => {
+    // as with a loose piece active in the selection
+    const doc = edit(placedDoc(), (d) => withDelta(d, { kind: "scale", factor: 2, axis: "y" }, { x: 0, y: 5000, z: 0 }))
+    assert.isNotEmpty(groupOf(doc).prefab?.overrides ?? [])
+    assert.isTrue(check(doc).unmodified)
+  })
+
+  it("records a member's other properties, and an Update keeps them while it follows the definition otherwise", () => {
+    const strength = { list: "floatProperties", name: "Strength", type: "Float" } as const
+    const placed = placedDoc()
+    const index = placed.ids.indexOf(instanceKeys(placed)[1]!)
+    const doc = edit(
+      placed,
+      (d) => ({ ...d, map: Option.getOrThrow(setProperties(d.map, [index], [{ property: strength, value: 2 }])) })
+    )
+    assert.deepStrictEqual(overrideFields(groupOf(doc).prefab?.overrides), [{ member: 1, fields: ["properties"] }])
+    assert.isTrue(check(doc).unmodified)
+    const updated = withUpdatedInstance(doc, GROUP, nextDefinition)!
+    const second = updated.map.items[updated.ids.indexOf(instanceKeys(updated)[1]!)]!
+    assert.strictEqual(second.floatProperties.find((p) => p.propertyName === "Strength")?.currentValue, 2)
+    assert.closeTo(second.itemTransform.translation.x, FRAME.x + 2000, 0.01)
+    assert.isTrue(check(updated).unmodified)
+  })
+
+  it("records a hidden member, and drops that once it's shown again", () => {
+    const doc = edit(placedDoc(), (d) => hidden(d, 1))
+    assert.deepStrictEqual(overrideFields(groupOf(doc).prefab?.overrides), [{ member: 1, fields: ["hidden"] }])
+    assert.isUndefined(groupOf(edit(doc, (d) => hidden(d, 1, false))).prefab?.overrides)
+  })
+
+  it("leaves an instance the edit placed or relinked alone, and one with a member gone", () => {
+    const placed = placedDoc()
+    const bare: Doc = { ...placed, structure: { ...placed.structure, tree: [] } }
+    assert.strictEqual(groupOf(withRecordedOverrides(bare, painted(placed, 0))).prefab, definition.link)
+    const relinked = withPrefabLink(placed.structure, GROUP, { ...definition.link })!
+    const after = withRecordedOverrides(placed, painted({ ...placed, structure: relinked }, 0))
+    assert.isUndefined(groupOf(after).prefab?.overrides)
+  })
+
+  it("keeps paint, moves and hiding through an Update, and the rest follows the definition", () => {
+    const doc = overridden()
+    const firstAt = xOfMember(doc, 0)
+    const updated = withUpdatedInstance(doc, GROUP, nextDefinition)!
+    const link = groupOf(updated).prefab!
+    assert.strictEqual(link.hash, NEW_HASH)
+    assert.deepStrictEqual(overrideFields(link.overrides), [{ member: 0, fields: ["hidden", "transform"] }, {
+      member: 1,
+      fields: ["paint"]
+    }])
+    assert.closeTo(xOfMember(updated, 0), firstAt, 1e-6)
+    // the second member's new place in the definition, with its paint
+    assert.closeTo(xOfMember(updated, 1), FRAME.x + 100 + 2000, 0.01)
+    assert.strictEqual(materialOf(updated, 1), materialOf(doc, 1))
+    assert.isTrue(updated.structure.items.get(instanceKeys(updated)[0]!)?.hidden)
+    // the member the definition gained stands where the instance puts it
+    assert.closeTo(xOfMember(updated, 2), FRAME.x + 100 + 2000, 0.01)
+    assert.isTrue(check(updated).unmodified)
+    // and once more, with nothing new
+    const again = withUpdatedInstance(updated, GROUP, nextDefinition)!
+    assert.closeTo(xOfMember(again, 0), firstAt, 1e-6)
+    assert.strictEqual(materialOf(again, 1), materialOf(doc, 1))
+  })
+
+  it("drops the overrides of a member that gives way to another class", () => {
+    const doc = edit(placedDoc(), (d) => painted(d, 1))
+    const cylinder = "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/" +
+      "BP_Prim_Cylinder.BP_Prim_Cylinder_C"
+    const other = changedPrefab((json) => void (json.items[1]!.class = cylinder))
+    const swapped = definitionOf(decode(other), { tier: "user", name: "Bridge", hash: NEW_HASH }, catalog)
+    const updated = withUpdatedInstance(doc, GROUP, swapped)!
+    assert.notStrictEqual(instanceKeys(updated)[1], instanceKeys(doc)[1])
+    assert.isUndefined(groupOf(updated).prefab?.overrides)
+  })
+})
+
+describe("resetting overrides", () => {
+  it("lists each member that carries overrides, by key, with what it overrides", () => {
+    const doc = overridden()
+    const [first, second] = instanceKeys(doc)
+    const members = overriddenMembers(doc)
+    assert.deepStrictEqual(members.get(first!), {
+      groupId: GROUP,
+      member: 0,
+      fields: ["transform", "hidden"]
+    })
+    assert.deepStrictEqual(members.get(second!), { groupId: GROUP, member: 1, fields: ["paint"] })
+    assert.strictEqual(overriddenMembers(placedDoc()).size, 0)
+    assert.strictEqual(overrideSummary(["transform", "paint", "hidden"]), "transform, paint and hidden")
+    assert.strictEqual(overrideSummary(["paint"]), "paint")
+  })
+
+  it("puts a member back as its definition has it, shown, and leaves the others' overrides", () => {
+    const doc = overridden()
+    const was = materialOf(doc, 1)
+    const reset = withResetMembers(doc, GROUP, [0], definition)!
+    assert.deepStrictEqual(overrideFields(groupOf(reset).prefab?.overrides), [{ member: 1, fields: ["paint"] }])
+    // where the instance's placement puts the definition's first item, 100 along
+    assert.closeTo(xOfMember(reset, 0), xOfMember(placedDoc(), 0) + 100, 0.01)
+    assert.isUndefined(reset.structure.items.get(instanceKeys(reset)[0]!)?.hidden)
+    assert.strictEqual(materialOf(reset, 1), was)
+    assert.isTrue(check(reset).unmodified)
+  })
+
+  it("puts every member back with none named", () => {
+    const reset = withResetMembers(overridden(), GROUP, undefined, definition)!
+    assert.isUndefined(groupOf(reset).prefab?.overrides)
+    assert.strictEqual(materialOf(reset, 1), materialOf(placedDoc(), 1))
+    assert.closeTo(xOfMember(reset, 0), xOfMember(placedDoc(), 0) + 100, 0.01)
+  })
+})
+
+describe("an instance given members or losing them", () => {
+  /** `doc` with item `key` moved into or out of the instance. */
+  const regrouped = (doc: Doc, key: string, into: boolean): Doc => {
+    const item: TreeNode = { kind: "item", key }
+    const tree = doc.structure.tree.flatMap((node): ReadonlyArray<TreeNode> => {
+      if (node.kind === "item") return node.key === key && into ? [] : [node]
+      if (node.id !== GROUP) return [node]
+      return into
+        ? [{ ...node, children: [...node.children, item] }]
+        : [{ ...node, children: node.children.filter((child) => child.kind !== "item" || child.key !== key) }, item]
+    })
+    return { ...doc, structure: { ...doc.structure, tree } }
+  }
+
+  it("is found when an item joins it or leaves it, and not for a move, a reorder, a rename or an Update", () => {
+    const doc = placedDoc()
+    const [loose] = doc.ids
+    const [first, second] = instanceKeys(doc)
+    assert.deepStrictEqual(reshapedInstances(doc, regrouped(doc, loose!, true)).map(({ id }) => id), [GROUP])
+    assert.deepStrictEqual(reshapedInstances(doc, regrouped(doc, first!, false)).map(({ id }) => id), [GROUP])
+    assert.lengthOf(reshapedInstances(doc, moved(doc, first!, 500)), 0)
+    const tree = doc.structure.tree.map((node) =>
+      node.kind === "group"
+        ? { ...node, name: "Other", children: [{ kind: "item", key: second! }, { kind: "item", key: first! }] as const }
+        : node
+    )
+    assert.lengthOf(reshapedInstances(doc, { ...doc, structure: { ...doc.structure, tree } }), 0)
+    assert.lengthOf(reshapedInstances(doc, withUpdatedInstance(doc, GROUP, nextDefinition)!), 0)
+  })
+
+  it("isn't when it goes whole", () => {
+    const doc = placedDoc()
+    const tree = doc.structure.tree.filter((node) => node.kind === "item")
+    assert.lengthOf(reshapedInstances(doc, { ...doc, structure: { ...doc.structure, tree } }), 0)
+  })
+
+  it("is made a plain group by unlinking, its items as they are", () => {
+    const doc = placedDoc()
+    const unlinked = withUnlinked(doc, [GROUP])
+    assert.isUndefined(groupOf(unlinked).prefab)
+    assert.strictEqual(unlinked.map, doc.map)
+    assert.strictEqual(withUnlinked(unlinked, [GROUP]), unlinked)
   })
 })
 

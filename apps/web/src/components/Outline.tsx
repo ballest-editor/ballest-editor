@@ -45,9 +45,10 @@ import {
   scrollToShow,
   visibleRange
 } from "../domain/outline"
-import { findNode, groupNames, numberedNameText } from "../domain/structure"
+import { overriddenMembers, overriddenSummaryOf } from "../domain/prefabInstance"
+import { findGroup, findNode, groupNames, numberedNameText } from "../domain/structure"
 import { flagStateOf } from "../domain/visibility"
-import { detachInstance, selectAllInGroup, updateInstance } from "../editor/actions"
+import { detachInstance, resetOverrides, selectAllInGroup, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { elementOf } from "../editor/keyTargets"
 import { nextSelection, nodeNamesOf, noTabOpen, useCanGroup, useEditor } from "../editor/store"
@@ -198,6 +199,7 @@ export function Outline() {
   const noTab = useEditor(noTabOpen)
   const names = useMemo(() => nodeNamesOf({ doc, catalogIndex }), [doc, catalogIndex])
   const classes = useMemo(() => itemClasses(map, ids), [map, ids])
+  const overridden = overriddenMembers(doc)
   const rows = useMemo(
     () => outlineRows(structure, names, classes, collapsedGroups, query),
     [structure, names, classes, collapsedGroups, query]
@@ -379,6 +381,12 @@ export function Outline() {
   const link = instance?.prefab
   // The group "Select all in group" means: the row's own, or the one the row is in.
   const menuGroupId = menuRow === null ? null : menuRow.kind === "group" ? menuRow.id : menuRow.parentId
+  // the item row's overrides, and the instance they're of
+  const menuOverride = useMemo(() => {
+    const override = menuRow?.kind === "item" ? overridden.get(menuRow.id) : undefined
+    const ref = override === undefined ? undefined : findGroup(tree, override.groupId)?.prefab
+    return override === undefined || ref === undefined ? undefined : { ...override, ref }
+  }, [menuRow, overridden, tree])
   const enterRow = (id: string) => {
     const s = useEditor.getState()
     s.expandGroups([...groupPathOf(s.doc.structure.tree, id), id])
@@ -472,6 +480,7 @@ export function Outline() {
                     (enteredRange !== undefined && (rowIndex < enteredRange.start || rowIndex >= enteredRange.end))}
                   hidden={flagStateOf(structure, keys, "hidden")}
                   locked={flagStateOf(structure, keys, "locked")}
+                  overrides={row.kind === "item" ? overriddenSummaryOf(overridden, row.id) : undefined}
                   keysOf={liveKeysOf}
                   dragged={drag?.set.has(row.id) === true}
                   dropInto={drag?.target?.position === "into" && drag.target.rowId === row.id}
@@ -529,6 +538,13 @@ export function Outline() {
             )
             : <MenuCommand action="chainSelection" disabled={!canGroup}>Make chain</MenuCommand>}
           <SavePrefabItem item={ContextMenuItem} />
+          {menuOverride !== undefined && (
+            <ContextMenuItem
+              onClick={() => void resetOverrides(menuOverride.groupId, menuOverride.ref, [menuOverride.member])}
+            >
+              Reset override
+            </ContextMenuItem>
+          )}
           {instance !== undefined && link !== undefined && (
             <>
               <ContextMenuItem onClick={() => void updateInstance(instance.id, link)}>

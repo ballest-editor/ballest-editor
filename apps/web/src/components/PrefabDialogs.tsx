@@ -254,3 +254,27 @@ export function DeletePrefabDialog({ open, onClose }: DialogProps) {
     </TitledDialog>
   )
 }
+
+/**
+ * Asked when an edit would give prefab instances members or take them away (docs/DESKTOP.md § Prefabs): Unlink lets it
+ * go ahead with them made plain groups; Cancel, or closing, drops it.
+ */
+export function UnlinkInstancesDialog({ open, onClose }: DialogProps) {
+  const names = useEditor((s) => s.dialog?.id === "unlinkInstances" ? s.dialog.names : null) ?? []
+  const one = names.length === 1
+  return (
+    <TitledDialog
+      open={open}
+      onClose={onClose}
+      title={one ? <>Unlink {names[0]}?</> : <>Unlink {names.length} instances?</>}
+      description={one
+        ? "Adding or removing pieces makes this instance a plain group, and it stops following its prefab. Editing a piece in place keeps it linked."
+        : "Adding or removing pieces makes these instances plain groups, and they stop following their prefabs. Editing a piece in place keeps them linked."}
+    >
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => useEditor.getState().resolveUnlinkPrompt(true)}>Unlink</Button>
+      </DialogFooter>
+    </TitledDialog>
+  )
+}

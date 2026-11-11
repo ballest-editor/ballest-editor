@@ -13,7 +13,7 @@ import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
 import { offsetEntry } from "../domain/numberEntry"
 import { prefabOfItems } from "../domain/prefab"
-import { definitionOf } from "../domain/prefabInstance"
+import { checkInstance, definitionOf, instancesIn } from "../domain/prefabInstance"
 import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { findGroup, numberedNameText, treeKeys } from "../domain/structure"
@@ -2030,7 +2030,8 @@ describe("groups and the selection", () => {
     state().togglePivotMode()
   })
 
-  it("pivots a prefab instance on its origin, and follows a live move", () => {
+  /** Two cubes, and an instance of a prefab of them placed 5000 cm along x, selected; answers its keys. */
+  const placedPair = () => {
     mapWithCubes(0, 1000)
     const [, a, b] = state().doc.ids
     const pair = [a!, b!].map((key) => state().doc.map.items[state().doc.ids.indexOf(key)]!)
@@ -2046,7 +2047,64 @@ describe("groups and the selection", () => {
       }
     }))
     state().placeGroup(shifted, "Pair", link)
-    const keys = [...state().selectedIds]
+    return [...state().selectedIds]
+  }
+
+  it("keeps an instance following when the Paint tool paints a member", () => {
+    const keys = placedPair()
+    // a click with the Paint tool paints the piece under it, entered or not
+    state().paintSurface([keys[1]!], 2)
+    const group = state().doc.structure.tree.find((n) => n.kind === "group" && n.prefab !== undefined)
+    assert.isTrue(group?.kind === "group" && group.prefab !== undefined)
+    if (group?.kind !== "group" || group.prefab === undefined) return
+    assert.deepStrictEqual(group.prefab.overrides, [{ member: 1, paint: true }])
+    assert.isTrue(checkInstance(state().doc, group, group.prefab).unmodified)
+  })
+
+  it("asks before an edit gives an instance members or takes them, and unlinks it only on yes", () => {
+    const keys = placedPair()
+    const id = instancesIn(state().doc.structure.tree)[0]?.id ?? ""
+    const steps = state().past.length
+    const deleteFirst = () => {
+      state().enterGroup(id)
+      state().select([keys[0]!])
+      state().deleteSelection()
+    }
+    deleteFirst()
+    assert.deepStrictEqual(state().dialog, { id: "unlinkInstances", names: ["Pair"] })
+    assert.include(state().doc.ids, keys[0])
+    assert.strictEqual(state().past.length, steps)
+    state().closeDialog()
+    assert.include(state().doc.ids, keys[0])
+    assert.strictEqual(state().past.length, steps)
+    deleteFirst()
+    state().resolveUnlinkPrompt(true)
+    assert.isNull(state().dialog)
+    assert.notInclude(state().doc.ids, keys[0])
+    const group = findGroup(state().doc.structure.tree, id)
+    assert.isTrue(group !== undefined && group.prefab === undefined)
+    assert.strictEqual(state().past.length, steps + 1)
+    state().undo()
+    assert.include(state().doc.ids, keys[0])
+    assert.isDefined(findGroup(state().doc.structure.tree, id)?.prefab)
+  })
+
+  it("puts an Alt+drag copy inside an instance back when the prompt is turned down", () => {
+    const keys = placedPair()
+    state().enterGroup(instancesIn(state().doc.structure.tree)[0]?.id ?? null)
+    state().select([keys[1]!])
+    const before = state().doc
+    const copy = state().beginDuplicateDrag()?.get(keys[1]!) ?? ""
+    const t = transformOf(copy)
+    assert.isTrue(state().endDuplicateDrag(new Map([[copy, { ...t, translation: { ...t.translation, z: 500 } }]])))
+    assert.strictEqual(state().dialog?.id, "unlinkInstances")
+    state().resolveUnlinkPrompt(false)
+    assert.strictEqual(state().doc, before)
+    assert.deepStrictEqual(state().selectedIds, [keys[1]!])
+  })
+
+  it("pivots a prefab instance on its origin, and follows a live move", () => {
+    const keys = placedPair()
     const origin = selectionPivot(state(), transformOf)?.pivot
     assert.closeTo(origin?.x ?? 0, 5000, 0.01)
     assert.closeTo(origin?.z ?? 1, 0, 0.01)
@@ -2070,9 +2128,9 @@ describe("groups and the selection", () => {
     assert.closeTo(previewPivot?.y ?? 0, 5000, 0.01)
     state().setPreview(null)
     assert.closeTo(selectionPivot(state(), transformOf)?.pivot.x ?? 0, 5000, 0.01)
-    // edited, it has no origin left, so it's any group
+    // a member moved on its own is an override, so the instance keeps its origin
     moveItem(keys[0]!, { ...transformOf(keys[0]!).translation, x: 9000 })
-    assert.isAbove(Math.abs(selectionPivot(state(), transformOf)?.pivot.z ?? 0), 1)
+    assert.closeTo(selectionPivot(state(), transformOf)?.pivot.x ?? 0, 5000, 0.01)
   })
 
   it("groups the selection, whole groups staying whole", () => {

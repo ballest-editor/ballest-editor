@@ -36,7 +36,13 @@ import { ImportClashDialog } from "./ImportClashDialog"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { NameMapDialog } from "./NameMapDialog"
 import { NewProjectDialog } from "./NewProjectDialog"
-import { DeletePrefabDialog, NamePrefabDialog, RenamePrefabDialog, SavePrefabDialog } from "./PrefabDialogs"
+import {
+  DeletePrefabDialog,
+  NamePrefabDialog,
+  RenamePrefabDialog,
+  SavePrefabDialog,
+  UnlinkInstancesDialog
+} from "./PrefabDialogs"
 import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
@@ -207,6 +213,7 @@ export function Editor() {
       />
       <SavePrefabDialog open={dialog === "savePrefab"} onClose={close} />
       <NamePrefabDialog open={dialog === "namePrefab"} onClose={close} />
+      <UnlinkInstancesDialog open={dialog === "unlinkInstances"} onClose={close} />
       <RenamePrefabDialog open={dialog === "renamePrefab"} onClose={close} />
       <DeletePrefabDialog open={dialog === "deletePrefab"} onClose={close} />
       <KeybindCheatSheet />
