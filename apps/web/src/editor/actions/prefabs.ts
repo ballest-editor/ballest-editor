@@ -153,11 +153,25 @@ export const selectionPrefabProblem = (s: EditorState): string | undefined => {
  */
 export const suggestPrefabName = (s: EditorState): string => {
   const group = exactSelectedGroup(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
-  const pieces = selectedItems(s).map(({ actorToSpawn }) =>
-    s.catalogIndex?.pieceByClass.get(actorToSpawn) ?? { className: classNameOf(actorToSpawn) }
-  )
-  const label = group === undefined || group.name === DEFAULT_GROUP_NAME ? selectionLabelOf(pieces) : group.name
+  const label = group === undefined || group.name === DEFAULT_GROUP_NAME
+    ? labelOfItems(s, selectedItems(s))
+    : group.name
   return freePrefabName(label, new Set(s.prefabs.map(({ name }) => name)))
+}
+
+/** What `items` read as: "Kicker pair", "Curve 1 Medium x3". */
+const labelOfItems = (s: EditorState, items: ReadonlyArray<Item>) =>
+  selectionLabelOf(
+    items.map(({ actorToSpawn }) =>
+      s.catalogIndex?.pieceByClass.get(actorToSpawn) ?? { className: classNameOf(actorToSpawn) }
+    )
+  )
+
+/** What a new prefab's first Save offers as a name: what its items read as, clear of its tier's names. */
+export const suggestNewPrefabName = (s: EditorState): string => {
+  const tier = s.document.kind === "prefab" ? s.document.tier : newPrefabTier(s)
+  const taken = new Set(s.prefabs.filter((p) => p.tier === tier).map(({ name }) => name))
+  return freePrefabName(labelOfItems(s, s.doc.map.items), taken)
 }
 
 /** Edit › Save selection as prefab…: names it in a dialog. */
@@ -228,7 +242,7 @@ export const newPrefabProblem = (s: EditorState): string | undefined =>
 
 /**
  * New prefab: an empty definition in a tab of its own, as New map is a map's. It asks nothing and writes nothing, and it
- * goes by Untitled prefab until the first Save, which the game's two items hold back (`prefabSaveProblem`).
+ * goes by Untitled prefab until the first Save names it, which the game's two items hold back (`prefabSaveProblem`).
  */
 export const newPrefabEffect = Effect.sync(() => {
   const s = useEditor.getState()
@@ -249,35 +263,53 @@ export const newPrefabEffect = Effect.sync(() => {
 
 export const startNewPrefab = () => run(newPrefabEffect)
 
-/**
- * Save on a definition's tab: its items back into the prefab's file, and the instances of it in the open maps follow, in
- * the same step, with one toast for both. What the game would refuse stops here with the game's words, and the tab keeps
- * its edits. A tab that lost its file to a switch of projects writes a new prefab in the project now in use, and a new
- * prefab takes its file's name here, clear of what the tier has by now.
- */
-export const savePrefabTab = Effect.gen(function*() {
-  const { doc, document, file, fresh, prefabs, tabId } = useEditor.getState()
-  if (document.kind !== "prefab") return
-  const problem = prefabSaveProblem(doc.map.items.length)
-  if (problem !== null) return yield* new PlatformError({ message: problem })
-  const { sources, tier } = document
-  const taken = new Set(prefabs.filter((p) => p.tier === tier).map((p) => p.name))
-  const name = file === null && fresh ? freePrefabName(document.name, taken) : document.name
-  const prefab = prefabOfTab(document.file, doc.map.items, doc.ids, sources)
-  const info = yield* writePrefab({ tier, name }, prefab, file !== null)
-  useEditor.getState().markPrefabSaved(
-    tabId,
-    doc,
-    { ...document, name, file: prefab, hash: info.hash, sources: prefabSourcesOf(prefab, doc.map.items, doc.ids) },
-    { name: prefabFileNameOf(name), path: info.path }
-  )
-  const updated = yield* lookAtPrefabs({ tier, name })
-  const saved = `Saved the prefab ${name}`
-  useEditor.getState().notify("info", updated > 0 ? `${counted(updated, "instance")} updated` : saved, {
-    kind: "prefabSaved",
-    ...(updated > 0 && { body: saved })
-  })
+/** A new prefab no Save has named yet (a restored one too): its first Save asks for a name, as a new map's does. */
+export const isUntitledPrefab = (s: Pick<EditorState, "document" | "file" | "fresh">): boolean =>
+  s.document.kind === "prefab" && s.file === null && s.fresh
+
+/** Fails with the game's words when the open definition has too few items to save. */
+export const prefabTabSaveable = Effect.suspend(() => {
+  const problem = prefabSaveProblem(useEditor.getState().doc.map.items.length)
+  return problem === null ? Effect.void : Effect.fail(new PlatformError({ message: problem }))
 })
+
+/**
+ * Save on a definition's tab, under `named` or its own name: its items back into the prefab's file, and the instances of
+ * it in the open maps follow, in the same step, with one toast for both. What the game would refuse stops here with the
+ * game's words, and the tab keeps its edits. A tab that lost its file to a switch of projects writes a new prefab in the
+ * project now in use.
+ */
+const writePrefabTab = (named?: string) =>
+  Effect.gen(function*() {
+    const { doc, document, file, tabId } = useEditor.getState()
+    if (document.kind !== "prefab") return
+    yield* prefabTabSaveable
+    const { sources, tier } = document
+    const name = named ?? document.name
+    const prefab = prefabOfTab(document.file, doc.map.items, doc.ids, sources)
+    const info = yield* writePrefab({ tier, name }, prefab, file !== null)
+    useEditor.getState().markPrefabSaved(
+      tabId,
+      doc,
+      { ...document, name, file: prefab, hash: info.hash, sources: prefabSourcesOf(prefab, doc.map.items, doc.ids) },
+      { name: prefabFileNameOf(name), path: info.path }
+    )
+    const updated = yield* lookAtPrefabs({ tier, name })
+    const saved = `Saved the prefab ${name}`
+    useEditor.getState().notify("info", updated > 0 ? `${counted(updated, "instance")} updated` : saved, {
+      kind: "prefabSaved",
+      ...(updated > 0 && { body: saved })
+    })
+  })
+
+export const savePrefabTab = writePrefabTab()
+
+/** The `namePrefab` dialog's last step: a new prefab's first Save, under `name`, then the dialog's `afterSave`. */
+export const saveNewPrefabEffect = (name: string, afterSave: Effect.Effect<void, unknown> = Effect.void) =>
+  writePrefabTab(name).pipe(Effect.andThen(afterSave))
+
+export const saveNewPrefab = (name: string, afterSave?: Effect.Effect<void, unknown>) =>
+  run(saveNewPrefabEffect(name, afterSave))
 
 /** The first of `<name>_2`, `<name>_3`, ... that the tier doesn't have. */
 const copyNameOf = (name: string, tier: PrefabTier) => {

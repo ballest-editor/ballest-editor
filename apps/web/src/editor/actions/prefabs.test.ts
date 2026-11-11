@@ -50,15 +50,17 @@ import {
   placePrefabEffect,
   projectMapsUsingPrefabEffect,
   renamePrefabEffect,
+  saveNewPrefabEffect,
   savePrefabTab,
   saveSelectionAsPrefabEffect,
   selectInstances,
   selectionPrefabProblem,
+  suggestNewPrefabName,
   suggestPrefabName,
   tabsUsingPrefab
 } from "./prefabs"
 import { saveMapFile } from "./save"
-import { closeTabEffect } from "./unsaved"
+import { closeTabEffect, closeTabsBesideEffect } from "./unsaved"
 
 const parsed = Schema.decodeUnknownSync(Catalog)(
   JSON.parse(fs.readFileSync(path.join(repoRoot, "assets", "catalog.json"), "utf8"))
@@ -586,7 +588,7 @@ describe("a new prefab", () => {
       })
     ))
 
-  it.effect("holds Save back until it has 2 items, then writes it through the prefab save path", () =>
+  it.effect("holds Save back until it has 2 items, then asks for a name before it writes anything", () =>
     withDisk((disk) =>
       Effect.gen(function*() {
         yield* startedWithProjects(disk)
@@ -596,35 +598,85 @@ describe("a new prefab", () => {
         assert.isTrue(s().dirty)
         const error = yield* Effect.flip(saveMapFile)
         assert.include(error.message, "at least 2 items")
+        assert.isNull(s().dialog)
         assert.isTrue(s().dirty)
 
         s().placePiece(cube, placementTransform(cube, { x: 400, y: 0, z: 9000 }))
         assert.isNull(saveProblemOf(s()))
         yield* saveMapFile
+        assert.strictEqual(s().dialog?.id, "namePrefab")
+        assert.isTrue(s().dirty)
+        assert.isNull(s().file)
+        assert.isFalse([...disk.files.keys()].some((name) => name.includes("/prefabs/Untitled")))
+        assert.isFalse(disk.files.has(projectPrefabFile("Cube_pair")))
+        assert.strictEqual(suggestNewPrefabName(s()), "Cube_pair")
+
+        s().closeDialog()
+        yield* saveNewPrefabEffect("Twin_cubes")
         assert.isFalse(s().dirty)
         assert.isNotNull(s().file)
-        assert.deepInclude(s().document, { name: "Untitled_prefab" })
-        assert.isTrue(disk.files.has(projectPrefabFile("Untitled_prefab")))
-        assert.deepInclude(s().prefabs.find((p) => p.tier === "project"), { name: "Untitled_prefab", itemCount: 2 })
-      })
-    ))
-
-  it.effect("takes a free name at its first Save, and keeps it after that", () =>
-    withDisk((disk) =>
-      Effect.gen(function*() {
-        yield* startedWithProjects(disk)
-        disk.files.set(projectPrefabFile("Untitled_prefab"), PREFAB_TEXT)
-        yield* checkPrefabs
-        yield* newPrefabEffect
-        placeTwoCubes()
-        yield* saveMapFile
-        assert.deepInclude(s().document, { name: "Untitled_prefab_2" })
-        assert.strictEqual(disk.files.get(projectPrefabFile("Untitled_prefab")), PREFAB_TEXT)
+        assert.strictEqual(tabLabelOf(s()), "Twin_cubes")
+        assert.deepInclude(s().document, { name: "Twin_cubes" })
+        assert.isTrue(disk.files.has(projectPrefabFile("Twin_cubes")))
+        assert.deepInclude(s().prefabs.find((p) => p.tier === "project"), { name: "Twin_cubes", itemCount: 2 })
 
         s().placePiece(cube, placementTransform(cube, { x: 800, y: 0, z: 9000 }))
         yield* saveMapFile
-        assert.deepInclude(s().document, { name: "Untitled_prefab_2" })
-        assert.deepInclude(s().prefabs.find((p) => p.name === "Untitled_prefab_2"), { itemCount: 3 })
+        assert.isNull(s().dialog)
+        assert.deepInclude(s().prefabs.find((p) => p.name === "Twin_cubes"), { itemCount: 3 })
+      })
+    ))
+
+  it.effect("suggests a name clear of what the tier has", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        disk.files.set(projectPrefabFile("Cube_pair"), PREFAB_TEXT)
+        yield* checkPrefabs
+        yield* newPrefabEffect
+        assert.strictEqual(suggestNewPrefabName(s()), "Prefab")
+        placeTwoCubes()
+        assert.strictEqual(suggestNewPrefabName(s()), "Cube_pair_2")
+      })
+    ))
+
+  it.effect("the unsaved-changes prompt's Save names it first, then closes the tab", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        yield* newPrefabEffect
+        const { tabId } = s()
+        placeTwoCubes()
+        disk.promptAnswers.push("save")
+        yield* closeTabEffect(tabId)
+        assert.include(s().tabIds, tabId)
+        const dialog = s().dialog
+        assert.strictEqual(dialog?.id, "namePrefab")
+        s().closeDialog()
+        yield* saveNewPrefabEffect("Twin_cubes", dialog?.id === "namePrefab" ? dialog.afterSave : undefined)
+        assert.isTrue(disk.files.has(projectPrefabFile("Twin_cubes")))
+        assert.notInclude(s().tabIds, tabId)
+      })
+    ))
+
+  it.effect("Close others names it first, with its tab active, then closes it and goes back to the kept tab", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        const keep = s().tabId
+        yield* newPrefabEffect
+        const prefabTab = s().tabId
+        placeTwoCubes()
+        disk.promptAnswers.push("save")
+        yield* closeTabsBesideEffect(keep, [prefabTab])
+        const dialog = s().dialog
+        assert.strictEqual(dialog?.id, "namePrefab")
+        assert.strictEqual(s().tabId, prefabTab)
+        s().closeDialog()
+        yield* saveNewPrefabEffect("Twin_cubes", dialog?.id === "namePrefab" ? dialog.afterSave : undefined)
+        assert.isTrue(disk.files.has(projectPrefabFile("Twin_cubes")))
+        assert.deepStrictEqual(s().tabIds, [keep])
+        assert.strictEqual(s().tabId, keep)
       })
     ))
 
