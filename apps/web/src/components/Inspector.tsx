@@ -35,9 +35,11 @@ import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
 import { assetNameOf } from "../domain/Materials"
+import { documentOrigin } from "../domain/prefab"
 import { scaleSnapStep, snapsGrid, snapsRotation } from "../domain/snapConfig"
 import { idOf, pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
+import { ORIGIN, vecAdd, vecSub } from "../domain/ueMath"
 import { pivotModeFor, pivotUnitOf } from "../domain/units"
 import type { MapValidation } from "../domain/validateMap"
 import {
@@ -494,8 +496,9 @@ function ScaleModeToggle({ units, sizeKnown, unknown }: {
  * or a whole group's frame. A typed value takes the unit's axis there and the rest of the selection follows by the
  * same change, as a scrub does and as the game's panel does, so a selection keeps its spread; items that differ from
  * the unit are marked Mixed. A paste is the row's `onPaste`. With snapping on, a scrub lands on the grid or rotation
- * step. `perUnit` converts each axis's display value to the stored one (a size to its scale). `mode` is a control
- * after the label (Scale's factor or size).
+ * step. `perUnit` converts each axis's display value to the stored one (a size to its scale). `origin` is the point a
+ * location reads from (`documentOrigin`): shown, typed, copied and pasted values are measured from it, scrubs aren't
+ * touched. `mode` is a control after the label (Scale's factor or size).
  */
 function TransformRow(props: {
   readonly row: TransformRowSpec
@@ -513,9 +516,11 @@ function TransformRow(props: {
   /** The clipboard's kind of row, when it isn't the field's (a size). */
   readonly clipKey?: ClipKey
   readonly mode?: ReactNode
+  /** Where the row's 0 is, for a location; the world's origin otherwise. */
+  readonly origin?: Vec3
 }) {
   const snapping = useEditor(snapConfigOf)
-  const { row, perUnit } = props
+  const { row, perUnit, origin = ORIGIN } = props
   const { field } = row
   // Scrubs follow the tool bar's snapping, in display units: the grid for a location or a size, the step for rotation.
   const snap = row.grid !== undefined
@@ -549,20 +554,20 @@ function TransformRow(props: {
         <RowClipboard
           clipKey={props.clipKey ?? field}
           label={row.label}
-          value={props.copyValue}
-          onPaste={props.onPaste}
+          value={vecSub(props.copyValue, origin)}
+          onPaste={(value) => props.onPaste(vecAdd(value, origin))}
         />
       </div>
       <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
         {axes.map((axis) => {
-          const value = readField(props.unit, field)[axis] / perUnit[axis]
+          const value = (readField(props.unit, field)[axis] - origin[axis]) / perUnit[axis]
           const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit[axis] }) as const
           return (
             <NumberField
               key={axis}
               label={row.axisLabels[axis]}
               value={value}
-              onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit[axis] })}
+              onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit[axis] + origin[axis] })}
               onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
               onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
               step={row.step}
@@ -831,6 +836,8 @@ function TransformSection({ of, unit, transforms, active, extent, items = NO_ITE
   const units = useEditor((s) => s.settings.general.units)
   const catalog = useEditor((s) => s.catalogIndex)
   const scaleMode = useEditor((s) => s.settings.panels.inspectorScale)
+  // a definition's tab reads its locations from the prefab's frame, where the origin marker is
+  const origin = useEditor((s) => documentOrigin(s.document))
   // Display units only; the map always stores centimetres (rotation and scale don't convert).
   const perUnit = units === "m" ? 100 : 1
   // a decal's scale is its size already
@@ -847,7 +854,8 @@ function TransformSection({ of, unit, transforms, active, extent, items = NO_ITE
           onPaste: (value: Vec3) =>
             of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value),
           extent,
-          perUnit: uniform(row.field === "translation" ? perUnit : 1)
+          perUnit: uniform(row.field === "translation" ? perUnit : 1),
+          origin: row.field === "translation" ? origin : ORIGIN
         }
         if (row.field !== "scale3D") return <TransformRow key={row.field} {...props} />
         if (decals) return <TransformRow key={row.field} {...props} row={DECAL_SIZE_ROW} />
