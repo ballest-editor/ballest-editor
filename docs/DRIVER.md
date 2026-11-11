@@ -1,7 +1,8 @@
 # Game driver: an MCP server that runs and drives the game for agents
 
 Status: built, and this page holds its design and what was measured (written 2026-11-03). `tools/driver/` is an MCP
-server `.mcp.json` registers. It runs slots and the file channel, and [its README](../tools/driver/README.md) lists its
+server that no session starts on its own: an agent whose task needs the real game reaches its tools through
+`pnpm driver tool`, and Steam must already be running. It runs slots and the file channel, and [its README](../tools/driver/README.md) lists its
 tools and how to run them. The driver plugin (`packages/ballest-driver`) backs the ones that go through the script API.
 Not built: the rendering comparisons, feeding `Ballest.usmap` into `tools/extract`, and the pipe bridge (§ Order of
 work). The spike's files are in `~/.cache/ballest-editor/driver-spike/`; the driver's own live in
@@ -73,7 +74,10 @@ Two findings from `dumptypes` show what the driver is for. `EBallestSurfaceAssig
 
 `tools/driver/`: an MCP server in TypeScript on Effect (`effect/ai`'s `McpServer`, in the pinned 4.0.6), run with
 `node` like `tools/extract/src`. It is a developer tool, not part of the app: no dependency from `apps/`, no UI. Agents
-reach it through their MCP client's config. It owns:
+reach its tools from a shell (`pnpm driver tools`, `pnpm driver tool <name> '<json>'`), through the same handlers the
+server runs; the repo registers no MCP server, because every session would start one (about 120 MB each) whether its
+task touched the game or not. `pnpm driver serve` is the server over stdio, for anyone who registers it themselves. It
+owns:
 
 - `~/.cache/ballest-editor/driver/game/`: a copy of the game install (2 GB, `rsync` from the Steam library) with the
   host and our plugins installed. The real install is never written; the user's own plugin folder is `GameLink`'s
@@ -95,7 +99,7 @@ also listens on TCP in sandbox mode). Worth asking upstream for; the file channe
 
 ### Tools
 
-Each tool is one MCP tool with an Effect schema for its input and output. [tools/driver/README.md](../tools/driver/README.md#the-tools)
+Each tool is one MCP tool with an Effect schema for its input and output, which `pnpm driver tool` decodes its JSON with. [tools/driver/README.md](../tools/driver/README.md#the-tools)
 lists them. The design choices behind that list:
 
 - Common test commands get a thin wrapper that returns the host's reply: `state`, `tap`, `gamekey`, `editor_pieces`,
