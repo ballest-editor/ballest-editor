@@ -15,12 +15,12 @@ import { prefabOfItems } from "../domain/prefab"
 import { definitionOf } from "../domain/prefabInstance"
 import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
-import { findGroup, treeKeys } from "../domain/structure"
+import { findGroup, numberedNameText, treeKeys } from "../domain/structure"
 import { lightingOf } from "../domain/sunlight"
 import { surfaceOf } from "../domain/surface"
 import { defaultViewLayout } from "../domain/viewLayout"
 import type { ProjectState } from "../services/Platform"
-import { selectAll } from "./actions/selection"
+import { editSelectionAxis, selectAll, selectAllInGroup } from "./actions/selection"
 import { paintTargetOf, pickedBrushOf } from "./paintTarget"
 import {
   areaCandidates,
@@ -2191,14 +2191,16 @@ describe("the Validate result", () => {
 })
 
 describe("hide, isolate and lock", () => {
-  /** Three cubes, the first two grouped; answers their keys. */
-  const threeCubes = () => {
+  /** Three cubes in a row, the first two grouped, or with `chain` all three a chain; answers their keys and the group. */
+  const threeCubes = (chain = false) => {
     useEditor.setState({ tabIds: [state().tabId], parkedTabs: new Map() })
     mapWithCubes(0, 200, 400)
     const [a = "", b = "", c = ""] = state().doc.ids.slice(1)
-    state().select([a, b])
-    state().groupSelection()
-    return { a, b, c }
+    state().select(chain ? [a, b, c] : [a, b])
+    if (chain) state().chainSelection()
+    else state().groupSelection()
+    const group = state().doc.structure.tree.find((node) => node.kind === "group")?.id ?? ""
+    return { a, b, c, group }
   }
   const hidden = () => state().doc.ids.filter((key) => state().doc.structure.items.get(key)?.hidden === true)
 
@@ -2224,13 +2226,14 @@ describe("hide, isolate and lock", () => {
     assert.deepStrictEqual(state().selectedIds, [c])
   })
 
-  it("shows every hidden item and selects them", () => {
-    const { a, c } = threeCubes()
+  it("shows every hidden item and selects them at the click level", () => {
+    const { a, b, c } = threeCubes()
     state().setItemFlag([a, c], "hidden", true)
     state().select([])
     state().clearFlag("hidden")
     assert.deepStrictEqual(hidden(), [])
-    assert.deepStrictEqual(state().selectedIds, [a, c])
+    // a's group comes whole, as a click on a would select it
+    assert.deepStrictEqual(state().selectedIds, [a, b, c])
     const steps = state().past.length
     state().clearFlag("hidden")
     assert.strictEqual(state().past.length, steps)
@@ -2287,5 +2290,91 @@ describe("hide, isolate and lock", () => {
     state().select([])
     state().toggleIsolation()
     assert.isNull(state().isolation)
+  })
+
+  /** Whether a notification names the item `key`, as the Outline does. */
+  const refusedNaming = (key: string) => {
+    const name = numberedNameText(nodeNamesOf(state()).get(key)!)
+    return state().toasts.some((n) => n.title.includes(name) && n.title.includes("locked"))
+  }
+  const xOf = (key: string) => transformOf(key).translation.x
+
+  it("refuses a move of a group with a locked member, naming it, and moves nothing", () => {
+    const { a, b, c } = threeCubes()
+    state().setItemFlag([b], "locked", true)
+    const steps = state().past.length
+    const moved = (key: string) =>
+      [key, { ...transformOf(key), translation: { x: xOf(key) + 50, y: 0, z: 0 } }] as const
+    assert.isFalse(state().transformItems(new Map([moved(a), moved(b)])))
+    assert.deepStrictEqual([xOf(a), xOf(b)], [0, 200])
+    assert.strictEqual(state().past.length, steps)
+    assert.isTrue(refusedNaming(b))
+    // what doesn't move isn't refused: a locked piece stays a target, and the rest still moves
+    assert.isTrue(state().transformItems(new Map([moved(c), [b, transformOf(b)]])))
+    assert.strictEqual(xOf(c), 450)
+  })
+
+  it("refuses a chain edit that would carry a locked link, and Lay chain on one", () => {
+    const { a, b, c, group: chain } = threeCubes(true)
+    state().setItemFlag([c], "locked", true)
+    state().enterGroup(chain)
+    state().select([a])
+    assert.isFalse(editSelectionAxis("translation", "y", { kind: "offset", by: 100 }))
+    assert.deepStrictEqual([a, b, c].map((key) => transformOf(key).translation.y), [0, 0, 0])
+    assert.isTrue(refusedNaming(c))
+    const before = state().doc
+    assert.isFalse(state().layChain(chain, { kind: "helix", axis: { x: 0, y: 0, z: 1 }, turn: 30, rise: 0 }))
+    assert.strictEqual(state().doc, before)
+  })
+
+  it("refuses Inspector paint, a surface and a flip on a locked piece", () => {
+    const { a, b } = threeCubes()
+    state().setItemFlag([b], "locked", true)
+    const material = "/Script/Engine.MaterialInstanceConstant'/Game/A/MI_Env_Rough_Red.MI_Env_Rough_Red'"
+    const before = state().doc
+    assert.isFalse(state().paintSlots([a, b].map((id) => ({ id, component: 0, slot: 0, material }))))
+    assert.isFalse(state().paintSurface([b], 1))
+    state().select([a, b])
+    state().flipSelection("x")
+    assert.strictEqual(state().doc, before)
+    assert.isTrue(refusedNaming(b))
+  })
+
+  it("Select all in group enters the group and selects what a click there could pick", () => {
+    const { a, b, c, group } = threeCubes()
+    state().setItemFlag([b], "locked", true)
+    state().select([c])
+    selectAllInGroup(group)
+    assert.strictEqual(state().enteredGroupId, group)
+    assert.deepStrictEqual(state().selectedIds, [a])
+  })
+
+  it("keeps a group selected whole when one of its members is locked or hidden", () => {
+    const { a, b, c } = threeCubes()
+    state().select([a, b, c])
+    state().setItemFlag([b], "locked", true)
+    assert.sameMembers([...state().selectedIds], [a, b, c])
+    // what can no longer be picked at all leaves
+    state().setItemFlag([c], "hidden", true)
+    assert.sameMembers([...state().selectedIds], [a, b])
+    state().setItemFlag([a], "hidden", true)
+    assert.deepStrictEqual(state().selectedIds, [])
+  })
+
+  it("Show all and Unlock all select what they reveal at the click level, and only what can be picked", () => {
+    const { a, b, c } = threeCubes()
+    // b is hidden and locked: Show all reveals it still locked, and its group comes whole from a
+    state().setItemFlag([b], "hidden", true)
+    state().setItemFlag([b], "locked", true)
+    state().setItemFlag([c], "hidden", true)
+    state().select([a])
+    state().toggleIsolation()
+    state().select([])
+    state().clearFlag("hidden")
+    assert.deepStrictEqual(state().selectedIds, [], "b is locked and c is outside the isolation")
+    state().toggleIsolation()
+    state().setItemFlag([a, b], "locked", true)
+    state().clearFlag("locked")
+    assert.sameMembers([...state().selectedIds], [a, b])
   })
 })

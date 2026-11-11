@@ -121,5 +121,5 @@ L alone (Unity) is snapping's "guides only" during a drag, and a key held before
 - A tint or grey for locked pieces (Max, Rhino, SketchUp). A click passing through is the only sign in the viewport. If that proves confusing, a faint tint is the next step.
 - Blender's lasting second level of hide, Max's Hide by Category, Unity's master toggle, Rhino's swaps.
 - Prefab definitions have no sidecar, so hiding in a definition's tab marks it unsaved and is lost when it's saved.
-- Lock blocks the viewport's picks only: a click, a body drag, Select all, paint. Delete, the gizmo and the Inspector act on a locked piece selected in the Outline.
+- Lock was first built to block only the viewport's picks. Since #264 it also refuses every edit that would move, turn, scale or paint a locked piece (DESKTOP.md); Delete, Duplicate and tags still act on one selected in the Outline.
 - A laser's beam still stops on a hidden piece, as it would in the game.

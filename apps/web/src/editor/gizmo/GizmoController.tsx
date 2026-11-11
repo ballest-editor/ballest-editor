@@ -47,6 +47,7 @@ import { allTurnStopsOf, reachAlong, scaleStopsOf, turnStopsFrom } from "../snap
 import {
   type EditorState,
   fitTransforms,
+  lockRefusalOf,
   selectionUnits,
   shownGizmoSpace,
   snapConfigOf,
@@ -303,6 +304,13 @@ export function GizmoController() {
       const { camera } = pointer.pane
       e.stopImmediatePropagation() // the gizmo wins over camera drags and click-select
       e.preventDefault()
+      // an Alt+drag copy leaves what it copies where it is; anything else would carry a locked piece
+      const copies = e.altKey && useEditor.getState().settings.general.altDragDuplicates && isTranslate(spec)
+      const refusal = copies ? undefined : lockRefusalOf(useEditor.getState(), target.transforms.keys())
+      if (refusal !== undefined) {
+        useEditor.getState().notify("info", refusal)
+        return
+      }
       try {
         el.setPointerCapture(e.pointerId)
       } catch {

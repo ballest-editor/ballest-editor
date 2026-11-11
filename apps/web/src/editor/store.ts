@@ -108,6 +108,7 @@ import {
   indexOfKey,
   itemNames,
   type NumberedName,
+  numberedNameText,
   sameStrings,
   type Structure,
   treeGroupIds,
@@ -152,13 +153,16 @@ import {
   withPaneRolled
 } from "../domain/viewLayout"
 import {
+  clickLevelSelection,
   type Isolation,
   isolationOf,
   isPickable,
   isShown,
   type ItemFlag,
   keysWith,
+  lockedAmong,
   toggledFlag,
+  unpickableNodeKeys,
   withFlag
 } from "../domain/visibility"
 import type { LoadedCatalog } from "../services/CatalogLoader"
@@ -310,6 +314,8 @@ export interface PickerRequest {
   readonly prompt: string
   /** What the pick can be: a face, a face or an end, or whatever the targets give. */
   readonly accepts: "face" | "faceOrEnd" | "any"
+  /** Only what a click could pick: the pick goes through hidden, locked and isolated-out items, as a click does. */
+  readonly pickable?: boolean
   /** The small panel beside the prompt, for a tool that has options. */
   readonly panel?: "flush"
   readonly onPick: (picked: PickedTarget) => void
@@ -684,8 +690,10 @@ export interface EditorState extends TabState {
   readonly picker: PickerRequest | null
   /** The offer the last connector snap left in its chip. */
   readonly flipOffer: FlipOffer | null
-  /** The item under the pointer: what the hover outlines, and whose open ends show while Show open ends is On hover. */
+  /** The drawn item under the pointer: whose open ends show while Show open ends is On hover. */
   readonly hoveredItem: string | null
+  /** What a click under the pointer would pick, for the hover's outline: past a locked item, what's behind it. */
+  readonly hoveredPick: string | null
   /** Flush and tangent's panel: which, and how far the faces stand apart in cm. */
   readonly flushMode: FaceMeeting
   readonly flushOffset: number
@@ -956,7 +964,8 @@ export interface EditorState extends TabState {
   readonly setDragKeys: (keys: DragKeysShown | null) => void
   readonly setPicker: (picker: PickerRequest | null) => void
   readonly setFlipOffer: (offer: FlipOffer | null) => void
-  readonly setHoveredItem: (key: string | null) => void
+  /** The drawn item under the pointer, and what a click there would pick (the same item, unless it is locked). */
+  readonly setHoveredItem: (key: string | null, pick?: string | null) => void
   /** One undo step each, as the map's own. */
   readonly addConstruction: (construction: Construction) => void
   readonly renameConstruction: (id: string, name: string) => void
@@ -1151,6 +1160,14 @@ export const useEditor = create<EditorState>()((set, get) => {
     })
     if (indices.length < all.length) s.notify("info", "The player start isn't copied: a map has only one.")
     return indices
+  }
+
+  /** Whether an edit that would change `keys` is refused for a locked one among them; says which when it is. */
+  const refusedForLock = (keys: Iterable<string>): boolean => {
+    const s = get()
+    const refusal = lockRefusalOf(s, keys)
+    if (refusal !== undefined) s.notify("info", refusal)
+    return refusal !== undefined
   }
 
   /** Whether `count` more items fit in the map; says so when they don't. */
@@ -1365,6 +1382,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     picker: null,
     flipOffer: null,
     hoveredItem: null,
+    hoveredPick: null,
     flushMode: "flush",
     flushOffset: 0,
     arrangeHover: null,
@@ -1546,24 +1564,23 @@ export const useEditor = create<EditorState>()((set, get) => {
       const { catalogIndex, doc } = get()
       const entries = [...transforms].map(([id, t]) => [indexOfKey(doc.ids, id), t] as const)
       const next = setTransforms(doc.map, entries)
-      if (Option.isSome(next)) {
-        // a drag that ends where it started leaves no step
-        if (!entries.every(([index]) => sameItemTransform(doc.map, next.value, index))) {
-          commit(
-            withMovedItems(doc, next.value, transforms, options, catalogIndex),
-            {},
-            undefined,
-            options?.description
-          )
-        }
-        return true
+      if (Option.isNone(next)) {
+        get().notify("error", INVALID_TRANSFORM)
+        return false
       }
-      get().notify("error", INVALID_TRANSFORM)
-      return false
+      // a drag that ends where it started leaves no step; what stays put may be locked, as a target is
+      const moved = entries.flatMap(([index]) =>
+        sameItemTransform(doc.map, next.value, index) ? [] : (doc.ids[index] ?? [])
+      )
+      if (moved.length === 0) return true
+      if (refusedForLock(moved)) return false
+      commit(withMovedItems(doc, next.value, transforms, options, catalogIndex), {}, undefined, options?.description)
+      return true
     },
 
     paintSlots: (edits) => {
       const { doc } = get()
+      if (refusedForLock(edits.map(({ id }) => id))) return false
       const next = setSlotMaterials(
         doc.map,
         edits.map(({ id, ...edit }) => ({ ...edit, index: indexOfKey(doc.ids, id) }))
@@ -1578,6 +1595,7 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     paintSurface: (ids, value) => {
       const { doc, notify } = get()
+      if (refusedForLock(ids)) return false
       const indices = ids.map((id) => indexOfKey(doc.ids, id))
       const property = { list: "intProperties", name: SURFACE_PROPERTY, type: "Integer" } as const
       const next = indices.includes(-1) ? Option.none() : setProperties(doc.map, indices, [{ property, value }])
@@ -1635,7 +1653,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         // A flip also swaps the mesh (and some materials) for the game's baked mirror, in the same step.
         return flipped === item ? item : withMirrorMesh(flipped, s.catalogIndex)
       })
-      if (items.some((item, i) => item !== map.items[i])) commit({ ...s.doc, map: { ...map, items } })
+      const flipped = s.doc.ids.filter((_, i) => items[i] !== map.items[i])
+      if (flipped.length > 0 && !refusedForLock(flipped)) commit({ ...s.doc, map: { ...map, items } })
     },
 
     setItemPivots: (pivots) => {
@@ -1896,10 +1915,12 @@ export const useEditor = create<EditorState>()((set, get) => {
         validation: { doc, result: validateMap(gameMapOf(doc, catalogIndex), catalogIndex) }
       })),
     setItemFlag: (keys, flag, on) => {
-      const { doc, selectedIds } = get()
+      const { doc, enteredGroupId, isolation, selectedIds } = get()
       const structure = withFlag(doc.structure, keys, flag, on)
       if (structure === undefined) return
-      const gone = new Set(on ? keys : [])
+      const gone = on
+        ? unpickableNodeKeys(structure.tree, enteredGroupId, keys, (key) => isPickable(structure, isolation, key))
+        : new Set<string>()
       commit(
         { ...doc, structure },
         { selectedIds: selectedIds.filter((id) => !gone.has(id)) },
@@ -1912,10 +1933,17 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (selectedIds.length > 0) setItemFlag(selectedIds, flag, toggledFlag(doc.structure, selectedIds, flag))
     },
     clearFlag: (flag) => {
-      const { doc } = get()
+      const { doc, enteredGroupId, isolation } = get()
       const keys = keysWith(doc.structure, flag)
       const structure = withFlag(doc.structure, keys, flag, false)
-      if (structure !== undefined) commit({ ...doc, structure }, { selectedIds: keys }, undefined, FLAG_STEPS[flag][2])
+      if (structure === undefined) return
+      const selectedIds = clickLevelSelection(
+        structure.tree,
+        enteredGroupId,
+        keys,
+        (key) => isPickable(structure, isolation, key)
+      )
+      commit({ ...doc, structure }, { selectedIds }, undefined, FLAG_STEPS[flag][2])
     },
     toggleIsolation: () =>
       set((s) => {
@@ -2065,7 +2093,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setDragKeys: (dragKeys) => set({ dragKeys }),
     setPicker: (picker) => set({ picker }),
     setFlipOffer: (flipOffer) => set({ flipOffer }),
-    setHoveredItem: (hoveredItem) => set({ hoveredItem }),
+    setHoveredItem: (hoveredItem, hoveredPick = hoveredItem) => set({ hoveredItem, hoveredPick }),
     addConstruction: (construction) =>
       commitAnnotations((a) => ({ ...a, construction: [...a.construction, construction] })),
     renameConstruction: (id, name) =>
@@ -2085,6 +2113,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     clearMeasurements: () => commitAnnotations((a) => ({ ...a, measurements: [] })),
     mirrorItems: (transforms, flip, axis, options) => {
       const { catalogIndex, doc } = get()
+      if (refusedForLock([...flip, ...transforms.keys()])) return false
       const items = doc.map.items.map((item, index) => {
         if (!flip.has(doc.ids[index] ?? "")) return item
         const piece = catalogIndex?.pieceByClass.get(item.actorToSpawn)
@@ -2375,6 +2404,26 @@ export const nodeNamesOf = (s: Pick<EditorState, "doc" | "catalogIndex">): Reado
     ...itemNames(s.doc.map, s.doc.ids, s.doc.structure.items, s.catalogIndex),
     ...groupNames(s.doc.structure.tree)
   ])
+
+/**
+ * Why an edit that would move, turn, scale or paint `keys` is refused: one of them is locked (docs/DESKTOP.md § Hide,
+ * isolate and lock). It names the piece, as the Outline does; undefined when none is locked. The store's edits ask it
+ * when they commit, and the gizmo and a body drag when they start.
+ */
+export const lockRefusalOf = (
+  s: Pick<EditorState, "doc" | "catalogIndex">,
+  keys: Iterable<string>
+): string | undefined => {
+  const [first, ...others] = lockedAmong(s.doc.structure, keys)
+  if (first === undefined) return undefined
+  const named = nodeNamesOf(s).get(first)
+  const name = named === undefined ? "A piece" : `“${numberedNameText(named)}”`
+  return others.length === 0
+    ? `${name} is locked. Unlock it to change it.`
+    : `${name} and ${others.length} other locked ${
+      others.length === 1 ? "piece" : "pieces"
+    } can't change. Unlock them first.`
+}
 
 /** The snap settings in force: the tab's own, else what a new map starts on. */
 export const snapConfigOf = (s: Pick<TabState, "snap"> & Pick<EditorState, "settings">): SnapConfig =>

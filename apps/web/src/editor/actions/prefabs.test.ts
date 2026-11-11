@@ -739,7 +739,7 @@ describe("with no tab open", () => {
 })
 
 describe("the instances of a definition", () => {
-  it.effect("selecting them takes in every instance, whatever is entered, and nothing else", () =>
+  it.effect("selecting them takes in every instance a click could pick, whatever is entered, and nothing else", () =>
     withDisk((disk) =>
       Effect.gen(function*() {
         yield* started(disk)
@@ -752,6 +752,10 @@ describe("the instances of a definition", () => {
         selectInstances(USER)
         assert.isNull(s().enteredGroupId)
         assert.sameMembers([...s().selectedIds], [...treeKeys([instance(first)!, instance(second)!])])
+        // one with nothing a click could pick stays out, as from Select all
+        s().setItemFlag(treeKeys([instance(second)!]), "locked", true)
+        selectInstances(USER)
+        assert.sameMembers([...s().selectedIds], [...treeKeys([instance(first)!])])
       })
     ))
 

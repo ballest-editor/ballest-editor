@@ -14,7 +14,15 @@ import { applyDelta, movedAlikeKeys, type PivotMode, pivotModeFor, type Selectio
 import { transformSelection } from "../actions"
 import { type PaneCamera, panePointer } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
-import { fitTransforms, pickableOf, type PickerRequest, shownOf, snapConfigOf, useEditor } from "../store"
+import {
+  fitTransforms,
+  lockRefusalOf,
+  pickableOf,
+  type PickerRequest,
+  shownOf,
+  snapConfigOf,
+  useEditor
+} from "../store"
 import { cancelsDrag, type DragKeyState, handleDragKey, releaseDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import {
   dragKeysOf,
@@ -25,7 +33,7 @@ import {
   previewMove,
   setFeedback
 } from "./moveSession"
-import { anchorUnder, hitUnder, pickedOf } from "./pickTarget"
+import { anchorUnder, hitUnder, pickedOf, pickerSkips } from "./pickTarget"
 import { bodyDrags, dragTargetOf, selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
 import { gameRayOf, toGame } from "./snapView"
@@ -138,7 +146,9 @@ export function SnapInput() {
     const beginDrag = (from: Pressed): BodyDrag | undefined => {
       const s = useEditor.getState()
       const target = dragTargetOf(s)
-      if (target === undefined) {
+      const refusal = target === undefined ? undefined : lockRefusalOf(s, target.transforms.keys())
+      if (target === undefined || refusal !== undefined) {
+        if (refusal !== undefined) s.notify("info", refusal)
         useEditor.getState().setDragKeys(null)
         return undefined
       }
@@ -241,7 +251,11 @@ export function SnapInput() {
         itemAskedAt = performance.now()
         const s = useEditor.getState()
         const key = itemUnder(el, e, raycaster)
-        if (key !== s.hoveredItem) s.setHoveredItem(key)
+        // a click goes through a locked item, so the hover outlines what's behind it
+        const pick = key === null || pickableOf(s)(key)
+          ? key
+          : pressedOn(el, e, raycaster, pickableOf(s))?.key ?? null
+        if (key !== s.hoveredItem || pick !== s.hoveredPick) s.setHoveredItem(key, pick)
       }
       const wait = itemAskedAt + HOVERED_ITEM_MS - performance.now()
       if (wait <= 0) ask()
@@ -257,7 +271,7 @@ export function SnapInput() {
     const showPick = (picker: PickerRequest, e: PointerEvent) => {
       const s = useEditor.getState()
       const { pane, px } = panePointer(el, e)
-      const found = hitUnder(s, pane, px, picker.accepts)
+      const found = hitUnder(s, pane, px, picker.accepts, pickerSkips(s, picker))
       // a face picked for Flush and tangent shows the meeting it will make
       const hit = found !== undefined && picker.panel === "flush" && found.held.shape === "plane"
         ? { ...found, relation: s.flushMode }
@@ -274,7 +288,7 @@ export function SnapInput() {
       if (picker !== null) {
         const { pane, px, slot } = panePointer(el, e)
         s.setActivePane(slot)
-        const hit = hitUnder(s, pane, px, picker.accepts)
+        const hit = hitUnder(s, pane, px, picker.accepts, pickerSkips(s, picker))
         e.stopImmediatePropagation()
         e.preventDefault()
         if (hit === undefined) return

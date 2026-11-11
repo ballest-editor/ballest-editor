@@ -700,9 +700,9 @@ function HoveredOutline({ id }: { readonly id: string }) {
 
 function HoveredOutlines() {
   const hovered = useEditor((s) =>
-    s.tool === "paint" || s.picker !== null || s.hoveredItem === null || !pickableOf(s)(s.hoveredItem)
+    s.tool === "paint" || s.picker !== null || s.hoveredPick === null || !pickableOf(s)(s.hoveredPick)
       ? null
-      : s.hoveredItem
+      : s.hoveredPick
   )
   const tree = useEditor((s) => s.doc.structure.tree)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)

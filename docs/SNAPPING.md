@@ -300,12 +300,12 @@ The status bar's right end says what snapped while a drag is in progress, its gl
 
 These are open issues already. What changes is that each takes its points, faces and planes from the same target picker as a drag, so there is one way to say "that corner" or "that face" in the whole app: hover and click, with the same highlights and label.
 
-- **Flush and tangent** (#89). Click a face on item A, click a face on item B: B moves so the faces are coplanar (Flush) or touching (Tangent). An offset field in the same small panel. With Connectors on, clicking two ends joins them, which is the same tool with ends for faces.
+- **Flush and tangent** (#89). Click a face on item A, click a face on item B: B moves so the faces are coplanar (Flush) or touching (Tangent). B is picked as a click would pick it: the pick goes through a locked piece, and B brings its whole group unless the group is entered or B is in the selection, which then moves. An offset field in the same small panel. With Connectors on, clicking two ends joins them, which is the same tool with ends for faces.
 - **Align and distribute** (#88). The button form of alignment snapping, in the Inspector and under Tools (§ Align and distribute).
 - **Measure** (#99). Two clicks on any target give the distance and per-axis deltas; a click on two faces gives the angle. A measurement is a sidecar annotation that stays until cleared, and it is a target itself, so a jump can be measured and then built to.
 - **Mirror** (#87). The plane comes from the target picker: a face, a construction plane, a world plane through the grid origin. One reflection takes the whole selection, Together or Each, so a group comes out as its mirror image with its Point pivot reflected too. Inside an entered chain the links a selected link carries are reflected with it.
 - **Grid origin** (#84). Pick a point with the target picker.
-- **Select connected**. Walks the joints from the selection to select the whole track. Not an issue yet; it falls out of joints being recorded.
+- **Select connected**. Walks the joints from the selection to select the whole track, as clicks on it would: whole groups unless one is entered, leaving out what is hidden, locked or isolated out. Not an issue yet; it falls out of joints being recorded.
 
 ### Align and distribute
 

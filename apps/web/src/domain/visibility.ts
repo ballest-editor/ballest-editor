@@ -4,6 +4,7 @@
  * so a group is hidden or locked by its items. Isolation is a tab's view, outside the document: the items it leaves out.
  * Pure, like `structure.ts`: an edit that changes nothing answers undefined.
  */
+import { clickLevelOf, nodeKeys } from "./groupSelection"
 import type { TreeNode } from "./MapSidecar"
 import { findGroup, type Structure, treeKeys, withMeta } from "./structure"
 
@@ -24,12 +25,56 @@ export const isShown = (structure: Structure, isolation: Isolation | null, key: 
   !isHidden(structure, key) && isolation?.outside.has(key) !== true
 
 /**
- * Whether the viewport can pick an item: a click, a box or lasso, Select all. It must be drawn and not locked. A pick
- * still reaches the item's whole group at the click level (`clickLevelOf`), hidden or locked members and all, so a
- * group keeps its shape; the Outline selects anything.
+ * Whether the viewport can pick an item: a click, a box or lasso, Select all, and what adds to the selection (Select
+ * connected, Show all, Flush and tangent's second pick). It must be drawn and not locked. A pick still reaches the
+ * item's whole group at the click level (`clickLevelOf`), hidden or locked members and all, so a group keeps its shape;
+ * the Outline selects anything.
  */
 export const isPickable = (structure: Structure, isolation: Isolation | null, key: string): boolean =>
   isShown(structure, isolation, key) && !isLocked(structure, key)
+
+/** The locked items among `keys`, in their order: what an edit that would change them is refused for. */
+export const lockedAmong = (structure: Structure, keys: Iterable<string>): ReadonlyArray<string> =>
+  [...new Set(keys)].filter((key) => isLocked(structure, key))
+
+/**
+ * What a tool that adds `keys` to the selection selects: each one a click could pick, as a click on it reaches it (its
+ * whole group, unless the group is entered), in the order of `keys`.
+ */
+export const clickLevelSelection = (
+  tree: ReadonlyArray<TreeNode>,
+  enteredGroupId: string | null,
+  keys: Iterable<string>,
+  pickable: (key: string) => boolean
+): ReadonlyArray<string> => {
+  const picked = new Set<string>()
+  for (const key of keys) {
+    if (picked.has(key) || !pickable(key)) continue
+    const reached = nodeKeys(tree, clickLevelOf(tree, key, enteredGroupId).nodeId)
+    for (const one of reached.length === 0 ? [key] : reached) picked.add(one)
+  }
+  return [...picked]
+}
+
+/**
+ * What leaves the selection when `keys` are hidden or locked: the whole click-level node of each one whose node has
+ * nothing left a click could pick. A group with a member still pickable stays selected whole, so it never splits.
+ */
+export const unpickableNodeKeys = (
+  tree: ReadonlyArray<TreeNode>,
+  enteredGroupId: string | null,
+  keys: Iterable<string>,
+  pickable: (key: string) => boolean
+): ReadonlySet<string> => {
+  const gone = new Set<string>()
+  for (const key of keys) {
+    if (gone.has(key)) continue
+    const reached = nodeKeys(tree, clickLevelOf(tree, key, enteredGroupId).nodeId)
+    const node = reached.length === 0 ? [key] : reached
+    if (!node.some(pickable)) { for (const one of node) gone.add(one) }
+  }
+  return gone
+}
 
 /** `keys` with `flag` set (`on`) or cleared, as one edit; undefined when none of them changes. */
 export const withFlag = (

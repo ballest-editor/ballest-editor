@@ -28,6 +28,7 @@ import { pickableSelection } from "../../domain/visibility"
 import {
   editedKeys,
   fitTransforms,
+  lockRefusalOf,
   pickableOf,
   pivotOf,
   selectionPivot,
@@ -59,6 +60,16 @@ export const duplicateSelection = () => useEditor.getState().duplicateSelection(
 export const selectAll = () => {
   const s = useEditor.getState()
   s.select(pickableSelection(s.doc.structure.tree, s.enteredGroupId, pickableOf(s)))
+}
+
+/**
+ * The Outline's "Select all in group": enters group `id` and selects its children, one level down, each one a click
+ * could pick whole, as Select all does inside it.
+ */
+export const selectAllInGroup = (id: string) => {
+  const s = useEditor.getState()
+  s.enterGroup(id)
+  s.select(pickableSelection(s.doc.structure.tree, id, pickableOf(s)))
 }
 
 /** An item's edit transform in the document: never the live preview. */
@@ -187,8 +198,12 @@ export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisE
  * Shows an axis edit live (a scrub) without committing it; null ends the preview. The edit is
  * the whole scrub so far, from the document, not a step on top of the last preview.
  */
-export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit | null): void =>
-  useEditor.getState().setPreview(edit === null ? null : withAxisEdit(field, axis, edit))
+export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit | null): void => {
+  const s = useEditor.getState()
+  // a scrub that would carry a locked piece shows nothing; letting go says why
+  const locked = lockRefusalOf(s, editedKeys(s)) !== undefined
+  s.setPreview(edit === null || locked ? null : withAxisEdit(field, axis, edit))
+}
 
 /**
  * Sets the pivot `choice` on every selected item, measured on each one's own bounds (one
