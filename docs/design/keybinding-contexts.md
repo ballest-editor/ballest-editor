@@ -4,13 +4,13 @@ A binding is a chord string on an action (`domain/Keybinds.ts`). Where it works 
 
 ## The context
 
-| Dimension  | Values                                                                        | Read from                                                                                                                   |
-| ---------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `drag`     | `none`, `camera`, `move`, `turn`, `scale`, `place`, `stroke`, `scrub`, `area` | `sceneRegistry`: a look, a gizmo handle's kind, a body drag (a move), a box or lasso, a paint stroke; `preview` for a scrub |
-| `tool`     | `select`, `translate`, `rotate`, `scale`, `paint`                             | the store's `tool`                                                                                                          |
-| `platform` | `desktop`, `browser`                                                          | `capabilities.play`                                                                                                         |
+| Dimension  | Values                                                                                        | Read from                                                                                                                   |
+| ---------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `drag`     | `none`, `camera`, `move`, `turn`, `scale`, `place`, `stroke`, `scrub`, `area`, `pick`, `pane` | `sceneRegistry`: a look, a gizmo handle's kind, a body drag (a move), a box or lasso, a paint stroke; `preview` for a scrub |
+| `tool`     | `select`, `translate`, `rotate`, `scale`, `repeat`, `paint`                                   | the store's `tool`                                                                                                          |
+| `platform` | `desktop`, `browser`                                                                          | `capabilities.play`                                                                                                         |
 
-Drags are exclusive: one at a time. The ones that change the map (move, turn, scale, place, stroke) are "while dragging" in Settings' words (`describeWhen`); looking, a number field's scrub and a box or lasso (`area`, "while selecting") are kept apart. A move is a move handle's drag, the selection's body dragged, or an Alt+drag's copy; the names follow [SNAPPING.md](../SNAPPING.md) ("a move", "a turn", "a scale"), not the tools', since the Move tool can be picked with nothing moving and a body drag moves things in any tool. `place` is a palette or prefab drop, which is the browser's own drag and reports modifiers only, so a snapping-off key held through one has to be a modifier (`dropSnapOff`).
+Drags are exclusive: one at a time. The ones that change the map (move, turn, scale, place, stroke) are "while dragging" in Settings' words (`describeWhen`); looking, a number field's scrub and a box or lasso (`area`, "while selecting") are kept apart. A move is a move handle's drag, the selection's body dragged, or an Alt+drag's copy; the names follow [SNAPPING.md](../SNAPPING.md) ("a move", "a turn", "a scale"), not the tools', since the Move tool can be picked with nothing moving and a body drag moves things in any tool. `place` is a palette or prefab drop, which is the browser's own drag and reports modifiers only, so a snapping-off key held through one has to be a modifier (`dropSnapOff`). `pick` (a snap tool's pick prompt) and `pane` (a pane label dragged to swap panes) aren't read off the editor: nothing else waits on them, and they exist so their cancel key is looked up like any other gesture's.
 
 What stays in code, on purpose:
 
@@ -18,35 +18,35 @@ What stays in code, on purpose:
 - **Selection state and open tabs** decide whether a command does anything, inside the command, not whether its binding exists.
 - **W as forward and move** is settled by the "movement keys need look" setting and what is held (`flyKeys`), not by context.
 - **A bare Ctrl's 120 ms wait** and its suppression once it is part of a chord (`HeldKeys`) are chord timing.
-- **Escape's order** with nothing dragged (tracking points, then a maximised pane, then the entered group, then the selection) is one "back out" intent inside `deselect`.
+- **Escape's order** with nothing dragged (a maximised pane, then the entered group, then the selection) is one "back out" intent inside `deselect` ([DESKTOP.md § Escape](../DESKTOP.md#escape)).
 - **The tool's plain primary button**: it selects, or paints. Only modified clicks are bindings.
 
 ## The conditions
 
 `actionWhen` gives every action its `When`. An unset field holds always, except `drag`, which unset means "nothing dragged", so an action has to say if it works during a drag.
 
-| Actions                                                    | When                                                    |
-| ---------------------------------------------------------- | ------------------------------------------------------- |
-| one-shots: tools, edit, view, file, snap switches, help    | nothing dragged                                         |
-| the fly keys, look keys, fly faster, camera speed          | nothing dragged, looking, a move, turn or scale         |
-| `addToSelection`, `toggleSelection`, `removeFromSelection` | Select, Move, Rotate and Scale tools                    |
-| `lassoSelect`                                              | a box or lasso                                          |
-| `paintWholePiece`, `pickPaint`                             | Paint tool                                              |
-| `snapOff`                                                  | a move, turn, scale or placement                        |
-| `snapHold`                                                 | a move or turn                                          |
-| `snapLockX/Y/Z`, `snapPlaneX/Y/Z`                          | a move                                                  |
-| `snapOnlyConnectors`, `snapOnlyMesh`, `snapOnlyAlignment`  | the transforms that snap to that kind (`SNAP_KINDS_OF`) |
-| `cancelDrag`                                               | a move, turn, scale, or a box or lasso                  |
-| `playMap`                                                  | desktop                                                 |
+| Actions                                                    | When                                                                               |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| one-shots: tools, edit, view, file, snap switches, help    | nothing dragged                                                                    |
+| the fly keys, look keys, fly faster, camera speed          | nothing dragged, looking, a move, turn or scale                                    |
+| `addToSelection`, `toggleSelection`, `removeFromSelection` | Select, Move, Rotate, Scale and Repeat tools                                       |
+| `lassoSelect`                                              | a box or lasso                                                                     |
+| `paintWholePiece`, `pickPaint`                             | Paint tool                                                                         |
+| `snapOff`                                                  | a move, turn, scale or placement                                                   |
+| `snapHold`                                                 | a move or turn                                                                     |
+| `snapLockX/Y/Z`, `snapPlaneX/Y/Z`                          | a move                                                                             |
+| `snapOnlyConnectors`, `snapOnlyMesh`, `snapOnlyAlignment`  | the transforms that snap to that kind (`SNAP_KINDS_OF`)                            |
+| `cancelDrag`                                               | every gesture: a move, turn, scale, box or lasso, stroke, scrub, pick or pane swap |
+| `playMap`                                                  | desktop                                                                            |
 
-The fly keys keep flying during a gizmo drag because `FlyCamera` never checked for one; it lets go of its modifiers then, so Ctrl is snapping's. `cancelDrag` (Escape) replaced the gizmo's and the body drag's "Escape or the deselect key": a save from before it had a key of its own keeps cancelling on what `deselect` was bound to (`mergeKeybinds`).
+The fly keys keep flying during a gizmo drag, and `FlyCamera` checks their condition each frame (`cameraKeyLive`), so they and the wheel stop for a box, a stroke or a scrub; it lets go of its modifiers in a gizmo drag, so Ctrl is snapping's. `cancelDrag` (Escape) replaced the gizmo's and the body drag's "Escape or the deselect key": a save from before it had a key of its own keeps cancelling on what `deselect` was bound to (`mergeKeybinds`).
 
 ## Dispatch
 
 `resolveChord(keybinds, ctx, chord)` returns the actions bound to the chord whose condition holds, the narrowest first (`specificity`: a tool or platform named counts, and a drag only when one is required), ties in the table's order. Everything that reads a chord goes through it or `firesHere`:
 
 - `useActionKeys` runs the first resolved action with a command. During a look, a drag or a scrub no one-shot resolves, so undo, delete and the rest wait for the drag's one undo step; a chord that resolves to nothing falls through to the browser, which is how F5 still reloads in a browser, where Play has no binding.
-- `editor/snap/dragKeys.ts` is the drag's keyboard: `handleDragKey` takes a key only when it resolves to one of `duringDragActions` in the drag under way, reading the chord without Ctrl and also bare, since Ctrl and Shift are drag keys themselves. `cancelsDrag` is `cancelDrag` in that drag. `dragHintsOf` lists, for the status bar, every action with a hint word (`keybindActionHints`) that is live in the drag, so a turn offers no lock and a scale only the mesh without a table of its own, and a key bound to more drags shows up there with no other change.
+- `editor/snap/dragKeys.ts` is the drag's keyboard: `handleDragKey` takes a key only when it resolves to one of `duringDragActions` in the drag under way, reading the chord without Ctrl and also bare, since Ctrl and Shift are drag keys themselves. Every gesture's cancel is `cancelsGesture`: `cancelDrag` in that gesture, its key also bare. `dragHintsOf` lists, for the status bar, every action with a hint word (`keybindActionHints`) that is live in the drag, so a turn offers no lock and a scale only the mesh without a table of its own, and a key bound to more drags shows up there with no other change.
 - The viewport's click selection and the paint tool's clicks resolve the mouse chord in the context, so Shift+click adds to the selection in the selecting tools and paints the whole piece in Paint, and Alt+click picks paint in Paint and orbits elsewhere.
 
 ## Conflicts
@@ -61,4 +61,4 @@ Each a PR of its own, in this order:
 2. **Widen `allows` one action at a time**, making its command cope with a drag in progress: the axis switch mid-move (which has to restart the drag's maths), the view keys, the snap magnet, Frame. Undo, delete, copy and the file actions stay "not dragging".
 3. **The hint line as a consumer.** `dragHintsOf` generalises to "the keys live here" for the tool as well as the drag, feeding the status bar's hint line (`statusHint.ts`) in the Paint tool: `Shift` whole piece, `Alt + LMB` pick.
 
-Open: whether a palette drop should take the move's narrowing keys (the drop lands on the same targets as a move, so J, M and L would apply, but the browser's drag reports no key codes); whether `altDragDuplicates` and the orthographic wheel should become bindings; whether a paint stroke should cancel on Escape as a drag does.
+Open: whether a palette drop should take the move's narrowing keys (the drop lands on the same targets as a move, so J, M and L would apply, but the browser's drag reports no key codes); whether `altDragDuplicates` and the orthographic wheel should become bindings.

@@ -18,7 +18,14 @@ import * as THREE from "three"
 import type { CatalogPiece } from "../domain/Catalog"
 import { threeToUeVector, toTuple3, ueToThreeVector } from "../domain/coords"
 import { counted, groupBoxTargets, hoverKeysOf } from "../domain/groupSelection"
-import { firesHere, holdsModifiersOf, type ModifierState, mouseChordOf, resolveChord } from "../domain/Keybinds"
+import {
+  cancelsGesture,
+  firesHere,
+  holdsModifiersOf,
+  type ModifierState,
+  mouseChordOf,
+  resolveChord
+} from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
@@ -414,6 +421,15 @@ function PaintTool() {
       modifiers = e
       stale = true
     }
+    /** The cancel drag key calls a stroke off, painting nothing (docs/DESKTOP.md § Escape). */
+    const onCancelKey = (e: KeyboardEvent) => {
+      if (stroke === null || !cancelsGesture(useEditor.getState().keybinds, "stroke", e)) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      stroke = null
+      useEditor.getState().cancelPaintStroke()
+      stale = true
+    }
 
     const listening = new AbortController()
     const { signal } = listening
@@ -422,6 +438,7 @@ function PaintTool() {
     el.addEventListener("pointerup", onUp, { signal })
     el.addEventListener("pointercancel", endStroke, { signal })
     el.addEventListener("pointerleave", onLeave, { signal })
+    window.addEventListener("keydown", onCancelKey, { capture: true, signal })
     window.addEventListener("keydown", onKey, { signal })
     window.addEventListener("keyup", onKey, { signal })
     window.addEventListener("blur", endStroke, { signal })

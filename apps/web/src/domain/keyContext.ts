@@ -5,8 +5,11 @@
  * can't both hold, which is how Ctrl flies down with nothing dragged and turns snapping off during a move.
  */
 
-/** What is being dragged, if anything. One at a time. */
-const drags = ["none", "camera", "move", "turn", "scale", "place", "stroke", "scrub", "area"] as const
+/**
+ * What is being dragged, if anything. One at a time. A snap tool's `pick` and a pane label's swap (`pane`) aren't read
+ * off the editor (`keyContextOf`), as nothing else waits on them: they are only where their own cancel key is looked up.
+ */
+const drags = ["none", "camera", "move", "turn", "scale", "place", "stroke", "scrub", "area", "pick", "pane"] as const
 export type Drag = (typeof drags)[number]
 
 /** The drags that change the map: "while dragging" in Settings' words. Looking and a number field's scrub aren't. */
@@ -70,7 +73,9 @@ const DRAG_WORDS: Readonly<Record<Drag, string>> = {
   place: "placing",
   stroke: "painting",
   scrub: "scrubbing",
-  area: "selecting"
+  area: "selecting",
+  pick: "picking",
+  pane: "swapping panes"
 }
 
 const TOOL_WORDS: Readonly<Record<Tool, string>> = {

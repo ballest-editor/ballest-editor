@@ -8,9 +8,19 @@ import {
   sharedKeysFlyFreely
 } from "./flyKeys"
 import { defaultKeybinds } from "./Keybinds"
+import type { Drag } from "./keyContext"
 
-const flying = (mode: MovementLookMode, looking: boolean, ...held: ReadonlyArray<string>) =>
-  [...flyingActions(defaultKeybinds, mode, looking, (b) => held.includes(b))].sort()
+/** A look, or nothing dragged. */
+const lookingOrNot = (looking: boolean): Drag => looking ? "camera" : "none"
+const flying = (mode: MovementLookMode, looking: boolean | Drag, ...held: ReadonlyArray<string>) =>
+  [
+    ...flyingActions(
+      defaultKeybinds,
+      mode,
+      typeof looking === "boolean" ? lookingOrNot(looking) : looking,
+      (b) => held.includes(b)
+    )
+  ].sort()
 
 describe("needsLook", () => {
   it("follows the mode", () => {
@@ -34,7 +44,7 @@ describe("flyingActions", () => {
     const justPressed = (
       mode: MovementLookMode,
       looking: boolean
-    ) => [...flyingActions(defaultKeybinds, mode, looking, (b, atOnce) => b === "ControlLeft" && atOnce)]
+    ) => [...flyingActions(defaultKeybinds, mode, lookingOrNot(looking), (b, atOnce) => b === "ControlLeft" && atOnce)]
     expect(justPressed("all", true)).toEqual(["moveDown"])
     expect(justPressed("upDown", true)).toEqual(["moveDown"])
     expect(justPressed("all", false)).toEqual([])
@@ -64,6 +74,15 @@ describe("flyingActions", () => {
   it("all: nothing flies without looking", () => {
     expect(flying("all", false, "KeyA", "KeyS", "Space", "KeyW")).toEqual([])
     expect(flying("all", true, "KeyA", "KeyW")).toEqual(["moveForward", "moveLeft"])
+  })
+
+  it("flies through a gizmo drag, but not a box, a paint stroke or a scrub", () => {
+    for (const drag of ["move", "turn", "scale"] as const) {
+      expect(flying("nothing", drag, "KeyA")).toEqual(["moveLeft"])
+    }
+    for (const drag of ["area", "stroke", "scrub"] as const) {
+      expect(flying("nothing", drag, "KeyA", "Space")).toEqual([])
+    }
   })
 })
 

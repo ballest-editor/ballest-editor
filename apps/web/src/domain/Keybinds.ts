@@ -6,7 +6,7 @@
  * unbound.
  */
 import { Schema } from "effect"
-import { type KeyContext, matches, needsDrag, overlaps, specificity, type When, within } from "./keyContext"
+import { type Drag, type KeyContext, matches, needsDrag, overlaps, specificity, type When, within } from "./keyContext"
 import { SNAP_KINDS_OF, type SnapKind, type SnapTransform } from "./snapConfig"
 import type { ViewProjection } from "./viewLayout"
 
@@ -270,11 +270,11 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   selectAll:
     "Select every item in the map; inside an entered group, every item in that group. Hidden and locked items are left out.",
   deselect:
-    "Clear the selection. Inside an entered group it steps out of the group instead, and with a pane maximised it restores the panes. (The game uses Ctrl+click.)",
+    "Step back one level per press: restore a maximised pane, then step out of the entered group and select it, then clear the selection. A drag under way takes the cancel drag key first. Edit › Deselect does the same. (The game uses Ctrl+click.)",
   cancelDrag:
-    "During a drag, put the selection back where it started and end the drag; an Alt+drag's copies go. Editor only: the game has no gizmo drags to cancel.",
+    "Call off what is under way and put things back as they were: a gizmo or selection drag (an Alt+drag's copies go), a box or lasso, a paint stroke, a number field's scrub, a pane label's swap, or a snap tool's pick. Editor only: the game has no gizmo drags to cancel.",
   enterGroup:
-    "Enter the selected group, so a click selects what is inside it. Double-clicking an item of a group does the same. Editor only.",
+    "Enter the selected group with nothing selected inside it, so a click selects what is inside it. Double-clicking an item of a group enters it too, selecting what the click reaches inside. Editor only.",
   groupSelection:
     "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the in-game editor.",
   chainSelection:
@@ -389,10 +389,13 @@ export const mouseClickActions: ReadonlySet<KeybindAction> = new Set([
 /** Actions bound to a mouse button held while dragging. */
 export const mouseDragActions: ReadonlySet<KeybindAction> = new Set(["look", "orbit", "pan"])
 
-/** The camera flies and changes speed with nothing dragged, during a look, and while a handle or body is being dragged. */
+/**
+ * The camera flies and changes speed with nothing dragged, during a look, and while a handle or body is being dragged;
+ * not through a box, a paint stroke or a scrub, which would see the view move under them.
+ */
 const FLYING: When = { drag: ["none", "camera", "move", "turn", "scale"] }
 /** The tools whose clicks select; the paint tool's paint. */
-const SELECTING: When = { tool: ["select", "translate", "rotate", "scale"] }
+const SELECTING: When = { tool: ["select", "translate", "rotate", "scale", "repeat"] }
 const PAINTING: When = { tool: ["paint"] }
 const snapTransforms = ["move", "turn", "scale"] as const satisfies ReadonlyArray<SnapTransform>
 /** The drags a snap key that narrows to `kind` is live in: the transforms that snap to that kind. */
@@ -429,7 +432,7 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   deleteSelection: {},
   selectAll: {},
   deselect: {},
-  cancelDrag: { drag: ["move", "turn", "scale", "area"] },
+  cancelDrag: { drag: ["move", "turn", "scale", "area", "stroke", "scrub", "pick", "pane"] },
   enterGroup: {},
   groupSelection: {},
   chainSelection: {},
@@ -705,6 +708,20 @@ export const resolveChord = (keybinds: Keybinds, ctx: KeyContext, chord: string)
 /** Is `chord` bound to `action` where `ctx` is? */
 export const firesHere = (keybinds: Keybinds, ctx: KeyContext, action: KeybindAction, chord: string): boolean =>
   keybinds[action].includes(chord) && matches(actionWhen[action], ctx)
+
+/**
+ * Does key `e` call off the gesture `drag`: the first step of Escape's stack (docs/DESKTOP.md § Escape), which every
+ * gesture asks here rather than naming a key. The key counts bare too, so it cancels with the gesture's modifiers still
+ * down: Shift (hold), Ctrl (snapping off) or Alt (a copy's drag, a lasso).
+ */
+export const cancelsGesture = (
+  keybinds: Keybinds,
+  drag: Drag,
+  e: ModifierState & { readonly code: string }
+): boolean => {
+  const ctx: KeyContext = { drag, tool: "select", platform: "desktop" }
+  return firesHere(keybinds, ctx, "cancelDrag", chordOf(e)) || firesHere(keybinds, ctx, "cancelDrag", e.code)
+}
 
 const MODIFIER_CODES = new Set([
   "ShiftLeft",

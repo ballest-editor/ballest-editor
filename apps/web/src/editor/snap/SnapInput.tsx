@@ -6,7 +6,7 @@ import { useThree } from "@react-three/fiber"
 import { useEffect } from "react"
 import * as THREE from "three"
 import type { UeTransform, Vec3 } from "../../domain/coords"
-import { mouseChordOf } from "../../domain/Keybinds"
+import { cancelsGesture, mouseChordOf } from "../../domain/Keybinds"
 import { targetOn } from "../../domain/snapConfig"
 import type { Constraint } from "../../domain/snapFrame"
 import { shownMarks } from "../../domain/snapRelation"
@@ -368,7 +368,7 @@ export function SnapInput() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       const s = useEditor.getState()
-      if (s.picker !== null && e.code === "Escape") {
+      if (s.picker !== null && cancelsGesture(s.keybinds, "pick", e)) {
         e.preventDefault()
         e.stopImmediatePropagation()
         s.picker.onCancel?.()
