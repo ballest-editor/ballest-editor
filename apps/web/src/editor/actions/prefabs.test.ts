@@ -60,7 +60,7 @@ import {
   tabsUsingPrefab
 } from "./prefabs"
 import { saveMapFile } from "./save"
-import { closeTabEffect } from "./unsaved"
+import { closeTabEffect, closeTabsBesideEffect } from "./unsaved"
 
 const parsed = Schema.decodeUnknownSync(Catalog)(
   JSON.parse(fs.readFileSync(path.join(repoRoot, "assets", "catalog.json"), "utf8"))
@@ -656,6 +656,27 @@ describe("a new prefab", () => {
         yield* saveNewPrefabEffect("Twin_cubes", dialog?.id === "namePrefab" ? dialog.afterSave : undefined)
         assert.isTrue(disk.files.has(projectPrefabFile("Twin_cubes")))
         assert.notInclude(s().tabIds, tabId)
+      })
+    ))
+
+  it.effect("Close others names it first, with its tab active, then closes it and goes back to the kept tab", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        const keep = s().tabId
+        yield* newPrefabEffect
+        const prefabTab = s().tabId
+        placeTwoCubes()
+        disk.promptAnswers.push("save")
+        yield* closeTabsBesideEffect(keep, [prefabTab])
+        const dialog = s().dialog
+        assert.strictEqual(dialog?.id, "namePrefab")
+        assert.strictEqual(s().tabId, prefabTab)
+        s().closeDialog()
+        yield* saveNewPrefabEffect("Twin_cubes", dialog?.id === "namePrefab" ? dialog.afterSave : undefined)
+        assert.isTrue(disk.files.has(projectPrefabFile("Twin_cubes")))
+        assert.deepStrictEqual(s().tabIds, [keep])
+        assert.strictEqual(s().tabId, keep)
       })
     ))
 
