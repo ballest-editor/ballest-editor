@@ -13,7 +13,7 @@ import { writeToGame } from "./gameWrite"
 import { checkPrefabs } from "./prefabs"
 import { notifyFailure, run, runUntilCleanup } from "./run"
 import { withSavedOpenMap } from "./save"
-import { fileOf, loadProjectMapFile, refreshProject, showMap } from "./shared"
+import { afterGestures, fileOf, loadProjectMapFile, refreshProject, showMap } from "./shared"
 import { askSyncConflict, gameDiffOf, textKeepingPivots } from "./syncConflict"
 import { unlessCancelledFor } from "./unsaved"
 
@@ -34,6 +34,8 @@ const notifyConflict = (fileName: string) =>
  * that doesn't read, as one the game is still writing, is left for the next look, which reports nothing, so it's told.
  */
 const settleChange = Effect.fnUntraced(function*(fileName: string) {
+  // a gesture under way may still be editing the map: what it is once the gesture ends decides
+  yield* afterGestures
   const state = useEditor.getState()
   const map = state.projectMaps.find((m) => m.fileName === fileName)
   if (map === undefined) return
@@ -91,33 +93,37 @@ export const checkExports = () => run(checkExportsEffect)
 /**
  * Re-import: the game's version of a map replaces the project's (which goes to the project's backups), and the link
  * records it as in sync. Its sidecar is re-matched against it, as on any open. A tab that has the map open is made
- * active and reloaded from it, after asking about its unsaved edits.
+ * active and reloaded from it, after asking about its unsaved edits. It waits for any gesture under way to end, and
+ * loads only into that map's own tab, whichever is active by then (docs/DESKTOP.md § Sync).
  */
 export const reimportMapEffect = (fileName: string) =>
-  unlessCancelledFor(fileName, "reimport", (open) =>
+  afterGestures.pipe(Effect.andThen(unlessCancelledFor(fileName, "reimport", () =>
     Effect.gen(function*() {
       const file = yield* (yield* Platform).reimportMap(fileName, yield* textKeepingPivots(fileName))
       yield* refreshProject
       const { loaded, map } = yield* loadProjectMapFile(file, loadGameStructure)
-      if (open) yield* showMap(map, fileOf(file), { loaded })
+      // a gesture may have started while main wrote the files
+      yield* afterGestures
+      const tabId = tabWithFile(useEditor.getState(), fileName)
+      if (tabId !== undefined) yield* showMap(map, fileOf(file), { loaded, into: { tabId } })
       useEditor.getState().notify("info", `Re-imported ${mapLabelOf(fileName)} from the game`, {
         kind: "mapReimported",
         body: "The project's previous version is in the backups (the map's menu › Backups…).",
-        actions: open ? [] : [{ label: "Open", command: { _tag: "OpenMap", fileName } }]
+        actions: tabId !== undefined ? [] : [{ label: "Open", command: { _tag: "OpenMap", fileName } }]
       })
-    }))
+    }))))
 
 export const reimportMap = (fileName: string) => run(reimportMapEffect(fileName))
 
 /** Runs `next` on `name` with any unsaved edits in its tab saved first, so what replaces them leaves them in the backups. */
 const withEditsSaved = <E, R>(name: string, next: (fileName: string) => Effect.Effect<void, E, R>) =>
-  Effect.suspend(() => {
+  afterGestures.pipe(Effect.andThen(Effect.suspend(() => {
     const state = useEditor.getState()
     const tabId = tabWithFile(state, name)
     if (tabId === undefined || fileTabOf(state, name)?.dirty !== true) return next(name)
     state.activateTab(tabId)
     return withSavedOpenMap(next)
-  })
+  })))
 
 /**
  * The syncConflict dialog's Keep project version: the export that found the conflict goes on over the game's copy, or

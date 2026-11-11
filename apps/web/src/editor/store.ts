@@ -723,6 +723,8 @@ export interface EditorState extends TabState {
   ) => void
   /** Makes `tabId` the active tab; nothing while a drag or scrub is under way. */
   readonly activateTab: (tabId: string) => void
+  /** Whether a drag, scrub, slider, paint stroke or Alt+drag duplicate is holding its change back, as `activateTab` waits for. */
+  readonly gestureUnderway: () => boolean
   /** Moves tab `tabId` to position `index` in the strip (clamped). */
   readonly moveTab: (tabId: string, index: number) => void
   /**
@@ -1431,6 +1433,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         parkedTabs.delete(tabId)
         return { ...next, ...leftBehind, tabId, parkedTabs }
       }),
+
+    gestureUnderway: () => interacting(get()) || strokeUnderway(),
 
     moveTab: (tabId, index) =>
       set((s) => {
