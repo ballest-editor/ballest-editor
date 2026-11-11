@@ -33,9 +33,6 @@ const TOOLS: ReadonlyArray<{
   { tool: "paint", label: "Paint", action: "paintMode", icon: IconBrush }
 ]
 
-/** The tools with chrome of their own over the tool bar while they're on: a view each (viewIds.ts, `tool:<tool>`). */
-export const toolPanels: ReadonlyArray<Tool> = ["repeat", "paint"]
-
 /**
  * Tool switcher, bottom-centre of the viewport. It belongs to no pane and floats over them all: a divider under it passes
  * behind the pill and drags from either side of it. The paint tool's palette sits above it while that tool is on, and

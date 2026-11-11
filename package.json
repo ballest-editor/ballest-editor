@@ -15,7 +15,6 @@
     "release:mock-server": "node tools/release/src/main.ts mock-server",
     "driver": "node tools/driver/src/main.ts",
     "map": "node --import ./tools/map/src/register.ts tools/map/src/main.ts",
-    "app-driver": "node tools/app-driver/src/main.ts",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "lint": "pnpm lint:files apps packages tools",

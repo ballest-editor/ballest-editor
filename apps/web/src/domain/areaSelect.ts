@@ -12,9 +12,6 @@ export interface Point2 {
   readonly y: number
 }
 
-/** The regions a drag draws, each a view of its own (`components/viewIds.ts`). */
-export const areaShapes = ["box", "lasso"] as const
-
 /** What the drag draws: a box from the press to the pointer, or the lasso's path from the press. */
 export type AreaShape =
   | { readonly kind: "box"; readonly from: Point2; readonly to: Point2 }

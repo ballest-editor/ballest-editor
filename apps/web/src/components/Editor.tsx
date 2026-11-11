@@ -53,7 +53,6 @@ import { WhereToOpenDialog } from "./WhereToOpenDialog"
 if (import.meta.env.DEV) {
   // Dev-only handle for poking at the scene from the console / browser automation.
   Object.assign(globalThis, { __ballest: { sceneRegistry, useEditor } })
-  void import("./driveHook").then(({ installDriveHook }) => installDriveHook())
 }
 
 /** Applies the theme setting to <html> (the ui preset styles `.dark`), and to the desktop window's controls. */

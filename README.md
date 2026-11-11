@@ -73,7 +73,6 @@ The web review build is the same editor in a browser, without anything that need
 | [tools/release](tools/release/README.md)                                 | Installers and releases                                                         |
 | [tools/driver](tools/driver/README.md)                                   | Running the game driver                                                         |
 | [tools/map](tools/map/README.md)                                         | Inspecting, validating, diffing and generating maps                             |
-| [tools/app-driver](tools/app-driver/README.md)                           | Putting the editor in a known state, then capturing, measuring or comparing it  |
 
 ## Notice
 

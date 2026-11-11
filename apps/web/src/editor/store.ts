@@ -335,8 +335,7 @@ export interface FlipOffer {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type { Tool }
-export const settingsCategories = ["general", "editor", "camera", "keybinds", "appearance", "beta", "game"] as const
-export type SettingsCategory = (typeof settingsCategories)[number]
+export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "beta" | "game"
 
 const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
@@ -457,33 +456,6 @@ export type DialogState =
   | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
   | { readonly id: "recoverUnsaved"; readonly tabs: ReadonlyArray<RecoveredTab> }
 export type Dialog = DialogState["id"]
-
-/** Every dialog by id, as a value: a new member of `DialogState` doesn't compile until it is here. */
-const everyDialog: Readonly<Record<Dialog, true>> = {
-  rename: true,
-  duplicate: true,
-  projectSettings: true,
-  mapSettings: true,
-  gameLink: true,
-  keybinds: true,
-  feedback: true,
-  about: true,
-  newProject: true,
-  newDraft: true,
-  recover: true,
-  saveAs: true,
-  settings: true,
-  replacePublished: true,
-  syncConflict: true,
-  replaceInGame: true,
-  importClash: true,
-  whereToOpen: true,
-  savePrefab: true,
-  renamePrefab: true,
-  deletePrefab: true,
-  recoverUnsaved: true
-}
-export const dialogIds = Object.keys(everyDialog)
 
 /** What `notify` records besides the level and title (docs/DESKTOP.md § Notifications). */
 export interface NotifyOptions {

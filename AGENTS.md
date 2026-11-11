@@ -22,8 +22,6 @@ Use one name per thing, in code comments and docs alike.
 | driver plugin      | `ballest-driver`, installed only into the game driver's copies of the game.                                                                                |
 | plugin manager     | The third-party [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plugin-manager/). Its `version.dll` inside the game is "the host". |
 | game driver        | `tools/driver`, the MCP server that runs sandboxed copies of the game.                                                                                     |
-| app driver         | `tools/app-driver`, which runs Ballest Editor in a declared state.                                                                                         |
-| state, view        | A view is a surface the app has; a state is a declared way to reach one or more, in a `*.states.ts` file.                                                  |
 | in-game editor     | The game's own map editor (not "track editor" or "level editor").                                                                                          |
 | game's maps folder | `UserSavedMaps`.                                                                                                                                           |
 | dock, centre group | The dockview shell between the top bar and status bar; the centre group is its group of map tabs and the viewport.                                         |
@@ -57,7 +55,6 @@ Use one name per thing, in code comments and docs alike.
 - `tools/release/` packages the desktop app with electron-builder (`pnpm dist:desktop:win|linux`, `pnpm release:smoke`) and checks a release's assets; `.github/workflows/release.yml` runs it on `v*.*.*` tags.
 - `tools/driver/` is the game driver (`pnpm driver`, `docs/DRIVER.md`): an MCP server (`.mcp.json` registers it) that runs sandboxed copies of the game headless under Proton in `~/.cache/ballest-editor/driver/` and drives them through the plugin manager's test channel: render, state, the in-game editor, `dumptypes`, map probes. Linux only; needs Steam running, which an agent never starts itself, and the plugin manager host built from the fork's `ui-dump` branch (`tools/driver/README.md`).
 - `tools/map/` is `pnpm map`: inspect, validate, diff, build and seed maps with the editor's own domain code ([its README](tools/map/README.md)). Reach for it before writing a script over a map.
-- `tools/app-driver/` is the app driver (`pnpm app-driver`, [its README](tools/app-driver/README.md)): an MCP server and CLI that put the editor in a declared state, then capture, measure or compare it. Use it instead of writing a browser script. States are `*.states.ts` files beside the views they show, and `viewCoverage.test.ts` fails on a view with no state.
 - `repos/` holds vendored read-only references (see below).
 - `docs/` holds the format, the vision, the desktop app's design, the project model and the game driver's design. `docs/qa/` holds what was measured in the game, case by case, and `docs/mockups/` holds wireframes.
 
