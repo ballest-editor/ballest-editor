@@ -17,6 +17,8 @@ import {
   saveMap,
   selectAll,
   startNewMap,
+  toggleAngleSnap,
+  toggleGridSnap,
   toggleSnapping
 } from "./actions"
 import { sceneRegistry } from "./sceneRegistry"
@@ -81,6 +83,8 @@ export const actionCommands = {
   toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
   togglePivotMode: () => useEditor.getState().togglePivotMode(),
   snapToggle: onOpenTab(toggleSnapping),
+  snapGridToggle: onOpenTab(toggleGridSnap),
+  snapAngleToggle: onOpenTab(toggleAngleSnap),
   speedFaster: () => useEditor.getState().changeSpeed(1),
   speedSlower: () => useEditor.getState().changeSpeed(-1),
   viewTop: () => lookAlong("top"),

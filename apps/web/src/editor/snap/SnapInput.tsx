@@ -201,13 +201,19 @@ export function SnapInput() {
       hoverAt = undefined
     }
 
-    /** A pointer that has come to rest acquires what is under it, when tracking is on. */
+    /** A body drag or a gizmo drag is in progress: the only time tracking acquires anything. */
+    const dragging = () => drag !== null || sceneRegistry.gizmoDragActive()
+
+    /**
+     * A pointer that has come to rest during a drag acquires what is under it, when tracking is on. Outside a drag it
+     * acquires nothing, so a point never outlives the drag that took it (docs/SNAPPING.md § Tracking).
+     */
     const trackHover = (e: PointerEvent) => {
       const s = useEditor.getState()
       const config = snapConfigOf(s)
       const { trackingAcquire: acquire, trackingHoverMs: hoverMs } = s.settings.snapPrefs
       if (
-        !targetOn(config, "tracking") || (acquire === "shift" && !e.shiftKey) || s.picker !== null
+        !dragging() || !targetOn(config, "tracking") || (acquire === "shift" && !e.shiftKey) || s.picker !== null
       ) {
         stopHover()
         return
@@ -216,10 +222,9 @@ export function SnapInput() {
       clearTimeout(hoverTimer)
       hoverAt = { x: e.clientX, y: e.clientY }
       const at = { clientX: e.clientX, clientY: e.clientY }
-      const dragging = sceneRegistry.gizmoDragActive()
       hoverTimer = setTimeout(() => {
         // a pause in a drag that has ended since goes with the points that drag let go of
-        if (dragging && !sceneRegistry.gizmoDragActive()) {
+        if (!dragging()) {
           stopHover()
           return
         }
@@ -322,7 +327,10 @@ export function SnapInput() {
     const onPointerUp = (e: PointerEvent) => {
       if (pressed !== null) letGo()
       const active = drag
-      if (active === null) return
+      if (active === null) {
+        useEditor.getState().clearTracked()
+        return
+      }
       e.stopImmediatePropagation()
       const { last, session, startTransforms } = active
       const options = session.commitOptions(startTransforms.size)

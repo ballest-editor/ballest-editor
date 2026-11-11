@@ -32,8 +32,9 @@ import { DISCLOSURE_BODY, DisclosureChevron, Row, Segmented, SwitchRow, ValuePar
 const BASE_NAMES = { pivot: "Pivot", closest: "Closest", centre: "Center" } as const
 
 /**
- * The targets as the snap menu names them (docs/SNAPPING.md § The snap menu): Ends, Pieces and Guides are the plain
- * screen's switches, and Guides is two targets there, line-up guides to nearby pieces and guides from remembered points.
+ * The targets as the snap menu names them (docs/SNAPPING.md § The snap menu): Ends, Surfaces and Guides are the plain
+ * screen's switches under Snap to pieces, and Guides is two targets there, line-up guides to nearby pieces and guides
+ * from remembered points.
  */
 export const TARGET_WORDS: Readonly<Record<SnapTarget, { readonly label: string; readonly help: string }>> = {
   grid: {
@@ -46,8 +47,8 @@ export const TARGET_WORDS: Readonly<Record<SnapTarget, { readonly label: string;
       "The ends of tracks, tubes and ramps join end to end. Example: a Curve's end joins a Track's end with no step."
   },
   mesh: {
-    label: "Pieces",
-    help: "The corners, edges and faces of other pieces. Example: a lamp dropped on a wall sits on the wall."
+    label: "Surfaces",
+    help: "The corners, edges, middles and faces of other pieces. Example: a lamp dropped on a wall sits on the wall."
   },
   construction: {
     label: "Planes",
@@ -262,13 +263,11 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
 }
 
 /**
- * The snap menu's Advanced (docs/SNAPPING.md § The snap menu): which point snaps, the priority list with each target's
- * parameters, and the remembered points.
+ * The snap menu's Advanced (docs/SNAPPING.md § The snap menu): which point snaps, and the priority list with each
+ * target's parameters.
  */
 export function SnapAdvanced() {
   const config = useEditor(snapConfigOf)
-  const tracked = useEditor((s) => s.tracked.length)
-  const clearTracked = useEditor((s) => s.clearTracked)
   const [dragged, setDragged] = useState<SnapTarget | null>(null)
   return (
     <div className="flex flex-col gap-2" data-snap-advanced>
@@ -308,12 +307,6 @@ export function SnapAdvanced() {
           />
         ))}
       </div>
-      <Row
-        label={`${tracked} ${tracked === 1 ? "point" : "points"} remembered`}
-        help="The points Point guides draw from. They last until cleared, or Escape with no drag."
-      >
-        <Button variant="outline" disabled={tracked === 0} onClick={clearTracked}>Clear</Button>
-      </Row>
     </div>
   )
 }

@@ -27,7 +27,7 @@ What stays in code, on purpose:
 
 | Actions                                                    | When                                                    |
 | ---------------------------------------------------------- | ------------------------------------------------------- |
-| one-shots: tools, edit, view, file, snap magnet, help      | nothing dragged                                         |
+| one-shots: tools, edit, view, file, snap switches, help    | nothing dragged                                         |
 | the fly keys, look keys, fly faster, camera speed          | nothing dragged, looking, a move, turn or scale         |
 | `addToSelection`, `toggleSelection`, `removeFromSelection` | Select, Move, Rotate and Scale tools                    |
 | `lassoSelect`                                              | a box or lasso                                          |

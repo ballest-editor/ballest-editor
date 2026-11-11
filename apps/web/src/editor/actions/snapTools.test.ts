@@ -39,6 +39,8 @@ import {
   startGridOriginPick,
   startMeasure,
   startPlaneFromPoints,
+  toggleAngleSnap,
+  toggleGridSnap,
   toggleSnapping,
   updateSnap,
   updateSnapTarget
@@ -112,6 +114,23 @@ describe("snap settings", () => {
     assert.strictEqual(config().magnet, before)
     assert.isFalse(config().targets.grid.enabled)
     assert.isTrue(config().rotationEnabled)
+  })
+
+  it("turns the grid, the angle step and pieces over each on its own, as their keys do", () => {
+    const switches = () => {
+      const { magnet, rotationEnabled, targets } = snapConfigOf(useEditor.getState())
+      return [targets.grid.enabled, rotationEnabled, magnet]
+    }
+    const [grid, angle, pieces] = switches()
+    toggleGridSnap()
+    assert.deepStrictEqual(switches(), [!grid, angle, pieces])
+    toggleAngleSnap()
+    assert.deepStrictEqual(switches(), [!grid, !angle, pieces])
+    toggleSnapping()
+    assert.deepStrictEqual(switches(), [!grid, !angle, !pieces])
+    toggleGridSnap()
+    toggleAngleSnap()
+    assert.deepStrictEqual(switches(), [grid, angle, !pieces])
   })
 
   it("turns the grid on with the step it picks, and leaves the magnet alone", () => {

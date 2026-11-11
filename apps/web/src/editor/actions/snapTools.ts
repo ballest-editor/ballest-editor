@@ -99,8 +99,16 @@ export const updateSnapTarget = <T extends SnapTarget>(target: T, patch: Partial
   applySnap({ ...config, targets: { ...config.targets, [target]: { ...config.targets[target], ...patch } } })
 }
 
-/** Turns the magnet on or off: snapping to every target but the grid (docs/SNAPPING.md § Affect). */
+/** Turns the magnet on or off: snapping to every target but the grid (`snapToggle`, docs/SNAPPING.md § Affect). */
 export const toggleSnapping = () => updateSnap({ magnet: !snapConfigOf(useEditor.getState()).magnet })
+
+/** Turns the grid on or off: the grid pill's icon (`snapGridToggle`). */
+export const toggleGridSnap = () =>
+  updateSnapTarget("grid", { enabled: !snapConfigOf(useEditor.getState()).targets.grid.enabled })
+
+/** Turns the angle step on or off: the angle pill's icon (`snapAngleToggle`). */
+export const toggleAngleSnap = () =>
+  updateSnap({ rotationEnabled: !snapConfigOf(useEditor.getState()).rotationEnabled })
 
 /** Picks the grid's step, and turns the Grid target on to use it. */
 export const pickGridSize = (gridSize: number) => {

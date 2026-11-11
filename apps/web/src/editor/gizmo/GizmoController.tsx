@@ -518,8 +518,8 @@ export function GizmoController() {
       // the drag is over first, so the capture this lets go of doesn't cancel it
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       land(active)
-      // a click on a handle isn't a drag: what was acquired for the drag to come stays
-      if (active.last !== undefined) useEditor.getState().clearTracked()
+      // a press on a handle is a drag from the start, landed or not: what it acquired goes with it
+      useEditor.getState().clearTracked()
     }
 
     /** The pointer gone from under a drag (the system took it, or the capture was lost): it goes back, as on Escape. */

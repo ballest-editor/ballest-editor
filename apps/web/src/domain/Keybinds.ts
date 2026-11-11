@@ -110,6 +110,8 @@ export const keybindSections = [
     name: "snapping",
     actions: [
       "snapToggle",
+      "snapGridToggle",
+      "snapAngleToggle",
       "snapOff",
       "snapHold",
       "snapLockX",
@@ -187,7 +189,9 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   speedSlower: "camera speed down",
   orbit: "orbit",
   pan: "pan",
-  snapToggle: "snapping on / off",
+  snapToggle: "snap to pieces on / off",
+  snapGridToggle: "snap to grid on / off",
+  snapAngleToggle: "snap angle on / off",
   snapOff: "snapping off",
   snapHold: "hold target",
   snapLockX: "lock to x",
@@ -196,9 +200,9 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   snapPlaneX: "lock to plane across x",
   snapPlaneY: "lock to plane across y",
   snapPlaneZ: "lock to plane across z",
-  snapOnlyConnectors: "connectors only",
-  snapOnlyMesh: "mesh only",
-  snapOnlyAlignment: "alignment only",
+  snapOnlyConnectors: "ends only",
+  snapOnlyMesh: "surfaces only",
+  snapOnlyAlignment: "guides only",
   viewTop: "top view",
   viewBottom: "bottom view",
   viewFront: "front view",
@@ -303,9 +307,13 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
   snapToggle:
-    "Turn snapping as a whole on or off: the magnet in the view bar. Grid, rotation, scale and each target keep their own toggles under it. No equivalent in the in-game editor.",
+    "Turn snapping to pieces on or off: the magnet in the view bar. Moves and turns snap to other pieces' ends, corners, edges, faces and middles, and to guides, each with its own switch in the snap menu. The grid and the angle step have their own keys. No equivalent in the in-game editor.",
+  snapGridToggle:
+    "Turn snapping to the grid on or off: the grid pill's icon in the view bar. It doesn't wait on the magnet. G for grid.",
+  snapAngleToggle:
+    "Turn the angle step on or off: the angle pill's icon in the view bar. A turn goes round in steps of it, whether or not the magnet is on. T for turn.",
   snapOff:
-    "Hold during a drag: nothing snaps while it is held. With snapping off already it does nothing. Only once a drag has begun, so Ctrl still flies down.",
+    "Hold during a drag: nothing snaps while it is held, the grid, the steps and pieces alike. With all of them off already it does nothing. Only once a drag has begun, so Ctrl still flies down.",
   snapHold:
     "Hold during a drag: the selection stays on the target it found, sliding along it, and nothing else takes over.",
   snapLockX: "During a drag, lock the move to the X axis (the grid's, when it is turned). Press again to unlock.",
@@ -315,11 +323,11 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   snapPlaneY: "During a drag, lock the move to the plane square to Y. Press again to unlock.",
   snapPlaneZ: "During a drag, lock the move to the plane square to Z. Press again to unlock.",
   snapOnlyConnectors:
-    "Hold during a move or a turn: only connector ends count, even with snapping off. A move stays where it started until one of its ends meets another on screen, from further off than usual, and jumps to the join. J for join: C is the game's key for the gizmo's axes.",
+    "Hold during a move or a turn: only connector ends count, even with the magnet off. A move stays where it started until one of its ends meets another on screen, from further off than usual, and jumps to the join. J for join: C is the game's key for the gizmo's axes.",
   snapOnlyMesh:
-    "Hold during a move, a turn or a scale: only the Mesh target counts (vertices, edges and faces, and the faces a turn or a scale stops on), even with snapping off. M for mesh.",
+    "Hold during a move, a turn or a scale: only Surfaces count (vertices, edges and faces, and the faces a turn or a scale stops on), even with the magnet off. M for mesh.",
   snapOnlyAlignment:
-    "Hold during a move: only alignment and tracking count, even with snapping off, so a row lines up without the grid or a face taking over. L for line up: A flies the camera left.",
+    "Hold during a move: only guides count, even with the magnet off, so a row lines up without the grid or a face taking over. L for line up: A flies the camera left.",
   viewTop: "Look straight down in the active pane, orthographic. Editor only: the game has no orthographic views.",
   viewBottom: "Look straight up from under the map in the active pane, orthographic.",
   viewFront: "Look at the map from its front (the +X side, the game's forward) in the active pane, orthographic.",
@@ -462,6 +470,8 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   lockSelection: {},
   unlockAll: {},
   snapToggle: {},
+  snapGridToggle: {},
+  snapAngleToggle: {},
   snapOff: { drag: ["move", "turn", "scale", "place"] },
   snapHold: { drag: ["move", "turn"] },
   snapLockX: { drag: ["move"] },
@@ -501,7 +511,7 @@ export const keybindActionHints: Partial<Record<KeybindAction, string>> = {
   snapLockY: "lock",
   snapLockZ: "lock",
   snapOnlyConnectors: "ends",
-  snapOnlyMesh: "pieces",
+  snapOnlyMesh: "surfaces",
   snapOnlyAlignment: "guides",
   lassoSelect: "lasso"
 }
@@ -531,6 +541,8 @@ export type Keybinds = Readonly<Record<KeybindAction, Bindings>>
  */
 export const defaultKeybinds: Keybinds = {
   snapToggle: ["KeyN"],
+  snapGridToggle: ["KeyG"],
+  snapAngleToggle: ["KeyT"],
   snapOff: ["ControlLeft", "ControlRight"],
   snapHold: ["ShiftLeft", "ShiftRight"],
   snapLockX: ["KeyX"],

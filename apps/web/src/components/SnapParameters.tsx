@@ -49,15 +49,17 @@ export function RowLabel({ label, help, dimmed = false, strong = false }: {
   )
 }
 
-export function Row({ label, help, dimmed, strong, children }: {
+/** What every row says at its left: its label, its help, and how it reads. */
+interface RowHead {
   readonly label: string
   readonly help?: string | undefined
-  /** Snapping as a whole is off: the row still works, and says it has no effect yet. */
+  /** A switch the row waits on is off: the row still works, and says it has no effect yet. */
   readonly dimmed?: boolean | undefined
-  /** A row that names a thing, a target, rather than a parameter of one. */
+  /** A row that names a thing, a switch of its own or a target, rather than a parameter of one. */
   readonly strong?: boolean | undefined
-  readonly children: ReactNode
-}) {
+}
+
+export function Row({ label, help, dimmed, strong, children }: RowHead & { readonly children: ReactNode }) {
   return (
     <div className="flex min-h-7 flex-wrap items-center justify-between gap-x-3 gap-y-1">
       <RowLabel label={label} help={help} dimmed={dimmed} strong={strong} />
@@ -66,16 +68,13 @@ export function Row({ label, help, dimmed, strong, children }: {
   )
 }
 
-export function SwitchRow({ label, help, checked, onChange, dimmed, strong }: {
-  readonly label: string
-  readonly help?: string | undefined
+export function SwitchRow({ checked, onChange, ...head }: RowHead & {
   readonly checked: boolean
   readonly onChange: (on: boolean) => void
-  readonly dimmed?: boolean | undefined
-  readonly strong?: boolean | undefined
 }) {
+  const { label } = head
   return (
-    <Row label={label} help={help} dimmed={dimmed} strong={strong}>
+    <Row {...head}>
       <Switch aria-label={label} checked={checked} onCheckedChange={onChange} />
     </Row>
   )
@@ -158,18 +157,16 @@ function StepField({ label, value, options, format, unit, onChange }: StepProps)
 }
 
 /** A kind of snapping with a step: the step, then the switch that turns it on. */
-export function StepRow({ label, help, step, enabled, onEnabled, dimmed }: {
-  readonly label: string
+export function StepRow({ step, enabled, onEnabled, ...head }: RowHead & {
   readonly help: string
   readonly step: StepProps
   readonly enabled: boolean
   readonly onEnabled: (on: boolean) => void
-  readonly dimmed?: boolean | undefined
 }) {
   return (
-    <Row label={label} help={help} dimmed={dimmed}>
+    <Row {...head}>
       <StepField {...step} />
-      <Switch aria-label={`Snap ${label.toLowerCase()}`} checked={enabled} onCheckedChange={onEnabled} />
+      <Switch aria-label={`Snap ${head.label.toLowerCase()}`} checked={enabled} onCheckedChange={onEnabled} />
     </Row>
   )
 }

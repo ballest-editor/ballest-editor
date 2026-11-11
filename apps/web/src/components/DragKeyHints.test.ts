@@ -38,7 +38,7 @@ describe("the status bar's drag keys", () => {
       "Shift hold",
       "X Y Z lock",
       "J ends",
-      "M pieces",
+      "M surfaces",
       "L guides"
     ])
   })
@@ -48,19 +48,19 @@ describe("the status bar's drag keys", () => {
       "Control off",
       "Shift hold",
       "J ends",
-      "M pieces",
+      "M surfaces",
       "L guides"
     ])
     assert.deepStrictEqual(hintsOf({ transform: "scale", pressed: [], lock: undefined }), [
       "Control off",
-      "M pieces"
+      "M surfaces"
     ])
   })
 
   it("lights what is held and the axis locked", () => {
     assert.deepStrictEqual(
       hintsOf({ transform: "move", pressed: ["ControlLeft", "KeyJ"], lock: { axis: "y", plane: true } }),
-      ["Control* off*", "Shift hold", "X Y* Z lock*", "J* ends*", "M pieces", "L guides"]
+      ["Control* off*", "Shift hold", "X Y* Z lock*", "J* ends*", "M surfaces", "L guides"]
     )
   })
 })

@@ -450,8 +450,9 @@ export function SettingsDialog(props: {
         id: "snapTrackingHover",
         ...snapSetting("trackingHoverMs"),
         label: "Hover time",
-        description: "How long a rest takes to remember a point.",
-        info: "How long the pointer rests on a point before it is remembered.",
+        description: "How long a rest during a drag takes to remember a point.",
+        info:
+          "How long the pointer rests on a point during a drag before it is remembered. The drag forgets it as it ends.",
         control: (
           <SliderControl
             label="Hover time"

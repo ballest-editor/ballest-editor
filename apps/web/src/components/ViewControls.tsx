@@ -22,6 +22,7 @@ import { Toggle } from "@workspace/ui/components/toggle"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ReactNode } from "react"
 import { soleGroupOf } from "../domain/groupSelection"
+import type { KeybindAction } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { AUTO_GRID_COLORS, isDefaultDisplay, withDefaultDisplay } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
@@ -86,6 +87,7 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
               icon={<IconGrid4x4 />}
               label="Snap to grid"
               enabled={targets.grid.enabled}
+              action="snapGridToggle"
               onToggle={(pressed) => updateSnapTarget("grid", { enabled: pressed })}
               value={gridSize}
               options={GRID_SIZES}
@@ -99,6 +101,7 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
               icon={<IconAngle />}
               label="Snap angle"
               enabled={rotationEnabled}
+              action="snapAngleToggle"
               onToggle={(pressed) => updateSnap({ rotationEnabled: pressed })}
               value={rotationStep}
               options={ROTATION_STEPS}
@@ -433,13 +436,15 @@ function DisplayControl({ disabled }: { readonly disabled: boolean }) {
 }
 
 /**
- * One kind of gizmo snapping: the icon turns it on and off, the value next to it picks the step and turns it on. Neither
- * waits on the magnet beside them, which is snapping to pieces (docs/SNAPPING.md § Affect).
+ * One kind of gizmo snapping: the icon turns it on and off (`action`), the value next to it picks the step and turns it
+ * on. Neither waits on the magnet beside them, which is snapping to pieces.
  */
 function SnapGroup<V extends number>(props: {
   readonly icon: ReactNode
   readonly label: string
   readonly enabled: boolean
+  /** The keybind that turns it over, named in the icon's tip. */
+  readonly action: KeybindAction
   readonly onToggle: (pressed: boolean) => void
   readonly value: V
   readonly options: ReadonlyArray<V>
@@ -457,6 +462,7 @@ function SnapGroup<V extends number>(props: {
     <>
       <ViewTip
         label={`${props.label}: ${enabled ? "on" : "off"}`}
+        action={props.action}
         render={
           <Toggle
             pressed={enabled}
