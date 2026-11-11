@@ -1632,21 +1632,24 @@ describe("groups and the selection", () => {
     assert.isFalse(state().collapsedGroups.has(outer))
   })
 
-  it("pivots a whole group on the centre of its members, and anything else on the active item", () => {
+  it("pivots on the active unit: a whole group on the centre of its members, a loose piece on itself", () => {
     const { a, b, c, d } = nestedMap()
     const pivot = () => selectionPivot(state(), transformOf)
     const turned = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
     transformItem(b, { ...transformOf(b), rotation: turned })
+    // no catalog here, so each member counts as its origin: x 0 to 200, with the group's axes, the world's
+    const onGroup = () => {
+      assert.deepStrictEqual(pivot()?.pivot, { x: 100, y: 0, z: transformOf(a).translation.z })
+      assert.deepStrictEqual(pivot()?.rotation, { x: 0, y: 0, z: 0, w: 1 })
+    }
     state().select([a, b, c])
-    // no catalog here, so each member counts as its origin: x 0 to 200
-    assert.deepStrictEqual(pivot()?.pivot, { x: 100, y: 0, z: transformOf(a).translation.z })
-    assert.deepStrictEqual(pivot()?.rotation, { x: 0, y: 0, z: 0, w: 1 })
+    onGroup()
     assert.deepStrictEqual(pivot()?.activePivot, transformOf(c).translation)
-    // a group and a loose piece: the game goes back to the active item
+    // a group and a loose piece: the loose piece when it is active, else the group's frame, never one member
     state().select([a, b, c, d])
     assert.deepStrictEqual(pivot()?.pivot, transformOf(d).translation)
     state().select([d, a, c, b])
-    assert.deepStrictEqual(pivot()?.rotation, transformOf(b).rotation)
+    onGroup()
     state().select([])
     assert.isUndefined(pivot())
   })
@@ -1668,7 +1671,11 @@ describe("groups and the selection", () => {
       z: transformOf(a).translation.z
     })
     state().togglePivotMode()
-    assert.deepStrictEqual(selectionPivot(state(), transformOf)?.pivot, transformOf(c).translation)
+    assert.deepStrictEqual(selectionPivot(state(), transformOf)?.pivot, {
+      x: 100,
+      y: 0,
+      z: transformOf(a).translation.z
+    })
   })
 
   it("sets, freezes and clears a group's pivot as undo steps, and carries a Point with a move", () => {

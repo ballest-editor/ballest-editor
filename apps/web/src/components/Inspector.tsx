@@ -1093,7 +1093,6 @@ export function Inspector() {
                 key={group.id}
                 group={group}
                 items={items}
-                transforms={transforms}
                 actions={<SelectionActions />}
               />
               <ContentsSection items={items} />

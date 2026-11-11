@@ -15,13 +15,15 @@ import { selectedNodes } from "./groupSelection"
 import { applyGroupDelta, clampScale, forUnit, type GroupDelta, scaleAbout } from "./groupTransform"
 import type { Box } from "./itemBounds"
 import { boxCentreOf } from "./itemBounds"
-import type { ChainGrowth, GroupNode, GroupPivot, GroupPivotFace, TreeNode } from "./MapSidecar"
+import type { ChainGrowth, GroupNode, GroupPivotFace, TreeNode } from "./MapSidecar"
 import { localToWorld } from "./pivot"
 import { findGroup, idOf, rewriteTree, type Structure, treeKeys } from "./structure"
 import {
+  IDENTITY_QUAT,
   ORIGIN,
   quatBetween,
   quatConjugate,
+  quatDot,
   quatFromAxisAngle,
   quatMul,
   quatNormalize,
@@ -76,8 +78,11 @@ export interface UnitContext {
   readonly transformOf: (key: string) => UeTransform | undefined
   /** An item's own pivot, local and unscaled. */
   readonly localPivotOf: (key: string) => Vec3
-  /** The world-aligned box around items as `transformOf` places them. */
-  readonly boxOf: (keys: ReadonlyArray<string>) => Box | undefined
+  /**
+   * The box around items as `transformOf` places them: square to the world, or with `frame` square to it and in its
+   * coordinates (`placedBoxOf`).
+   */
+  readonly boxOf: (keys: ReadonlyArray<string>, frame?: Quat4) => Box | undefined
   /** A prefab instance's origin as it stands now; undefined for a group that isn't one, or one that was edited. */
   readonly instanceOriginOf: (group: GroupNode) => Vec3 | undefined
   /**
@@ -85,7 +90,53 @@ export interface UnitContext {
    * will move it by for good, a move of them all alike or a landing. Just `world` for the document itself.
    */
   readonly livePointOf: (keys: ReadonlyArray<string>, world: Vec3) => Vec3
+  /**
+   * A group's turn while a live edit has `keys` where they are: it follows what `withCarriedFrames` will turn it by for
+   * good, a rigid motion of them all. Just `rotation` for the document itself.
+   */
+  readonly liveRotationOf: (keys: ReadonlyArray<string>, rotation: Quat4 | undefined) => Quat4 | undefined
 }
+
+/**
+ * A group's frame: its box square to its own turn (`GroupNode.rotation`), as a world centre, that turn, and the box's
+ * half-size along each of its axes. What the group's box is drawn as, its Centre and face pivots sit on, and its gizmo's
+ * Local axes follow.
+ */
+export interface GroupFrame {
+  readonly origin: Vec3
+  readonly rotation: Quat4
+  readonly halfExtents: Vec3
+}
+
+/** `box`, measured in `rotation`'s coordinates (`placedBoxOf` with a frame), as a frame in the world. */
+export const frameOfBox = (box: Box, rotation: Quat4): GroupFrame => ({
+  origin: rotateVec(rotation, boxCentreOf(box)),
+  rotation,
+  halfExtents: vecScale(vecSub(box.max, box.min), 0.5)
+})
+
+/**
+ * The frame of a group with items `keys` and turn `rotation` (absent: the world's axes): the box around them square to
+ * that turn. Undefined when none of them can be measured.
+ */
+export const groupFrameOf = (
+  keys: ReadonlyArray<string>,
+  rotation: Quat4 | undefined,
+  boxOf: UnitContext["boxOf"]
+): GroupFrame | undefined => {
+  const turn = rotation ?? IDENTITY_QUAT
+  const box = boxOf(keys, turn)
+  return box === undefined ? undefined : frameOfBox(box, turn)
+}
+
+/** The eight corners of `frame` in the world; a corner's bits say which side it takes along x, y and z. */
+export const frameCornersOf = ({ halfExtents: h, origin, rotation }: GroupFrame): ReadonlyArray<Vec3> =>
+  [0, 1, 2, 3, 4, 5, 6, 7].map((corner) =>
+    vecAdd(
+      origin,
+      rotateVec(rotation, { x: corner & 1 ? h.x : -h.x, y: corner & 2 ? h.y : -h.y, z: corner & 4 ? h.z : -h.z })
+    )
+  )
 
 const faceOf = (box: Box, face: GroupPivotFace): Vec3 => {
   const c = boxCentreOf(box)
@@ -116,24 +167,33 @@ const itemUnit = (key: string, ctx: UnitContext): Unit | undefined => {
   }
 }
 
-/** The pivot `choice` names for a group, and the axes that go with it; undefined when nothing can be measured. */
+/** A group's frame at `pivot`: its own turn, scale 1. */
+const frameAt = (pivot: Vec3, rotation: Quat4): UeTransform => ({ ...identityTransform(pivot), rotation })
+
+/**
+ * The pivot a group's choice names, and the axes that go with it; undefined when nothing can be measured. Every choice
+ * but Item turns with the group: a face or the Centre sits on its box square to its turn, and the axes are that turn.
+ */
 const groupPivotOf = (
+  group: GroupNode,
   keys: ReadonlyArray<string>,
-  choice: GroupPivot | undefined,
   ctx: UnitContext
 ): Pick<Unit, "pivot" | "transform" | "anchor"> | undefined => {
+  const choice = group.pivot
   if (choice?.choice === "item") {
     const item = keys.includes(choice.key) ? itemUnit(choice.key, ctx) : undefined
     if (item !== undefined) return { pivot: item.pivot, transform: item.transform, anchor: choice.key }
   }
+  const rotation = ctx.liveRotationOf(keys, group.rotation) ?? IDENTITY_QUAT
   if (choice?.choice === "point") {
     const world = ctx.livePointOf(keys, choice.world)
-    return { pivot: world, transform: identityTransform(world) }
+    return { pivot: world, transform: frameAt(world, rotation) }
   }
-  const box = ctx.boxOf(keys)
+  const box = ctx.boxOf(keys, rotation)
   if (box === undefined) return undefined
-  const pivot = choice === undefined || choice.choice === "item" ? boxCentreOf(box) : faceOf(box, choice.choice)
-  return { pivot, transform: identityTransform(pivot) }
+  const local = choice === undefined || choice.choice === "item" ? boxCentreOf(box) : faceOf(box, choice.choice)
+  const pivot = rotateVec(rotation, local)
+  return { pivot, transform: frameAt(pivot, rotation) }
 }
 
 /** The unit a node is; undefined when none of its items can be read. */
@@ -142,7 +202,10 @@ export const unitOf = (node: TreeNode, ctx: UnitContext): Unit | undefined => {
   const keys = treeKeys([node]).filter((key) => ctx.transformOf(key) !== undefined)
   if (keys.length === 0) return undefined
   const origin = ctx.instanceOriginOf(node)
-  if (origin !== undefined) return { id: node.id, keys, pivot: origin, transform: identityTransform(origin) }
+  if (origin !== undefined) {
+    const rotation = ctx.liveRotationOf(keys, node.rotation) ?? IDENTITY_QUAT
+    return { id: node.id, keys, pivot: origin, transform: frameAt(origin, rotation) }
+  }
   if (node.chain === true) {
     const links = node.children.flatMap((child) => unitOf(child, ctx) ?? [])
     const [root] = links
@@ -157,7 +220,7 @@ export const unitOf = (node: TreeNode, ctx: UnitContext): Unit | undefined => {
       ...(root.anchor !== undefined && { anchor: root.anchor })
     }
   }
-  const placed = groupPivotOf(keys, node.pivot, ctx)
+  const placed = groupPivotOf(node, keys, ctx)
   return placed === undefined ? undefined : { id: node.id, keys, ...placed }
 }
 
@@ -201,13 +264,12 @@ export const pathOrder = (points: ReadonlyArray<Vec3>, root = 0): ReadonlyArray<
 export interface SelectionUnits {
   /** In tree order. */
   readonly units: ReadonlyArray<Unit>
-  /** The unit holding the active (last selected) item: where Each puts the gizmo. */
-  readonly active: Unit
   /**
-   * The active item on its own: where Together pivots when the selection is more than one unit, as the game does
-   * (docs/qa/gizmo-scale.md); one whole group pivots on its own pivot.
+   * The unit holding the active (last selected) item: where the gizmo sits and what its axes follow, in Together and
+   * Each alike. For loose items it is the active item, as the game pivots several pieces (docs/qa/gizmo-scale.md); for
+   * a whole group, the group's frame.
    */
-  readonly activeItem: Unit
+  readonly active: Unit
   /**
    * When the entered group is a chain: its links in order, selected or not, so a selected link carries the links after
    * it (§ Chains).
@@ -227,17 +289,16 @@ export const selectionUnitsOf = (
   const units = nodes.flatMap((node) => unitOf(node, ctx) ?? [])
   const activeKey = selectedIds.findLast((id) => ctx.transformOf(id) !== undefined)
   const active = activeKey === undefined ? undefined : units.find((unit) => unit.keys.includes(activeKey))
-  const activeItem = activeKey === undefined ? undefined : itemUnit(activeKey, ctx)
-  if (active === undefined || activeItem === undefined) return undefined
+  if (active === undefined) return undefined
   const entered = enteredGroupId === null ? undefined : findGroup(ctx.tree, enteredGroupId)
-  if (entered?.chain !== true) return { units, active, activeItem }
+  if (entered?.chain !== true) return { units, active }
   const selected = new Set(nodes.map(idOf))
   const chain = entered.children.flatMap((child) => {
     const unit = units.find((u) => u.id === idOf(child))
     return unit ?? unitOf(child, ctx) ?? []
   })
-  if (!chain.some((link) => selected.has(link.id))) return { units, active, activeItem }
-  return { units, active, activeItem, chain, ...(entered.growth !== undefined && { growth: entered.growth }) }
+  if (!chain.some((link) => selected.has(link.id))) return { units, active }
+  return { units, active, chain, ...(entered.growth !== undefined && { growth: entered.growth }) }
 }
 
 /** The items an edit of the selection can reach: its own, and inside an entered chain the links a selected one carries. */
@@ -260,13 +321,11 @@ const passHeadOf = ({ chain, units }: SelectionUnits): Unit | undefined => {
 }
 
 /**
- * The unit an edit by `mode` is measured on, and the gizmo sits on: the active unit in Each, or inside an entered chain
- * the first selected link, which the pass runs from; the game's rule in Together.
+ * The unit an edit by `mode` is measured on, and the gizmo sits on: the active unit, or in Each inside an entered chain
+ * the first selected link, which the pass runs from.
  */
-export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit => {
-  if (effectivePivotMode(mode, selection) === "each") return passHeadOf(selection) ?? selection.active
-  return selection.units.length === 1 ? selection.active : selection.activeItem
-}
+export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit =>
+  effectivePivotMode(mode, selection) === "each" ? passHeadOf(selection) ?? selection.active : selection.active
 
 /**
  * The effective mode: Each needs two or more units, one chain of two or more links, or a link inside an entered chain;
@@ -712,58 +771,90 @@ export const turnAccumulates = (selection: SelectionUnits, mode: PivotMode): boo
 const EPSILON = 1e-6
 const nearVec = (a: Vec3, b: Vec3) =>
   Math.abs(a.x - b.x) < EPSILON && Math.abs(a.y - b.y) < EPSILON && Math.abs(a.z - b.z) < EPSILON
-const sameQuat = (a: Quat4, b: Quat4) =>
-  Math.abs(a.x - b.x) < EPSILON && Math.abs(a.y - b.y) < EPSILON && Math.abs(a.z - b.z) < EPSILON &&
-  Math.abs(a.w - b.w) < EPSILON
+
+/** A rigid motion of a group's items, and where it takes a point. */
+export interface GroupMotion {
+  /** The turn every item took. */
+  readonly rotation: Quat4
+  /** What a point of the world goes to. */
+  readonly point: (world: Vec3) => Vec3
+}
+
+const POSITION_CM = 1e-3
 
 /**
- * How far an edit moved every one of `keys` from `before` to `after`, when it moved them all by one offset with no turn
- * or scale: the one kind of edit a Point pivot follows. Undefined otherwise, or when nothing moved.
+ * The one rigid motion an edit gave every one of `keys` from `before` to `after`: the same turn for each, the same
+ * scale it had, and each place turned and moved alike. Undefined otherwise, or when nothing moved.
  */
-export const commonMoveOf = (
+export const commonMotionOf = (
   keys: ReadonlyArray<string>,
   before: (key: string) => UeTransform | undefined,
   after: (key: string) => UeTransform | undefined
-): Vec3 | undefined => {
-  let offset: Vec3 | undefined
+): GroupMotion | undefined => {
+  let motion: Rigid | undefined
   for (const key of keys) {
     const [from, to] = [before(key), after(key)]
-    if (from === undefined || to === undefined) return undefined
-    if (!sameQuat(from.rotation, to.rotation) || !nearVec(from.scale3D, to.scale3D)) return undefined
-    const d = vecSub(to.translation, from.translation)
-    if (offset === undefined) offset = d
-    else if (!nearVec(offset, d)) return undefined
+    if (from === undefined || to === undefined || !nearVec(from.scale3D, to.scale3D)) return undefined
+    const q = quatNormalize(quatMul(to.rotation, quatConjugate(from.rotation)))
+    const t = vecSub(to.translation, rotateVec(q, from.translation))
+    if (motion === undefined) motion = { q, t }
+    else if (Math.abs(quatDot(q, motion.q)) < 1 - 1e-9 || vecLength(vecSub(t, motion.t)) > POSITION_CM) return undefined
   }
-  return offset === undefined || nearVec(offset, ORIGIN) ? undefined : offset
+  if (motion === undefined) return undefined
+  const { q, t } = motion
+  const turned = Math.abs(1 - Math.abs(q.w)) > 1e-9
+  if (!turned && vecLength(t) < EPSILON) return undefined
+  const rotation = turned ? q : IDENTITY_QUAT
+  return { rotation, point: (world) => vecAdd(rotateVec(rotation, world), t) }
+}
+
+/** `rotation` turned by `by`; absent when that leaves the world's axes, as a group starts. */
+export const turnedBy = (rotation: Quat4 | undefined, by: Quat4): Quat4 | undefined => {
+  const q = quatNormalize(quatMul(by, rotation ?? IDENTITY_QUAT))
+  return Math.abs(1 - Math.abs(q.w)) < 1e-12 ? undefined : q
+}
+
+/** `group` with its turn `rotation`, or none. */
+export const withGroupRotation = (group: GroupNode, rotation: Quat4 | undefined): GroupNode => {
+  if (rotation !== undefined) return { ...group, rotation }
+  if (group.rotation === undefined) return group
+  const { rotation: _dropped, ...rest } = group
+  return rest
 }
 
 /**
- * A Point pivot moves with its group's own moves and is left alone by turns and scales, since it is what they are
- * about (docs/design/pivot-modes-and-chains.md § Group pivot). `after` is an edit about to be committed, and a group
- * whose every item it moved by one offset, with no turn or scale, takes its Point along. `through` says the edit was one
- * motion of the world, a landing or a reflection, and where it takes a point: every item's turn is the motion's and not
- * one about the Point, so a group the edit took whole goes with it. Undefined when no Point moves.
+ * A group's frame rides along with every rigid motion of all its items (docs/design/pivot-modes-and-chains.md § Group
+ * pivot): its turn takes the motion's turn, and a Point pivot goes where the motion takes it. A turn about the Point
+ * leaves it put, since it is what the turn is about; a scale, or an edit of some members only, leaves both alone. `after`
+ * is an edit about to be committed. `through` says the edit was one motion of the world, a landing or a reflection, and
+ * where it takes a point: a group the edit took whole takes its Point there. Undefined when no group changes.
  */
-export const withCarriedPoints = (
+export const withCarriedFrames = (
   structure: Structure,
   before: (key: string) => UeTransform | undefined,
   after: ReadonlyMap<string, UeTransform>,
   through?: (world: Vec3) => Vec3
 ): Structure | undefined => {
-  const moved: Array<string> = []
-  const carried = (keys: ReadonlyArray<string>, world: Vec3): Vec3 | undefined => {
-    if (through !== undefined) return keys.every((key) => after.has(key)) ? through(world) : undefined
-    const offset = commonMoveOf(keys, before, (key) => after.get(key))
-    return offset === undefined ? undefined : vecAdd(world, offset)
-  }
+  const changed: Array<string> = []
   const tree = rewriteTree(structure.tree, (node) => {
-    if (node.kind !== "group" || node.pivot?.choice !== "point") return [node]
-    const world = carried(treeKeys([node]), node.pivot.world)
-    if (world === undefined) return [node]
-    moved.push(node.id)
-    return [{ ...node, pivot: { choice: "point", world } }]
+    if (node.kind !== "group") return [node]
+    const keys = treeKeys([node])
+    const motion = keys.every((key) => after.has(key))
+      ? commonMotionOf(keys, before, (key) => after.get(key))
+      : undefined
+    const whole = through !== undefined && keys.length > 0 && keys.every((key) => after.has(key))
+    const point = node.pivot?.choice !== "point"
+      ? undefined
+      : whole
+      ? through(node.pivot.world)
+      : motion?.point(node.pivot.world)
+    const turned = motion !== undefined && motion.rotation !== IDENTITY_QUAT
+    if (point === undefined && !turned) return [node]
+    changed.push(node.id)
+    const pivoted: GroupNode = point === undefined ? node : { ...node, pivot: { choice: "point", world: point } }
+    return [turned ? withGroupRotation(pivoted, turnedBy(node.rotation, motion.rotation)) : pivoted]
   })
-  return moved.length > 0 ? { ...structure, tree } : undefined
+  return changed.length > 0 ? { ...structure, tree } : undefined
 }
 
 /** A dot to draw at a pivot: where, and whether it sits inside its unit's box, which draws it dotted (#82). */

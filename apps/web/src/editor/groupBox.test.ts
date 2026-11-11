@@ -1,11 +1,16 @@
 import { assert, describe, it } from "@effect/vitest"
+import * as THREE from "three"
+import type { Quat4 } from "../domain/coords"
+import { IDENTITY_QUAT, ORIGIN, rotatorToQuat } from "../domain/ueMath"
+import type { GroupFrame } from "../domain/units"
 import { BRACKET, GroupBox } from "./groupBox"
 import { LINE_WIDTH } from "./screenLines"
 
-/** A box in the game's frame from the origin, `x` by `y` by `z` cm. */
-const boxOf = (x: number, y: number, z: number, at = 0) => ({
-  min: { x: at, y: 0, z: 0 },
-  max: { x: at + x, y, z }
+/** A frame in the game's axes from the origin, `x` by `y` by `z` cm, turned by `rotation`. */
+const boxOf = (x: number, y: number, z: number, at = 0, rotation: Quat4 = IDENTITY_QUAT): GroupFrame => ({
+  origin: { x: at + x / 2, y: y / 2, z: z / 2 },
+  rotation,
+  halfExtents: { x: x / 2, y: y / 2, z: z / 2 }
 })
 
 /** Each bracket's run along its edge, and whether it leaves a corner of `box`. */
@@ -47,10 +52,31 @@ describe("GroupBox", () => {
 
   it("turns the game's frame into the scene's", () => {
     const box = new GroupBox()
-    box.update({ min: { x: 0, y: 100, z: 200 }, max: { x: 10, y: 110, z: 220 } })
+    box.update({ origin: { x: 5, y: 105, z: 210 }, rotation: IDENTITY_QUAT, halfExtents: { x: 5, y: 5, z: 10 } })
     box.geometry.computeBoundingBox()
     assert.deepStrictEqual(box.geometry.boundingBox?.min.toArray(), [0, 200, 100])
     assert.deepStrictEqual(box.geometry.boundingBox?.max.toArray(), [10, 220, 110])
+  })
+
+  it("turns with the group: its edges run along the group's axes, not the world's", () => {
+    const box = new GroupBox()
+    // 200 long along the group's x, turned 90 yaw: it runs along the world's y, the scene's z
+    box.update({
+      origin: ORIGIN,
+      rotation: rotatorToQuat({ roll: 0, pitch: 0, yaw: 90 }),
+      halfExtents: { x: 100, y: 10, z: 10 }
+    })
+    box.geometry.computeBoundingBox()
+    const size = box.geometry.boundingBox?.getSize(new THREE.Vector3()).toArray().map((v) => Math.round(v))
+    assert.deepStrictEqual(size, [20, 20, 200])
+    // turned 45: no edge lies along a world axis any more
+    box.update({
+      origin: ORIGIN,
+      rotation: rotatorToQuat({ roll: 0, pitch: 0, yaw: 45 }),
+      halfExtents: { x: 100, y: 10, z: 10 }
+    })
+    const along = bracketsOf(box).filter(({ run }) => run.length === 1)
+    assert.lengthOf(along, 8, "only the upright edges keep to one world axis")
   })
 
   it("follows its items", () => {

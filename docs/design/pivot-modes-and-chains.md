@@ -35,11 +35,11 @@ Every unit has a pivot point and axes:
 | Unit            | Pivot                                                                  | Axes in Local                                  |
 | --------------- | ---------------------------------------------------------------------- | ---------------------------------------------- |
 | Item            | Its own pivot (`editorState.pivots`), as today                         | Its own rotation                               |
-| Group           | Its group pivot (§ Group pivot); Centre, the bounds centre, by default | Identity, or the anchor item's (§ Group pivot) |
-| Prefab instance | The definition origin (`instanceOrigin`), always                       | Identity                                       |
+| Group           | Its group pivot (§ Group pivot); Centre, the bounds centre, by default | Its own turn, or the anchor item's (§ Group pivot) |
+| Prefab instance | The definition origin (`instanceOrigin`), always                       | Its own turn                                   |
 | Chain           | Its first link's pivot                                                 | Its first link's axes                          |
 
-Together uses one pivot, the active unit's, which is what `selectionPivot` returns now. The gizmo sits there in both modes.
+Together uses one pivot, the active unit's, which is what `selectionPivot` returns. The gizmo sits there in both modes. For loose pieces the active unit is the active item, the game's rule ([qa/gizmo-scale.md](../qa/gizmo-scale.md)); when the active item is in a group whole in the selection, it is that group, so two turned groups move along the active group's axes and turn about its pivot, never one of its members'.
 
 ## The maths, per tool
 
@@ -97,7 +97,7 @@ Numeric fields accept arithmetic with `+`, `-`, `*`, `/`, parentheses and scient
 
 The Transform rows always edit the gizmo's unit: a piece, a whole group, the first selected link inside a chain in Each, or a group selected among pieces. Every unit has the same rows: Location, Rotation, Scale (Factor or Size) and Flip. A unit's Location is its transform's translation: a piece's origin, a group's pivot, or the origin of the member a group pivots on (a chain's first link, an Item pivot). The Pivot section's Position row shows only where the pivot isn't that Location, so a piece's off-origin pivot has one and a group's own frame never does (`shownPivotPoint`). Size needs a unit that takes an item's transform (`Unit.anchor`, `unitExtentOf`): a group's own frame has none, since its items scale along their own axes and the box around turned items doesn't scale by the factor. The Pivot section keeps its choices in place for every selection: item presets only when every selected unit is an item, a group's own when it is selected alone, and otherwise the same grid greyed with why under it (a chain, an instance, a group among pieces).
 
-**Groups and instances.** A whole group is one unit, so it has Transform rows of its own, over its frame: Location is its pivot and a change moves the group; Rotation and Scale read 0 and 1, since a group holds neither, and a value typed there is a change about the pivot, the way the game's panel treats a joined set. With an Item pivot (below) the rows read that item's values, Size included. A group's Paint and Properties sit in the open under its rows, as several loose pieces' do; they edit every member. On an instance the Instance section says that an edit there changes the instance away from its definition, which the unit rows never do: every edit of theirs is about the instance's origin.
+**Groups and instances.** A whole group is one unit, so it has Transform rows of its own, over its frame: Location is its pivot and a change moves the group; Rotation reads the group's own turn (§ Group pivot) and Scale reads 1, since a group holds no scale, and a value typed there is a change about the pivot, the way the game's panel treats a joined set. With an Item pivot (below) the rows read that item's values, Size included. A group's Paint and Properties sit in the open under its rows, as several loose pieces' do; they edit every member. On an instance the Instance section says that an edit there changes the instance away from its definition, which the unit rows never do: every edit of theirs is about the instance's origin.
 
 ## Showing it
 
@@ -114,22 +114,22 @@ How this sits with the open gizmo issues:
 
 ## Group pivot
 
-The game refuses a pivot on a group (`CanSetSelectionPivot` false) but loads a `frame` anywhere, and the frame is where its gizmo sits and what the group turns and scales about. The editor writes the bounds centre and keeps no frame. The choices here:
+The game refuses a pivot on a group (`CanSetSelectionPivot` false) but loads a `frame` anywhere, and the frame is where its gizmo sits and what the group turns and scales about. Its rotation turns with the group: a yaw of 90 takes a frame from 0 to 90 ([qa/groups-prefabs.md](../qa/groups-prefabs.md)). The editor keeps that turn as the group's `rotation`, and its frame (`groupFrameOf`) is the box around the members' bounds square to it, which is the box the viewport draws and the group card measures. The choices here:
 
-| Choice                                | The pivot                                                      | Axes        | After the group turns                          |
-| ------------------------------------- | -------------------------------------------------------------- | ----------- | ---------------------------------------------- |
-| Centre (default)                      | Centre of the box around the members' bounds, as Ctrl+G makes  | Identity    | Recomputed, so the gizmo moves (today's limit) |
-| Bottom, Top, Left, Right, Back, Front | That face of the same box                                      | Identity    | Recomputed                                     |
-| Item                                  | One member's own pivot, chosen in the Outline or the Inspector | That item's | Follows the item, so it stays put              |
-| Point                                 | A world point, stored                                          | Identity    | Stays put: it's the game's frame               |
+| Choice                                | The pivot                                                      | Axes             | After the group turns                     |
+| ------------------------------------- | -------------------------------------------------------------- | ---------------- | ----------------------------------------- |
+| Centre (default)                      | Centre of the frame's box, as Ctrl+G makes                     | The group's turn | Turns with the box, so it stays put       |
+| Bottom, Top, Left, Right, Back, Front | That face of the same box, along the group's own axes          | The group's turn | Turns with the box                        |
+| Item                                  | One member's own pivot, chosen in the Outline or the Inspector | That item's      | Follows the item, so it stays put         |
+| Point                                 | A world point, stored                                          | The group's turn | Rides along with the group's rigid motion |
 
 #225 disables the Pivot section's choices on a whole group, with a hint that a group turns about its frame, and `setSelectionPivot` refuses one. The choice here replaces that disabled state and lifts the refusal: it is the one Pivot section, with a group's choices in place of a piece's.
 
-**Storage.** A `pivot` field on the sidecar's `GroupNode`, optional, absent for Centre: `{ "choice": "Top" }`, `{ "choice": "item", "key": "<stable key>" }` or `{ "choice": "point", "world": { "x", "y", "z" } }`. Not in `editorState.groups`: the game would drop it on save, and the sidecar already holds everything the game can't. The `.balledit` gets the pivot as the group's `frame` translation on every encode, rotation identity and scale 1, so the in-game gizmo sits where the editor's does. The other way, a map with no sidecar whose frame isn't at the bounds centre gets a Point pivot at the frame's translation, which is the one place a frame the game kept can come back in.
+**Storage.** A `pivot` field on the sidecar's `GroupNode`, optional, absent for Centre: `{ "choice": "Top" }`, `{ "choice": "item", "key": "<stable key>" }` or `{ "choice": "point", "world": { "x", "y", "z" } }`. Not in `editorState.groups`: the game would drop it on save, and the sidecar already holds everything the game can't. The turn is a `rotation` field beside it, a unit quaternion, absent for the world's axes. The `.balledit` gets the pivot as the group's `frame` translation on every encode, with the group's turn as its rotation and scale 1, so the in-game gizmo sits and turns where the editor's does. The other way, a map with no sidecar takes a frame's rotation as the group's turn, and a frame that isn't at the centre of the box square to it gets a Point pivot at the frame's translation.
 
-**Should the editor store a frame?** Only as the Point choice, and only when the user asks for it. A frame stored for every group goes stale the moment a member is moved inside the group, and nothing in a re-match after an in-game edit can recover it. Centre stays the default because it follows the members. The gizmo jump after a turn, the known limit from #220, goes away for a group with an Item or Point pivot, and that is the fix I'd offer rather than a hidden frame: "Set pivot here" in the Inspector freezes the current pivot as a Point.
+**What the editor stores of a frame.** The turn, always, and the position only as the Point choice. A stored position goes stale the moment a member moves inside the group, so Centre stays the default because it follows the members. A turn doesn't go stale that way: moving one member leaves the group's axes where they were and the box still fits square to them. It is what makes a turned group keep its box, its face pivots and its Local axes, where a world-aligned box grew and swung about after every turn (#220's gizmo jump).
 
-**Moves.** A Point moves with the group's own moves and is left alone by turns and scales, since it is the pivot. A snapped landing and a mirror are motions of the whole group rather than turns about the Point, so it goes with them, live during a landing's drag. A Point on a group whose members are then moved one at a time stays where the user put it.
+**Moves.** A group's frame rides along with every rigid motion of all its items (`withCarriedFrames`): its turn takes the motion's turn, and a Point goes where the motion takes it. A turn about the Point leaves it put, since it is what the turn is about, and a turn of the group with others about another pivot swings it along. A scale isn't rigid and leaves both alone, and so does an edit of only some members: a Point on a group whose members are then moved one at a time stays where the user put it, and so does its turn. A snapped landing and a mirror are motions of the whole group, so the Point goes with them, live during a landing's drag. A group with one item turns when that item turns. A nested group turns with its parent.
 
 **Prefab instances** don't get the choice. Their pivot is the definition origin, and the Inspector says so where the choice would be. An instance scaled along one axis about any other point stops being a placement of its definition and reads as modified (`checkInstance`), so the one rule that keeps instances intact is to pivot there. In Each, an instance among the units pivots on its origin and stays unmodified. In Together with anything else selected, the shared pivot isn't its origin and a one-axis scale modifies it, as today.
 
@@ -212,7 +212,7 @@ A review of the words the chain feature shows turned up one problem underneath t
 ## Open questions
 
 - **Escaping the carry inside a chain.** A modifier during the drag, or nothing but Unchain? Alt is duplicate and Shift is selection, so a modifier would be new.
-- **Instance axes in Local.** An instance's unit axes are identity here. Its placement rotation is known (`checkInstance`), and using it would make an instance in Local turn about its own axes like a piece. I left it at identity to match today's sole-group gizmo; either is defensible.
+- **Instance axes in Local.** An instance's axes are its group's turn, which a placement starts at the world's axes and every turn of the whole instance adds to. Its placement rotation is known too (`checkInstance`), and would give the same axes for an instance placed square; the turn is kept instead so every group follows one rule.
 - **The game's chain of joins on load.** The driver can't read a saved join because there is none; if a later build saves them, a map with no sidecar could become groups with Item pivots.
 
 ## Decided here, not by the user
@@ -221,7 +221,7 @@ A review of the words the chain feature shows turned up one problem underneath t
 - A whole group has Transform rows over its frame; its items' editor loses theirs.
 - Chains propagate rotation only. Scale and move act per link.
 - A chain's pivot is its first link's; the group pivot choice is hidden on it.
-- Group pivots live in the sidecar only and reach the game as the frame. No frame is stored unless the user picks Point.
+- Group pivots live in the sidecar only and reach the game as the frame. A group's turn is always stored; its position only when the user picks Point.
 - Instances always pivot on the definition origin, in every mode.
 - The setting is store state, not persisted, with a toggle in the axes pill and a keybind.
 - No Join command.
@@ -234,4 +234,4 @@ A review of the words the chain feature shows turned up one problem underneath t
 4. **feat: configurable group pivot.** The sidecar field, the Inspector's choice with Set pivot here, the frame on encode, the Point on import, the instance exception. Done when a turned group's gizmo stays put with an Item or Point pivot, and the in-game gizmo sits where the editor's does.
 5. **feat: chains.** The sidecar flag, Outline rows and menu, rotation down the chain in Each, carry inside an entered chain, Reverse. Done when a five-link chain turned 10 degrees in Each reads 10, 20, 30, 40, 50 on its links and exports as one flat group.
 
-All five landed together in #227, on top of #225's Pivot section and Position row. Of the open questions, the carry inside a chain has no modifier: Unchain is the escape. An instance's axes stay identity.
+All five landed together in #227, on top of #225's Pivot section and Position row. Of the open questions, the carry inside a chain has no modifier: Unchain is the escape. Groups and instances later kept a turn of their own (`GroupNode.rotation`), so an instance's axes are no longer identity.

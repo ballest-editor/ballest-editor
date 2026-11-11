@@ -4,18 +4,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { type ReactNode, useMemo, useState } from "react"
-import type { CatalogIndex } from "../domain/Catalog"
-import type { UeTransform } from "../domain/coords"
 import { counted } from "../domain/groupSelection"
-import { formatBoxSize, placedBoxOf } from "../domain/itemBounds"
+import { formatBoxSize } from "../domain/itemBounds"
 import { itemCountOf } from "../domain/mapDiff"
 import type { Item } from "../domain/MapFile"
 import type { ChainGrowth, GroupNode, PrefabLink } from "../domain/MapSidecar"
 import { isSamePrefab } from "../domain/prefab"
 import { checkInstance } from "../domain/prefabInstance"
-import { growthOf } from "../domain/units"
+import { vecScale } from "../domain/ueMath"
+import { type GroupFrame, growthOf } from "../domain/units"
 import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
-import { useEditor } from "../editor/store"
+import { shownGroupFrame, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
 import { FIELD_LABEL, FieldRow, Identity, IDENTITY_TILE, IdentityBlock, InlineName, Section } from "./InspectorLayout"
 import { NumberField } from "./NumberField"
@@ -36,25 +35,16 @@ function TagsField({ id, owner, tags }: {
 }
 
 /**
- * What kind of group it is, how many items it holds and how much room they take, as shown (live during a drag): the
- * kind of thing in grey under its name, as a piece's category is.
+ * What kind of group it is, how many items it holds and how much room they take along its own axes (`groupFrameOf`), as
+ * shown (live during a drag): the kind of thing in grey under its name, as a piece's category is.
  */
-function groupSummaryOf(
-  group: GroupNode,
-  items: ReadonlyArray<Item>,
-  transforms: ReadonlyArray<UeTransform>,
-  catalogIndex: CatalogIndex | null
-): string {
-  const box = placedBoxOf(
-    items.flatMap((item, i) => {
-      const transform = transforms[i]
-      return transform === undefined ? [] : [{ item, transform }]
-    }),
-    catalogIndex
-  )
+function groupSummaryOf(group: GroupNode, itemCount: number, frame: GroupFrame | undefined): string {
   const kind = group.prefab !== undefined ? "Instance" : group.chain === true ? "Chain" : "Group"
-  const count = group.chain === true ? counted(group.children.length, "link") : itemCountOf(items.length)
-  return [kind, count, ...(box === undefined ? [] : [formatBoxSize(box)])].join(" · ")
+  const count = group.chain === true ? counted(group.children.length, "link") : itemCountOf(itemCount)
+  const size = frame === undefined
+    ? []
+    : [formatBoxSize({ min: vecScale(frame.halfExtents, -1), max: frame.halfExtents })]
+  return [kind, count, ...size].join(" · ")
 }
 
 /** A group's glyph on its identity's tile, as its Outline row draws it. */
@@ -72,22 +62,24 @@ function GroupTile({ group }: { readonly group: GroupNode }) {
 }
 
 /** A selection that is exactly one group: its name, edited in place, what it holds and how big, and its tags. */
-export function GroupIdentity({ group, items, transforms, actions }: {
+export function GroupIdentity({ group, items, actions }: {
   readonly group: GroupNode
-  /** The group's items, with their transforms as shown. */
+  /** The group's items. */
   readonly items: ReadonlyArray<Item>
-  readonly transforms: ReadonlyArray<UeTransform>
   /** The selection's icon buttons. */
   readonly actions: ReactNode
 }) {
   const renameGroup = useEditor((s) => s.renameGroup)
   const catalogIndex = useEditor((s) => s.catalogIndex)
-  const summary = useMemo(() => groupSummaryOf(group, items, transforms, catalogIndex), [
-    group,
-    items,
-    transforms,
-    catalogIndex
+  const doc = useEditor((s) => s.doc)
+  const preview = useEditor((s) => s.preview)
+  const frame = useMemo(() => shownGroupFrame({ doc, preview, catalogIndex }, group.id), [
+    doc,
+    preview,
+    catalogIndex,
+    group.id
   ])
+  const summary = groupSummaryOf(group, items.length, frame)
   return (
     <IdentityBlock>
       <Identity

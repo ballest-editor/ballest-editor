@@ -5,6 +5,7 @@
 import { FileHash, PrefabName, PrefabTier } from "@ballest/contracts"
 import { Schema } from "effect"
 import { SPOT_IDS } from "./connectorSpots"
+import type { Quat4 } from "./coords"
 import { SnapConfig } from "./snapConfig"
 
 /** An item's stable key or a group's id: random and URL-safe. The two share one space, so a tree node has one id. */
@@ -51,6 +52,9 @@ export type GroupPivotFace = (typeof GROUP_PIVOT_FACES)[number]
 
 const WorldPoint = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
 
+/** A group's own turn in the world, a unit quaternion in the game's convention: what its box is square to. */
+const GroupRotation = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite, w: Schema.Finite })
+
 /**
  * Where a group turns and scales, and where its gizmo sits, when that isn't the centre of its items' box (the game's
  * Ctrl+G frame, and the default): a face of that box, one member's own pivot, or a world point the user froze.
@@ -87,6 +91,11 @@ export interface GroupNode {
   readonly children: ReadonlyArray<TreeNode>
   readonly prefab?: PrefabLink
   readonly pivot?: GroupPivot
+  /**
+   * The group's own turn (`groupFrameOf`): its box is square to it, its Centre and face pivots sit on that box, and its
+   * axes are these. A turn of the whole group adds to it. Absent, the world's axes, as Ctrl+G makes a group.
+   */
+  readonly rotation?: Quat4
   /** A chain: its children, in this order, are its links, each hanging off the one before (docs/DESKTOP.md § Chains). */
   readonly chain?: true
   /** A chain's growth; absent on a plain group. */
@@ -105,6 +114,7 @@ const TreeNode: Schema.Codec<TreeNode> = Schema.Union([
     children: Schema.Array(Schema.suspend((): Schema.Codec<TreeNode> => TreeNode)),
     prefab: Schema.optionalKey(PrefabLink),
     pivot: Schema.optionalKey(GroupPivot),
+    rotation: Schema.optionalKey(GroupRotation),
     chain: Schema.optionalKey(Schema.Literal(true)),
     growth: Schema.optionalKey(ChainGrowth)
   })

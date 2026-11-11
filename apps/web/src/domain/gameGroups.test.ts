@@ -6,11 +6,11 @@ import { indexCatalog } from "./Catalog"
 import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
 import { gameGroupNameOf, structureFromGame, withGameGroups } from "./gameGroups"
 import { gameLoadProblems } from "./limits"
-import { type Item, ItemTransform, MapFile } from "./MapFile"
+import { type EditorGroup, type Item, ItemTransform, MapFile } from "./MapFile"
 import type { GroupNode, TreeNode } from "./MapSidecar"
 import { structureOfMap } from "./sidecar"
 import { flatStructure, freshKeys, treeKeys, withGroup } from "./structure"
-import { rotatorToQuat } from "./ueMath"
+import { quatDot, rotatorToQuat } from "./ueMath"
 
 const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
 const decodeFrame = Schema.decodeUnknownSync(ItemTransform)
@@ -34,6 +34,11 @@ const mapWith = (...xs: ReadonlyArray<number>): MapFile => {
   const map = newMapFile({ displayName: "Test", creatorName: "me", createdAt: "" })
   return { ...map, items: [start, ...xs.map((x) => at(x))] }
 }
+
+const withGroupsOf = (map: MapFile, groups: ReadonlyArray<EditorGroup>): MapFile => ({
+  ...map,
+  editorState: { ...defaultEditorState(), groups }
+})
 
 /** Every item index is in at most one group, and each group passes the game's rules. */
 const assertValid = (map: MapFile) => {
@@ -146,6 +151,23 @@ describe("withGameGroups' groups", () => {
       gameGroupsOf(spread, keys, [group("G", item("k1"), item("k2"))], null, () => ({ x: 5, y: 6, z: 7 }))[0]?.frame,
       identityTransform({ x: 5, y: 6, z: 7 })
     )
+  })
+
+  it("turns the frame as the group is turned, so the game's gizmo and panel show the group's turn", () => {
+    const yaw90 = rotatorToQuat({ roll: 0, pitch: 0, yaw: 90 })
+    const tree = [{ ...group("G", item("k1"), item("k2")), rotation: yaw90 }]
+    const [frame] = gameGroupsOf(map, ["k0", "k1", "k2"], tree, null).map((g) => g.frame)
+    const { rotation, scale3D, translation } = decodeFrame(frame)
+    expectVec(translation, { x: 15, y: 0, z: 0 })
+    assert.deepStrictEqual([{ ...rotation }, { ...scale3D }], [yaw90, { x: 1, y: 1, z: 1 }])
+    // and back: the turn comes in as the group's, with no Point, as the frame is at the centre of the box square to it
+    const turned = withGroupsOf(map, [{ members: [1, 2], name: "G", frame }])
+    const back = structureFromGame(turned, ["k0", "k1", "k2"]).tree.find((node) => node.kind === "group")
+    assert.closeTo(back?.kind === "group" && back.rotation !== undefined ? quatDot(back.rotation, yaw90) : 0, 1, 1e-12)
+    assert.isUndefined(back?.kind === "group" ? back.pivot : "no group")
+    // a frame with no turn gives a group with none
+    const plain = structureFromGame(withGroupsOf(map, [{ members: [1, 2], frame: identityTransform() }]), ids).tree
+    assert.isUndefined(plain.find((node) => node.kind === "group")?.rotation)
   })
 
   it("takes the frame's translation at the centre of the members' box", () => {

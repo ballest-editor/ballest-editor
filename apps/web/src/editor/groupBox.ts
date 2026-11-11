@@ -1,6 +1,6 @@
 /**
  * The box around a whole group, so it reads as one unit where its items' outlines (selectionOutline.ts) read as pieces.
- * It is the box a group's frame is the centre of (`domain/itemBounds.ts`), axis-aligned in the scene, marked by its
+ * It is the group's frame (`groupFrameOf`): the box around its items square to the group's own turn, marked by its
  * corners, as brackets, as 3ds Max marks a selection: a whole box would cross the group's items and its neighbours' with
  * lines that belong to neither, and a dashed one means hidden (screenLines.ts). Two looks: a selected group's, in the
  * selection's colour, and the entered group's, thinner and faint in no hue: where the work is, and nothing to act on.
@@ -9,7 +9,8 @@ import * as THREE from "three"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import { ueToThreeVector } from "../domain/coords"
-import type { Box } from "../domain/itemBounds"
+import { quatDot, sameVec } from "../domain/ueMath"
+import { frameCornersOf, type GroupFrame } from "../domain/units"
 import { LINE_WIDTH, lineMaterial } from "./screenLines"
 
 /** The entered group's corners stay in view without competing with what's selected inside it. */
@@ -38,18 +39,16 @@ const EDGES = [
   [3, 7]
 ] as const
 
-const cornerOf = (corner: number, min: THREE.Vector3, max: THREE.Vector3, target: THREE.Vector3) =>
-  target.set(corner & 1 ? max.x : min.x, corner & 2 ? max.y : min.y, corner & 4 ? max.z : min.z)
-
-const next = new THREE.Box3()
-const size = new THREE.Vector3()
 const start = new THREE.Vector3()
 const end = new THREE.Vector3()
 const reach = new THREE.Vector3()
 
+const sameFrame = (a: GroupFrame, b: GroupFrame) =>
+  sameVec(a.origin, b.origin) && sameVec(a.halfExtents, b.halfExtents) && quatDot(a.rotation, b.rotation) === 1
+
 /** One group's corners: put it in the scene, then `update` it each frame. Never raycast. */
 export class GroupBox extends LineSegments2 {
-  private readonly shown = new THREE.Box3()
+  private shown: GroupFrame | undefined
   /** Written in place as the box moves: `setPositions` would leave a GPU buffer behind on every frame of a drag. */
   private readonly ends = new THREE.InstancedInterleavedBuffer(new Float32Array(EDGES.length * 12), 6, 1)
 
@@ -73,25 +72,25 @@ export class GroupBox extends LineSegments2 {
     this.material.opacity = entered ? ENTERED_LOOK.opacity : 1
   }
 
-  /** Fits the corners to `bounds` (none hides them). */
-  update(bounds: Box | undefined): void {
-    this.visible = bounds !== undefined
-    if (bounds === undefined) return
-    const [min, max] = [ueToThreeVector(bounds.min), ueToThreeVector(bounds.max)]
-    next.min.set(min.x, min.y, min.z)
-    next.max.set(max.x, max.y, max.z)
-    if (next.equals(this.shown)) return
-    this.shown.copy(next)
-    this.fit()
+  /** Fits the corners to `frame`, turned as it is (none hides them). */
+  update(frame: GroupFrame | undefined): void {
+    this.visible = frame !== undefined
+    if (frame === undefined || (this.shown !== undefined && sameFrame(frame, this.shown))) return
+    this.shown = frame
+    this.fit(frame)
   }
 
-  private fit(): void {
-    const { min, max } = this.shown
-    const sides = this.shown.getSize(size).toArray().sort((a, b) => a - b)
-    const most = sides[1] * BRACKET.ofMiddle
+  private fit(frame: GroupFrame): void {
+    const corners = frameCornersOf(frame).map((corner) => {
+      const { x, y, z } = ueToThreeVector(corner)
+      return new THREE.Vector3(x, y, z)
+    })
+    const { x, y, z } = frame.halfExtents
+    const sides = [x, y, z].map((half) => 2 * half).sort((a, b) => a - b)
+    const most = (sides[1] ?? 0) * BRACKET.ofMiddle
     EDGES.forEach(([from, to], i) => {
-      cornerOf(from, min, max, start)
-      cornerOf(to, min, max, end)
+      start.copy(corners[from] ?? start)
+      end.copy(corners[to] ?? end)
       const length = start.distanceTo(end)
       const share = length === 0 ? 0 : Math.min(BRACKET.ofEdge, most / length)
       start.toArray(this.ends.array, i * 12)

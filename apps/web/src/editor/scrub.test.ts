@@ -295,7 +295,7 @@ describe("a whole group's Transform rows, over its frame", () => {
     }
   })
 
-  it("turns the group rigidly about its pivot by a typed yaw, and the row reads 0 again", () => {
+  it("turns the group rigidly about its pivot by a typed yaw, which the row then reads as the group's turn", () => {
     const { ids, before, unit } = grouped()
     const pivot = unit().translation
     editSelectionAxis("rotation", "z", { kind: "set", value: 90 })
@@ -310,7 +310,11 @@ describe("a whole group's Transform rows, over its frame", () => {
         id
       )
     }
-    expectVec(readField(unit(), "rotation"), { x: 0, y: 0, z: 0 }, "rotation")
+    expectVec(readField(unit(), "rotation"), { x: 0, y: 0, z: 90 }, "rotation")
+    expectVec(unit().translation, pivot, "the pivot stays, on the box that turned with the group")
+    // typing the value it already holds turns nothing
+    editSelectionAxis("rotation", "z", { kind: "set", value: 90 })
+    expectQuarterTurnAbout(before, pivot)
   })
 
   it("takes a pasted row as the group's new values: a turn to the pasted yaw, a scale by the ratio, a move there", () => {
