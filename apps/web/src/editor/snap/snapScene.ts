@@ -8,6 +8,7 @@ import { endsOf } from "../../domain/connectors"
 import type { Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
 import { placedBoxOf } from "../../domain/itemBounds"
+import type { GroupNode, TreeNode } from "../../domain/MapSidecar"
 import {
   type MeshElements,
   meshElementsOf,
@@ -18,6 +19,9 @@ import {
 } from "../../domain/meshElements"
 import { pivotBoundsOf } from "../../domain/pivot"
 import type { SnapItem, SnapView, SurfaceHit } from "../../domain/snapFrame"
+import { groupSnapItem } from "../../domain/snapGroups"
+import { indexOfKey, treeKeys } from "../../domain/structure"
+import { groupFrameOf } from "../../domain/units"
 import { traverseShown } from "../meshBatches"
 import type { PaneCamera } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
@@ -132,9 +136,36 @@ const snapItemsWhere = (
   })
 }
 
+/** Every group under `nodes`, outer before inner. */
+const groupsUnder = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<GroupNode> =>
+  nodes.flatMap((node) => node.kind === "group" ? [node, ...groupsUnder(node.children)] : [])
+
+/**
+ * The map's groups as targets, each its frame's box (docs/SNAPPING.md § Groups): around all its items, hidden ones too,
+ * as it is drawn. None for a group with something of `except` in it, whose box moves with the drag, or with nothing of it
+ * drawn.
+ */
+const snapGroupsOf = (
+  s: Pick<EditorState, "doc" | "catalogIndex" | "isolation">,
+  except: ReadonlySet<string>
+): ReadonlyArray<SnapItem> => {
+  const shown = shownOf(s)
+  const names = nodeNamesOf(s)
+  return groupsUnder(s.doc.structure.tree).flatMap((group): ReadonlyArray<SnapItem> => {
+    const keys = treeKeys(group.children)
+    if (keys.some((key) => except.has(key)) || !keys.some(shown)) return []
+    const placed = keys.flatMap((key) => {
+      const item = s.doc.map.items[indexOfKey(s.doc.ids, key)]
+      return item === undefined ? [] : [{ item, transform: editTransform(item) }]
+    })
+    const frame = groupFrameOf(keys, group.rotation, (_, turn) => placedBoxOf(placed, s.catalogIndex, turn))
+    return frame === undefined ? [] : [groupSnapItem(group.id, names.get(group.id)?.name ?? "a group", frame)]
+  })
+}
+
 /**
  * What's drawn in the map but for `except`, as targets: a hidden item, or one an isolation leaves out, isn't one, and a
- * locked one is (docs/DESKTOP.md § Hide, isolate and lock).
+ * locked one is (docs/DESKTOP.md § Hide, isolate and lock). The groups come after the items.
  */
 export const snapItemsOf = (
   s: Pick<EditorState, "doc" | "catalogIndex" | "isolation">,
@@ -142,7 +173,7 @@ export const snapItemsOf = (
   sharpAngle: number
 ): ReadonlyArray<SnapItem> => {
   const shown = shownOf(s)
-  return snapItemsWhere(s, (key) => !except.has(key) && shown(key), sharpAngle)
+  return [...snapItemsWhere(s, (key) => !except.has(key) && shown(key), sharpAngle), ...snapGroupsOf(s, except)]
 }
 
 /** The items `keys` as `snapItemsOf` has a target, for what measures the selection's own shape. */

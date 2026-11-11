@@ -25,11 +25,23 @@ import { snapMarks } from "./snapMarks"
 import { snapCasts, snapItemsOf } from "./snapScene"
 import { snapViewOf } from "./snapView"
 
-/** Targets are worked out once for the document in view: a drag asks on every event, and it can't change under one. */
-let targets: { readonly doc: Doc; readonly items: ReadonlyArray<SnapItem> } | undefined
+/**
+ * Targets are worked out once for what's in view: a drag asks on every event, and they can't change under one. The
+ * document, its isolation and the sharp edge angle say what that is.
+ */
+let targets:
+  | {
+    readonly doc: Doc
+    readonly isolation: EditorState["isolation"]
+    readonly sharpAngle: number
+    readonly items: ReadonlyArray<SnapItem>
+  }
+  | undefined
 
 const targetsOf = (s: EditorState, sharpAngle: number) => {
-  if (targets?.doc !== s.doc) targets = { doc: s.doc, items: snapItemsOf(s, new Set(), sharpAngle) }
+  if (targets?.doc !== s.doc || targets.isolation !== s.isolation || targets.sharpAngle !== sharpAngle) {
+    targets = { doc: s.doc, isolation: s.isolation, sharpAngle, items: snapItemsOf(s, new Set(), sharpAngle) }
+  }
   return targets.items
 }
 

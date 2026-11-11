@@ -4,12 +4,13 @@ import type { Vec3 } from "./coords"
 import type { Box } from "./itemBounds"
 import { defaultSnapConfig, type SnapConfig, type SnapTarget, withPreset, withTargetMoved } from "./snapConfig"
 import type { BasePoint, SnapFrame, SnapHit, SnapItem, TrackedPoint } from "./snapFrame"
+import { groupSnapItem } from "./snapGroups"
 import { defaultSnapPrefs } from "./snapPrefs"
 import { cornersOf, shownMarks } from "./snapRelation"
 import { moveOf, resolveDrag, resolveSnap } from "./snapResolve"
 import { meshHits, nearEndsOf } from "./snapTargets"
 import { selectionBases } from "./snapTools"
-import { IDENTITY_QUAT, ORIGIN, vecDot, vecSub } from "./ueMath"
+import { IDENTITY_QUAT, ORIGIN, quatFromAxisAngle, rotateVec, vecDot, vecSub } from "./ueMath"
 
 const on = (config: SnapConfig, ...targets: ReadonlyArray<SnapTarget>): SnapConfig => {
   const turned = <T extends { readonly enabled: boolean }>(name: SnapTarget, target: T): T => ({
@@ -499,6 +500,46 @@ describe("the Mesh target under a move's constraint", () => {
     assert.notInclude(labels(offered(meshed, surface)), "Face of Cube")
     assert.deepStrictEqual(labels(offered(unloaded, line)), ["Face of Cube", "Middle of Cube"])
     assert.include(labels(offered(unloaded, plane)), "Center of a face of Cube")
+  })
+
+  describe("a group", () => {
+    /** A group's box 100 cm a side about `at`, turned by `yaw` degrees. */
+    const groupAt = (yaw = 0) =>
+      groupSnapItem("g", "Group", {
+        origin: at,
+        rotation: quatFromAxisAngle({ x: 0, y: 0, z: 1 }, yaw * Math.PI / 180),
+        halfExtents: { x: 50, y: 50, z: 50 }
+      })
+    const surface = { kind: "surface", normal: { x: 0, y: 0, z: 1 } } as const
+
+    it("offers its box's faces and middle along a line, as a piece offers its bounds", () => {
+      assert.deepStrictEqual(labels(offered(groupAt(), line)), ["Face of Group", "Middle of Group"])
+      assert.include(labels(offered(groupAt(), plane)), "Center of a face of Group")
+    })
+
+    it("offers its corners and face centres to a free drag, and no face in the air under the pointer", () => {
+      const labelled = labels(offered(groupAt(), surface))
+      assert.includeMembers(labelled, ["Corner of Group", "Center of a face of Group"])
+      assert.notInclude(labelled, "Face of Group")
+    })
+
+    it("turns its faces with its frame", () => {
+      const along = rotateVec(quatFromAxisAngle({ x: 0, y: 0, z: 1 }, Math.PI / 6), X)
+      const turned = { kind: "line", direction: along } as const
+      const hits = offered(groupAt(30), turned)
+      assert.deepStrictEqual(labels(hits), ["Face of Group", "Middle of Group"])
+      const stops = hits.map(({ landing }) => vecDot(vecSub(landing, at), along)).toSorted((a, b) => a - b)
+      assert.deepStrictEqual(stops.map(Math.round), [-50, 0, 50])
+      assert.deepStrictEqual(labels(offered(groupAt(30), line)), [], "no face of the turned box stands across X")
+    })
+
+    it("has a world-aligned box around its turned one, for Alignment", () => {
+      const { box } = groupAt(45)
+      const half = 50 * Math.SQRT2
+      assert.closeTo(box.max.x - at.x, half, 1e-9)
+      assert.closeTo(at.y - box.min.y, half, 1e-9)
+      assert.closeTo(box.max.z - at.z, 50, 1e-9)
+    })
   })
 
   it("leaves the faces and the centres to their own toggles, by what stands in", () => {

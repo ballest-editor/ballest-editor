@@ -146,7 +146,7 @@ export interface SnapHit {
   readonly parts?: ReadonlyArray<SnapHit>
 }
 
-/** An item that isn't being moved, as a target. */
+/** An item that isn't being moved, or a group with nothing of it moving, as a target. */
 export interface SnapItem {
   readonly key: string
   /** What the label calls it: "Track L". */
@@ -161,6 +161,11 @@ export interface SnapItem {
   readonly mesh: () => WorldMesh | undefined
   /** Only the flat faces of `mesh`, for what would otherwise place the rest of it for nothing. */
   readonly faces: () => ReadonlyArray<MeshFace> | undefined
+  /**
+   * It is a group's box (`domain/snapGroups.ts`), which has no face under the pointer: in the air over what the group
+   * holds, it would catch every drag across the group.
+   */
+  readonly group?: true
 }
 
 /** A face under the pointer, from the renderer. */
