@@ -91,7 +91,12 @@ import type { PaintPicker } from "../domain/Paint"
 import { localToWorld, type Pivot, pivotAt } from "../domain/pivot"
 import { documentOrigin, isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/prefab"
 import type { PrefabFile } from "../domain/PrefabFile"
-import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
+import {
+  instanceOrigin,
+  type PrefabDefinition,
+  withRecordedOverrides,
+  withUpdatedInstance
+} from "../domain/prefabInstance"
 import type { RecoveredTab } from "../domain/recovery"
 import { repeatCopies, repeatOffsets, type RepeatOptions, repeatProblem } from "../domain/repeat"
 import { defaultSettings, type Settings } from "../domain/Settings"
@@ -1160,19 +1165,22 @@ const FLAG_STEPS: Readonly<Record<ItemFlag, readonly [string, string, string]>> 
 export const useEditor = create<EditorState>()((set, get) => {
   /**
    * Push `before` (by default the current doc and selection) onto the undo stack and replace
-   * the doc; clears the redo stack.
+   * the doc; clears the redo stack. What the edit changed of a prefab instance's members is
+   * recorded on its link as overrides.
    */
-  const commit = (doc: Doc, extra: Partial<EditorState> = {}, before?: DocState, description?: string) =>
-    set((s) =>
-      noTabOpen(s) ? s : ({
+  const commit = (edited: Doc, extra: Partial<EditorState> = {}, before?: DocState, description?: string) =>
+    set((s) => {
+      if (noTabOpen(s)) return s
+      const doc = withRecordedOverrides((before ?? s).doc, edited)
+      return {
         ...extra,
         doc,
         enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
         ...stepFrom(s.past, before ?? s, extra.selectedIds ?? s.selectedIds, false, description),
         dirty: true,
         editedAt: new Date().toISOString()
-      })
-    )
+      }
+    })
 
   /**
    * Document indices of the selected items that can be copied, in selection order. A map has

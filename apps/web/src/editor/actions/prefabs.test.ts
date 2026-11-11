@@ -131,6 +131,15 @@ const moveItem = (key: string, by: number) => {
   s().transformItems(new Map([[key, { ...t, translation: { ...t.translation, x: t.translation.x + by } }]]))
 }
 
+/**
+ * Edits an item's property, which isn't one of the overrides an instance keeps (docs/DESKTOP.md § Prefabs), so an
+ * instance holding it no longer follows its definition.
+ */
+const editProperty = (key: string) => {
+  s().select([key])
+  s().setSelectionProperties([{ property: { list: "floatProperties", name: "Strength", type: "Float" }, value: 2 }])
+}
+
 const moveAll = (id: string, by: number) => {
   const { doc } = s()
   s().transformItems(
@@ -290,6 +299,50 @@ describe("instances following their definition", () => {
       })
     ))
 
+  it.effect("keeps a member's paint, move and hiding as overrides, in the sidecar too, and still follows", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        const id = yield* placed
+        const [a = "", b = ""] = treeKeys([instance(id)!])
+        const materialOf = (key: string) =>
+          s().doc.map.items[s().doc.ids.indexOf(key)]?.meshComponents[0]?.materials[0]?.material
+        // as the Paint tool does it
+        s().beginPaintStroke()
+        s().paintSlots([{ id: b, component: 0, slot: 0, material: "/Game/A/MI_Red.MI_Red" }])
+        s().endPaintStroke()
+        const red = materialOf(b)
+        moveItem(a, 250)
+        const wasA = xOf(a)
+        const wasB = xOf(b)
+        s().setItemFlag([a], "hidden", true)
+        const overrides = [{ member: 0, transform: true, hidden: true }, { member: 1, paint: true }] as const
+        assert.deepStrictEqual(instance(id)?.prefab?.overrides, overrides)
+
+        // the definition moves both items, the first of which this instance moved itself
+        disk.files.set(
+          userPrefabFile("Bridge"),
+          changedPrefab((json) => {
+            json.items[0]!.transform.location = [-1500, 0, -250.5]
+            json.items[1]!.transform.location[0] = 1500.25
+          })
+        )
+        yield* checkPrefabs
+
+        assert.strictEqual(instance(id)?.prefab?.hash, hashOf(USER))
+        assert.lengthOf(notices("prefabInstancesEdited"), 0)
+        assert.closeTo(xOf(a), wasA, 1e-6)
+        assert.closeTo(xOf(b), wasB + 500, 0.01)
+        assert.strictEqual(materialOf(b), red)
+        assert.isTrue(s().doc.structure.items.get(a)?.hidden)
+        assert.deepStrictEqual(instance(id)?.prefab?.overrides, overrides)
+
+        yield* saveMapFile
+        const node = decodeSidecar(disk.files.get(sidecarFile(MAP))).tree.find((n) => n.kind === "group")
+        assert.deepStrictEqual(node?.kind === "group" ? node.prefab?.overrides : undefined, overrides)
+      })
+    ))
+
   it.effect("is one undo step, which a later look doesn't take back", () =>
     withDisk((disk) =>
       Effect.gen(function*() {
@@ -312,7 +365,7 @@ describe("instances following their definition", () => {
         yield* started(disk)
         const id = yield* placed
         const [key = ""] = treeKeys([instance(id)!])
-        moveItem(key, 250)
+        editProperty(key)
         const was = xOf(key)
         const oldHash = instance(id)?.prefab?.hash
         disk.files.set(userPrefabFile("Bridge"), edited(-1500))
@@ -475,7 +528,7 @@ describe("a definition's tab", () => {
       Effect.gen(function*() {
         yield* started(disk)
         const { key } = yield* placedFirst
-        moveItem(key, 100)
+        editProperty(key)
         yield* openDefinition
         moveItem(s().doc.ids[0] ?? "", 300)
         yield* saveMapFile

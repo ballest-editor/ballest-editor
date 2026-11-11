@@ -33,6 +33,18 @@ export class SidecarItem extends Schema.Opaque<SidecarItem>()(
 ) {}
 
 /**
+ * What an instance changed of one of its members, which an Update keeps (docs/DESKTOP.md § Prefabs): its transform, its
+ * paint (its meshes' materials and its surface) and whether it is hidden. `member` is its place in the definition.
+ */
+export const MemberOverride = Schema.Struct({
+  member: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  transform: Schema.optionalKey(Schema.Literal(true)),
+  paint: Schema.optionalKey(Schema.Literal(true)),
+  hidden: Schema.optionalKey(Schema.Literal(true))
+})
+export type MemberOverride = typeof MemberOverride.Type
+
+/**
  * What makes a group a prefab instance: the definition it was placed from. `items` is what each of those items was, in
  * the definition's frame and document order (`signatureOf`), which is how an instance is told from an edited one once
  * the definition has moved on.
@@ -42,7 +54,9 @@ export const PrefabLink = Schema.Struct({
   name: PrefabName,
   /** The SHA-256 of the definition's file when this was placed or last updated. */
   hash: FileHash,
-  items: Schema.Array(Schema.String)
+  items: Schema.Array(Schema.String),
+  /** The members this instance changed, by place in the definition; absent with none. */
+  overrides: Schema.optionalKey(Schema.Array(MemberOverride))
 })
 export type PrefabLink = typeof PrefabLink.Type
 

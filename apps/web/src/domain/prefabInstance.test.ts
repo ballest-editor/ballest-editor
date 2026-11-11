@@ -17,6 +17,7 @@ import {
   instanceOrigin,
   instancesIn,
   instancesOfPrefab,
+  withRecordedOverrides,
   withUpdatedInstance
 } from "./prefabInstance"
 import {
@@ -271,6 +272,120 @@ describe("updating an instance", () => {
 
   it("answers undefined for a group that isn't an instance", () => {
     assert.isUndefined(withUpdatedInstance(placedDoc(), "nothing", definition))
+  })
+})
+
+const RED = "/Game/A/MI_Red.MI_Red"
+
+/** `doc` with the instance's member `n` painted. */
+const painted = (doc: Doc, n: number): Doc => {
+  const index = doc.ids.indexOf(instanceKeys(doc)[n]!)
+  return {
+    ...doc,
+    map: Option.getOrThrow(setSlotMaterials(doc.map, [{ index, component: 0, slot: 0, material: RED }]))
+  }
+}
+
+/** `doc` with the instance's member `n` hidden, or shown. */
+const hidden = (doc: Doc, n: number, on = true): Doc => {
+  const key = instanceKeys(doc)[n]!
+  const items = new Map(doc.structure.items)
+  if (on) items.set(key, { hidden: true })
+  else items.delete(key)
+  return { ...doc, structure: { ...doc.structure, items } }
+}
+
+/** One edit, as the store commits it. */
+const edit = (doc: Doc, change: (doc: Doc) => Doc) => withRecordedOverrides(doc, change(doc))
+
+const materialOf = (doc: Doc, n: number) =>
+  doc.map.items[doc.ids.indexOf(instanceKeys(doc)[n]!)]?.meshComponents[0]?.materials[0]?.material
+const xOfMember = (doc: Doc, n: number) =>
+  doc.map.items[doc.ids.indexOf(instanceKeys(doc)[n]!)]?.itemTransform.translation.x ?? NaN
+
+describe("an instance's overrides", () => {
+  it("records a member's paint, and the instance still follows its definition", () => {
+    const doc = edit(placedDoc(), (d) => painted(d, 0))
+    assert.deepStrictEqual(groupOf(doc).prefab?.overrides, [{ member: 0, paint: true }])
+    assert.isTrue(check(doc).unmodified)
+    expectVec(instanceOrigin(doc, groupOf(doc), groupOf(doc).prefab!)!, FRAME, 2)
+  })
+
+  it("records the member that moved on its own, whichever it is, and not a move of the whole instance", () => {
+    for (const n of [0, 1]) {
+      const doc = edit(placedDoc(), (d) => moved(d, instanceKeys(d)[n]!, 500))
+      assert.deepStrictEqual(groupOf(doc).prefab?.overrides, [{ member: n, transform: true }])
+      assert.isTrue(check(doc).unmodified)
+      expectVec(instanceOrigin(doc, groupOf(doc), groupOf(doc).prefab!)!, FRAME, 2)
+    }
+    const whole = edit(
+      placedDoc(),
+      (d) => withDelta(d, { kind: "rotate", rotation: rotatorToQuat({ pitch: 0, yaw: 40, roll: 0 }) })
+    )
+    assert.isUndefined(groupOf(whole).prefab?.overrides)
+    // the overridden member goes along with the rest, and stays its own
+    const once = edit(placedDoc(), (d) => moved(d, instanceKeys(d)[1]!, 500))
+    const twice = edit(once, (d) => withDelta(d, { kind: "translate", offset: { x: 0, y: 300, z: 0 } }))
+    assert.deepStrictEqual(groupOf(twice).prefab?.overrides, [{ member: 1, transform: true }])
+    assert.isTrue(check(twice).unmodified)
+  })
+
+  it("records the members a scale along one axis about another point leaves out of line", () => {
+    // as with a loose piece active in the selection
+    const doc = edit(placedDoc(), (d) => withDelta(d, { kind: "scale", factor: 2, axis: "y" }, { x: 0, y: 5000, z: 0 }))
+    assert.isNotEmpty(groupOf(doc).prefab?.overrides ?? [])
+    assert.isTrue(check(doc).unmodified)
+  })
+
+  it("records a hidden member, and drops that once it's shown again", () => {
+    const doc = edit(placedDoc(), (d) => hidden(d, 1))
+    assert.deepStrictEqual(groupOf(doc).prefab?.overrides, [{ member: 1, hidden: true }])
+    assert.isUndefined(groupOf(edit(doc, (d) => hidden(d, 1, false))).prefab?.overrides)
+  })
+
+  it("leaves an instance the edit placed or relinked alone, and one with a member gone", () => {
+    const placed = placedDoc()
+    const bare: Doc = { ...placed, structure: { ...placed.structure, tree: [] } }
+    assert.strictEqual(groupOf(withRecordedOverrides(bare, painted(placed, 0))).prefab, definition.link)
+    const relinked = withPrefabLink(placed.structure, GROUP, { ...definition.link })!
+    const after = withRecordedOverrides(placed, painted({ ...placed, structure: relinked }, 0))
+    assert.isUndefined(groupOf(after).prefab?.overrides)
+  })
+
+  it("keeps paint, moves and hiding through an Update, and the rest follows the definition", () => {
+    const placed = withDelta(placedDoc(), { kind: "translate", offset: { x: 100, y: 0, z: 0 } })
+    const doc = edit(
+      edit(edit(placed, (d) => painted(d, 1)), (d) => moved(d, instanceKeys(d)[0]!, 500)),
+      (d) => hidden(d, 0)
+    )
+    const firstAt = xOfMember(doc, 0)
+    const updated = withUpdatedInstance(doc, GROUP, nextDefinition)!
+    const link = groupOf(updated).prefab!
+    assert.strictEqual(link.hash, NEW_HASH)
+    assert.deepStrictEqual(link.overrides, [{ member: 0, transform: true, hidden: true }, { member: 1, paint: true }])
+    assert.closeTo(xOfMember(updated, 0), firstAt, 1e-6)
+    // the second member's new place in the definition, with its paint
+    assert.closeTo(xOfMember(updated, 1), FRAME.x + 100 + 2000, 0.01)
+    assert.strictEqual(materialOf(updated, 1), materialOf(doc, 1))
+    assert.isTrue(updated.structure.items.get(instanceKeys(updated)[0]!)?.hidden)
+    // the member the definition gained stands where the instance puts it
+    assert.closeTo(xOfMember(updated, 2), FRAME.x + 100 + 2000, 0.01)
+    assert.isTrue(check(updated).unmodified)
+    // and once more, with nothing new
+    const again = withUpdatedInstance(updated, GROUP, nextDefinition)!
+    assert.closeTo(xOfMember(again, 0), firstAt, 1e-6)
+    assert.strictEqual(materialOf(again, 1), materialOf(doc, 1))
+  })
+
+  it("drops the overrides of a member that gives way to another class", () => {
+    const doc = edit(placedDoc(), (d) => painted(d, 1))
+    const cylinder = "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/" +
+      "BP_Prim_Cylinder.BP_Prim_Cylinder_C"
+    const other = changedPrefab((json) => void (json.items[1]!.class = cylinder))
+    const swapped = definitionOf(decode(other), { tier: "user", name: "Bridge", hash: NEW_HASH }, catalog)
+    const updated = withUpdatedInstance(doc, GROUP, swapped)!
+    assert.notStrictEqual(instanceKeys(updated)[1], instanceKeys(doc)[1])
+    assert.isUndefined(groupOf(updated).prefab?.overrides)
   })
 })
 
