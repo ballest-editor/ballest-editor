@@ -13,7 +13,7 @@ import { type Doc, gameMapOf, type OpenFile, type ProjectMap, tabStateOf, useEdi
 import { ASK_FIRST, writeToGame } from "./gameWrite"
 import { nameProjectEffect } from "./maps"
 import { cacheMapThumbnail } from "./mapThumbnails"
-import { savePrefabTab } from "./prefabs"
+import { isUntitledPrefab, prefabTabSaveable, savePrefabTab } from "./prefabs"
 import { run } from "./run"
 import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeProjectMap, writeSidecarOf } from "./shared"
 
@@ -109,22 +109,20 @@ const gameFileNameOf = (doc: Doc) => {
 }
 
 /**
- * Opens the `saveAs` dialog to name the open map; `then` runs once the dialog has saved it, and not after its Cancel.
- * The one place that names a map before going on.
+ * Opens `id`, the `saveAs` dialog for the open map or `namePrefab` for a new prefab, to name it; `then` runs once the
+ * dialog has saved it, and not after its Cancel. The one place that names a document before going on.
  */
-const nameFirst = <E, R>(then: Effect.Effect<void, E, R>) =>
+const nameFirst = <E, R>(then: Effect.Effect<void, E, R>, id: "saveAs" | "namePrefab" = "saveAs") =>
   Effect.gen(function*() {
     // It runs later, from the dialog: it takes its services along.
-    useEditor.getState().openDialog({
-      id: "saveAs",
-      afterSave: Effect.provideContext(then, yield* Effect.context<R>())
-    })
+    useEditor.getState().openDialog({ id, afterSave: Effect.provideContext(then, yield* Effect.context<R>()) })
   })
 
 /**
  * Save, then `then`: on desktop, writes the project file and asks nothing (a map that has no file yet is named first,
  * in the `saveAs` dialog, and `then` waits for it). In a browser, downloads it, asking for the name first unless it
- * is the file's. Export on save exports what was written, unless the save is `stepOfGameWrite`.
+ * is the file's. A new prefab is named first too, in the `namePrefab` dialog, once it has the items to save. Export on
+ * save exports what was written, unless the save is `stepOfGameWrite`.
  */
 export const saveOpenMapThen = <E, R>(
   then: Effect.Effect<void, E, R>,
@@ -134,6 +132,10 @@ export const saveOpenMapThen = <E, R>(
     const platform = yield* Platform
     const { doc, document, file } = useEditor.getState()
     if (document.kind === "prefab") {
+      if (isUntitledPrefab(useEditor.getState())) {
+        yield* prefabTabSaveable
+        return yield* nameFirst(then, "namePrefab")
+      }
       yield* savePrefabTab
       return yield* then
     }

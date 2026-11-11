@@ -428,6 +428,7 @@ export interface ImportClash {
  * - `replacePublished`, `syncConflict` and `importClash` ask about what Export, Play or Import found.
  * - `whereToOpen` asks whether `target` (shown as `name`) takes over this window or opens in a new one.
  * - `savePrefab` names a prefab made from the selection; `renamePrefab` and `deletePrefab` are the Prefabs panel's.
+ * - `namePrefab` names a new prefab at its first Save, as `saveAs` names a new map, with the same `afterSave`.
  * - `recoverUnsaved` offers `tabs`, what the last session left unsaved (docs/DESKTOP.md § Recovery).
  */
 export type DialogState =
@@ -453,6 +454,7 @@ export type DialogState =
   | { readonly id: "importClash" } & ImportClash
   | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
   | { readonly id: "savePrefab" }
+  | { readonly id: "namePrefab"; readonly afterSave?: Effect.Effect<void, unknown> }
   | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
   | { readonly id: "recoverUnsaved"; readonly tabs: ReadonlyArray<RecoveredTab> }
 export type Dialog = DialogState["id"]
