@@ -111,6 +111,10 @@ The selection's own stations (§ Snap base) pair like with like, as Alignment do
 
 Nothing hides a station, as it isn't something the pointer picks by sight: a piece moved inside another still stops on its faces. On a plane handle a face of the selection only stops along the axis it is a face of, and stations reached on both axes hold together as Alignment's do: the move lands where their planes cross, with no Rotate to face, and leaving one's range frees that axis only. A station on one axis and an alignment on the other hold together the same way, whichever of Mesh and Alignment comes first in the list, so a piece can touch one neighbour and line up its centre with another in one landing.
 
+##### Groups
+
+A group is a target as well as its items: the box the viewport draws for it, square to its own turn (`groupFrameOf`), standing in as a piece's bounds do until its mesh has loaded (`domain/snapGroups.ts`). A constrained move stops at its faces across the move and at the middle between them, a turn and a scale stop at its faces, Alignment lines up with the sides and centre of the world-aligned box around it, and a free drag lands on its corners and the centres of its faces, each under the toggle a piece's bounds use. A free drag gets no face of the box under the pointer: in the air over what the group holds, it would catch every drag across the group. The box is around all the group's items, hidden ones too, though a hidden piece is never a target itself; a group with nothing of it drawn isn't one. Nor is a group with any of what's moving in it, as its box moves with the drag. The label names it as the Outline does: "Middle of Group".
+
 #### Construction
 
 Planes and axes that are part of the map's sidecar and never of the map (#92). They are made from a face, from three points, from a world axis or plane, or from another plane with an offset and an angle. They draw as a finite tinted square or a line, with a name.

@@ -290,7 +290,7 @@ const edgeHits = (
   })
 }
 
-/** Faces under the base: the renderer's for a mesh, and a box's own for an item whose mesh hasn't loaded. */
+/** Faces under the base: the renderer's for a mesh, and the box of an item whose mesh hasn't loaded, never a group's. */
 const faceHits = (
   frame: SnapFrame,
   { base, reference }: { readonly base: BasePoint; readonly reference: ScreenPoint },
@@ -305,7 +305,7 @@ const faceHits = (
       : [{ ...faceHit(frame, base, surface.point, surface.normal, surface.corners, surface.item), frontmost: true }]),
     ...(elements.boundsFaces
       ? near.flatMap((item) => {
-        const box = item.mesh() === undefined ? boundsOf(item) : undefined
+        const box = item.mesh() === undefined && item.group !== true ? boundsOf(item) : undefined
         const under = box === undefined ? undefined : boundsFaceUnder(box.faces, ray)
         return under === undefined
           ? []
