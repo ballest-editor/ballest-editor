@@ -182,8 +182,10 @@ import type {
 import {
   type ChainMode,
   type ChainShape,
-  commonMoveOf,
+  commonMotionOf,
   effectivePivotMode,
+  type GroupFrame,
+  groupFrameOf,
   isChainSelection,
   layChain,
   pathOrder,
@@ -195,10 +197,11 @@ import {
   reachableKeys,
   type SelectionUnits,
   selectionUnitsOf,
+  turnedBy,
   type Unit,
   type UnitContext,
   unitOf,
-  withCarriedPoints
+  withCarriedFrames
 } from "../domain/units"
 import { areaDragging } from "./areaDrag"
 import type { GizmoSpace } from "./gizmo/handles"
@@ -267,7 +270,7 @@ export interface TransformOptions {
   /** A connector snap brought ends together: record them as joints. */
   readonly connected?: boolean
   readonly description?: string | undefined
-  /** The move took a target's rotation too, which a Point pivot follows as it wouldn't a turn (`withCarriedPoints`). */
+  /** The move took a target's rotation too, which a group's frame follows (`withCarriedFrames`). */
   readonly landing?: RigidDelta | undefined
   /** The edit reflected what it took in this plane, and a Point pivot goes with it. */
   readonly reflection?: MirrorPlane | undefined
@@ -1105,7 +1108,7 @@ const withMovedItems = (
   catalog: CatalogIndex | null
 ): Doc => {
   const { landing, reflection } = options ?? {}
-  const structure = withCarriedPoints(
+  const structure = withCarriedFrames(
     doc.structure,
     (id) => {
       const item = doc.map.items[indexOfKey(doc.ids, id)]
@@ -2385,18 +2388,29 @@ export const nextSelection = (current: Selection, ids: ReadonlyArray<string>, mo
 export const areaCandidates = (s: Pick<EditorState, "doc" | "enteredGroupId" | "isolation">): ReadonlyArray<string> =>
   selectableKeys(s.doc.structure.tree, s.enteredGroupId).filter(pickableOf(s))
 
-/** The box around the items at `keys` where they show, which is ahead of the document during a continuous edit. */
-export const groupBoxOf = (
+/**
+ * Group `id`'s frame (`groupFrameOf`) where its items show, which is ahead of the document during a continuous edit:
+ * its box square to its turn, which a live turn of the whole group turns too (`withCarriedFrames`).
+ */
+export const shownGroupFrame = (
   { catalogIndex, doc, preview }: Pick<EditorState, "catalogIndex" | "doc" | "preview">,
-  keys: ReadonlyArray<string>
-) =>
-  placedBoxOf(
-    keys.flatMap((key) => {
-      const item = doc.map.items[indexOfKey(doc.ids, key)]
-      return item === undefined ? [] : [{ item, transform: preview?.get(key) ?? editTransform(item) }]
-    }),
-    catalogIndex
-  )
+  id: string
+): GroupFrame | undefined => {
+  const group = findGroup(doc.structure.tree, id)
+  if (group === undefined) return undefined
+  const keys = treeKeys([group])
+  const placed = new Map(keys.flatMap((key) => {
+    const item = doc.map.items[indexOfKey(doc.ids, key)]
+    if (item === undefined) return []
+    const before = editTransform(item)
+    return [[key, { item, before, transform: preview?.get(key) ?? before }] as const]
+  }))
+  const motion = preview === null
+    ? undefined
+    : commonMotionOf(keys, (key) => placed.get(key)?.before, (key) => placed.get(key)?.transform)
+  const rotation = motion === undefined ? group.rotation : turnedBy(group.rotation, motion.rotation)
+  return groupFrameOf(keys, rotation, (_, frame) => placedBoxOf([...placed.values()], catalogIndex, frame))
+}
 
 /** Document indices of the selected items, in selection order. */
 export const selectedIndices = (s: Pick<EditorState, "doc" | "selectedIds">): Array<number> =>
@@ -2494,14 +2508,15 @@ const unitContext = (s: EditorState, transformOf: (id: string) => UeTransform | 
   tree: s.doc.structure.tree,
   transformOf,
   localPivotOf: (id) => pivotOf(s, id).localPosition,
-  boxOf: (keys) =>
+  boxOf: (keys, frame) =>
     placedBoxOf(
       keys.flatMap((id) => {
         const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
         const transform = transformOf(id)
         return item === undefined || transform === undefined ? [] : [{ item, transform }]
       }),
-      s.catalogIndex
+      s.catalogIndex,
+      frame
     ),
   // An instance's origin is the document's, carried along by a live move of its items.
   instanceOriginOf: (group) => {
@@ -2518,11 +2533,11 @@ const unitContext = (s: EditorState, transformOf: (id: string) => UeTransform | 
   livePointOf: (keys, world) => {
     const landing = liveLandingOf(s, transformOf, keys)
     if (landing !== undefined) return landedPoint(world, landing)
-    const offset = commonMoveOf(keys, (id) => {
-      const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
-      return item === undefined ? undefined : editTransform(item)
-    }, transformOf)
-    return offset === undefined ? world : vecAdd(world, offset)
+    return commonMotionOf(keys, (id) => docTransformOf(s, id), transformOf)?.point(world) ?? world
+  },
+  liveRotationOf: (keys, rotation) => {
+    const motion = commonMotionOf(keys, (id) => docTransformOf(s, id), transformOf)
+    return motion === undefined ? rotation : turnedBy(rotation, motion.rotation)
   }
 })
 
@@ -2551,7 +2566,7 @@ export const selectionUnits = (
   transformOf: (id: string) => UeTransform | undefined
 ): SelectionUnits | undefined => selectionUnitsOf(s.selectedIds, s.enteredGroupId, unitContext(s, transformOf))
 
-/** Whether the selection as shown is a chain on its own, which follows the chain setting (`isChainSelection`). */
+/** Whether the selection as shown is links inside an entered chain, which follow the chain setting (`isChainSelection`). */
 export const isShownChain = (s: EditorState): boolean => {
   const selection = selectionUnits(s, (id) => shownTransform(s, id))
   return selection !== undefined && isChainSelection(selection)
@@ -2606,8 +2621,10 @@ export const shownChainStart = (s: EditorState): ChainStartSpec | undefined =>
 
 const chainStartFor = perState((s): ChainStartSpec | undefined => {
   const selection = selectionUnits(s, (id) => shownTransform(s, id))
-  if (selection === undefined || !isChainSelection(selection)) return undefined
-  const at = (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot
+  if (selection === undefined) return undefined
+  const [first, second] = selection.units
+  const whole = second === undefined && (first?.links?.length ?? 0) >= 2 ? first?.links : undefined
+  const at = (selection.chain ?? whole)?.[0]?.pivot
   if (at === undefined) return undefined
   const pivot = pivotUnitOf(selection, pivotModeFor(s, selection)).pivot
   const transforming = s.tool === "translate" || s.tool === "rotate" || s.tool === "scale"

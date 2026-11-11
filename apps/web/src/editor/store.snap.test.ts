@@ -1,7 +1,7 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { identityTransform } from "../domain/factory"
-import type { RigidDelta } from "../domain/groupTransform"
+import { applyGroupDelta, type RigidDelta } from "../domain/groupTransform"
 import type { GroupPivot } from "../domain/MapSidecar"
 import { PrefabFile } from "../domain/PrefabFile"
 import { defaultSettings } from "../domain/Settings"
@@ -382,10 +382,13 @@ describe("a snapped commit on a group with a Point pivot", () => {
       assert.deepStrictEqual(pivotOfGroup(id), POINT)
     })
 
-    it("is said by the landing and not by the turn, which leaves the Point where it is", () => {
+    it("is said by the landing and not by a turn about the Point, which leaves it where it is", () => {
       const { b, c } = joinedGroup()
       useEditor.getState().select([b, c])
-      previewMove(preview(b, c), { kind: "rotate", rotation: landing.rotation })
+      const turn = { kind: "rotate", rotation: landing.rotation } as const
+      const s = useEditor.getState()
+      const turned = new Map([b, c].map((k) => [k, applyGroupDelta(shownTransform(s, k)!, POINT.world, turn)]))
+      previewMove(turned, turn)
       assertVec(livePivot() ?? ORIGIN, POINT.world, "a turn is about it")
       previewMove(preview(b, c), landing)
       previewMove(preview(b, c), { kind: "translate", offset: ORIGIN })

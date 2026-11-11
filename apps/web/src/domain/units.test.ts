@@ -25,6 +25,7 @@ import {
   quatToRotator,
   rotateVec,
   rotatorToQuat,
+  vecAdd,
   vecDot,
   vecLength,
   vecSub
@@ -37,6 +38,8 @@ import {
   type ChainShape,
   deltaEdit,
   effectivePivotMode,
+  frameCornersOf,
+  groupFrameOf,
   isChainSelection,
   layChain,
   leadingKeys,
@@ -51,7 +54,7 @@ import {
   type UnitContext,
   type UnitEdit,
   unitOf,
-  withCarriedPoints
+  withCarriedFrames
 } from "./units"
 
 /** A cube `half` cm each way of its origin, like the game's primitive cube at scale 1 is 500. */
@@ -81,13 +84,19 @@ const contextOf = (
   tree,
   transformOf: (key) => transforms.get(key),
   localPivotOf: (key) => pivots.get(key) ?? ORIGIN,
-  boxOf: (keys): Box | undefined => {
+  boxOf: (keys, frame): Box | undefined => {
     let box: Box | undefined
+    const into = frame === undefined ? undefined : quatConjugate(frame)
     for (const key of keys) {
       const t = transforms.get(key)
       if (t === undefined) continue
       const corners = [-HALF, HALF].flatMap((x) =>
-        [-HALF, HALF].flatMap((y) => [-HALF, HALF].map((z) => localToWorld(t, { x, y, z })))
+        [-HALF, HALF].flatMap((y) =>
+          [-HALF, HALF].map((z) => {
+            const world = localToWorld(t, { x, y, z })
+            return into === undefined ? world : rotateVec(into, world)
+          })
+        )
       )
       for (const c of corners) {
         box = box === undefined ? { min: c, max: c } : {
@@ -99,7 +108,8 @@ const contextOf = (
     return box
   },
   instanceOriginOf: () => undefined,
-  livePointOf: (_, world) => world
+  livePointOf: (_, world) => world,
+  liveRotationOf: (_, rotation) => rotation
 })
 
 const yawOf = (t: UeTransform) => quatToRotator(t.rotation).yaw
@@ -123,10 +133,9 @@ describe("units of a selection", () => {
     assertVec(sel.units[1]!.pivot, { x: 3000, y: 0, z: 0 }, "g's centre")
     // the last selected item is c, inside g
     assert.strictEqual(sel.active.id, "g")
-    assert.strictEqual(sel.activeItem.id, "c")
   })
 
-  it("holds Together with fewer than two units, and pivots Together on the active item, as the game does", () => {
+  it("holds Together with fewer than two units, and pivots Together on the active unit", () => {
     const tree = [item("a"), group("g", [item("b"), item("c")])]
     const ctx = contextOf(tree, transforms)
     const one = selectionUnitsOf(["b", "c"], null, ctx)!
@@ -134,7 +143,9 @@ describe("units of a selection", () => {
     assert.strictEqual(pivotUnitOf(one, "each").id, "g", "one whole group pivots on itself")
     const two = selectionUnitsOf(["a", "b", "c"], null, ctx)!
     assert.strictEqual(effectivePivotMode("each", two), "each")
-    assert.strictEqual(pivotUnitOf(two, "together").id, "c", "the active item, not its group")
+    assert.strictEqual(pivotUnitOf(two, "together").id, "g", "the active item's group, whole")
+    const loose = selectionUnitsOf(["b", "c", "a"], null, ctx)!
+    assert.strictEqual(pivotUnitOf(loose, "together").id, "a", "a loose active item, as the game pivots pieces")
     assert.strictEqual(pivotUnitOf(two, "each").id, "g")
   })
 
@@ -260,13 +271,28 @@ describe("chains", () => {
   const transforms = new Map(links.map((key, i) => [key, at(i * 1000)]))
   const chain = group("chain", links.map(item), { chain: true })
 
-  it("turns each link by the angle about its own moved pivot in Each, so the turns accumulate down the chain", () => {
+  it("turns a whole chain beside another unit as one thing in Each, rigidly about its first link", () => {
     const withX = selectionUnitsOf(
       [...links, "x"],
       null,
       contextOf([chain, item("x")], new Map([...transforms, ["x", at(9000)]]))
     )!
     const out = applyUnitEdit(withX, "each", new Map([...transforms, ["x", at(9000)]]), deltaEdit(turn(10)))
+    links.forEach((key, i) => {
+      assert.closeTo(yawOf(out.get(key)!), 10, 1e-6, key)
+      assertVec(out.get(key)!.translation, swung({ x: i * 1000, y: 0, z: 0 }, ORIGIN, 10), key)
+    })
+    // the loose piece turns 10 about itself
+    assert.closeTo(yawOf(out.get("x")!), 10, 1e-6)
+  })
+
+  it("turns each link by the angle about its own moved pivot inside an entered chain, so the turns accumulate", () => {
+    const out = applyUnitEdit(
+      selectionUnitsOf(links, "chain", contextOf([chain], transforms))!,
+      "each",
+      transforms,
+      deltaEdit(turn(10))
+    )
     links.forEach((key, i) => assert.closeTo(yawOf(out.get(key)!), 10 * (i + 1), 1e-6, `${key} reads ${10 * (i + 1)}`))
     // link 2 swung about link 1's pivot by 10, then turned 10 more about its own moved pivot (which doesn't move it)
     assertVec(out.get("l2")!.translation, swung({ x: 1000, y: 0, z: 0 }, ORIGIN, 10), "link 2 carried by link 1")
@@ -277,16 +303,12 @@ describe("chains", () => {
       swung(swung({ x: 2000, y: 0, z: 0 }, ORIGIN, 10), l2, 10),
       "link 3 carried twice"
     )
-    // the loose piece turns 10 about itself
-    assert.closeTo(yawOf(out.get("x")!), 10, 1e-6)
   })
 
-  it("bends a chain selected whole in Each, on its own, and turns it rigidly about its first link in Together", () => {
+  it("holds a whole chain alone at Together, and turns it rigidly about its first link", () => {
     const sel = selectionUnitsOf(links, null, contextOf([chain], transforms))!
-    assert.strictEqual(effectivePivotMode("each", sel), "each", "a chain alone bends")
-    const bent = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
-    links.forEach((key, i) => assert.closeTo(yawOf(bent.get(key)!), 10 * (i + 1), 1e-6, key))
-    const rigid = applyUnitEdit(sel, "together", transforms, deltaEdit(turn(10)))
+    assert.strictEqual(effectivePivotMode("each", sel), "together", "a whole chain is one thing")
+    const rigid = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
     links.forEach((key, i) => {
       assert.closeTo(yawOf(rigid.get(key)!), 10, 1e-6)
       assertVec(rigid.get(key)!.translation, swung({ x: i * 1000, y: 0, z: 0 }, ORIGIN, 10), key)
@@ -316,16 +338,17 @@ describe("chains", () => {
     assert.closeTo(yawOf(out.get("l5")!), 90, 1e-6, "carried rigidly, so turned with it")
   })
 
-  it("lets the chain setting decide a chain on its own, and the pivot setting anything else", () => {
+  it("lets the chain setting decide links inside an entered chain, and the pivot setting anything else", () => {
     const ctx = contextOf([chain, item("x")], new Map([...transforms, ["x", at(9000)]]))
     const linksFirst = { pivotMode: "together", chainMode: "links" } as const
     const rigidEach = { pivotMode: "each", chainMode: "rigid" } as const
     const whole = selectionUnitsOf(links, null, ctx)!
     const inside = selectionUnitsOf(["l3"], "chain", ctx)!
     const mixed = selectionUnitsOf([...links, "x"], null, ctx)!
-    assert.deepStrictEqual([whole, inside, mixed].map(isChainSelection), [true, true, false])
-    assert.strictEqual(pivotModeFor(linksFirst, whole), "each")
-    assert.strictEqual(pivotModeFor(rigidEach, whole), "together")
+    assert.deepStrictEqual([whole, inside, mixed].map(isChainSelection), [false, true, false])
+    // a whole chain follows the pivot setting, and alone it is one unit, so Together
+    assert.strictEqual(pivotModeFor(linksFirst, whole), "together")
+    assert.strictEqual(effectivePivotMode(pivotModeFor(rigidEach, whole), whole), "together")
     assert.strictEqual(pivotModeFor(linksFirst, mixed), "together")
     assert.strictEqual(pivotModeFor(rigidEach, mixed), "each")
     // one link selected inside an entered chain bends from it to the end
@@ -358,7 +381,7 @@ describe("chains", () => {
     assert.deepStrictEqual(links.map((key) => across.get(key)?.translation.y), [undefined, 100, 200, 300, 400])
     // grown: linear 100% moves them 50, 100, 150, 200, 250 more than the one before
     const grown = group("chain", links.map(item), { chain: true, growth: { curve: "linear", percent: 100 } })
-    const whole = selectionUnitsOf(links, null, contextOf([grown], transforms))!
+    const whole = selectionUnitsOf(links, "chain", contextOf([grown], transforms))!
     const spaced = applyUnitEdit(
       whole,
       "each",
@@ -369,7 +392,7 @@ describe("chains", () => {
   })
 
   it("opens every joint of a curve along itself when the drag is along the first link", () => {
-    const sel = (t: ReadonlyMap<string, UeTransform>) => selectionUnitsOf(links, null, contextOf([chain], t))!
+    const sel = (t: ReadonlyMap<string, UeTransform>) => selectionUnitsOf(links, "chain", contextOf([chain], t))!
     const arc = new Map([...transforms, ...applyUnitEdit(sel(transforms), "each", transforms, deltaEdit(turn(40)))])
     // along the first link's own X, as the gizmo in Local shows it
     const offset = rotateVec(arc.get("l1")!.rotation, { x: 50, y: 0, z: 0 })
@@ -384,7 +407,7 @@ describe("chains", () => {
 
   it("stacks links piled on one pivot along the drag", () => {
     const pile = new Map(links.map((key) => [key, at(0)]))
-    const sel = selectionUnitsOf(links, null, contextOf([chain], pile))!
+    const sel = selectionUnitsOf(links, "chain", contextOf([chain], pile))!
     const up = applyUnitEdit(sel, "each", pile, deltaEdit({ kind: "translate", offset: { x: 0, y: 0, z: 100 } }))
     assert.deepStrictEqual(links.map((key) => up.get(key)!.translation.z), [100, 200, 300, 400, 500])
     assert.deepStrictEqual(links.map((key) => up.get(key)!.translation.x), [0, 0, 0, 0, 0])
@@ -394,7 +417,7 @@ describe("chains", () => {
     const whole = (growth?: ChainGrowth) =>
       selectionUnitsOf(
         links,
-        null,
+        "chain",
         contextOf(
           [group("chain", links.map(item), { chain: true, ...(growth !== undefined && { growth }) })],
           transforms
@@ -411,7 +434,7 @@ describe("chains", () => {
     assert.deepStrictEqual(xs(tapered), [0, 2000, 6000, 14000, 30000])
     // across a bent chain, each step grows along its own link
     const arc = new Map([...transforms, ...applyUnitEdit(whole(), "each", transforms, deltaEdit(turn(90)))])
-    const bent = applyUnitEdit(selectionUnitsOf(links, null, contextOf([chain], arc))!, "each", arc, double)
+    const bent = applyUnitEdit(selectionUnitsOf(links, "chain", contextOf([chain], arc))!, "each", arc, double)
     for (const [from, to] of [["l1", "l2"], ["l2", "l3"]] as const) {
       const step = vecSub(bent.get(to)!.translation, bent.get(from)!.translation)
       assert.closeTo(vecLength(step), 2000, 1e-6, `${from} to ${to}`)
@@ -423,7 +446,7 @@ describe("chains", () => {
     const keys = ["g1", "g2", "g3"]
     const turned = new Map(keys.map((key, i) => [`${key}i`, at(i * 1000, 0, 0, 90)]))
     const tree = [group("chain", keys.map((key) => group(key, [item(`${key}i`)])), { chain: true })]
-    const sel = selectionUnitsOf(keys.map((key) => `${key}i`), null, contextOf(tree, turned))!
+    const sel = selectionUnitsOf(keys.map((key) => `${key}i`), "chain", contextOf(tree, turned))!
     const out = applyUnitEdit(sel, "each", turned, deltaEdit({ kind: "scale", factor: 2, axis: "x" }))
     keys.forEach((key, i) => {
       assert.closeTo(out.get(`${key}i`)!.scale3D.x, 2, 1e-9, key)
@@ -507,7 +530,11 @@ describe("chains", () => {
 
   it("grows each link's turn by the chain's growth: by a share of the first turn, or compounding", () => {
     const sel = (growth: ChainGrowth) =>
-      selectionUnitsOf(links, null, contextOf([group("chain", links.map(item), { chain: true, growth })], transforms))!
+      selectionUnitsOf(
+        links,
+        "chain",
+        contextOf([group("chain", links.map(item), { chain: true, growth })], transforms)
+      )!
     const yaws = (growth: ChainGrowth) => {
       const out = applyUnitEdit(sel(growth), "each", transforms, deltaEdit(turn(10)))
       return links.map((key) => yawOf(out.get(key)!))
@@ -672,10 +699,10 @@ describe("a snapped drag under the setting", () => {
     assert.deepStrictEqual(leadingKeys(selectionUnitsOf(["l2"], "chain", chainContext)!, "together"), ["l2"])
   })
 
-  it("is led in Each by a chain's first link, the one link that takes the edit as dragged", () => {
+  it("is led in Each by a whole chain, one thing, and inside an entered chain by the first selected link", () => {
     const whole = selectionUnitsOf(["x", ...links], null, chainContext)!
-    assert.deepStrictEqual(leadingKeys(whole, "each"), ["l1"], "the active unit is the chain")
-    assert.deepStrictEqual(movedAlikeKeys(whole, "each"), ["l1", "x"], "a loose piece moves as dragged too")
+    assert.deepStrictEqual(leadingKeys(whole, "each"), [...links], "the active unit is the chain, whole")
+    assert.deepStrictEqual(movedAlikeKeys(whole, "each"), [...links, "x"], "a loose piece moves as dragged too")
     assert.deepStrictEqual(movedAlikeKeys(whole, "together"), [...links, "x"])
     const entered = selectionUnitsOf(["l3", "l2"], "chain", chainContext)!
     assert.deepStrictEqual(leadingKeys(entered, "each"), ["l2"], "the first selected inside the chain")
@@ -684,7 +711,7 @@ describe("a snapped drag under the setting", () => {
 
   it("knows when a turn goes past the angle dragged: only as it runs down a chain in Each", () => {
     const chainActive = selectionUnitsOf(["x", ...links], null, chainContext)!
-    assert.isTrue(turnAccumulates(chainActive, "each"), "the active unit is the chain")
+    assert.isFalse(turnAccumulates(chainActive, "each"), "a whole chain turns rigidly")
     assert.isFalse(turnAccumulates(chainActive, "together"))
     assert.isFalse(
       turnAccumulates(selectionUnitsOf([...links, "x"], null, chainContext)!, "each"),
@@ -705,7 +732,7 @@ describe("pivot dots and Point pivots", () => {
     assert.deepStrictEqual(each.map((d) => [d.id, d.inside]), [["a", true], ["b", false]])
   })
 
-  it("carries a Point with a move of every item in its group, and not with a turn or a partial move", () => {
+  it("carries a Point with a rigid motion of every item in its group, and not with a scale or a partial move", () => {
     const structure: Structure = {
       tree: [group("g", [item("a"), item("b")], { pivot: { choice: "point", world: { x: 1, y: 2, z: 3 } } })],
       items: new Map()
@@ -717,15 +744,22 @@ describe("pivot dots and Point pivots", () => {
           [k, t]
         ) => [k, { ...t, translation: { x: t.translation.x + offset.x, y: offset.y, z: offset.z } }])
       )
-    const moved = withCarriedPoints(structure, (k) => before.get(k), by({ x: 10, y: 20, z: 30 }))
-    const pivot = moved?.tree[0]?.kind === "group" ? moved.tree[0].pivot : undefined
-    assert.deepStrictEqual(pivot, { choice: "point", world: { x: 11, y: 22, z: 33 } })
-    const turned = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, turn(90))]))
-    assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), turned))
-    assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), new Map([["a", at(10)]])))
+    const pointOf = (s: Structure | undefined) => {
+      const pivot = s?.tree[0]?.kind === "group" ? s.tree[0].pivot : undefined
+      return pivot?.choice === "point" ? pivot.world : undefined
+    }
+    const moved = withCarriedFrames(structure, (k) => before.get(k), by({ x: 10, y: 20, z: 30 }))
+    assert.deepStrictEqual(pointOf(moved), { x: 11, y: 22, z: 33 })
+    const aboutPoint = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, { x: 1, y: 2, z: 3 }, turn(90))]))
+    assertVec(pointOf(withCarriedFrames(structure, (k) => before.get(k), aboutPoint))!, { x: 1, y: 2, z: 3 }, "kept")
+    const elsewhere = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, turn(90))]))
+    assertVec(pointOf(withCarriedFrames(structure, (k) => before.get(k), elsewhere))!, { x: -2, y: 1, z: 3 }, "swung")
+    const scaled = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, { kind: "scale", factor: 2 })]))
+    assert.isUndefined(withCarriedFrames(structure, (k) => before.get(k), scaled))
+    assert.isUndefined(withCarriedFrames(structure, (k) => before.get(k), new Map([["a", at(10)]])))
   })
 
-  it("takes a Point along a landing that turns its group too, which it wouldn't a turn alone", () => {
+  it("takes a Point along a landing that turns its group too", () => {
     const structure: Structure = {
       tree: [group("g", [item("a"), item("b")], { pivot: { choice: "point", world: { x: 100, y: 0, z: 0 } } })],
       items: new Map()
@@ -734,13 +768,18 @@ describe("pivot dots and Point pivots", () => {
     const landing: RigidDelta = { kind: "rigid", rotation: yawed(90), about: ORIGIN, offset: { x: 0, y: 0, z: 50 } }
     const after = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, landing)]))
     const through = (world: Vec3) => landedPoint(world, landing)
-    const landed = withCarriedPoints(structure, (k) => before.get(k), after, through)
-    const pivot = landed?.tree[0]?.kind === "group" ? landed.tree[0].pivot : undefined
-    assert.strictEqual(pivot?.choice, "point")
-    if (pivot?.choice === "point") assertVec(pivot.world, { x: 0, y: 100, z: 50 }, "the Point lands with the group")
-    assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), after), "as a turn, it stays")
+    for (
+      const landed of [
+        withCarriedFrames(structure, (k) => before.get(k), after, through),
+        withCarriedFrames(structure, (k) => before.get(k), after)
+      ]
+    ) {
+      const pivot = landed?.tree[0]?.kind === "group" ? landed.tree[0].pivot : undefined
+      assert.strictEqual(pivot?.choice, "point")
+      if (pivot?.choice === "point") assertVec(pivot.world, { x: 0, y: 100, z: 50 }, "the Point lands with the group")
+    }
     const part = new Map([["a", applyGroupDelta(at(0), ORIGIN, landing)]])
-    assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), part, through), "part of its group")
+    assert.isUndefined(withCarriedFrames(structure, (k) => before.get(k), part, through), "part of its group")
   })
 
   it("reads a rotator offset about a unit's own axis for the Inspector", () => {
@@ -765,5 +804,115 @@ describe("a unit's anchor", () => {
   it("is none for a group's own frame, at its pivot", () => {
     assert.isUndefined(anchorOf(group("g", [item("a"), item("b")])))
     assert.isUndefined(anchorOf(group("g", [item("a"), item("b")], { pivot: { choice: "Top" } })))
+  })
+})
+
+describe("a group's frame", () => {
+  /** Two cubes 2000 apart along `yaw`, each turned `yaw`: a pair laid along x, then turned as a whole about the origin. */
+  const pair = (yaw: number) =>
+    new Map([["a", at(0, 0, 0, yaw)], ["b", {
+      ...at(0, 0, 0, yaw),
+      translation: rotateVec(yawed(yaw), { x: 2000, y: 0, z: 0 })
+    }]])
+  const turnedPair = group("g", [item("a"), item("b")], { rotation: yawed(45) })
+
+  it("is the box square to the group's turn, as a world centre, that turn and half-sizes", () => {
+    const transforms = pair(45)
+    const ctx = contextOf([turnedPair], transforms)
+    const frame = groupFrameOf(["a", "b"], yawed(45), ctx.boxOf)!
+    assertVec(frame.origin, rotateVec(yawed(45), { x: 1000, y: 0, z: 0 }), "centre")
+    assertVec(frame.halfExtents, { x: 1500, y: HALF, z: HALF }, "as tight as before the turn")
+    assert.deepStrictEqual(frame.rotation, yawed(45))
+    const square = groupFrameOf(["a", "b"], undefined, ctx.boxOf)!
+    assert.isAbove(square.halfExtents.y, 1000, "square to the world it would grow")
+    assert.deepStrictEqual(square.rotation, { x: 0, y: 0, z: 0, w: 1 })
+    assert.lengthOf(frameCornersOf(frame), 8)
+    assertVec(
+      frameCornersOf(frame)[7]!,
+      vecAdd(frame.origin, rotateVec(yawed(45), { x: 1500, y: HALF, z: HALF })),
+      "max"
+    )
+  })
+
+  it("puts a turned group's Centre and faces on that box, with the group's axes", () => {
+    const transforms = pair(45)
+    const unitWith = (pivot?: GroupNode["pivot"]) =>
+      unitOf({ ...turnedPair, ...(pivot !== undefined && { pivot }) }, contextOf([turnedPair], transforms))!
+    const centre = rotateVec(yawed(45), { x: 1000, y: 0, z: 0 })
+    assertVec(unitWith().pivot, centre, "centre")
+    assert.deepStrictEqual(unitWith().transform.rotation, yawed(45), "the group's axes")
+    assertVec(unitWith({ choice: "Front" }).pivot, rotateVec(yawed(45), { x: -HALF, y: 0, z: 0 }), "front, along its x")
+    assertVec(unitWith({ choice: "Right" }).pivot, rotateVec(yawed(45), { x: 1000, y: HALF, z: 0 }), "right, its y")
+    assertVec(unitWith({ choice: "Top" }).pivot, vecAdd(centre, { x: 0, y: 0, z: HALF }), "top")
+    assert.deepStrictEqual(unitWith({ choice: "point", world: ORIGIN }).transform.rotation, yawed(45), "a Point too")
+    assert.deepStrictEqual(
+      unitWith({ choice: "item", key: "b" }).transform,
+      transforms.get("b"),
+      "an Item keeps its own"
+    )
+  })
+
+  it("turns with a turn of every item in the group, and keeps to the world's axes otherwise", () => {
+    const structure: Structure = { tree: [group("g", [item("a"), item("b")])], items: new Map() }
+    const before = pair(0)
+    const turnOf = (s: Structure | undefined) => s?.tree[0]?.kind === "group" ? s.tree[0].rotation : undefined
+    const turned = applyDelta(
+      selectionUnitsOf(["a", "b"], null, contextOf(structure.tree, before))!,
+      "together",
+      before,
+      turn(30)
+    )
+    const once = withCarriedFrames(structure, (k) => before.get(k), turned)
+    assert.closeTo(quatDot(turnOf(once)!, yawed(30)), 1, 1e-9)
+    // and back: the world's axes are no turn at all
+    const back = new Map([...turned].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, turn(-30))]))
+    assert.isUndefined(turnOf(withCarriedFrames(once!, (k) => turned.get(k), back)))
+    // a move leaves the turn as it is; each item about its own pivot isn't one turn of the group
+    const moved = new Map(
+      [...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, { kind: "translate", offset: { x: 5, y: 0, z: 0 } })])
+    )
+    assert.isUndefined(withCarriedFrames(structure, (k) => before.get(k), moved))
+    const each = applyUnitEdit(
+      selectionUnitsOf(["a", "b"], "g", contextOf(structure.tree, before))!,
+      "each",
+      before,
+      deltaEdit(turn(30))
+    )
+    assert.isUndefined(withCarriedFrames(structure, (k) => before.get(k), each))
+  })
+
+  it("turns a nested group with its parent", () => {
+    const structure: Structure = {
+      tree: [group("outer", [group("inner", [item("a")], { rotation: yawed(10) }), item("b")])],
+      items: new Map()
+    }
+    const before = pair(0)
+    const after = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, turn(20))]))
+    const [outer] = withCarriedFrames(structure, (k) => before.get(k), after)!.tree
+    const inner = outer?.kind === "group" ? outer.children[0] : undefined
+    assert.closeTo(Math.abs(quatDot(outer?.kind === "group" ? outer.rotation! : yawed(0), yawed(20))), 1, 1e-9)
+    assert.closeTo(Math.abs(quatDot(inner?.kind === "group" ? inner.rotation! : yawed(0), yawed(30))), 1, 1e-9)
+  })
+
+  it("moves each of two turned groups along its own axes in Local Each, and Together along the active group's", () => {
+    const tree = [
+      group("g", [item("a")], { rotation: yawed(90) }),
+      group("h", [item("b")], { rotation: yawed(0) })
+    ]
+    const transforms = new Map([["a", at(0)], ["b", at(5000)]])
+    const sel = selectionUnitsOf(["b", "a"], null, contextOf(tree, transforms))!
+    assert.strictEqual(sel.active.id, "g")
+    // a move of 100 along the gizmo's local x, which shows the active group's axes
+    const local: GroupDelta = {
+      kind: "translate",
+      offset: rotateVec(yawed(90), { x: 100, y: 0, z: 0 }),
+      frame: yawed(90)
+    }
+    const each = applyDelta(sel, "each", transforms, local)
+    assertVec(each.get("a")!.translation, { x: 0, y: 100, z: 0 }, "g along its x, the world's y")
+    assertVec(each.get("b")!.translation, { x: 5100, y: 0, z: 0 }, "h along its own x")
+    assert.deepStrictEqual(pivotUnitOf(sel, "together").transform.rotation, yawed(90), "Together: the active group's")
+    const together = applyDelta(sel, "together", transforms, local)
+    assertVec(together.get("b")!.translation, { x: 5000, y: 100, z: 0 }, "h goes along g's x too")
   })
 })

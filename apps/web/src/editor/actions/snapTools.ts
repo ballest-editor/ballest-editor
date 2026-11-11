@@ -15,7 +15,7 @@ import { connectedKeys } from "../../domain/joints"
 import type { Item } from "../../domain/MapFile"
 import { prefabSnapKeyOf } from "../../domain/MapPrefs"
 import type { Construction, EndRef } from "../../domain/MapSidecar"
-import { withMirrorMesh } from "../../domain/mirror"
+import { type FlipAxis, withMirrorMesh } from "../../domain/mirror"
 import {
   defaultSnapConfig,
   isPreset,
@@ -454,9 +454,10 @@ export const clearMeasurements = () => useEditor.getState().clearMeasurements()
 
 /**
  * Reflects the selection in `plane`, as one undo step: every unit, and the links it carries inside an entered chain, item
- * by item, so what they make up comes out as its mirror image. Items that can't flip in the game only move, and it says so.
+ * by item, so what they make up comes out as its mirror image. Each item takes a flip on `axis` (`mirroredTransform`).
+ * Items that can't flip in the game only move, and it says so.
  */
-export const mirrorSelection = (plane: MirrorPlane) => {
+export const mirrorSelection = (plane: MirrorPlane, axis: FlipAxis = "x", description?: string) => {
   const s = useEditor.getState()
   const selection = selectionUnits(s, (key) => shownTransform(s, key))
   if (selection === undefined) return
@@ -467,12 +468,12 @@ export const mirrorSelection = (plane: MirrorPlane) => {
   })
   const flippable = placed.filter(({ item }) => {
     const piece = s.catalogIndex?.pieceByClass.get(item.actorToSpawn)
-    return withFlip({ item, piece }, "x") !== item
+    return withFlip({ item, piece }, axis) !== item
   })
   if (placed.length === 0) return
-  const moved = new Map(placed.map(({ key, t }) => [key, mirroredTransform(t, plane)] as const))
-  s.mirrorItems(moved, new Set(flippable.map(({ key }) => key)), "x", {
-    description: `Mirror ${placed.length} items`,
+  const moved = new Map(placed.map(({ key, t }) => [key, mirroredTransform(t, plane, axis)] as const))
+  s.mirrorItems(moved, new Set(flippable.map(({ key }) => key)), axis, {
+    description: description ?? `Mirror ${placed.length} items`,
     reflection: plane
   })
   const rigid = placed.length - flippable.length
@@ -481,6 +482,17 @@ export const mirrorSelection = (plane: MirrorPlane) => {
       kind: "mirrorRigid"
     })
   }
+}
+
+/**
+ * Flip on a whole group: its layout mirrored along its own `axis` (the gizmo's Local one) about its pivot, so a left-hand
+ * bend becomes a right-hand one where it stands. Each member takes the flip on `axis` and moves across.
+ */
+export const flipGroupLayout = (axis: FlipAxis) => {
+  const target = activePivotOf(useEditor.getState())
+  if (target === undefined) return
+  const normal = rotateVec(target.rotation, axis === "x" ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 })
+  mirrorSelection({ origin: target.pivot, normal }, axis, `Flip ${axis.toUpperCase()}`)
 }
 
 /** Mirror: the plane comes from the target picker. */

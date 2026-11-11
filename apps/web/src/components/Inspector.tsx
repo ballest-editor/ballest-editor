@@ -1096,14 +1096,13 @@ export function Inspector() {
                 key={group.id}
                 group={group}
                 items={items}
-                transforms={transforms}
                 actions={<SelectionActions />}
               />
               <ContentsSection items={items} />
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
               {frame !== undefined && (
                 <TransformSection of="group" unit={frame} transforms={transforms} extent={extent}>
-                  <FlipSection items={placed} />
+                  <FlipSection items={placed} group />
                 </TransformSection>
               )}
               <PivotSection />

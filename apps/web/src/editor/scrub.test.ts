@@ -250,6 +250,23 @@ describe("Each in the Inspector", () => {
     s().enterGroup(null)
   })
 
+  it("moves a whole chain as one solid block by a typed location, whatever the settings", () => {
+    const { ids, before } = setup()
+    s().chainSelection()
+    s().select([...ids])
+    for (const mode of ["together", "each"] as const) {
+      if (s().pivotMode !== mode) s().togglePivotMode()
+      editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
+      assert.deepStrictEqual(ids.map((id) => docTransform(id).translation.y - before.get(id)!.translation.y), [
+        40,
+        40,
+        40
+      ], mode)
+      s().undo()
+    }
+    if (s().pivotMode !== "together") s().togglePivotMode()
+  })
+
   it("turns each piece about its own pivot by a typed yaw, so every pivot stays put", () => {
     const { ids, before } = withPivots()
     s().togglePivotMode()
@@ -295,7 +312,7 @@ describe("a whole group's Transform rows, over its frame", () => {
     }
   })
 
-  it("turns the group rigidly about its pivot by a typed yaw, and the row reads 0 again", () => {
+  it("turns the group rigidly about its pivot by a typed yaw, which the row then reads as the group's turn", () => {
     const { ids, before, unit } = grouped()
     const pivot = unit().translation
     editSelectionAxis("rotation", "z", { kind: "set", value: 90 })
@@ -310,7 +327,11 @@ describe("a whole group's Transform rows, over its frame", () => {
         id
       )
     }
-    expectVec(readField(unit(), "rotation"), { x: 0, y: 0, z: 0 }, "rotation")
+    expectVec(readField(unit(), "rotation"), { x: 0, y: 0, z: 90 }, "rotation")
+    expectVec(unit().translation, pivot, "the pivot stays, on the box that turned with the group")
+    // typing the value it already holds turns nothing
+    editSelectionAxis("rotation", "z", { kind: "set", value: 90 })
+    expectQuarterTurnAbout(before, pivot)
   })
 
   it("takes a pasted row as the group's new values: a turn to the pasted yaw, a scale by the ratio, a move there", () => {

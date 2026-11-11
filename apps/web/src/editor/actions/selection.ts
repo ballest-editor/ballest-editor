@@ -1,7 +1,7 @@
 /** Selection edits: each is one undo step, however many items it touches. */
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
-import { canSetItemPivots } from "../../domain/groupSelection"
+import { canSetItemPivots, soleGroupOf } from "../../domain/groupSelection"
 import {
   applyGroupDelta,
   type Axis,
@@ -36,6 +36,7 @@ import {
   type TransformOptions,
   useEditor
 } from "../store"
+import { flipGroupLayout } from "./snapTools"
 
 export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>, options?: TransformOptions): boolean =>
   useEditor.getState().transformItems(transforms, options)
@@ -47,8 +48,15 @@ export const paintSlots = (edits: ReadonlyArray<SlotPaint>): boolean => useEdito
 export const setSelectionProperties = (changes: ReadonlyArray<PropertyChange>): boolean =>
   useEditor.getState().setSelectionProperties(changes)
 
-/** Flips the selected items on one axis (one undo step); see `EditorState.flipSelection`. */
-export const flipSelection = (axis: FlipAxis) => useEditor.getState().flipSelection(axis)
+/**
+ * Flips the selection on one axis, as one undo step: a whole group mirrors its layout about its pivot
+ * (`flipGroupLayout`), and loose items each flip where they stand (`EditorState.flipSelection`).
+ */
+export const flipSelection = (axis: FlipAxis) => {
+  const s = useEditor.getState()
+  if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) flipGroupLayout(axis)
+  else s.flipSelection(axis)
+}
 
 export const deleteSelection = () => useEditor.getState().deleteSelection()
 

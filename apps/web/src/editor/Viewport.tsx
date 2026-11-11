@@ -66,11 +66,11 @@ import { SnapInput } from "./snap/SnapInput"
 import { SnapOverlay } from "./snap/SnapOverlay"
 import {
   currentBrush,
-  groupBoxOf,
   noTabOpen,
   pickableOf,
   type SelectMode,
   shownChainStart,
+  shownGroupFrame,
   shownOf,
   shownPivotDots,
   snapConfigOf,
@@ -715,7 +715,7 @@ function HoveredOutlines() {
 }
 
 /** A whole group's box (see groupBox.ts), following its items: the selection's colour, or no hue when entered. */
-function GroupBoxView({ keys, entered }: { readonly keys: ReadonlyArray<string>; readonly entered: boolean }) {
+function GroupBoxView({ id, entered }: { readonly id: string; readonly entered: boolean }) {
   const box = useMemo(() => new GroupBox(), [])
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => {
@@ -726,8 +726,8 @@ function GroupBoxView({ keys, entered }: { readonly keys: ReadonlyArray<string>;
   const doc = useEditor((s) => s.doc)
   const preview = useEditor((s) => s.preview)
   const catalogIndex = useEditor((s) => s.catalogIndex)
-  const bounds = useMemo(() => groupBoxOf({ doc, preview, catalogIndex }, keys), [doc, preview, catalogIndex, keys])
-  useEffect(() => box.update(bounds), [box, bounds])
+  const frame = useMemo(() => shownGroupFrame({ doc, preview, catalogIndex }, id), [doc, preview, catalogIndex, id])
+  useEffect(() => box.update(frame), [box, frame])
   return <primitive object={box} />
 }
 
@@ -787,7 +787,7 @@ function GroupBoxes() {
   const selectedIds = useShownSelection()
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
   const targets = useMemo(() => groupBoxTargets(tree, selectedIds, enteredGroupId), [tree, selectedIds, enteredGroupId])
-  return targets.map(({ id, keys, entered }) => <GroupBoxView key={id} keys={keys} entered={entered} />)
+  return targets.map(({ id, entered }) => <GroupBoxView key={id} id={id} entered={entered} />)
 }
 
 /** The prefab's (0, 0, 0), in a definition's tab alone (see prefabOrigin.ts). */
