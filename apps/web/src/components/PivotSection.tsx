@@ -9,9 +9,10 @@ import { canSetItemPivots, soleGroupOf } from "../domain/groupSelection"
 import type { Axis } from "../domain/groupTransform"
 import { GROUP_PIVOT_FACES, type GroupNode, type GroupPivot } from "../domain/MapSidecar"
 import { PIVOT_CHOICES, pivotBoundsOf } from "../domain/pivot"
+import { documentOrigin } from "../domain/prefab"
 import { gridScrubOf } from "../domain/snapConfig"
 import { indexOfKey, pieceNameOf, treeKeys } from "../domain/structure"
-import { vecSub } from "../domain/ueMath"
+import { vecAdd, vecSub } from "../domain/ueMath"
 import { editSelectionAxis, moveSelectionBy, previewSelectionAxis, setSelectionPivot } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { pivotOf, shownPivotPoint, snapConfigOf, useEditor } from "../editor/store"
@@ -29,10 +30,12 @@ const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
  * Where the pivot is in the world, which is what the game's Location field shows: the Transform section's Location stays
  * the piece's origin, as the map stores it, so a scale moves that one and holds this one. A whole group has no origin,
  * so this is its one position. An edit moves the selection by what it takes to bring the pivot there, in one step like
- * a scrubbed Location.
+ * a scrubbed Location. Like Location, it reads from the document's origin (`documentOrigin`).
  */
 function PivotPosition({ point }: { readonly point: Vec3 }) {
   const units = useEditor((s) => s.settings.general.units)
+  const origin = useEditor((s) => documentOrigin(s.document))
+  const shown = vecSub(point, origin)
   const snapping = useEditor(snapConfigOf)
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
@@ -50,14 +53,14 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
         <RowClipboard
           clipKey="pivot"
           label="Position"
-          value={point}
-          onPaste={(v) => moveSelectionBy(vecSub(v, point))}
+          value={shown}
+          onPaste={(v) => moveSelectionBy(vecSub(vecAdd(v, origin), point))}
         />
       </div>
       <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
         {AXES.map((axis) => {
-          const value = point[axis] / perUnit
-          const lattice = gridScrubOf(snapping, axis)
+          const value = shown[axis] / perUnit
+          const lattice = gridScrubOf(snapping, axis, origin)
           return (
             <NumberField
               key={axis}
