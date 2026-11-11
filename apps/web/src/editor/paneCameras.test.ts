@@ -526,6 +526,81 @@ describe("a pane's screen axes", () => {
   })
 })
 
+describe("a rolled pane", () => {
+  /** Front, rolled `roll` quarter turns clockwise, at 1 cm a pixel. */
+  const rolledFront = (roll: 0 | 1 | 2 | 3) => {
+    const pane = paneOn("front")
+    pane.cmPerPixel = 1
+    pane.followProjection("front", roll)
+    pane.resize(WIDTH + 1, HEIGHT, FOV) // lays the camera out at that zoom
+    pane.resize(WIDTH, HEIGHT, FOV)
+    return pane
+  }
+  const centre = { x: WIDTH / 2, y: HEIGHT / 2 }
+
+  it("turns the picture clockwise: what was up the screen runs to the right", () => {
+    const pane = rolledFront(1)
+    // upright, Front has Z up and +Y to the left
+    assert.closeTo(apart(onScreen(pane, { x: 0, y: 0, z: 100 }), { x: centre.x + 100, y: centre.y }), 0, 1e-3)
+    assert.closeTo(apart(onScreen(pane, { x: 0, y: 100, z: 0 }), { x: centre.x, y: centre.y - 100 }), 0, 1e-3)
+    assert.closeTo(pane.orthographic.matrixWorld.determinant(), 1, 1e-9)
+  })
+
+  it("turns it back counter-clockwise", () => {
+    const pane = rolledFront(3)
+    assert.closeTo(apart(onScreen(pane, { x: 0, y: 0, z: 100 }), { x: centre.x - 100, y: centre.y }), 0, 1e-3)
+  })
+
+  it("slides along the screen as it's rolled", () => {
+    const pane = rolledFront(1)
+    const point = { x: 0, y: 40, z: 70 }
+    const before = onScreen(pane, point)
+    pane.slide(-30, -12)
+    assert.closeTo(apart(onScreen(pane, point), { x: before.x + 30, y: before.y - 12 }), 0, 1e-3)
+  })
+
+  it("frames a box along its rolled sides", () => {
+    // 4 m along Z, 1 m along Y: rolled, Z runs across the 800 px
+    const box = boxOf({ x: 0, y: 0, z: 0 }, { x: 0, y: 100, z: 400 })
+    const pane = rolledFront(1)
+    pane.frame(box, 0)
+    assert.closeTo(pane.cmPerPixel, (1.15 * 400) / WIDTH, 1e-9)
+  })
+
+  it("shows the gizmo's axes turned with it", () => {
+    const { right, up } = rolledFront(1).screenAxes()
+    assert.closeTo(right.z, 1, 1e-9)
+    assert.closeTo(up.y, 1, 1e-9)
+  })
+
+  it("eases into the roll, keeping its centre and zoom", () => {
+    const pane = rolledFront(0)
+    pane.needsFraming = false
+    const target = pane.target.clone()
+    pane.followProjection("front", 1)
+    assert.isTrue(pane.easing)
+    assert.strictEqual(pane.cmPerPixel, 1)
+    assert.closeTo(pane.target.distanceTo(target), 0, 1e-9)
+  })
+
+  it("opens into perspective upright", () => {
+    const pane = rolledFront(1)
+    pane.setProjection("perspective")
+    assert.strictEqual(pane.roll, 0)
+    const { up, right } = pane.screenAxes()
+    assert.closeTo(up.z, 1, 1e-9)
+    assert.closeTo(right.y, -1, 1e-9)
+  })
+
+  it("keeps a rolled Top view's heading in perspective", () => {
+    const pane = paneOn("top")
+    pane.followProjection("top", 1)
+    pane.setProjection("perspective")
+    // rolled clockwise, +X runs to the right of the screen; it still does looking down in perspective
+    assert.closeTo(pane.screenAxes().right.x, 1, 1e-6)
+  })
+})
+
 describe("a tab's panes", () => {
   it("gives each tab its own cameras, and keeps them until the tab closes", () => {
     const first = paneCamerasOf("tab-a")

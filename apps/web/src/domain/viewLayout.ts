@@ -12,6 +12,11 @@ export type ViewProjection = (typeof viewProjections)[number]
 
 export const isOrthoView = (projection: ViewProjection): projection is OrthoView => projection !== "perspective"
 
+/** How far an orthographic pane's picture is rolled, in quarter turns clockwise: 0 is upright, as the view is named. */
+export const viewRolls = [0, 1, 2, 3] as const
+export type ViewRoll = (typeof viewRolls)[number]
+type Rolls = readonly [ViewRoll, ViewRoll, ViewRoll, ViewRoll]
+
 export const viewProjectionLabels: Readonly<Record<ViewProjection, string>> = {
   perspective: "Perspective",
   top: "Top",
@@ -39,6 +44,7 @@ export const clampSplit = (fraction: number): number => Math.min(1 - MIN_SPLIT, 
 
 const Split = Schema.Finite.check(Schema.isBetween({ minimum: MIN_SPLIT, maximum: 1 - MIN_SPLIT }))
 const Projection = Schema.Literals(viewProjections)
+const Roll = Schema.Literals(viewRolls)
 
 export const ViewLayout = Schema.Struct({
   kind: Schema.Literals(viewLayoutKinds),
@@ -48,6 +54,8 @@ export const ViewLayout = Schema.Struct({
   splitY: Split,
   /** What each slot looks along. A slot keeps its view while a smaller layout hides it. */
   projections: Schema.Tuple([Projection, Projection, Projection, Projection]),
+  /** How far each slot's orthographic picture is rolled; absent: every pane upright, as layouts were saved before. */
+  rolls: Schema.optionalKey(Schema.Tuple([Roll, Roll, Roll, Roll])),
   /** The slot filling the viewport for now, with `kind` and the dividers kept to go back to; absent: none. */
   maximised: Schema.optionalKey(Schema.Literals([0, 1, 2, 3]))
 })
@@ -87,6 +95,44 @@ export const withoutMaximised = ({ maximised: _maximised, ...layout }: ViewLayou
 export const withMaximisedToggled = (layout: ViewLayout, slot: PaneSlot): ViewLayout => {
   if (maximisedSlotOf(layout) !== undefined) return withoutMaximised(layout)
   return paneCountOf(layout.kind) > 1 ? { ...layout, maximised: slot } : layout
+}
+
+/** How far `slot`'s picture is rolled. */
+export const rollOf = (layout: ViewLayout, slot: number): ViewRoll => layout.rolls?.[slot] ?? 0
+
+/** `layout` with these rolls; with every pane upright it has none, so it's the layout it was before any roll. */
+const withRolls = ({ rolls: _rolls, ...layout }: ViewLayout, rolls: Rolls): ViewLayout =>
+  rolls.every((roll) => roll === 0) ? layout : { ...layout, rolls }
+
+const rollsOf = (layout: ViewLayout, roll: (slot: PaneSlot, current: ViewRoll) => ViewRoll): Rolls => [
+  roll(0, rollOf(layout, 0)),
+  roll(1, rollOf(layout, 1)),
+  roll(2, rollOf(layout, 2)),
+  roll(3, rollOf(layout, 3))
+]
+
+/**
+ * Rolls `slot`'s picture by `turns` quarter turns, clockwise for a positive number. Only an orthographic pane rolls: a
+ * perspective one stays upright, as looking around levels it anyway.
+ */
+export const withPaneRolled = (layout: ViewLayout, slot: number, turns: number): ViewLayout => {
+  const projection = layout.projections[slot]
+  if (projection === undefined || !isOrthoView(projection)) return layout
+  return withRolls(
+    layout,
+    rollsOf(layout, (each, roll) => each === slot ? viewRolls[(((roll + turns) % 4) + 4) % 4] ?? 0 : roll)
+  )
+}
+
+/** Puts `slot` on `projection`, upright: a view picked is shown the way it's named, even the one the pane is on. */
+export const withPaneProjection = (layout: ViewLayout, slot: number, projection: ViewProjection): ViewLayout => {
+  if (layout.projections[slot] === projection && rollOf(layout, slot) === 0) return layout
+  const [a, b, c, d] = layout.projections
+  const at = (i: number, current: ViewProjection) => i === slot ? projection : current
+  return withRolls(
+    { ...layout, projections: [at(0, a), at(1, b), at(2, c), at(3, d)] },
+    rollsOf(layout, (each, roll) => each === slot ? 0 : roll)
+  )
 }
 
 /** One pane on the canvas, in CSS pixels from its top left. */
@@ -214,13 +260,17 @@ export const paneSwap = (kind: ViewLayoutKind, a: PaneSlot, b: PaneSlot): PaneCh
 }
 
 /** `layout` after `change`, with all its panes showing. */
-export const withPaneChange = (layout: ViewLayout, { kind, order: [a, b, c, d] }: PaneChange): ViewLayout => {
+export const withPaneChange = (layout: ViewLayout, { kind, order }: PaneChange): ViewLayout => {
   const { projections } = layout
-  return {
-    ...withoutMaximised(layout),
-    kind,
-    projections: [projections[a], projections[b], projections[c], projections[d]]
-  }
+  const [a, b, c, d] = order
+  return withRolls(
+    {
+      ...withoutMaximised(layout),
+      kind,
+      projections: [projections[a], projections[b], projections[c], projections[d]]
+    },
+    rollsOf(layout, (slot) => rollOf(layout, order[slot]))
+  )
 }
 
 /** How often, at most, a pane other than the active one is drawn: they take turns, one at a time. */

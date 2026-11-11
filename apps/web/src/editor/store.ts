@@ -146,7 +146,9 @@ import {
   type ViewProjection,
   withMaximisedToggled,
   withoutMaximised,
-  withPaneChange
+  withPaneChange,
+  withPaneProjection,
+  withPaneRolled
 } from "../domain/viewLayout"
 import {
   type Isolation,
@@ -430,6 +432,7 @@ export interface ImportClash {
  * - `replacePublished`, `syncConflict` and `importClash` ask about what Export, Play or Import found.
  * - `whereToOpen` asks whether `target` (shown as `name`) takes over this window or opens in a new one.
  * - `savePrefab` names a prefab made from the selection; `renamePrefab` and `deletePrefab` are the Prefabs panel's.
+ * - `namePrefab` names a new prefab at its first Save, as `saveAs` names a new map, with the same `afterSave`.
  * - `recoverUnsaved` offers `tabs`, what the last session left unsaved (docs/DESKTOP.md § Recovery).
  */
 export type DialogState =
@@ -455,6 +458,7 @@ export type DialogState =
   | { readonly id: "importClash" } & ImportClash
   | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
   | { readonly id: "savePrefab" }
+  | { readonly id: "namePrefab"; readonly afterSave?: Effect.Effect<void, unknown> }
   | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
   | { readonly id: "recoverUnsaved"; readonly tabs: ReadonlyArray<RecoveredTab> }
 export type Dialog = DialogState["id"]
@@ -930,8 +934,10 @@ export interface EditorState extends TabState {
   readonly applyPaneChange: (change: PaneChange) => void
   /** Fills the viewport with the pane in `slot`, or goes back to the layout if a pane already fills it. */
   readonly togglePaneMaximised: (slot: PaneSlot) => void
-  /** What the pane in `slot` looks along. */
+  /** What the pane in `slot` looks along, upright. */
   readonly setPaneProjection: (slot: number, projection: ViewProjection) => void
+  /** Rolls an orthographic pane's picture by quarter turns, clockwise for a positive number. */
+  readonly rollPane: (slot: number, turns: number) => void
   readonly setActivePane: (slot: number) => void
   /** Gives the active tab its own snap settings. A map's are an unsaved change; a definition's go in the editor's prefs. */
   readonly setTabSnap: (snap: SnapConfig) => void
@@ -2017,11 +2023,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         return { viewLayout, activePane: maximisedSlotOf(viewLayout) ?? s.activePane }
       }),
     setPaneProjection: (slot, projection) =>
-      set((s) => {
-        const [a, b, c, d] = s.viewLayout.projections
-        const at = (i: number, current: ViewProjection) => i === slot ? projection : current
-        return { viewLayout: { ...s.viewLayout, projections: [at(0, a), at(1, b), at(2, c), at(3, d)] } }
-      }),
+      set((s) => ({ viewLayout: withPaneProjection(s.viewLayout, slot, projection) })),
+    rollPane: (slot, turns) => set((s) => ({ viewLayout: withPaneRolled(s.viewLayout, slot, turns) })),
     setTabSnap: (snap) =>
       set((s) =>
         noTabOpen(s) ? s : {

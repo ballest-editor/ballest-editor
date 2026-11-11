@@ -8,6 +8,7 @@ import {
   MAX_GRID_LEVELS,
   nearestOrthoView,
   ORTHO_AXES,
+  orthoAxesOf,
   orthoFraming,
   orthoPlacementPoint,
   scaleForDistance,
@@ -57,6 +58,28 @@ describe("orthographic views", () => {
     assert.deepStrictEqual(axisOf(ORTHO_AXES.top.right), { axis: "y", positive: true })
   })
 
+  it("rolls the picture clockwise a quarter turn at a time: what ran up the screen runs to the right", () => {
+    // Front: Z up and -Y to the right, upright
+    assert.deepStrictEqual(orthoAxesOf("front", 0), ORTHO_AXES.front)
+    const once = orthoAxesOf("front", 1)
+    assert.deepStrictEqual(axisOf(once.right), { axis: "z", positive: true })
+    assert.deepStrictEqual(axisOf(once.up), { axis: "y", positive: true })
+    const twice = orthoAxesOf("front", 2)
+    assert.deepStrictEqual(axisOf(twice.up), { axis: "z", positive: false })
+    assert.deepStrictEqual(axisOf(orthoAxesOf("front", 3).right), { axis: "z", positive: false })
+  })
+
+  it("rolls about the view's own direction, never mirroring it", () => {
+    for (const view of orthoViews) {
+      for (const roll of [0, 1, 2, 3] as const) {
+        const { forward, up, right } = orthoAxesOf(view, roll)
+        assert.deepStrictEqual(forward, ORTHO_AXES[view].forward)
+        assert.strictEqual(dot(forward, up), 0)
+        assert.strictEqual(handedness(forward, right, up), 1)
+      }
+    }
+  })
+
   it("finds the view closest to a direction", () => {
     assert.strictEqual(nearestOrthoView({ x: 0.1, y: 0.2, z: -0.9 }), "top")
     assert.strictEqual(nearestOrthoView({ x: -0.8, y: 0.1, z: 0.3 }), "front")
@@ -84,6 +107,12 @@ describe("framing an orthographic pane", () => {
     // Front: Y (1000 cm) across, Z (200 cm) up
     const { cmPerPixel } = orthoFraming(bounds, "front", 800, 600)
     assert.closeTo(cmPerPixel, (1.15 * 1000) / 800, 1e-9)
+  })
+
+  it("measures along a rolled view's axes", () => {
+    // Front rolled a quarter turn: Z (200 cm) across, Y (1000 cm) up
+    const { cmPerPixel } = orthoFraming(bounds, "front", 800, 600, 0, 1)
+    assert.closeTo(cmPerPixel, (1.15 * 1000) / 600, 1e-9)
   })
 
   it("doesn't let a small piece fill the pane", () => {

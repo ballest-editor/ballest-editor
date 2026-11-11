@@ -15,6 +15,7 @@ import { annotationsOf } from "../domain/structure"
 import { formatDateTime } from "../domain/time"
 import { updateCheckBlockedBy } from "../domain/updates"
 import {
+  isOrthoView,
   type ViewLayout,
   viewLayoutKinds,
   viewLayoutLabelsOf,
@@ -350,6 +351,15 @@ const paneMenus = ({ layout, projection }: MenuState): ReadonlyArray<MenuChoice>
   ]
 }
 
+/** Rolling the active pane's orthographic view (docs/DESKTOP.md § View panes). */
+const rollItems = ({ projection }: MenuState): ReadonlyArray<MenuNode> => {
+  const off = isOrthoView(projection) ? null : "Only an orthographic view rolls."
+  return [
+    command("rollViewCounterClockwise", "Roll view counter-clockwise", off),
+    command("rollViewClockwise", "Roll view clockwise", off)
+  ]
+}
+
 /** Hide, isolate and lock, each acting on the selection or the whole map (docs/DESKTOP.md § Hide, isolate and lock). */
 const visibilityItems = ({ hasSelection, noTabOff, visibility }: MenuState): ReadonlyArray<MenuNode> => {
   const selected = hasSelection ? null : NOTHING_SELECTED
@@ -390,7 +400,7 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
     ]
   },
   SEPARATOR,
-  { kind: "section", title: "Panes", children: paneMenus(state) },
+  { kind: "section", title: "Panes", children: [...paneMenus(state), ...rollItems(state)] },
   SEPARATOR,
   {
     kind: "section",

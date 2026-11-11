@@ -96,6 +96,8 @@ export const keybindSections = [
       "viewRight",
       "viewLeft",
       "toggleOrthographic",
+      "rollViewCounterClockwise",
+      "rollViewClockwise",
       "frameAll",
       "hideSelection",
       "showAll",
@@ -204,6 +206,8 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   viewRight: "right view",
   viewLeft: "left view",
   toggleOrthographic: "perspective view",
+  rollViewCounterClockwise: "roll view counter-clockwise",
+  rollViewClockwise: "roll view clockwise",
   frameAll: "frame all",
   hideSelection: "hide / show",
   showAll: "show all",
@@ -324,6 +328,10 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   viewLeft: "Look at the map from its left (the -Y side) in the active pane, orthographic.",
   toggleOrthographic:
     "Switch the active pane between perspective and the orthographic view closest to where it is looking.",
+  rollViewCounterClockwise:
+    "Turn the active pane's orthographic view a quarter turn counter-clockwise, about the direction it looks along. Picking a view stands it upright again. Editor only.",
+  rollViewClockwise:
+    "Turn the active pane's orthographic view a quarter turn clockwise, about the direction it looks along. Picking a view stands it upright again. Editor only.",
   frameAll: "Frame the whole map in the active pane, as far as it's drawn.",
   hideSelection:
     "Hide the selection: it isn't drawn, picked or snapped to until it's shown again. With all of it hidden already (picked in the Outline), show it. H in Blender, Unity and Unreal; the game has no hiding.",
@@ -445,6 +453,8 @@ export const actionWhen: Readonly<Record<KeybindAction, When>> = {
   viewRight: {},
   viewLeft: {},
   toggleOrthographic: {},
+  rollViewCounterClockwise: {},
+  rollViewClockwise: {},
   frameAll: {},
   hideSelection: {},
   showAll: {},
@@ -587,6 +597,8 @@ export const defaultKeybinds: Keybinds = {
   viewRight: ["Numpad3"],
   viewLeft: ["Ctrl+Numpad3"],
   toggleOrthographic: ["Numpad5"],
+  rollViewCounterClockwise: ["Ctrl+Numpad4"],
+  rollViewClockwise: ["Ctrl+Numpad6"],
   frameAll: ["Shift+KeyF"],
   hideSelection: ["KeyH"],
   showAll: ["Alt+KeyH"],

@@ -12,6 +12,7 @@ import {
   mixFov,
   nearestOrthoView,
   ORTHO_AXES,
+  orthoAxesOf,
   orthoFraming,
   orthoPlacementPoint,
   scaleForDistance,
@@ -25,7 +26,8 @@ import {
   type PaneChange,
   paneRectAt,
   paneRects,
-  type ViewProjection
+  type ViewProjection,
+  type ViewRoll
 } from "../domain/viewLayout"
 import { gameDirToWorld, type Px, worldPerPixel } from "./gizmo/math"
 import { shownOf, useEditor } from "./store"
@@ -97,6 +99,8 @@ export class PaneCamera {
   /** The perspective camera's orbit pivot; what an orthographic view is centred on. */
   readonly target = new THREE.Vector3()
   projection: ViewProjection = "perspective"
+  /** How far an orthographic view's picture is rolled; 0 in perspective. */
+  roll: ViewRoll = 0
   /** The orthographic zoom: resizing a pane shows more or less, it doesn't zoom. */
   cmPerPixel = 2
   width = 1
@@ -141,11 +145,12 @@ export class PaneCamera {
   }
 
   /**
-   * Changes what the pane looks along, keeping the point it looks at and the size it shows it at. The cameras are there
-   * at once and the picture eases after them (`stepTween`), unless the pane hasn't been shown yet or `ease` says not to.
+   * Changes what the pane looks along, or how far an orthographic view is rolled, keeping the point it looks at and the
+   * size it shows it at. The cameras are there at once and the picture eases after them (`stepTween`), unless the pane
+   * hasn't been shown yet or `ease` says not to. Perspective is always level: a rolled view opens into it upright.
    */
-  setProjection(next: ViewProjection, ease = true): void {
-    if (next === this.projection) return
+  setProjection(next: ViewProjection, ease = true, roll: ViewRoll = 0): void {
+    if (next === this.projection && roll === this.roll) return
     const from = this.tween?.shown ?? this.pose()
     if (ease && !this.needsFraming) this.tween = { from, shown: from, startedAt: undefined }
     const { perspective, orthographic, tweenCamera } = this
@@ -153,7 +158,10 @@ export class PaneCamera {
     tweenCamera.layers.enable(isOrthoView(next) ? ORTHOGRAPHIC_LAYER : FLOOR_GRID_LAYER)
     if (!isOrthoView(next)) {
       this.projection = next
-      perspective.quaternion.copy(orthographic.quaternion)
+      this.roll = 0
+      // looking straight down or up, three.js gives the roll to the yaw, so a rolled top view keeps its heading
+      const level = new THREE.Euler().setFromQuaternion(orthographic.quaternion, "YXZ")
+      perspective.quaternion.setFromEuler(level.set(level.x, level.y, 0))
       const back = new THREE.Vector3(0, 0, 1).applyQuaternion(perspective.quaternion)
       const distance = distanceForScale(this.cmPerPixel, this.height, perspective.fov)
       perspective.position.copy(this.target).addScaledVector(back, distance)
@@ -161,6 +169,7 @@ export class PaneCamera {
     }
     if (this.view === undefined) this.setScale(scaleForDistance(this.keepPivotAhead(), this.height, perspective.fov))
     this.projection = next
+    this.roll = roll
     this.placeOrthographic()
   }
 
@@ -169,9 +178,9 @@ export class PaneCamera {
    * first shown there does, because a perspective pane's zoom is only how far off its pivot happens to be. Between
    * orthographic views the zoom stays. The picture eases to all of it.
    */
-  followProjection(next: ViewProjection): void {
+  followProjection(next: ViewProjection, roll: ViewRoll = 0): void {
     const framing = this.view === undefined && isOrthoView(next)
-    this.setProjection(next)
+    this.setProjection(next, true, roll)
     if (framing) this.frameMap(mapBox())
   }
 
@@ -243,7 +252,7 @@ export class PaneCamera {
   slide(right: number, up: number): void {
     const { view } = this
     if (view === undefined) return
-    const axes = ORTHO_AXES[view]
+    const axes = orthoAxesOf(view, this.roll)
     this.target.addScaledVector(gameDirToWorld(axes.right), right).addScaledVector(gameDirToWorld(axes.up), up)
     this.placeOrthographic()
   }
@@ -269,7 +278,7 @@ export class PaneCamera {
       return
     }
     const bounds = { min: uePoint(box.min), max: uePoint(box.max) }
-    const { center, cmPerPixel } = orthoFraming(bounds, view, this.width, this.height, minimumSpan)
+    const { center, cmPerPixel } = orthoFraming(bounds, view, this.width, this.height, minimumSpan, this.roll)
     this.target.copy(toVector(ueToThreeVector(center)))
     this.setScale(cmPerPixel)
     this.placeOrthographic()
@@ -367,7 +376,7 @@ export class PaneCamera {
     camera.bottom = -(this.height / 2) * this.cmPerPixel
     camera.updateProjectionMatrix()
     if (view === undefined) return
-    const axes = ORTHO_AXES[view]
+    const axes = orthoAxesOf(view, this.roll)
     camera.up.copy(gameDirToWorld(axes.up))
     camera.position.copy(this.target).addScaledVector(gameDirToWorld(axes.forward), -ORTHO_STANDOFF)
     camera.lookAt(this.target)

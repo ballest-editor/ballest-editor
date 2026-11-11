@@ -27,7 +27,9 @@ import {
   viewLayoutLabelsOf,
   withMaximisedToggled,
   withoutMaximised,
-  withPaneChange
+  withPaneChange,
+  withPaneProjection,
+  withPaneRolled
 } from "./viewLayout"
 
 const layoutOf = (kind: ViewLayoutKind, splitX = 0.5, splitY = 0.5): ViewLayout => ({
@@ -242,6 +244,49 @@ describe("swapping panes", () => {
   it("undoes itself", () => {
     const change = paneSwap("columns", 1, 0)
     assert.deepStrictEqual(withPaneChange(withPaneChange(layoutOf("columns"), change), change), layoutOf("columns"))
+  })
+})
+
+describe("rolling a pane", () => {
+  const quad = layoutOf("quad")
+
+  it("turns an orthographic pane a quarter at a time, either way round", () => {
+    assert.deepStrictEqual(withPaneRolled(quad, 1, 1).rolls, [0, 1, 0, 0])
+    assert.deepStrictEqual(withPaneRolled(quad, 1, -1).rolls, [0, 3, 0, 0])
+    assert.deepStrictEqual(withPaneRolled(withPaneRolled(quad, 2, 1), 2, 1).rolls, [0, 0, 2, 0])
+  })
+
+  it("leaves a perspective pane as it is", () => {
+    assert.strictEqual(withPaneRolled(quad, 0, 1), quad)
+  })
+
+  it("forgets the roll when every pane is upright again, so the layout is the default again", () => {
+    const back = withPaneRolled(withPaneRolled(defaultViewLayout, 2, 1), 2, -1)
+    assert.notProperty(back, "rolls")
+    assert.isTrue(isDefaultViewLayout(back))
+    assert.isFalse(isDefaultViewLayout(withPaneRolled(defaultViewLayout, 2, 1)))
+  })
+
+  it("stands a pane upright when a view is picked, even the one it's on", () => {
+    const rolled = withPaneRolled(withPaneRolled(quad, 1, 1), 2, 1)
+    assert.deepStrictEqual(withPaneProjection(rolled, 1, "back").rolls, [0, 0, 1, 0])
+    assert.deepStrictEqual(withPaneProjection(rolled, 1, "top").rolls, [0, 0, 1, 0])
+    assert.deepStrictEqual(withPaneProjection(rolled, 1, "back").projections, ["perspective", "back", "front", "right"])
+    assert.strictEqual(withPaneProjection(quad, 1, "top"), quad)
+  })
+
+  it("goes with the view when panes are swapped or closed", () => {
+    const rolled = withPaneRolled(quad, 3, 1)
+    assert.deepStrictEqual(withPaneChange(rolled, paneSwap("quad", 0, 3)).rolls, [1, 0, 0, 0])
+    assert.deepStrictEqual(withPaneChange(rolled, paneCloseRow(0)).rolls, [0, 1, 0, 0])
+  })
+
+  it("survives JSON, and a layout saved before rolls still loads upright", () => {
+    const decode = Schema.decodeUnknownOption(ViewLayout)
+    const rolled = withPaneRolled(quad, 2, -1)
+    assert.deepStrictEqual(Option.getOrNull(decode(JSON.parse(JSON.stringify(rolled)))), rolled)
+    assert.deepStrictEqual(Option.getOrNull(decode(quad)), quad)
+    assert.strictEqual(decode({ ...quad, rolls: [0, 4, 0, 0] })._tag, "None")
   })
 })
 
