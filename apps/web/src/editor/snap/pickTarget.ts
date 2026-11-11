@@ -11,7 +11,7 @@ import { resolveSnap } from "../../domain/snapResolve"
 import { annotationsOf } from "../../domain/structure"
 import { ORIGIN, vecAdd, vecScale } from "../../domain/ueMath"
 import type { PaneCamera } from "../paneCameras"
-import { editedKeys, type EditorState, type PickedTarget, type PickerRequest, snapConfigOf } from "../store"
+import { editedKeys, type EditorState, pickableOf, type PickedTarget, type PickerRequest, snapConfigOf } from "../store"
 import { snapCasts, snapItemsOf } from "./snapScene"
 import { snapViewOf } from "./snapView"
 
@@ -60,6 +60,13 @@ const pickingConfig = (config: SnapConfig, accepts: Accepts): SnapConfig => {
       alignment: { ...config.targets.alignment, enabled: false }
     }
   }
+}
+
+/** The items a pick for `picker` goes through: none, or for a pick that must be pickable, what a click can't pick. */
+export const pickerSkips = (s: EditorState, picker: PickerRequest): ReadonlySet<string> => {
+  if (picker.pickable !== true) return new Set()
+  const pickable = pickableOf(s)
+  return new Set(s.doc.ids.filter((key) => !pickable(key)))
 }
 
 /** What's under `px`, as the tool `accepts` it. */

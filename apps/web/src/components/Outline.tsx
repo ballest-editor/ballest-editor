@@ -47,7 +47,7 @@ import {
 } from "../domain/outline"
 import { findNode, groupNames, numberedNameText } from "../domain/structure"
 import { flagStateOf } from "../domain/visibility"
-import { detachInstance, updateInstance } from "../editor/actions"
+import { detachInstance, selectAllInGroup, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { elementOf } from "../editor/keyTargets"
 import { nextSelection, nodeNamesOf, noTabOpen, useCanGroup, useEditor } from "../editor/store"
@@ -387,10 +387,9 @@ export function Outline() {
   }
   const selectAllIn = (id: string) => {
     const s = useEditor.getState()
-    const { tree: current } = s.doc.structure
-    selectHere(nodeKeys(current, id))
-    const { enteredGroupId: entered } = s
-    if (entered !== null && entered !== id && !groupPathOf(current, id).includes(entered)) s.enterGroup(null)
+    s.expandGroups([...groupPathOf(s.doc.structure.tree, id), id])
+    selectAllInGroup(id)
+    shownSelection.current = useEditor.getState().selectedIds
   }
   // Rename's field takes the focus, so the closing menu mustn't hand it back.
   const keepFocus = useRef(false)

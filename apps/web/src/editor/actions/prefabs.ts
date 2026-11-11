@@ -36,6 +36,7 @@ import {
   inNamedProject,
   NO_TAB_OPEN,
   noTabOpen,
+  pickableOf,
   type PrefabDocument,
   selectedIndices,
   tabLabels,
@@ -371,11 +372,21 @@ export const updateInstance = (groupId: string, ref: PrefabRef) =>
     updateInstances(tabId, [groupId], definition)
   }))
 
-/** The Prefabs panel's "2 placed": every instance of `ref` in the active tab, selected, from outside any entered group. */
+/**
+ * The Prefabs panel's "2 placed": every instance of `ref` in the active tab a click could pick, whole, selected from
+ * outside any entered group. One with nothing left to pick (all hidden, locked or isolated out) stays out, as from
+ * Select all.
+ */
 export const selectInstances = (ref: PrefabRef) => {
-  const { doc, enterGroup, select } = useEditor.getState()
-  enterGroup(null)
-  select(treeKeys(instancesOfPrefab(doc.structure.tree, ref)))
+  const s = useEditor.getState()
+  const pickable = pickableOf(s)
+  s.enterGroup(null)
+  s.select(
+    instancesOfPrefab(s.doc.structure.tree, ref).flatMap((instance) => {
+      const keys = treeKeys([instance])
+      return keys.some(pickable) ? keys : []
+    })
+  )
 }
 
 /** The items of a definition, for its thumbnail; none when it won't read, which needs no saying over a picture. */

@@ -10,6 +10,7 @@ import { annotationsOf, findGroup } from "../../domain/structure"
 import { rotatorToQuat } from "../../domain/ueMath"
 import { catalogWithEnds, endAlongX, grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { activePaneCamera } from "../paneCameras"
+import { pickerSkips } from "../snap/pickTarget"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
 import {
   addWorldAxis,
@@ -178,14 +179,19 @@ describe("snap settings", () => {
   })
 })
 
+/** Flush and tangent from a face of `a` at x=100 to a face of `b` at x=950, both facing +X. */
+const flushFaces = (a: string, b: string) => {
+  startFlush()
+  pickWith({ point: { x: 100, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 }, item: a })
+  pickWith({ point: { x: 950, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 }, item: b })
+}
+
 describe("flush and tangent", () => {
   it("moves B so the faces are coplanar, with one undo step", () => {
     const [a = "", b = ""] = load([0, 1000])
     const before = useEditor.getState().past.length
     setFlushOptions({ mode: "flush", offset: 0 })
-    startFlush()
-    pickWith({ point: { x: 100, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 }, item: a })
-    pickWith({ point: { x: 950, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 }, item: b })
+    flushFaces(a, b)
     assert.closeTo(xOf(b), 150, 1e-6)
     assert.strictEqual(useEditor.getState().past.length, before + 1)
     assert.strictEqual(xOf(a), 0)
@@ -197,6 +203,34 @@ describe("flush and tangent", () => {
     pickWith({ point: { x: 100, y: 0, z: 0 }, item: a, end: endAlongX(a, 0, 100, 1) })
     pickWith({ point: { x: 900, y: 0, z: 0 }, item: b, end: endAlongX(b, 0, 900, -1) })
     assert.closeTo(xOf(b), 200, 1e-6)
+  })
+})
+
+describe("flush and tangent's second pick", () => {
+  it("moves a group member's whole group, as a click on it would select", () => {
+    const [a = "", b = "", c = ""] = load([0, 1000, 1500])
+    grouped([b, c])
+    useEditor.getState().select([])
+    flushFaces(a, b)
+    assert.closeTo(xOf(b), 150, 1e-6)
+    assert.closeTo(xOf(c), 650, 1e-6, "the group keeps its shape")
+  })
+
+  it("goes through a locked piece, and won't move a group that holds one", () => {
+    const [a = "", b = "", c = ""] = load([0, 1000, 1500])
+    grouped([b, c])
+    useEditor.getState().setItemFlag([b], "locked", true)
+    useEditor.getState().select([])
+    const skips = () => {
+      const s = useEditor.getState()
+      return s.picker === null ? assert.fail("the picker isn't up") : pickerSkips(s, s.picker)
+    }
+    startFlush()
+    assert.isFalse(skips().has(b), "the piece that stays may be locked")
+    pickWith({ point: { x: 100, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 }, item: a })
+    assert.isTrue(skips().has(b), "the piece that moves can't be")
+    pickWith({ point: { x: 1450, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 }, item: c })
+    assert.deepStrictEqual([xOf(b), xOf(c)], [1000, 1500])
   })
 })
 
@@ -522,6 +556,27 @@ describe("select connected", () => {
     selectConnected()
     assert.deepStrictEqual([...useEditor.getState().selectedIds].sort(), [a, b].sort())
     assert.notInclude(useEditor.getState().selectedIds, c)
+  })
+
+  it("selects whole groups, and leaves out what can't be picked", () => {
+    const [a = "", b = "", c = "", d = "", e = ""] = load([0, 500, 600, 2000, 3000])
+    grouped([b, c])
+    const s = useEditor.getState()
+    const joint = (x: string, y: string) => ({ a: { item: x, end: 0 }, b: { item: y, end: 1 } })
+    useEditor.setState({
+      doc: {
+        ...s.doc,
+        structure: {
+          ...useEditor.getState().doc.structure,
+          annotations: { joints: [joint(a, b), joint(a, d), joint(a, e)], construction: [], measurements: [] }
+        }
+      }
+    })
+    useEditor.getState().setItemFlag([d], "locked", true)
+    useEditor.getState().setItemFlag([e], "hidden", true)
+    useEditor.getState().select([a])
+    selectConnected()
+    assert.sameMembers([...useEditor.getState().selectedIds], [a, b, c])
   })
 })
 

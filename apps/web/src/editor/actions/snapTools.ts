@@ -7,6 +7,7 @@ import { endsOf, meetingTurn } from "../../domain/connectors"
 import type { SpotId } from "../../domain/connectorSpots"
 import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
+import { clickLevelOf, nodeKeys } from "../../domain/groupSelection"
 import { applyGroupDelta, type RigidDelta } from "../../domain/groupTransform"
 import { type Box, itemsBoxOf } from "../../domain/itemBounds"
 import { withFlip } from "../../domain/itemProperties"
@@ -58,6 +59,7 @@ import {
   type SelectionUnits,
   type Unit
 } from "../../domain/units"
+import { clickLevelSelection } from "../../domain/visibility"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { activePaneCamera } from "../paneCameras"
 import { snapMarks } from "../snap/snapMarks"
@@ -66,6 +68,7 @@ import {
   editedKeys,
   type EditorState,
   fitTransforms,
+  pickableOf,
   type PickedTarget,
   type PickerRequest,
   selectionPivot,
@@ -158,9 +161,17 @@ export const snapDefaultsAreFactory = (s: Pick<EditorState, "settings">): boolea
  */
 export const resetSnapDefaults = () => saveSettings({ ...useEditor.getState().settings, snapping: defaultSnapConfig })
 
-/** The items a tool that moves "B" moves: the selection if the pick is on it, else the item picked. */
-const movingKeys = (s: EditorState, item: string | undefined): ReadonlyArray<string> =>
-  item === undefined ? [] : s.selectedIds.includes(item) ? s.selectedIds : [item]
+/**
+ * The items a tool that moves "B" moves: the selection if the pick is on it, else what a click on the item picked would
+ * select (its whole group, unless the group is entered).
+ */
+const movingKeys = (s: EditorState, item: string | undefined): ReadonlyArray<string> => {
+  if (item === undefined) return []
+  if (s.selectedIds.includes(item)) return s.selectedIds
+  const { tree } = s.doc.structure
+  const reached = nodeKeys(tree, clickLevelOf(tree, item, s.enteredGroupId).nodeId)
+  return reached.length === 0 ? [item] : reached
+}
 
 /** The document's transforms of `keys`. */
 const editTransformsOf = (s: EditorState, keys: ReadonlyArray<string>) =>
@@ -230,6 +241,7 @@ export const startFlush = () =>
       pick({
         prompt: "Click a face on the piece to move.",
         accepts: "faceOrEnd",
+        pickable: true,
         panel: "flush",
         onPick: (b) => meet(a, b)
       })
@@ -509,11 +521,18 @@ export const gridYawToSelection = () => {
 
 export const gridYawReset = () => updateSnapTarget("grid", { yaw: 0 })
 
-/** Selects everything joints reach from the selection: the whole track. */
+/**
+ * Selects everything joints reach from the selection, the whole track, as clicks on it would: whole groups unless one
+ * is entered, and only what a click could pick (not hidden, locked or isolated out).
+ */
 export const selectConnected = () => {
   const s = useEditor.getState()
   const reached = connectedKeys(annotationsOf(s.doc.structure).joints, s.selectedIds)
-  s.select([...s.selectedIds, ...s.doc.ids.filter((key) => reached.has(key) && !s.selectedIds.includes(key))])
+  const inDocOrder = s.doc.ids.filter((key) => reached.has(key) && !s.selectedIds.includes(key))
+  s.select([
+    ...s.selectedIds,
+    ...clickLevelSelection(s.doc.structure.tree, s.enteredGroupId, inDocOrder, pickableOf(s))
+  ])
 }
 
 /** An end of the map, with its item as `item` would stand there. */
