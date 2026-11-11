@@ -224,6 +224,8 @@ interface DocValidation {
 export interface DocClip extends Clip {
   readonly keys: ReadonlyArray<string>
   readonly structure: Structure
+  /** The tab it was copied or cut from: a paste there keeps the copied place, anywhere else is placed anew (`pasteClipboard`). */
+  readonly source?: string
 }
 
 /**
@@ -803,10 +805,10 @@ export interface EditorState extends TabState {
   /** Puts the selected items on the clipboard and removes them (one undo step). */
   readonly cutSelection: () => void
   /**
-   * Adds the clipboard's items where they were copied, like the game (one undo step), and
-   * selects them.
+   * Adds the clipboard's items where they were copied, like the game, or `offset` from there, taking their Point pivots
+   * along (one undo step), and selects them.
    */
-  readonly paste: () => void
+  readonly paste: (offset?: Vec3) => void
   /**
    * Starts an Alt+drag duplicate: copies the selection in place and selects the copies, with
    * no undo step yet. Returns each source id's copy id, or undefined when nothing was copied.
@@ -1166,6 +1168,33 @@ export const useEditor = create<EditorState>()((set, get) => {
       structure: withPasted(s.doc.structure, clip.structure, keyOf)
     }
     return { doc, added, keyOf }
+  }
+
+  /**
+   * `withClip`'s doc with the copies moved `offset` from where they were copied, Point pivots along; undefined, having
+   * said so, when a moved transform isn't one the game takes.
+   */
+  const withClipMoved = (
+    s: EditorState,
+    clip: DocClip,
+    next: NonNullable<ReturnType<typeof withClip>>,
+    offset: Vec3
+  ) => {
+    const transforms = new Map(clip.items.flatMap((item, n) => {
+      const id = next.added[n]
+      if (id === undefined) return []
+      const transform = editTransform(item)
+      return [[id, { ...transform, translation: vecAdd(transform.translation, offset) }] as const]
+    }))
+    const map = setTransforms(
+      next.doc.map,
+      [...transforms].map(([id, t]) => [indexOfKey(next.doc.ids, id), t] as const)
+    )
+    if (Option.isNone(map)) {
+      s.notify("error", INVALID_TRANSFORM)
+      return undefined
+    }
+    return withMovedItems(next.doc, map.value, transforms, undefined, s.catalogIndex)
   }
 
   /** One undo step for a change to the map's structure; nothing when `structure` says nothing changed. */
@@ -1625,22 +1654,9 @@ export const useEditor = create<EditorState>()((set, get) => {
       const selectedIds: Array<string> = []
       for (const offset of repeatOffsets(options)) {
         const next = withClip({ ...s, doc }, clip)
-        if (next === undefined) return
-        const transforms = new Map(clip.items.flatMap((item, n) => {
-          const id = next.added[n]
-          if (id === undefined) return []
-          const transform = editTransform(item)
-          return [[id, { ...transform, translation: vecAdd(transform.translation, offset) }] as const]
-        }))
-        const map = setTransforms(
-          next.doc.map,
-          [...transforms].map(([id, t]) => [indexOfKey(next.doc.ids, id), t] as const)
-        )
-        if (Option.isNone(map)) {
-          s.notify("error", INVALID_TRANSFORM)
-          return
-        }
-        doc = withMovedItems(next.doc, map.value, transforms, undefined, s.catalogIndex)
+        const moved = next === undefined ? undefined : withClipMoved(s, clip, next, offset)
+        if (next === undefined || moved === undefined) return
+        doc = moved
         selectedIds.push(...next.added)
       }
       commit(doc, { selectedIds }, undefined, "Repeat selection")
@@ -1655,7 +1671,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     copySelection: () => {
       const s = get()
       const clip = clipOf(s.doc, copyableIndices(s))
-      if (clip.items.length > 0) set({ clipboard: clip })
+      if (clip.items.length > 0) set({ clipboard: { ...clip, source: s.tabId } })
     },
 
     cutSelection: () => {
@@ -1663,13 +1679,19 @@ export const useEditor = create<EditorState>()((set, get) => {
       // only what was copied goes: cutting never removes the player start
       const indices = copyableIndices(s)
       if (indices.length === 0) return
-      commit(withoutItems(s.doc, indices), { selectedIds: [], clipboard: clipOf(s.doc, indices) })
+      commit(withoutItems(s.doc, indices), {
+        selectedIds: [],
+        clipboard: { ...clipOf(s.doc, indices), source: s.tabId }
+      })
     },
 
-    paste: () => {
+    paste: (offset) => {
       const s = get()
-      const next = s.clipboard === null ? undefined : withClip(s, s.clipboard)
-      if (next !== undefined) commit(next.doc, { selectedIds: next.added })
+      const clip = s.clipboard
+      const next = clip === null ? undefined : withClip(s, clip)
+      if (clip === null || next === undefined) return
+      const doc = offset === undefined ? next.doc : withClipMoved(s, clip, next, offset)
+      if (doc !== undefined) commit(doc, { selectedIds: next.added })
     },
 
     beginDuplicateDrag: () => {
