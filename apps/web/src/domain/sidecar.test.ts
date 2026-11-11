@@ -508,7 +508,7 @@ describe("editor data across a round trip through the game", () => {
     assert.lengthOf(loaded.structure.tree, 3)
   })
 
-  it("carries a Point pivot by the turn and move its group made in the game, and only then", () => {
+  it("carries a group's Point pivot and turn by the turn and move its items made in the game, and only then", () => {
     const { map, sidecar } = flagged()
     // a quarter turn about z, about (100, 0, 0), then 1000 along y: (x, y) goes to (100 - y, x - 100 + 1000)
     const quarter = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
@@ -519,16 +519,23 @@ describe("editor data across a round trip through the game", () => {
         itemTransform: { ...item.itemTransform, rotation: quarter, translation: { x: 100 - y, y: x - 100 + 1000, z } }
       }
     }
-    const pivotOf = (items: ReadonlyArray<Item>) => {
-      return groupOf(loadGameStructure(mapOf(items), OTHER_HASH, sidecar).structure, "g1").pivot
-    }
-    const point = pivotOf(map.items.map((item, index) => index === 1 || index === 2 ? turned(item) : item))
+    const g1Of = (items: ReadonlyArray<Item>) =>
+      groupOf(loadGameStructure(mapOf(items), OTHER_HASH, sidecar).structure, "g1")
+    const pivotOf = (items: ReadonlyArray<Item>) => g1Of(items).pivot
+    const g1 = g1Of(map.items.map((item, index) => index === 1 || index === 2 ? turned(item) : item))
+    const point = g1.pivot
     assert.strictEqual(point?.choice, "point")
     if (point?.choice === "point") {
       assert.closeTo(point.world.x, 50, 1e-6)
       assert.closeTo(point.world.y, 1050, 1e-6)
       assert.strictEqual(point.world.z, 0)
     }
+    assert.closeTo(g1.rotation?.z ?? 0, Math.SQRT1_2, 1e-9)
+    assert.closeTo(g1.rotation?.w ?? 0, Math.SQRT1_2, 1e-9)
+    // moved without a turn: the point goes along, and the group keeps the world's axes
+    const shifted = g1Of(map.items.map((item, index) => index === 1 || index === 2 ? nudged(item, 500) : item))
+    assert.deepStrictEqual(shifted.pivot, { choice: "point", world: { x: 650, y: 50, z: 0 } })
+    assert.isUndefined(shifted.rotation)
     // one member moved on its own: the point stays where it was frozen
     assert.deepStrictEqual(pivotOf(map.items.map((item, index) => index === 1 ? nudged(item, 500) : item)), {
       choice: "point",

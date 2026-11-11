@@ -10,7 +10,7 @@ import { editTransform } from "./editTransform"
 import { structureFromGame, withGroupsFromGame } from "./gameGroups"
 import { jointsAfterMove } from "./joints"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
-import type { Annotations, MapSidecar, SidecarItem, TreeNode } from "./MapSidecar"
+import type { Annotations, GroupNode, MapSidecar, SidecarItem, TreeNode } from "./MapSidecar"
 import type { SnapConfig } from "./snapConfig"
 import {
   annotationsOf,
@@ -23,7 +23,8 @@ import {
   treeKeys,
   withAnnotations
 } from "./structure"
-import { quatConjugate, quatMul, quatNormalize, rotateVec, vecAdd, vecDistance, vecSub } from "./ueMath"
+import { IDENTITY_QUAT, quatConjugate, quatMul, quatNormalize, rotateVec, vecAdd, vecDistance, vecSub } from "./ueMath"
+import { type GroupMotion, turnedBy, withGroupRotation } from "./units"
 
 /** The rounding in a fingerprint: 0.01 cm, and four places for a rotation or scale. */
 const TRANSLATION_PLACES = 2
@@ -289,16 +290,16 @@ const vecOf = ([x = 0, y = 0, z = 0]: ReadonlyArray<number>): Vec3 => ({ x, y, z
 const carryTolerance = (lever: number) => TOLERANCE.translation + 2e-4 * lever
 
 /**
- * The one move and turn that took each of `keys` from its sidecar entry to its item in `map`, as what it does to a
- * point; undefined when they didn't move together, rigidly, or nothing moved. A scale breaks it, as does an item that
- * moved on its own.
+ * The one move and turn that took each of `keys` from its sidecar entry to its item in `map` (`GroupMotion`), within
+ * the fingerprints' rounding; undefined when they didn't move together, rigidly, or nothing moved. A scale breaks it, as
+ * does an item that moved on its own. A turn smaller than the rounding is none.
  */
 const rigidMotionOf = (
   keys: ReadonlyArray<string>,
   sidecar: MapSidecar,
   map: MapFile,
   indexOf: ReadonlyMap<string, number>
-): ((point: Vec3) => Vec3) | undefined => {
+): GroupMotion | undefined => {
   const pairs = keys.flatMap((key) => {
     const entry = sidecar.items[key]
     const item = map.items[indexOf.get(key) ?? -1]
@@ -328,15 +329,20 @@ const rigidMotionOf = (
       Math.min(largestDifference(turned, after.rotation), largestDifference(turned, after.rotation, -1)) <=
         2 * TOLERANCE.rotation
   })
-  return together ? carried : undefined
+  return together
+    ? { rotation: 1 - Math.abs(turn.w) > SMALLEST_TURN ? turn : IDENTITY_QUAT, point: carried }
+    : undefined
 }
 
+/** `1 - |w|` of the smallest turn told apart from the fingerprints' rounding: about 0.05 degrees. */
+const SMALLEST_TURN = 1e-7
+
 /**
- * `tree` with each Point pivot carried by the move and turn its group made as one, in a file rewritten behind the
- * editor's back: the point was frozen in the world, and the group took it along. A group whose items moved apart keeps
- * the point where it was.
+ * `tree` with each group's frame carried by the move and turn its items made as one, in a file rewritten behind the
+ * editor's back, as an edit here carries it (`withCarriedFrames`): its turn takes the turn, and a Point pivot goes where
+ * the motion takes it. A group whose items moved apart keeps both.
  */
-const withPointPivotsCarried = (
+const withFramesCarried = (
   tree: ReadonlyArray<TreeNode>,
   sidecar: MapSidecar,
   map: MapFile,
@@ -344,9 +350,15 @@ const withPointPivotsCarried = (
 ): ReadonlyArray<TreeNode> => {
   const indexOf = new Map(ids.map((key, index) => [key, index]))
   return rewriteTree(tree, (node) => {
-    if (node.kind !== "group" || node.pivot?.choice !== "point") return [node]
-    const carried = rigidMotionOf(treeKeys(node.children), sidecar, map, indexOf)
-    return carried === undefined ? [node] : [{ ...node, pivot: { choice: "point", world: carried(node.pivot.world) } }]
+    if (node.kind !== "group") return [node]
+    const motion = rigidMotionOf(treeKeys(node.children), sidecar, map, indexOf)
+    if (motion === undefined) return [node]
+    const pivoted: GroupNode = node.pivot?.choice === "point"
+      ? { ...node, pivot: { choice: "point", world: motion.point(node.pivot.world) } }
+      : node
+    return [
+      motion.rotation === IDENTITY_QUAT ? pivoted : withGroupRotation(pivoted, turnedBy(node.rotation, motion.rotation))
+    ]
   })
 }
 
@@ -379,7 +391,7 @@ const assembled = (
   }))
   const tree = treeOver(sidecar, ids)
   const structure: Structure = {
-    tree: rewritten ? withGroupsFromGame(withPointPivotsCarried(tree, sidecar, map, ids), map, ids, catalog) : tree,
+    tree: rewritten ? withGroupsFromGame(withFramesCarried(tree, sidecar, map, ids), map, ids, catalog) : tree,
     items
   }
   return {
