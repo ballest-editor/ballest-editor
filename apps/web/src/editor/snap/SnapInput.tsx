@@ -7,6 +7,7 @@ import { useEffect } from "react"
 import * as THREE from "three"
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { mouseChordOf } from "../../domain/Keybinds"
+import { targetOn } from "../../domain/snapConfig"
 import type { Constraint } from "../../domain/snapFrame"
 import { shownMarks } from "../../domain/snapRelation"
 import { applyDelta, movedAlikeKeys, type PivotMode, pivotModeFor, type SelectionUnits } from "../../domain/units"
@@ -206,7 +207,7 @@ export function SnapInput() {
       const config = snapConfigOf(s)
       const { trackingAcquire: acquire, trackingHoverMs: hoverMs } = s.settings.snapPrefs
       if (
-        !config.targets.tracking.enabled || !config.enabled || (acquire === "shift" && !e.shiftKey) || s.picker !== null
+        !targetOn(config, "tracking") || (acquire === "shift" && !e.shiftKey) || s.picker !== null
       ) {
         stopHover()
         return

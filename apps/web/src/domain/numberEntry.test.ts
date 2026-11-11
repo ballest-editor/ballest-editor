@@ -72,4 +72,10 @@ describe("scrubbing", () => {
     assert.strictEqual(scrubbedValue(0, 10, 1, 100), 100)
     assert.strictEqual(scrubbedValue(0, 4, 1, 100), 0)
   })
+
+  it("counts the snap from where its steps start, as a grid with an origin of its own", () => {
+    assert.strictEqual(scrubbedValue(0, 100, 1, 10, 3), 103)
+    assert.strictEqual(scrubbedValue(3, 0, 1, 10, 3), 3)
+    assert.strictEqual(scrubbedValue(0, 100, 1, 10, -45), 105)
+  })
 })

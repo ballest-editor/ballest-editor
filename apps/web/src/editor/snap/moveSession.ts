@@ -215,7 +215,7 @@ export class MoveSession {
     const frame = this.frame(ray, px, config)
     const from = this.pathBroken ? frame.offset : before
     this.pathBroken = false
-    const snapping = config.enabled && !keys.off
+    const snapping = !keys.off && priorityOf(config).length > 0
     // With Ctrl, the held target still holds. What Shift finds current is the last sample's, as this one may have left it.
     const holding = keys.hold ? this.held ?? this.lastHit : undefined
     const hit = holding !== undefined

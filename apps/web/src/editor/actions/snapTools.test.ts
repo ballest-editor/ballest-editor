@@ -99,26 +99,29 @@ describe("snap settings", () => {
     assert.strictEqual(s.settings.snapping.gridSize, defaultSettings.snapping.gridSize)
   })
 
-  it("turns snapping as a whole over without touching the grid's own toggle", () => {
+  it("turns the magnet over without touching the grid's or Rotate's own toggle", () => {
     const config = () => snapConfigOf(useEditor.getState())
-    const before = config().enabled
+    const before = config().magnet
+    updateSnapTarget("grid", { enabled: true })
     toggleSnapping()
-    assert.strictEqual(config().enabled, !before)
+    assert.strictEqual(config().magnet, !before)
     assert.isTrue(config().targets.grid.enabled)
     updateSnapTarget("grid", { enabled: false })
+    updateSnap({ rotationEnabled: true })
     toggleSnapping()
-    assert.strictEqual(config().enabled, before)
+    assert.strictEqual(config().magnet, before)
     assert.isFalse(config().targets.grid.enabled)
+    assert.isTrue(config().rotationEnabled)
   })
 
-  it("turns the grid on with the step it picks, and leaves snapping as a whole alone", () => {
+  it("turns the grid on with the step it picks, and leaves the magnet alone", () => {
     const config = () => snapConfigOf(useEditor.getState())
-    const before = config().enabled
+    const before = config().magnet
     updateSnapTarget("grid", { enabled: false })
     pickGridSize(50)
     assert.strictEqual(config().gridSize, 50)
     assert.isTrue(config().targets.grid.enabled)
-    assert.strictEqual(config().enabled, before)
+    assert.strictEqual(config().magnet, before)
   })
 
   it("turns several targets on or off together and leaves the rest", () => {

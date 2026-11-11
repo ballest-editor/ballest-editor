@@ -116,8 +116,8 @@ describe("View › Snap", () => {
   const checks = (over?: Partial<MenuState>) =>
     snapRows(over).flatMap(({ label, checked }) => checked === undefined ? [] : [[label, checked] as const])
 
-  it("turns snapping as a whole on with its keybind, and leaves the rest to the snap menu", () => {
-    const snapping = { ...defaultSettings.snapping, enabled: true }
+  it("turns the magnet on with its keybind, and leaves the rest to the snap menu", () => {
+    const snapping = { ...defaultSettings.snapping, magnet: true }
     assert.deepStrictEqual(checks({ snapping }), [["Snapping", true]])
     assert.deepStrictEqual(snapRows().map(({ label }) => label), ["Snapping"])
     assert.strictEqual(snapRows().find(({ label }) => label === "Snapping")?.shortcut, "snapToggle")

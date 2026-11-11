@@ -3,7 +3,7 @@
  * parameters, and the priority order. Settings holds the set a new map starts on, and a map that changes it keeps its
  * own in its sidecar. How snapping behaves for the user, whatever the map, is `SnapPrefs`. No renderer here.
  */
-import { Effect, Schema } from "effect"
+import { Effect, Predicate, Schema, SchemaGetter } from "effect"
 import type { Vec3 } from "./coords"
 import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, DEFAULT_SCALE_STEP, formatGridSize } from "./snap"
 import { ORIGIN } from "./ueMath"
@@ -102,18 +102,46 @@ const AlignmentTarget = Schema.Struct({
   gapGuides: Schema.Literals(["ortho", "always", "never"])
 })
 
-export const SnapConfig = Schema.Struct({
-  /** Snap on or off: whether a move lands on a target. */
-  enabled: Schema.Boolean,
+/** The parts of a gated snap config that change on the way to the current form. */
+interface Gated {
+  readonly enabled: boolean
+  readonly targets: { readonly grid: object }
+}
+
+/** `gated` as it behaved, in the current form: see `ungatedSnapping`. */
+const ungated = <T extends Gated>({ enabled, ...rest }: T) =>
+  enabled ? { ...rest, magnet: true } : {
+    ...rest,
+    magnet: false,
+    rotationEnabled: false,
+    scaleEnabled: false,
+    targets: { ...rest.targets, grid: { ...rest.targets.grid, enabled: false } }
+  }
+
+/**
+ * A snap config saved while the magnet was snapping as a whole, read as it behaved (docs/SNAPPING.md § Affect). Its
+ * `enabled` becomes `magnet`. Saved off, nothing snapped, so the grid, Rotate and Scale come off with it and it still
+ * snaps nothing; saved on, they stay as they were. Anything else passes as it is. An old Settings save can hold only a
+ * part of one, which Settings fills in field by field.
+ */
+export const ungatedSnapping = (stored: unknown): unknown => {
+  if (!Predicate.isObject(stored) || typeof stored["enabled"] !== "boolean" || "magnet" in stored) return stored
+  const targets = Predicate.isObject(stored["targets"]) ? stored["targets"] : {}
+  const grid = Predicate.isObject(targets["grid"]) ? targets["grid"] : {}
+  return ungated({ ...stored, enabled: stored["enabled"], targets: { ...targets, grid } })
+}
+
+/** Everything but the switch the magnet is, which changed meaning (`ungatedSnapping`). */
+const snapConfigFields = {
   /** Grid step in cm: the game's list, or a typed one. */
   gridSize: Positive,
-  /** Whether a turn snaps. */
+  /** Whether a turn snaps to its step, magnet or not. */
   rotationEnabled: Schema.Boolean,
   /** Rotation step in degrees. */
   rotationStep: Positive,
-  /** Whether a scale snaps. */
+  /** Whether a scale snaps to its step, magnet or not. */
   scaleEnabled: Schema.Boolean,
-  /** Resize dimensions to grid multiples when bounds are known. */
+  /** Resize dimensions to grid multiples when bounds are known, while the grid is on. */
   scaleToGrid: Schema.Boolean.pipe(Schema.withDecodingDefaultTypeKey(Effect.succeed(true))),
   /** Scale step in percent. */
   scaleStep: Positive,
@@ -123,6 +151,7 @@ export const SnapConfig = Schema.Struct({
   /** The targets, highest priority first. */
   order: Schema.Array(Schema.Literals(SNAP_TARGETS)),
   targets: Schema.Struct({
+    /** The grid's switch is its own: a move lands on the grid while it is on, magnet or not. */
     grid: GridTarget,
     connectors: ConnectorsTarget,
     mesh: MeshTarget,
@@ -130,11 +159,32 @@ export const SnapConfig = Schema.Struct({
     tracking: TrackingTarget,
     alignment: AlignmentTarget
   })
+}
+
+const SnapConfigNow = Schema.Struct({
+  /**
+   * The magnet: snapping to what is in the map, every target but the grid (`targetOn`). The grid, a turn's step and
+   * a scale's step have switches of their own and don't wait on it.
+   */
+  magnet: Schema.Boolean,
+  ...snapConfigFields
 })
+
+/** A snap config saved while its `enabled` was snapping as a whole, grid and steps included (`ungatedSnapping`). */
+const SnapConfigGated = Schema.Struct({ enabled: Schema.Boolean, ...snapConfigFields }).pipe(
+  Schema.decodeTo(SnapConfigNow, {
+    decode: SchemaGetter.transform(ungated),
+    encode: SchemaGetter.forbidden(() => "A snap config is saved in its current form")
+  })
+)
+
+/** A map's snapping; one saved in the gated form reads as it behaved (`ungatedSnapping`), and is saved in this one. */
+export const SnapConfig = Schema.Union([SnapConfigNow, SnapConfigGated])
 export type SnapConfig = typeof SnapConfig.Type
 
+/** Nothing snaps until it is turned on: the magnet, the grid, Rotate and Scale all start off. */
 export const defaultSnapConfig: SnapConfig = {
-  enabled: false,
+  magnet: false,
   gridSize: DEFAULT_GRID_SIZE,
   rotationEnabled: false,
   rotationStep: DEFAULT_ROTATION_STEP,
@@ -145,7 +195,7 @@ export const defaultSnapConfig: SnapConfig = {
   threshold: 12,
   order: SNAP_PRESETS.gridFirst,
   targets: {
-    grid: { enabled: true, origin: ORIGIN, yaw: 0 },
+    grid: { enabled: false, origin: ORIGIN, yaw: 0 },
     connectors: {
       enabled: true,
       range: null,
@@ -182,9 +232,16 @@ const wholeOrder = (order: ReadonlyArray<SnapTarget>): ReadonlyArray<SnapTarget>
 /** Every target in its place, on or off: the rows of the priority list. */
 export const rowsOf = (config: SnapConfig): ReadonlyArray<SnapTarget> => wholeOrder(config.order)
 
+/**
+ * Whether `target` snaps under `config`: the grid by its own switch, every other target by its own and the magnet's
+ * (docs/SNAPPING.md § Affect).
+ */
+export const targetOn = (config: SnapConfig, target: SnapTarget): boolean =>
+  config.targets[target].enabled && (target === "grid" || config.magnet)
+
 /** The targets that are on, in the order they are asked. */
 export const priorityOf = (config: SnapConfig): ReadonlyArray<SnapTarget> =>
-  rowsOf(config).filter((target) => config.targets[target].enabled)
+  rowsOf(config).filter((target) => targetOn(config, target))
 
 /**
  * The order a frame asks the targets in: the list's, except that Connectors pulling harder than even goes ahead of Grid
@@ -200,15 +257,27 @@ export const askedOrder = (config: SnapConfig): ReadonlyArray<SnapTarget> => {
   return [...rest.slice(0, first), "connectors", ...rest.slice(first)]
 }
 
-/** Whether a move lands on the grid: snapping as a whole is on, and the Grid target is. */
-export const snapsGrid = (config: SnapConfig): boolean => config.enabled && config.targets.grid.enabled
+/** Whether a move lands on the grid: the Grid target's own switch, magnet or not. */
+export const snapsGrid = (config: SnapConfig): boolean => targetOn(config, "grid")
 
-/** Whether a turn snaps to its step: under snapping as a whole, unless Ctrl turns it `off`, and its own toggle. */
-export const snapsRotation = (config: SnapConfig, off = false): boolean =>
-  config.enabled && !off && config.rotationEnabled
+/**
+ * How a scrub of a position field lands on the grid along `axis` (docs/SNAPPING.md § Numeric steps): in the grid's
+ * steps, counted from its origin as measured from `shownFrom`, where the field reads 0; undefined while the grid is
+ * off. A turned grid's X and Y lines don't run along the fields' axes, so there those scrubs only keep its spacing from
+ * its origin.
+ */
+export const gridScrubOf = (
+  config: SnapConfig,
+  axis: "x" | "y" | "z",
+  shownFrom: Vec3 = ORIGIN
+): { readonly step: number; readonly from: number } | undefined =>
+  snapsGrid(config) ? { step: config.gridSize, from: config.targets.grid.origin[axis] - shownFrom[axis] } : undefined
+
+/** Whether a turn snaps to its step: Rotate's own switch, magnet or not, unless Ctrl turns it `off`. */
+export const snapsRotation = (config: SnapConfig, off = false): boolean => !off && config.rotationEnabled
 
 /** Whether a scale snaps to its step, as `snapsRotation` does a turn. */
-export const snapsScale = (config: SnapConfig, off = false): boolean => config.enabled && !off && config.scaleEnabled
+export const snapsScale = (config: SnapConfig, off = false): boolean => !off && config.scaleEnabled
 
 export const withPreset = (config: SnapConfig, preset: SnapPreset): SnapConfig => ({
   ...config,
@@ -255,8 +324,8 @@ export const kindsFor = (transform: SnapTransform, kinds: ReadonlyArray<SnapKind
 
 /**
  * `config` while the keys of `kinds` are held: those kinds' targets on and every other off, the grid among them, with
- * their parameters and their place in the priority list as they were. Holding one turns snapping on for its kind. With
- * no kinds it is `config` itself.
+ * their parameters and their place in the priority list as they were. Holding one turns the magnet on for its kind.
+ * With no kinds it is `config` itself.
  */
 export const narrowedTo = (config: SnapConfig, kinds: ReadonlyArray<SnapKind>): SnapConfig => {
   if (kinds.length === 0) return config
@@ -264,7 +333,7 @@ export const narrowedTo = (config: SnapConfig, kinds: ReadonlyArray<SnapKind>): 
   const { alignment, connectors, construction, grid, mesh, tracking } = config.targets
   return {
     ...config,
-    enabled: true,
+    magnet: true,
     targets: {
       grid: { ...grid, enabled: false },
       connectors: { ...connectors, enabled: kept.has("connectors") },
@@ -300,8 +369,8 @@ const TURN_TARGETS: Readonly<Record<"turn" | "scale", ReadonlyArray<SnapTarget>>
 
 /**
  * How a turn or a scale snaps under `config` with `kinds` held and Ctrl held (`off`; docs/SNAPPING.md § Affect): the
- * targets it can stop on come with snapping as a whole and a held key narrows them to its kind, bringing them on with
- * snapping off. The step comes with snapping as a whole and Rotate's or Scale's own switch, whatever key is held.
+ * targets it can stop on are those that are on (`targetOn`), and a held key narrows them to its kind, bringing them on
+ * with the magnet off. The step is Rotate's or Scale's own switch, whatever key is held. Ctrl turns all of it off.
  */
 export const turnSnapOf = (
   config: SnapConfig,
@@ -310,7 +379,7 @@ export const turnSnapOf = (
   off: boolean
 ): { readonly step: boolean; readonly targets: ReadonlyArray<SnapTarget> } => {
   const narrowed = narrowedTo(config, kindsFor(transform, kinds))
-  if (off || !narrowed.enabled) return { step: false, targets: [] }
+  if (off) return { step: false, targets: [] }
   return {
     step: transform === "turn" ? snapsRotation(config) : snapsScale(config),
     targets: priorityOf(narrowed).filter((target) => TURN_TARGETS[transform].includes(target))
@@ -369,7 +438,7 @@ export const scaleSnapStep = (
   extent: number | undefined,
   off = false
 ): number | undefined => {
-  if (off || !config.enabled) return undefined
+  if (off) return undefined
   if (config.scaleToGrid && config.targets.grid.enabled && extent !== undefined && extent > 0) {
     return config.gridSize / extent
   }

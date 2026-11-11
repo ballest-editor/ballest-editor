@@ -9,7 +9,7 @@ import type { ConstructionAxis, ConstructionPlane } from "./MapSidecar"
 import { runMidpoints } from "./meshElements"
 import { localToWorld } from "./pivot"
 import { snapValue } from "./snap"
-import { rangeOf, type SnapConfig, type SnapTarget } from "./snapConfig"
+import { rangeOf, type SnapConfig, type SnapTarget, targetOn } from "./snapConfig"
 import {
   type BasePoint,
   type Constraint,
@@ -462,7 +462,7 @@ const ON_CAP_CM = 1
  * the end connects by.
  */
 const onEndCap = (frame: SnapFrame, item: SnapItem, point: Vec3): boolean =>
-  frame.config.targets.connectors.enabled && item.ends.some((end) => {
+  targetOn(frame.config, "connectors") && item.ends.some((end) => {
     const out = vecSub(point, end.cap?.centre ?? end.position)
     const reach = end.cap === undefined ? CAP_CM : end.cap.reach + ON_CAP_CM
     return Math.abs(vecDot(out, end.forward)) <= ON_CAP_CM && vecLength(out) <= reach

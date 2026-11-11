@@ -8,6 +8,7 @@ import type { Box } from "../domain/itemBounds"
 import type { Item } from "../domain/MapFile"
 import type { WorldMesh } from "../domain/meshElements"
 import { defaultSettings } from "../domain/Settings"
+import { defaultSnapConfig, type SnapConfig } from "../domain/snapConfig"
 import type { SnapItem, SnapView } from "../domain/snapFrame"
 import { cornersOf } from "../domain/snapRelation"
 import type { PaneCamera } from "../editor/paneCameras"
@@ -159,3 +160,10 @@ export const endAlongX = (item: string, index: number, x: number, facing: 1 | -1
   up: { x: 0, y: 0, z: 1 },
   profile: "Track"
 })
+
+/** Snapping with the magnet, the grid and every target on, which the defaults leave off: where the snap tests start. */
+export const allSnapping: SnapConfig = {
+  ...defaultSnapConfig,
+  magnet: true,
+  targets: { ...defaultSnapConfig.targets, grid: { ...defaultSnapConfig.targets.grid, enabled: true } }
+}

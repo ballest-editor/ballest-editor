@@ -309,7 +309,7 @@ describe("snap data in the sidecar", () => {
   it("keeps a map's annotations and snap settings beside its pivots and chains, through a save and a rewrite", () => {
     const { ids, keys, map, structure } = authored()
     const annotations = { joints: [joint(keys.k0, keys.k1)], construction: [plane], measurements: [measurement] }
-    const snap = { ...defaultSnapConfig, enabled: true, gridSize: 37 }
+    const snap = { ...defaultSnapConfig, magnet: true, gridSize: 37 }
     const group = structure.tree.find((node) => node.kind === "group")
     if (group?.kind !== "group") return assert.fail("the map has no group")
     const world = { x: 1, y: 2, z: 3 }
@@ -328,6 +328,26 @@ describe("snap data in the sidecar", () => {
         assert.deepStrictEqual(loaded.snap, snap, hash)
       }
     }
+  })
+
+  it("reads snap settings saved while the magnet gated all of snapping as they behaved", () => {
+    const { ids, map, structure } = authored()
+    const saved = Schema.encodeSync(MapSidecar)(sidecarOf(map, ids, structure, HASH, defaultSnapConfig))
+    const { magnet: _, ...current } = defaultSnapConfig
+    const gated = (enabled: boolean) => ({
+      ...saved,
+      snap: {
+        ...current,
+        enabled,
+        gridSize: 37,
+        targets: { ...current.targets, grid: { ...current.targets.grid, enabled: true } }
+      }
+    })
+    const snapOf = (enabled: boolean) => loadStructure(map, HASH, Schema.decodeSync(MapSidecar)(gated(enabled))).snap
+    assert.deepStrictEqual(snapOf(false), { ...defaultSnapConfig, gridSize: 37 }, "off snapped nothing, grid included")
+    const on = snapOf(true) ?? assert.fail("no snap settings")
+    assert.isTrue(on.magnet)
+    assert.isTrue(on.targets.grid.enabled)
   })
 
   it("writes neither while the map has none of its own", () => {
