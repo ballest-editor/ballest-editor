@@ -3,8 +3,9 @@
 // listens there with a strict port; in desktop mode apps/desktop's watch build runs Electron against it.
 //
 // PORT=4000 pnpm dev overrides the port.
-import { execFileSync, spawn } from "node:child_process"
 import { devPort } from "./devPort.ts"
+import { git } from "./git.ts"
+import { runTurbo } from "./turbo.ts"
 
 const modes = {
   dev: { filters: ["@ballest/web"], host: "localhost" },
@@ -20,9 +21,6 @@ if (!isMode(modeName)) {
   process.exit(2)
 }
 const mode = modes[modeName]
-
-const git = (...args: ReadonlyArray<string>) =>
-  execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()
 
 /** The top of this checkout when it is a linked worktree (`git worktree add`); undefined for the main one. */
 const linkedWorktree = (): string | undefined => {
@@ -42,29 +40,11 @@ console.log(`[dev-runner] ${modeName} on ${url}${worktree === undefined ? "" : `
 
 // Loose env mode: the tasks need the variables above, and Electron needs the desktop session's (WAYLAND_DISPLAY,
 // XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, APPDATA, ...). Turbo's strict mode strips both; nothing here is cached.
-const windows = process.platform === "win32"
-const child = spawn(
-  "turbo",
+runTurbo(
   ["run", "dev", ...mode.filters.map((filter) => `--filter=${filter}`), "--env-mode=loose", ...turboArgs],
+  modeName,
   {
-    stdio: "inherit",
-    env: { ...process.env, PORT: String(port), HOST: mode.host, VITE_DEV_SERVER_URL: url },
-    // turbo is a .cmd shim on Windows, which only a shell can run.
-    shell: windows,
-    // Its own process group, signalled as a whole below: turbo's Node shim runs the real binary synchronously and
-    // passes no signal on. (On Windows, Ctrl+C reaches every process on the console, and detached means a new one.)
-    detached: !windows
+    env: { PORT: String(port), HOST: mode.host, VITE_DEV_SERVER_URL: url },
+    ownGroup: true
   }
 )
-for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-  process.on(signal, () => {
-    if (windows || child.pid === undefined) child.kill(signal)
-    else process.kill(-child.pid, signal)
-  })
-}
-child.on("error", (error) => {
-  // turbo is on PATH only inside a pnpm script.
-  console.error(`[dev-runner] could not run turbo (${error.message}); start this with \`pnpm ${modeName}\``)
-  process.exit(1)
-})
-child.on("exit", (code, signal) => process.exit(signal === null ? (code ?? 0) : 1))
