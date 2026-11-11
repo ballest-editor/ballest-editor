@@ -10,7 +10,7 @@ From the repo root:
 pnpm dev:desktop    # Vite for the page, a watch build for main and preload, and Electron
 ```
 
-Edits to the page hot-reload in the window. Edits under `src/` here rebuild `main.cjs` or `preload.cjs`, and Electron restarts if their bytes changed. Unsaved edits are kept through a restart ([docs/DESKTOP.md § Recovery](../../docs/DESKTOP.md#recovery)). Ctrl+C stops everything.
+Edits to the page hot-reload in the window. Edits under `src/` here rebuild `main.cjs` or `preload.cjs`, and Electron restarts if their bytes changed. Unsaved edits are kept through a restart ([docs/DESKTOP.md § Recovery](../../docs/DESKTOP.md#recovery)). Quitting the app (closing its last window, or Ctrl+Q) ends `pnpm dev:desktop`, as does Ctrl+C. If the main process crashes instead, the session stays up and Electron starts again on the next change to main or preload.
 
 Or run it against a production build:
 

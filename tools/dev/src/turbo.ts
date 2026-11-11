@@ -77,12 +77,13 @@ const lstatOrUndefined = (path: string) => {
  * Runs turbo with the shared cache and `env` on top of this process's, and exits with it. `script` names the pnpm script
  * for the message when turbo isn't on PATH. With `ownGroup`, turbo gets a process group of its own, which a signal to
  * this process reaches as a whole: turbo's Node shim runs the real binary synchronously and passes no signal on. Without
- * it, turbo stays in the caller's group, so whatever stops that (Ctrl+C, an agent's shell) stops turbo too.
+ * it, turbo stays in the caller's group, so whatever stops that (Ctrl+C, an agent's shell) stops turbo too. `quitOn` is
+ * a signal that asks for a clean stop: turbo gets SIGTERM, and this process exits 0 once it has gone.
  */
 export const runTurbo = (
   args: ReadonlyArray<string>,
   script: string,
-  options: { readonly env?: NodeJS.ProcessEnv; readonly ownGroup?: boolean } = {}
+  options: { readonly env?: NodeJS.ProcessEnv; readonly ownGroup?: boolean; readonly quitOn?: NodeJS.Signals } = {}
 ) => {
   const windows = process.platform === "win32"
   // On Windows, Ctrl+C reaches every process on the console, and detached means a new one.
@@ -95,10 +96,16 @@ export const runTurbo = (
     shell: windows,
     detached: ownGroup
   })
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-    process.on(signal, () => {
-      if (!ownGroup || child.pid === undefined) child.kill(signal)
-      else process.kill(-child.pid, signal)
+  const forward = (signal: NodeJS.Signals) => {
+    if (!ownGroup || child.pid === undefined) child.kill(signal)
+    else process.kill(-child.pid, signal)
+  }
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => forward(signal))
+  let quitting = false
+  if (options.quitOn !== undefined) {
+    process.on(options.quitOn, () => {
+      quitting = true
+      forward("SIGTERM")
     })
   }
   child.on("error", (error) => {
@@ -106,5 +113,5 @@ export const runTurbo = (
     console.error(`could not run turbo (${error.message}); start this with \`pnpm ${script}\``)
     process.exit(1)
   })
-  child.on("exit", (code, signal) => process.exit(signal === null ? (code ?? 0) : 1))
+  child.on("exit", (code, signal) => process.exit(quitting ? 0 : signal === null ? (code ?? 0) : 1))
 }
