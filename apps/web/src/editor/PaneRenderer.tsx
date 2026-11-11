@@ -1,7 +1,7 @@
 import { type RootState, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import { editorVerticalFov, MOTION_SCALE } from "../domain/Settings"
-import { firstPaneTurns, paneRects, type PaneSlot, panesToDraw, type PaneTurns } from "../domain/viewLayout"
+import { firstPaneTurns, paneRects, type PaneSlot, panesToDraw, type PaneTurns, rollOf } from "../domain/viewLayout"
 import { useAreaDrag } from "./areaDrag"
 import { meshBatches } from "./meshBatches"
 import { mapBox, type PaneCamera, paneCamerasOf, VIEW_TWEEN_MS } from "./paneCameras"
@@ -48,7 +48,7 @@ const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">
     const pane = panes[rect.slot]
     if (pane === undefined) continue
     pane.resize(rect.width, rect.height, fov)
-    pane.followProjection(viewLayout.projections[rect.slot])
+    pane.followProjection(viewLayout.projections[rect.slot], rollOf(viewLayout, rect.slot))
     if (pane.needsFraming) {
       pane.needsFraming = false
       pane.frameMap(mapBox())

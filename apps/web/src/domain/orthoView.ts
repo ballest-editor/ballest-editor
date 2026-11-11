@@ -4,7 +4,7 @@
  * `editor/paneCameras.ts` takes it to the renderer's frame through coords.ts.
  */
 import type { Vec3 } from "./coords"
-import { type OrthoView, orthoViews } from "./viewLayout"
+import { type OrthoView, orthoViews, type ViewRoll } from "./viewLayout"
 
 export interface OrthoAxes {
   /** Where the view looks. */
@@ -33,6 +33,13 @@ export const ORTHO_AXES: Readonly<Record<OrthoView, OrthoAxes>> = {
   right: { forward: minus(Y), up: Z, right: X }
 }
 
+/** A quarter turn of the picture clockwise: what ran up the screen runs to the right, and what ran right runs down. */
+const rollClockwise = ({ forward, up, right }: OrthoAxes): OrthoAxes => ({ forward, up: minus(right), right: up })
+
+/** A view's axes with its picture rolled `roll` quarter turns clockwise about the direction it looks along. */
+export const orthoAxesOf = (view: OrthoView, roll: ViewRoll): OrthoAxes =>
+  Array.from({ length: roll }).reduce<OrthoAxes>(rollClockwise, ORTHO_AXES[view])
+
 export const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z
 
 export type GameAxis = "x" | "y" | "z"
@@ -60,7 +67,7 @@ export const clampCmPerPixel = (cmPerPixel: number): number =>
 const FRAME_MARGIN = 1.15
 
 /**
- * The centre and zoom that show `bounds` whole in a pane of this size. `minimumSpan` (cm) keeps a single small piece or
+ * The centre and zoom that show `bounds` whole in a pane of this size, its picture rolled by `roll`. `minimumSpan` (cm) keeps a single small piece or
  * an empty map from filling the pane.
  */
 export const orthoFraming = (
@@ -68,9 +75,10 @@ export const orthoFraming = (
   view: OrthoView,
   width: number,
   height: number,
-  minimumSpan = 0
+  minimumSpan = 0,
+  roll: ViewRoll = 0
 ): { readonly center: Vec3; readonly cmPerPixel: number } => {
-  const { right, up } = ORTHO_AXES[view]
+  const { right, up } = orthoAxesOf(view, roll)
   const size = { x: bounds.max.x - bounds.min.x, y: bounds.max.y - bounds.min.y, z: bounds.max.z - bounds.min.z }
   const across = Math.max(Math.abs(dot(size, right)), minimumSpan)
   const along = Math.max(Math.abs(dot(size, up)), minimumSpan)
