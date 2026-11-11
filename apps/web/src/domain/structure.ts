@@ -140,10 +140,25 @@ export const withNewItems = (structure: Structure, keys: ReadonlyArray<string>):
   tree: [...structure.tree, ...keys.map(itemNode)]
 })
 
+/**
+ * `tree` with every Item pivot whose member has left its group back at the Centre (`GroupPivot`): the pivot names a
+ * member, so it goes when the member does, and a member that comes back doesn't bring it back unasked.
+ */
+const withoutStalePivots = (tree: ReadonlyArray<TreeNode>): ReadonlyArray<TreeNode> =>
+  rewriteTree(tree, (node) => {
+    if (node.kind !== "group" || node.pivot?.choice !== "item" || treeKeys([node]).includes(node.pivot.key)) {
+      return [node]
+    }
+    const { pivot: _gone, ...centred } = node
+    return [centred]
+  })
+
 /** Drops items from the tree, their names and tags, and the joints they were part of. */
 export const withoutKeys = (structure: Structure, keys: ReadonlySet<string>): Structure => ({
   ...withoutJointsOf(structure, keys),
-  tree: rewriteTree(structure.tree, (node) => node.kind === "item" && keys.has(node.key) ? [] : [node]),
+  tree: withoutStalePivots(
+    rewriteTree(structure.tree, (node) => node.kind === "item" && keys.has(node.key) ? [] : [node])
+  ),
   items: new Map([...structure.items].filter(([key]) => !keys.has(key)))
 })
 
@@ -231,18 +246,18 @@ const sameGroupPivot = (a: GroupPivot | undefined, b: GroupPivot | undefined): b
 export const DEFAULT_CHAIN_NAME = "Chain"
 
 /**
- * Makes group `id` a chain of its children in their order, or a plain group again. A chain pivots on its first link, so
- * its own pivot goes, and a chain that becomes a group loses its growth. A group still called Group becomes Chain, and
- * back; a name the user gave stays.
+ * Makes group `id` a chain of its children in their order, or a plain group again. A chain pivots on its first link,
+ * but its group pivot stays on it unused, so Unchain gives it back; a chain that becomes a group loses its growth. A
+ * group still called Group becomes Chain, and back; a name the user gave stays.
  */
 export const withChain = (structure: Structure, id: string, chain: boolean): Structure | undefined => {
   const group = findGroup(structure.tree, id)
   if (group === undefined || group.prefab !== undefined || (group.chain === true) === chain) return undefined
   const [was, becomes] = chain ? [DEFAULT_GROUP_NAME, DEFAULT_CHAIN_NAME] : [DEFAULT_CHAIN_NAME, DEFAULT_GROUP_NAME]
-  return withGroupNode(structure, id, ({ chain: _, growth: __, pivot, ...node }) => ({
+  return withGroupNode(structure, id, ({ chain: _, growth: __, ...node }) => ({
     ...node,
     name: node.name === was ? becomes : node.name,
-    ...(chain ? { chain: true } : pivot !== undefined && { pivot })
+    ...(chain && { chain: true })
   }))
 }
 
@@ -379,9 +394,11 @@ export const withMovedNodes = (
   const left = new Set(found.flatMap(({ path }) => path.map((group) => group.id)))
   return {
     ...structure,
-    tree: rewriteTree(
-      moved,
-      (node) => node.kind === "group" && node.children.length === 0 && left.has(node.id) ? [] : [node]
+    tree: withoutStalePivots(
+      rewriteTree(
+        moved,
+        (node) => node.kind === "group" && node.children.length === 0 && left.has(node.id) ? [] : [node]
+      )
     )
   }
 }

@@ -9,6 +9,7 @@ import { pieceLabelOf } from "./pieceName"
 
 import {
   copyStructure,
+  findGroup,
   flatStructure,
   freshKey,
   freshKeys,
@@ -17,6 +18,7 @@ import {
   numberedNameText,
   type Structure,
   treeKeys,
+  withChain,
   withConnectAt,
   withGroup,
   withGroupName,
@@ -195,6 +197,34 @@ describe("names and tags", () => {
     const onGroup = withTags(start, "x", ["t"])!
     assert.deepStrictEqual(onGroup.tree[1], { ...group("x", item("b")), tags: ["t"] })
     assert.isUndefined(withTags(start, "nope", ["t"]))
+  })
+})
+
+describe("a group's Item pivot when its member leaves", () => {
+  const byItem = (key: string, ...children: ReadonlyArray<TreeNode>): GroupNode => ({
+    ...group("g", ...children),
+    pivot: { choice: "item", key }
+  })
+  const pivotOf = (s: Structure | undefined) => s === undefined ? "unchanged" : findGroup(s.tree, "g")?.pivot
+
+  it("goes back to the Centre when the member is moved out or deleted, and stays on one moved within", () => {
+    const start = structure(byItem("c", item("a"), group("inner", item("b")), item("c")), item("d"))
+    assert.isUndefined(pivotOf(withMovedNodes(start, ["c"], null, 0)), "moved out")
+    assert.isUndefined(pivotOf(withoutKeys(start, new Set(["c"]))), "deleted")
+    assert.deepStrictEqual(pivotOf(withMovedNodes(start, ["c"], "inner", 0)), { choice: "item", key: "c" })
+    assert.deepStrictEqual(pivotOf(withoutKeys(start, new Set(["a"]))), { choice: "item", key: "c" })
+  })
+})
+
+describe("withChain", () => {
+  it("keeps a group's pivot through Make chain, so Unchain gives it back", () => {
+    const point = { choice: "point", world: { x: 1, y: 2, z: 3 } } as const
+    const start = structure({ ...group("g", item("a"), item("b")), pivot: point })
+    const chained = withChain(start, "g", true)!
+    assert.isTrue(findGroup(chained.tree, "g")?.chain)
+    const back = withChain(chained, "g", false)!
+    assert.deepStrictEqual(findGroup(back.tree, "g")?.pivot, point)
+    assert.isUndefined(findGroup(back.tree, "g")?.chain)
   })
 })
 

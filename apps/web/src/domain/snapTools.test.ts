@@ -20,7 +20,7 @@ import {
   planeFromWorld,
   selectionBases
 } from "./snapTools"
-import { rotateVec, rotatorToQuat, vecDot } from "./ueMath"
+import { quatDot, rotateVec, rotatorToQuat, vecDot } from "./ueMath"
 
 const must = <T>(value: T | undefined): T => {
   if (value === undefined) throw new Error("expected a value")
@@ -161,6 +161,22 @@ describe("mirroredTransform", () => {
     const mirrored = mirroredTransform<UeTransform>(turned, plane)
     const y = rotateVec(turned.rotation, { x: 0, y: 1, z: 0 })
     expectVec(rotateVec(mirrored.rotation, { x: 0, y: 1, z: 0 }), { x: -y.x, y: y.y, z: y.z })
+  })
+})
+
+describe("mirroredTransform on Y", () => {
+  it("keeps the rotation of an item whose Y is square to the plane, so its Flip Y alone mirrors it", () => {
+    const turned = {
+      ...identityTransform({ x: 0, y: 300, z: 0 }),
+      rotation: rotatorToQuat({ pitch: 0, yaw: 90, roll: 0 })
+    }
+    // the item's Y is the world's -X: a plane square to X
+    const mirrored = mirroredTransform<UeTransform>(turned, {
+      origin: { x: 100, y: 0, z: 0 },
+      normal: { x: 1, y: 0, z: 0 }
+    }, "y")
+    expectVec(mirrored.translation, { x: 200, y: 300, z: 0 })
+    assert.closeTo(Math.abs(quatDot(mirrored.rotation, turned.rotation)), 1, 1e-9)
   })
 })
 

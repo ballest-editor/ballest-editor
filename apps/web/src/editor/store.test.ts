@@ -40,6 +40,7 @@ import {
   selectionPivot,
   shownChainStart,
   shownGizmoSpace,
+  shownGroupFrame,
   shownLighting,
   shownOf,
   shownPivotMode,
@@ -1654,6 +1655,20 @@ describe("groups and the selection", () => {
     assert.isUndefined(pivot())
   })
 
+  it("counts a hidden member in its group's box and Centre pivot", () => {
+    const { a, b, c, outer } = nestedMap()
+    state().setItemFlag([c], "hidden", true)
+    state().select([a, b, c])
+    // no catalog here, so each member counts as its origin: x 0 to 200 with c, hidden, at 200
+    assert.deepStrictEqual(selectionPivot(state(), transformOf)?.pivot, {
+      x: 100,
+      y: 0,
+      z: transformOf(a).translation.z
+    })
+    const frame = shownGroupFrame(state(), outer)!
+    assert.deepStrictEqual([frame.origin.x, frame.halfExtents.x], [100, 100])
+  })
+
   it("holds the pivot setting at Together until two units are selected, and toggles it", () => {
     const { a, b, c, d } = nestedMap()
     assert.strictEqual(state().pivotMode, "together")
@@ -1798,33 +1813,36 @@ describe("groups and the selection", () => {
     assert.isFalse(state().layChain(a, { kind: "straight" }))
   })
 
-  it("chains one whole group selected in place, and bends it link by link at once, without entering it", () => {
+  it("chains one whole group selected in place, which moves as one thing until it is entered", () => {
     const { a, b, c, d, outer } = nestedMap()
     state().select([a, b, c])
     state().chainSelection()
     assert.strictEqual(findGroup(state().doc.structure.tree, outer)?.chain, true, "the group itself")
     assert.strictEqual(state().enteredGroupId, null)
-    assert.isTrue(isShownChain(state()))
-    assert.strictEqual(shownPivotMode(state()), "each", "a new chain goes link by link, so a turn bends it")
+    assert.isFalse(isShownChain(state()), "a whole chain follows the pivot setting")
+    assert.strictEqual(shownPivotMode(state()), "together", "and alone it is one thing, so it turns rigidly")
     assert.deepStrictEqual(
       shownChainStart(state()),
       { at: selectionPivot(state(), transformOf)!.pivot, gizmo: true },
       "link 1's pivot, under the gizmo"
     )
-    // the period key flips the chain's setting, and leaves the pivot setting alone
-    state().togglePivotMode()
-    assert.strictEqual(state().chainMode, "rigid")
-    assert.strictEqual(state().pivotMode, "together")
-    assert.strictEqual(shownPivotMode(state()), "together", "Rigid")
-    state().togglePivotMode()
-    // a chain among other units follows the pivot setting, and has no start to mark
-    state().select([a, b, c, d])
-    assert.isFalse(isShownChain(state()))
-    assert.strictEqual(shownPivotMode(state()), "together")
-    assert.isUndefined(shownChainStart(state()))
+    // the period key flips the pivot setting, which a chain alone can't take, and leaves the chain's alone
     state().togglePivotMode()
     assert.strictEqual(state().chainMode, "links")
-    assert.strictEqual(shownPivotMode(state()), "each")
+    assert.strictEqual(state().pivotMode, "each")
+    assert.strictEqual(shownPivotMode(state()), "together")
+    state().togglePivotMode()
+    // a chain among other units follows the pivot setting too, and has no start to mark
+    state().select([a, b, c, d])
+    assert.isUndefined(shownChainStart(state()))
+    // inside it, its links follow the chain setting, link by link by default
+    state().enterGroup(outer)
+    state().select([a, b, c])
+    assert.isTrue(isShownChain(state()))
+    assert.strictEqual(shownPivotMode(state()), "each", "a turn bends it")
+    state().togglePivotMode()
+    assert.strictEqual(state().chainMode, "rigid")
+    assert.strictEqual(shownPivotMode(state()), "together", "Rigid")
     state().togglePivotMode()
   })
 

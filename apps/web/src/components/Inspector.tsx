@@ -1099,7 +1099,7 @@ export function Inspector() {
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
               {frame !== undefined && (
                 <TransformSection of="group" unit={frame} transforms={transforms} extent={extent}>
-                  <FlipSection items={placed} />
+                  <FlipSection items={placed} group />
                 </TransformSection>
               )}
               <PivotSection />

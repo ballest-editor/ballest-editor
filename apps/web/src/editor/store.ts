@@ -2459,7 +2459,7 @@ export const selectionUnits = (
   transformOf: (id: string) => UeTransform | undefined
 ): SelectionUnits | undefined => selectionUnitsOf(s.selectedIds, s.enteredGroupId, unitContext(s, transformOf))
 
-/** Whether the selection as shown is a chain on its own, which follows the chain setting (`isChainSelection`). */
+/** Whether the selection as shown is links inside an entered chain, which follow the chain setting (`isChainSelection`). */
 export const isShownChain = (s: EditorState): boolean => {
   const selection = selectionUnits(s, (id) => shownTransform(s, id))
   return selection !== undefined && isChainSelection(selection)
@@ -2514,8 +2514,10 @@ export const shownChainStart = (s: EditorState): ChainStartSpec | undefined =>
 
 const chainStartFor = perState((s): ChainStartSpec | undefined => {
   const selection = selectionUnits(s, (id) => shownTransform(s, id))
-  if (selection === undefined || !isChainSelection(selection)) return undefined
-  const at = (selection.chain ?? selection.units[0]?.links)?.[0]?.pivot
+  if (selection === undefined) return undefined
+  const [first, second] = selection.units
+  const whole = second === undefined && (first?.links?.length ?? 0) >= 2 ? first?.links : undefined
+  const at = (selection.chain ?? whole)?.[0]?.pivot
   if (at === undefined) return undefined
   const pivot = pivotUnitOf(selection, pivotModeFor(s, selection)).pivot
   const transforming = s.tool === "translate" || s.tool === "rotate" || s.tool === "scale"

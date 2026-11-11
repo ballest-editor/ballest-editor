@@ -41,12 +41,13 @@ import {
 export type PivotMode = "together" | "each"
 
 /**
- * How a chain on its own takes an edit (`isChainSelection`): whole, as Together moves a group, or link by link, as Each
- * passes it down the links, so a turn bends it, a move spreads it and a scale stretches it.
+ * How links selected inside an entered chain take an edit (`isChainSelection`): whole, as Together moves a group, or link
+ * by link, as Each passes it down the links, so a turn bends it, a move spreads it and a scale stretches it. A whole
+ * chain selected from outside is one thing and always takes an edit whole (docs/design/pivot-modes-and-chains.md § Chains).
  */
 export type ChainMode = "rigid" | "links"
 
-/** The two settings an edit is applied by: one for a chain on its own, one for any other selection. */
+/** The two settings an edit is applied by: one for links inside an entered chain, one for any other selection. */
 export interface PivotSettings {
   readonly pivotMode: PivotMode
   readonly chainMode: ChainMode
@@ -328,28 +329,23 @@ export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit =>
   effectivePivotMode(mode, selection) === "each" ? passHeadOf(selection) ?? selection.active : selection.active
 
 /**
- * The effective mode: Each needs two or more units, one chain of two or more links, or a link inside an entered chain;
- * else a selection is Together whatever the setting holds.
+ * The effective mode: Each needs two or more units, or a link inside an entered chain; else a selection is Together
+ * whatever the setting holds.
  */
 export const effectivePivotMode = (mode: PivotMode, selection: SelectionUnits | undefined): PivotMode =>
   mode === "each" && selection !== undefined && canEach(selection) ? "each" : "together"
 
-/** Whether Each does anything to `selection`: two or more units, a chain alone that can bend, or a link inside one. */
-export const canEach = (selection: SelectionUnits): boolean => {
-  const [first, second] = selection.units
-  return second !== undefined || selection.chain !== undefined || (first?.links?.length ?? 0) >= 2
-}
+/** Whether Each does anything to `selection`: two or more units, or a link inside an entered chain. */
+export const canEach = (selection: SelectionUnits): boolean =>
+  selection.units[1] !== undefined || selection.chain !== undefined
 
 /**
- * Whether the chain setting decides how `selection` takes an edit: one whole chain of two or more links, or links
- * selected inside an entered chain. A chain among other units follows the pivot setting.
+ * Whether the chain setting decides how `selection` takes an edit: links selected inside an entered chain. A whole chain
+ * is one unit, which follows the pivot setting like a group and moves, turns and scales whole.
  */
-export const isChainSelection = (selection: SelectionUnits): boolean => {
-  const [first, second] = selection.units
-  return selection.chain !== undefined || (second === undefined && (first?.links?.length ?? 0) >= 2)
-}
+export const isChainSelection = (selection: SelectionUnits): boolean => selection.chain !== undefined
 
-/** The mode an edit of `selection` is applied by: the chain setting for a chain on its own, the pivot setting else. */
+/** The mode an edit of `selection` is applied by: the chain setting inside an entered chain, the pivot setting else. */
 export const pivotModeFor = (settings: PivotSettings, selection: SelectionUnits): PivotMode =>
   isChainSelection(selection) ? (settings.chainMode === "links" ? "each" : "together") : settings.pivotMode
 
@@ -694,10 +690,8 @@ export const applyUnitEdit = (
     chainPass(out, chain, (link) => selected.has(link.id), transforms, edit, selection.growth)
     return out
   }
-  for (const unit of units) {
-    if (unit.links !== undefined) chainPass(out, unit.links, () => true, transforms, edit, unit.growth)
-    else applyTo(out, unit.keys, transforms, edit(unit))
-  }
+  // a whole chain is one thing: it takes its edit whole, about its own pivot, as a group does
+  for (const unit of units) applyTo(out, unit.keys, transforms, edit(unit))
   return out
 }
 
@@ -737,36 +731,29 @@ export const applyUnitOffsets = (
   return out
 }
 
-/** The items of a unit that take an edit in Each as the gizmo shows it: a chain's first link, since the links after it
- * take it more than once as it runs down; a plain unit's own. */
-const leaderOf = (unit: Unit): ReadonlyArray<string> => unit.links?.[0]?.keys ?? unit.keys
-
 /**
  * The items snapping measures an edit by `mode` on: those that take it as the gizmo shows it. In Together that is every
- * unit, and in Each only the active one, as the others go along their own axes or about their own pivots. A chain in
- * Each passes the edit down from its first link (inside an entered chain, the first selected), so that link alone
- * leads: the links after take it again and again. A link carried along inside an entered chain isn't one either.
+ * unit, and in Each only the active one, as the others go along their own axes or about their own pivots. Inside an
+ * entered chain in Each the edit runs down from the first selected link, so that link alone leads: the links after take
+ * it again and again, and a link carried along isn't one either.
  */
 export const leadingKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> => {
   if (effectivePivotMode(mode, selection) !== "each") return selection.units.flatMap((unit) => unit.keys)
-  return passHeadOf(selection)?.keys ?? leaderOf(selection.active)
+  return passHeadOf(selection)?.keys ?? selection.active.keys
 }
 
 /**
- * The items that take a move along the world's axes as dragged, so any of them can lead it: every unit in Together, and
- * in Each every plain unit and a chain's first link (`leadingKeys`).
+ * The items that take a move along the world's axes as dragged, so any of them can lead it: every unit, except inside
+ * an entered chain in Each, where only the first selected link does (`leadingKeys`).
  */
 export const movedAlikeKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> =>
-  effectivePivotMode(mode, selection) !== "each"
-    ? selection.units.flatMap((unit) => unit.keys)
-    : selection.chain === undefined
-    ? selection.units.flatMap(leaderOf)
-    : leadingKeys(selection, mode)
+  effectivePivotMode(mode, selection) === "each" && selection.chain !== undefined
+    ? leadingKeys(selection, mode)
+    : selection.units.flatMap((unit) => unit.keys)
 
 /** Whether a turn by `mode` runs down a chain, so the active unit can end up turned by more than the angle dragged. */
 export const turnAccumulates = (selection: SelectionUnits, mode: PivotMode): boolean =>
-  effectivePivotMode(mode, selection) === "each" &&
-  (selection.chain !== undefined || selection.active.links !== undefined)
+  effectivePivotMode(mode, selection) === "each" && selection.chain !== undefined
 
 const EPSILON = 1e-6
 const nearVec = (a: Vec3, b: Vec3) =>

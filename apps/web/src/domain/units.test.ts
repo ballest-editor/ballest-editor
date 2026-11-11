@@ -271,13 +271,28 @@ describe("chains", () => {
   const transforms = new Map(links.map((key, i) => [key, at(i * 1000)]))
   const chain = group("chain", links.map(item), { chain: true })
 
-  it("turns each link by the angle about its own moved pivot in Each, so the turns accumulate down the chain", () => {
+  it("turns a whole chain beside another unit as one thing in Each, rigidly about its first link", () => {
     const withX = selectionUnitsOf(
       [...links, "x"],
       null,
       contextOf([chain, item("x")], new Map([...transforms, ["x", at(9000)]]))
     )!
     const out = applyUnitEdit(withX, "each", new Map([...transforms, ["x", at(9000)]]), deltaEdit(turn(10)))
+    links.forEach((key, i) => {
+      assert.closeTo(yawOf(out.get(key)!), 10, 1e-6, key)
+      assertVec(out.get(key)!.translation, swung({ x: i * 1000, y: 0, z: 0 }, ORIGIN, 10), key)
+    })
+    // the loose piece turns 10 about itself
+    assert.closeTo(yawOf(out.get("x")!), 10, 1e-6)
+  })
+
+  it("turns each link by the angle about its own moved pivot inside an entered chain, so the turns accumulate", () => {
+    const out = applyUnitEdit(
+      selectionUnitsOf(links, "chain", contextOf([chain], transforms))!,
+      "each",
+      transforms,
+      deltaEdit(turn(10))
+    )
     links.forEach((key, i) => assert.closeTo(yawOf(out.get(key)!), 10 * (i + 1), 1e-6, `${key} reads ${10 * (i + 1)}`))
     // link 2 swung about link 1's pivot by 10, then turned 10 more about its own moved pivot (which doesn't move it)
     assertVec(out.get("l2")!.translation, swung({ x: 1000, y: 0, z: 0 }, ORIGIN, 10), "link 2 carried by link 1")
@@ -288,16 +303,12 @@ describe("chains", () => {
       swung(swung({ x: 2000, y: 0, z: 0 }, ORIGIN, 10), l2, 10),
       "link 3 carried twice"
     )
-    // the loose piece turns 10 about itself
-    assert.closeTo(yawOf(out.get("x")!), 10, 1e-6)
   })
 
-  it("bends a chain selected whole in Each, on its own, and turns it rigidly about its first link in Together", () => {
+  it("holds a whole chain alone at Together, and turns it rigidly about its first link", () => {
     const sel = selectionUnitsOf(links, null, contextOf([chain], transforms))!
-    assert.strictEqual(effectivePivotMode("each", sel), "each", "a chain alone bends")
-    const bent = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
-    links.forEach((key, i) => assert.closeTo(yawOf(bent.get(key)!), 10 * (i + 1), 1e-6, key))
-    const rigid = applyUnitEdit(sel, "together", transforms, deltaEdit(turn(10)))
+    assert.strictEqual(effectivePivotMode("each", sel), "together", "a whole chain is one thing")
+    const rigid = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
     links.forEach((key, i) => {
       assert.closeTo(yawOf(rigid.get(key)!), 10, 1e-6)
       assertVec(rigid.get(key)!.translation, swung({ x: i * 1000, y: 0, z: 0 }, ORIGIN, 10), key)
@@ -327,16 +338,17 @@ describe("chains", () => {
     assert.closeTo(yawOf(out.get("l5")!), 90, 1e-6, "carried rigidly, so turned with it")
   })
 
-  it("lets the chain setting decide a chain on its own, and the pivot setting anything else", () => {
+  it("lets the chain setting decide links inside an entered chain, and the pivot setting anything else", () => {
     const ctx = contextOf([chain, item("x")], new Map([...transforms, ["x", at(9000)]]))
     const linksFirst = { pivotMode: "together", chainMode: "links" } as const
     const rigidEach = { pivotMode: "each", chainMode: "rigid" } as const
     const whole = selectionUnitsOf(links, null, ctx)!
     const inside = selectionUnitsOf(["l3"], "chain", ctx)!
     const mixed = selectionUnitsOf([...links, "x"], null, ctx)!
-    assert.deepStrictEqual([whole, inside, mixed].map(isChainSelection), [true, true, false])
-    assert.strictEqual(pivotModeFor(linksFirst, whole), "each")
-    assert.strictEqual(pivotModeFor(rigidEach, whole), "together")
+    assert.deepStrictEqual([whole, inside, mixed].map(isChainSelection), [false, true, false])
+    // a whole chain follows the pivot setting, and alone it is one unit, so Together
+    assert.strictEqual(pivotModeFor(linksFirst, whole), "together")
+    assert.strictEqual(effectivePivotMode(pivotModeFor(rigidEach, whole), whole), "together")
     assert.strictEqual(pivotModeFor(linksFirst, mixed), "together")
     assert.strictEqual(pivotModeFor(rigidEach, mixed), "each")
     // one link selected inside an entered chain bends from it to the end
@@ -369,7 +381,7 @@ describe("chains", () => {
     assert.deepStrictEqual(links.map((key) => across.get(key)?.translation.y), [undefined, 100, 200, 300, 400])
     // grown: linear 100% moves them 50, 100, 150, 200, 250 more than the one before
     const grown = group("chain", links.map(item), { chain: true, growth: { curve: "linear", percent: 100 } })
-    const whole = selectionUnitsOf(links, null, contextOf([grown], transforms))!
+    const whole = selectionUnitsOf(links, "chain", contextOf([grown], transforms))!
     const spaced = applyUnitEdit(
       whole,
       "each",
@@ -380,7 +392,7 @@ describe("chains", () => {
   })
 
   it("opens every joint of a curve along itself when the drag is along the first link", () => {
-    const sel = (t: ReadonlyMap<string, UeTransform>) => selectionUnitsOf(links, null, contextOf([chain], t))!
+    const sel = (t: ReadonlyMap<string, UeTransform>) => selectionUnitsOf(links, "chain", contextOf([chain], t))!
     const arc = new Map([...transforms, ...applyUnitEdit(sel(transforms), "each", transforms, deltaEdit(turn(40)))])
     // along the first link's own X, as the gizmo in Local shows it
     const offset = rotateVec(arc.get("l1")!.rotation, { x: 50, y: 0, z: 0 })
@@ -395,7 +407,7 @@ describe("chains", () => {
 
   it("stacks links piled on one pivot along the drag", () => {
     const pile = new Map(links.map((key) => [key, at(0)]))
-    const sel = selectionUnitsOf(links, null, contextOf([chain], pile))!
+    const sel = selectionUnitsOf(links, "chain", contextOf([chain], pile))!
     const up = applyUnitEdit(sel, "each", pile, deltaEdit({ kind: "translate", offset: { x: 0, y: 0, z: 100 } }))
     assert.deepStrictEqual(links.map((key) => up.get(key)!.translation.z), [100, 200, 300, 400, 500])
     assert.deepStrictEqual(links.map((key) => up.get(key)!.translation.x), [0, 0, 0, 0, 0])
@@ -405,7 +417,7 @@ describe("chains", () => {
     const whole = (growth?: ChainGrowth) =>
       selectionUnitsOf(
         links,
-        null,
+        "chain",
         contextOf(
           [group("chain", links.map(item), { chain: true, ...(growth !== undefined && { growth }) })],
           transforms
@@ -422,7 +434,7 @@ describe("chains", () => {
     assert.deepStrictEqual(xs(tapered), [0, 2000, 6000, 14000, 30000])
     // across a bent chain, each step grows along its own link
     const arc = new Map([...transforms, ...applyUnitEdit(whole(), "each", transforms, deltaEdit(turn(90)))])
-    const bent = applyUnitEdit(selectionUnitsOf(links, null, contextOf([chain], arc))!, "each", arc, double)
+    const bent = applyUnitEdit(selectionUnitsOf(links, "chain", contextOf([chain], arc))!, "each", arc, double)
     for (const [from, to] of [["l1", "l2"], ["l2", "l3"]] as const) {
       const step = vecSub(bent.get(to)!.translation, bent.get(from)!.translation)
       assert.closeTo(vecLength(step), 2000, 1e-6, `${from} to ${to}`)
@@ -434,7 +446,7 @@ describe("chains", () => {
     const keys = ["g1", "g2", "g3"]
     const turned = new Map(keys.map((key, i) => [`${key}i`, at(i * 1000, 0, 0, 90)]))
     const tree = [group("chain", keys.map((key) => group(key, [item(`${key}i`)])), { chain: true })]
-    const sel = selectionUnitsOf(keys.map((key) => `${key}i`), null, contextOf(tree, turned))!
+    const sel = selectionUnitsOf(keys.map((key) => `${key}i`), "chain", contextOf(tree, turned))!
     const out = applyUnitEdit(sel, "each", turned, deltaEdit({ kind: "scale", factor: 2, axis: "x" }))
     keys.forEach((key, i) => {
       assert.closeTo(out.get(`${key}i`)!.scale3D.x, 2, 1e-9, key)
@@ -518,7 +530,11 @@ describe("chains", () => {
 
   it("grows each link's turn by the chain's growth: by a share of the first turn, or compounding", () => {
     const sel = (growth: ChainGrowth) =>
-      selectionUnitsOf(links, null, contextOf([group("chain", links.map(item), { chain: true, growth })], transforms))!
+      selectionUnitsOf(
+        links,
+        "chain",
+        contextOf([group("chain", links.map(item), { chain: true, growth })], transforms)
+      )!
     const yaws = (growth: ChainGrowth) => {
       const out = applyUnitEdit(sel(growth), "each", transforms, deltaEdit(turn(10)))
       return links.map((key) => yawOf(out.get(key)!))
@@ -683,10 +699,10 @@ describe("a snapped drag under the setting", () => {
     assert.deepStrictEqual(leadingKeys(selectionUnitsOf(["l2"], "chain", chainContext)!, "together"), ["l2"])
   })
 
-  it("is led in Each by a chain's first link, the one link that takes the edit as dragged", () => {
+  it("is led in Each by a whole chain, one thing, and inside an entered chain by the first selected link", () => {
     const whole = selectionUnitsOf(["x", ...links], null, chainContext)!
-    assert.deepStrictEqual(leadingKeys(whole, "each"), ["l1"], "the active unit is the chain")
-    assert.deepStrictEqual(movedAlikeKeys(whole, "each"), ["l1", "x"], "a loose piece moves as dragged too")
+    assert.deepStrictEqual(leadingKeys(whole, "each"), [...links], "the active unit is the chain, whole")
+    assert.deepStrictEqual(movedAlikeKeys(whole, "each"), [...links, "x"], "a loose piece moves as dragged too")
     assert.deepStrictEqual(movedAlikeKeys(whole, "together"), [...links, "x"])
     const entered = selectionUnitsOf(["l3", "l2"], "chain", chainContext)!
     assert.deepStrictEqual(leadingKeys(entered, "each"), ["l2"], "the first selected inside the chain")
@@ -695,7 +711,7 @@ describe("a snapped drag under the setting", () => {
 
   it("knows when a turn goes past the angle dragged: only as it runs down a chain in Each", () => {
     const chainActive = selectionUnitsOf(["x", ...links], null, chainContext)!
-    assert.isTrue(turnAccumulates(chainActive, "each"), "the active unit is the chain")
+    assert.isFalse(turnAccumulates(chainActive, "each"), "a whole chain turns rigidly")
     assert.isFalse(turnAccumulates(chainActive, "together"))
     assert.isFalse(
       turnAccumulates(selectionUnitsOf([...links, "x"], null, chainContext)!, "each"),

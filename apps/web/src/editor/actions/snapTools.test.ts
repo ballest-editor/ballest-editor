@@ -11,6 +11,7 @@ import { rotatorToQuat } from "../../domain/ueMath"
 import { catalogWithEnds, endAlongX, grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { activePaneCamera } from "../paneCameras"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
+import { flipSelection, setSelectionUnitField } from "./selection"
 import {
   addWorldAxis,
   addWorldPlane,
@@ -429,6 +430,24 @@ describe("mirror", () => {
     useEditor.getState().select([a])
     mirrorSelection(acrossX(100))
     assert.deepStrictEqual(pointOf(id), world)
+  })
+
+  it("flips a whole group by mirroring its layout about its pivot, along the group's own axis", () => {
+    const [a = "", b = ""] = loadFlippable([300, 700])
+    grouped([a, b])
+    useEditor.getState().select([a, b])
+    flipSelection("x")
+    assert.closeTo(xOf(a), 700, 1e-6, "across the centre")
+    assert.closeTo(xOf(b), 300, 1e-6)
+    assert.isTrue(flipped(a) && flipped(b))
+    flipSelection("x")
+    // turned a quarter, the group's X is the world's Y: it mirrors along that, not the world's X
+    setSelectionUnitField("rotation", { x: 0, y: 0, z: 90 })
+    const [ya, yb] = [yOf(a), yOf(b)]
+    flipSelection("x")
+    assert.closeTo(yOf(a), yb, 1e-6, "a goes where b was")
+    assert.closeTo(yOf(b), ya, 1e-6)
+    assert.closeTo(xOf(a), xOf(b), 1e-6, "still in a line along the group's X")
   })
 
   it("reflects the links a selected link carries inside an entered chain, even one sitting on the plane", () => {

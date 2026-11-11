@@ -173,7 +173,7 @@ Which transforms snapping applies to. Move is always on. Rotate and Scale are to
 
 ### Under the pivot setting
 
-Snapping measures a drag on the items that take it as the gizmo shows it (`leadingKeys`, `domain/units.ts`), and the pivot setting says which those are ([DESKTOP.md § Pivot setting](DESKTOP.md#pivot-setting-together-and-each)). A chain on its own follows the chain setting instead, where Rigid reads as Together and link by link as Each ([§ Group pivots and chains](DESKTOP.md#group-pivots-and-chains)).
+Snapping measures a drag on the items that take it as the gizmo shows it (`leadingKeys`, `domain/units.ts`), and the pivot setting says which those are ([DESKTOP.md § Pivot setting](DESKTOP.md#pivot-setting-together-and-each)). Links inside an entered chain follow the chain setting instead, where Rigid reads as Together and link by link as Each; a whole chain is one unit, as a group is ([§ Group pivots and chains](DESKTOP.md#group-pivots-and-chains)).
 
 - **Together:** every unit leads. A link carried along inside an entered chain moves but doesn't lead, so its corners and ends aren't bases.
 - **Each:** a move along world axes is the same for every unit that takes it as dragged, so they all lead it (`movedAlikeKeys`). Under a local move, a turn or a scale only the active unit leads: it lands on the target, and the others take the same move, angle or factor along their own axes and about their own pivots. A chain passes the edit down from its first link (inside an entered chain, the first selected, where the gizmo then sits), and each link after takes it again on top of the one before, so only that first link leads, for a world move too.

@@ -250,6 +250,23 @@ describe("Each in the Inspector", () => {
     s().enterGroup(null)
   })
 
+  it("moves a whole chain as one solid block by a typed location, whatever the settings", () => {
+    const { ids, before } = setup()
+    s().chainSelection()
+    s().select([...ids])
+    for (const mode of ["together", "each"] as const) {
+      if (s().pivotMode !== mode) s().togglePivotMode()
+      editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
+      assert.deepStrictEqual(ids.map((id) => docTransform(id).translation.y - before.get(id)!.translation.y), [
+        40,
+        40,
+        40
+      ], mode)
+      s().undo()
+    }
+    if (s().pivotMode !== "together") s().togglePivotMode()
+  })
+
   it("turns each piece about its own pivot by a typed yaw, so every pivot stays put", () => {
     const { ids, before } = withPivots()
     s().togglePivotMode()
