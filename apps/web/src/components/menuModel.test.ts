@@ -92,7 +92,7 @@ describe("searching the menus", () => {
   it("reaches into sections and submenus", () => {
     assert.deepStrictEqual(find("outline"), ["View › Panels › Outline"])
     assert.include(find("active top"), "View › Panes › Active pane › Top")
-    assert.include(find("snapping"), "View › Snap › Snapping")
+    assert.include(find("pieces"), "View › Snap › Snap to pieces")
   })
 
   it("finds nothing for what's in no menu", () => {
@@ -116,11 +116,32 @@ describe("View › Snap", () => {
   const checks = (over?: Partial<MenuState>) =>
     snapRows(over).flatMap(({ label, checked }) => checked === undefined ? [] : [[label, checked] as const])
 
-  it("turns the magnet on with its keybind, and leaves the rest to the snap menu", () => {
-    const snapping = { ...defaultSettings.snapping, magnet: true }
-    assert.deepStrictEqual(checks({ snapping }), [["Snapping", true]])
-    assert.deepStrictEqual(snapRows().map(({ label }) => label), ["Snapping"])
-    assert.strictEqual(snapRows().find(({ label }) => label === "Snapping")?.shortcut, "snapToggle")
+  it("has the grid, the angle and pieces as three switches with their keybinds, and leaves the rest to the snap menu", () => {
+    const { snapping } = defaultSettings
+    const only = (over: Partial<typeof snapping>) => checks({ snapping: { ...snapping, ...over } })
+    const grid = (enabled: boolean) => ({ ...snapping.targets, grid: { ...snapping.targets.grid, enabled } })
+    const off = { magnet: false, rotationEnabled: false, targets: grid(false) }
+    assert.deepStrictEqual(only(off), [["Snap to grid", false], ["Snap angle", false], ["Snap to pieces", false]])
+    assert.deepStrictEqual(only({ ...off, targets: grid(true) }), [
+      ["Snap to grid", true],
+      ["Snap angle", false],
+      ["Snap to pieces", false]
+    ])
+    assert.deepStrictEqual(only({ ...off, rotationEnabled: true }), [
+      ["Snap to grid", false],
+      ["Snap angle", true],
+      ["Snap to pieces", false]
+    ])
+    assert.deepStrictEqual(only({ ...off, magnet: true }), [
+      ["Snap to grid", false],
+      ["Snap angle", false],
+      ["Snap to pieces", true]
+    ])
+    assert.deepStrictEqual(snapRows().map(({ shortcut }) => shortcut), [
+      "snapGridToggle",
+      "snapAngleToggle",
+      "snapToggle"
+    ])
   })
 })
 

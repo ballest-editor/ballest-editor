@@ -49,6 +49,8 @@ import {
   startMirror,
   startSavePrefab,
   switchProject,
+  toggleAngleSnap,
+  toggleGridSnap,
   toggleSnapping
 } from "../editor/actions"
 import { actionCommands, type CommandAction, lookAlong } from "../editor/commands"
@@ -408,7 +410,21 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
     children: [
       {
         kind: "check",
-        label: "Snapping",
+        label: "Snap to grid",
+        checked: state.snapping.targets.grid.enabled,
+        run: toggleGridSnap,
+        shortcut: "snapGridToggle"
+      },
+      {
+        kind: "check",
+        label: "Snap angle",
+        checked: state.snapping.rotationEnabled,
+        run: toggleAngleSnap,
+        shortcut: "snapAngleToggle"
+      },
+      {
+        kind: "check",
+        label: "Snap to pieces",
         checked: state.snapping.magnet,
         run: toggleSnapping,
         shortcut: "snapToggle"

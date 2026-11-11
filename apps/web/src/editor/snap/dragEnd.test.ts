@@ -192,21 +192,44 @@ describe.each(Object.entries(dragging))("a drag %s", (_kind, drag) => {
     assert.lengthOf(useEditor.getState().tracked, 0)
   })
 
-  it("keeps them through a click that never became a drag", () => {
-    act(() => scene.frame())
-    const at = _kind === "by a gizmo handle" ? handlePixel() : { x: CENTRE, y: CENTRE }
-    pointer("pointerdown", at.x, at.y, 1)
-    pointer("pointerup", at.x, at.y, 0)
-    assert.lengthOf(useEditor.getState().tracked, 1)
-  })
-
-  it("leaves the next idle hover to acquire as ever", () => {
+  it("acquires nothing from a hover once it is over, so Escape has no points to clear (docs/SNAPPING.md § Tracking)", () => {
     drag()
     pointer("pointerup", CENTRE, CENTRE, 0)
     vi.advanceTimersByTime(REST_MS)
     pointer("pointermove", CENTRE + 200, CENTRE + 200, 0)
     vi.advanceTimersByTime(REST_MS)
-    assert.lengthOf(useEditor.getState().tracked, 1)
+    assert.lengthOf(useEditor.getState().tracked, 0)
+  })
+})
+
+describe("tracking points outside a drag", () => {
+  afterEach(tearDown)
+
+  it("are never acquired by a pointer at rest, in any tool", () => {
+    setUp()
+    useEditor.getState().clearTracked()
+    for (const tool of ["select", "translate", "paint"] as const) {
+      useEditor.getState().setTool(tool)
+      pointer("pointermove", CENTRE + 200, CENTRE + 200, 0)
+      vi.advanceTimersByTime(REST_MS)
+      pointer("pointermove", CENTRE + 150, CENTRE + 150, 0)
+      vi.advanceTimersByTime(REST_MS)
+    }
+    assert.lengthOf(useEditor.getState().tracked, 0)
+  })
+
+  it("go with a click on a handle or the body that never became a drag", () => {
+    for (const on of ["a handle", "the body"] as const) {
+      setUp()
+      act(() => scene.frame())
+      if (on === "the body") useEditor.getState().setTool("select")
+      const at = on === "a handle" ? handlePixel() : { x: CENTRE, y: CENTRE }
+      pointer("pointerdown", at.x, at.y, 1)
+      vi.advanceTimersByTime(REST_MS)
+      pointer("pointerup", at.x, at.y, 0)
+      assert.lengthOf(useEditor.getState().tracked, 0, on)
+      tearDown()
+    }
   })
 })
 
