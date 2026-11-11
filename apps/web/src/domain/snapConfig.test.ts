@@ -4,6 +4,7 @@ import { allSnapping } from "../test/snapFixtures"
 import {
   askedOrder,
   defaultSnapConfig,
+  gridScrubOf,
   isPreset,
   narrowedTo,
   priorityOf,
@@ -320,6 +321,24 @@ describe("snapConfig", () => {
     assert.throws(() => Schema.decodeSync(SnapConfig)(pulled(8)))
     assert.throws(() => Schema.decodeSync(SnapConfig)(pulled(0.1)))
     assert.strictEqual(Schema.decodeSync(SnapConfig)(pulled(4)).targets.connectors.weight, 4)
+  })
+})
+
+describe("a position field's scrub", () => {
+  const moved = {
+    ...allSnapping,
+    gridSize: 50,
+    targets: { ...allSnapping.targets, grid: { ...allSnapping.targets.grid, origin: { x: 137, y: -20, z: 5 } } }
+  }
+
+  it("counts the grid's steps from its origin, magnet or not", () => {
+    assert.deepStrictEqual(gridScrubOf({ ...moved, magnet: false }, "x"), { step: 50, from: 137 })
+    assert.deepStrictEqual(gridScrubOf(moved, "z"), { step: 50, from: 5 })
+    assert.isUndefined(gridScrubOf(defaultSnapConfig, "x"))
+  })
+
+  it("measures the origin from where the field reads 0", () => {
+    assert.deepStrictEqual(gridScrubOf(moved, "y", { x: 0, y: 30, z: 0 }), { step: 50, from: -50 })
   })
 })
 

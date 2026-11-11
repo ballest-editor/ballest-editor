@@ -260,6 +260,19 @@ export const askedOrder = (config: SnapConfig): ReadonlyArray<SnapTarget> => {
 /** Whether a move lands on the grid: the Grid target's own switch, magnet or not. */
 export const snapsGrid = (config: SnapConfig): boolean => targetOn(config, "grid")
 
+/**
+ * How a scrub of a position field lands on the grid along `axis` (docs/SNAPPING.md § Numeric steps): in the grid's
+ * steps, counted from its origin as measured from `shownFrom`, where the field reads 0; undefined while the grid is
+ * off. A turned grid's X and Y lines don't run along the fields' axes, so there those scrubs only keep its spacing from
+ * its origin.
+ */
+export const gridScrubOf = (
+  config: SnapConfig,
+  axis: "x" | "y" | "z",
+  shownFrom: Vec3 = ORIGIN
+): { readonly step: number; readonly from: number } | undefined =>
+  snapsGrid(config) ? { step: config.gridSize, from: config.targets.grid.origin[axis] - shownFrom[axis] } : undefined
+
 /** Whether a turn snaps to its step: Rotate's own switch, magnet or not, unless Ctrl turns it `off`. */
 export const snapsRotation = (config: SnapConfig, off = false): boolean => !off && config.rotationEnabled
 
