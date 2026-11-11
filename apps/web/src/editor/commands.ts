@@ -27,6 +27,12 @@ export const lookAlong = (projection: ViewProjection) => {
   setPaneProjection(activePane, projection)
 }
 
+/** Rolls the active pane's orthographic view by quarter turns, clockwise for a positive number. */
+export const rollActivePane = (turns: number) => {
+  const { activePane, rollPane } = useEditor.getState()
+  rollPane(activePane, turns)
+}
+
 /** A command that has nothing to act on with no tab open. */
 const onOpenTab = (command: () => void) => () => {
   if (!noTabOpen(useEditor.getState())) command()
@@ -83,6 +89,8 @@ export const actionCommands = {
   viewRight: () => lookAlong("right"),
   viewLeft: () => lookAlong("left"),
   toggleOrthographic: () => lookAlong(sceneRegistry.toggledProjection()),
+  rollViewCounterClockwise: () => rollActivePane(-1),
+  rollViewClockwise: () => rollActivePane(1),
   frameAll: onOpenTab(() => useEditor.getState().requestFrameAll()),
   hideSelection: () => useEditor.getState().toggleSelectionFlag("hidden"),
   showAll: () => useEditor.getState().clearFlag("hidden"),

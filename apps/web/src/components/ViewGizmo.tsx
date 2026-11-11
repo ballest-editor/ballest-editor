@@ -1,3 +1,4 @@
+import { IconRotate, IconRotateClockwise } from "@tabler/icons-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, type PointerEvent, useRef } from "react"
 import { PROJECTION_ACTIONS } from "../domain/Keybinds"
@@ -20,6 +21,12 @@ const SIZE = 2 * RADIUS + END_SIZE
 
 /** Above the ends that face away, under the ends that face the eye. */
 const CENTRE_LAYER = 10
+
+/** The roll buttons sit between the ends, up to the left and right, where an orthographic view has none. */
+const ROLL_SIZE = 16
+const ROLL_OFFSET = RADIUS * Math.SQRT1_2
+/** Over every end: an end only passes under them while a roll eases. */
+const ROLL_LAYER = 2 * CENTRE_LAYER + 1
 
 const endsOf = (pane: PaneCamera) => gizmoEnds(pane.screenAxes())
 
@@ -64,6 +71,44 @@ function AxisEnd({ end, color, onPick, disabled }: {
       }
     >
       {positive ? axis.toUpperCase() : `−${axis.toUpperCase()}`}
+    </ViewTip>
+  )
+}
+
+/** Rolls an orthographic view a quarter turn, counter-clockwise from the button up to the left, clockwise from the right. */
+function RollButton({ turns, onRoll, disabled }: {
+  readonly turns: 1 | -1
+  readonly onRoll: (turns: number) => void
+  readonly disabled: boolean
+}) {
+  const clockwise = turns > 0
+  const label = clockwise ? "Roll view clockwise" : "Roll view counter-clockwise"
+  const Icon = clockwise ? IconRotateClockwise : IconRotate
+  return (
+    <ViewTip
+      label={label}
+      action={clockwise ? "rollViewClockwise" : "rollViewCounterClockwise"}
+      side="right"
+      render={
+        <button
+          type="button"
+          aria-label={label}
+          disabled={disabled}
+          className="absolute flex items-center justify-center rounded-full text-fg-secondary transition-colors hover:bg-hover hover:text-foreground active:bg-pressed"
+          style={{
+            left: SIZE / 2 + (clockwise ? ROLL_OFFSET : -ROLL_OFFSET) - ROLL_SIZE / 2,
+            top: SIZE / 2 - ROLL_OFFSET - ROLL_SIZE / 2,
+            width: ROLL_SIZE,
+            height: ROLL_SIZE,
+            zIndex: ROLL_LAYER
+          }}
+          onClick={() => onRoll(turns)}
+          data-view-roll={clockwise ? "clockwise" : "counter-clockwise"}
+          {...noFocus}
+        />
+      }
+    >
+      <Icon aria-hidden className="pointer-events-none size-3" stroke={2} />
     </ViewTip>
   )
 }
@@ -116,7 +161,7 @@ const useGizmoDrag = (slot: number, projection: ViewProjection, disabled: boolea
 /**
  * Which way the game's axes run across a pane, turning with its camera (docs/DESKTOP.md § View panes): a click on an end
  * snaps the pane to that view, a click on the centre goes back to perspective, and a drag anywhere on it orbits the pane.
- * The round gizmo is all that takes the pointer.
+ * On an orthographic view, two buttons between the ends roll it. The round gizmo is all that takes the pointer.
  */
 export function ViewGizmo({ slot, projection, disabled }: {
   readonly slot: number
@@ -126,6 +171,7 @@ export function ViewGizmo({ slot, projection, disabled }: {
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   const setActivePane = useEditor((s) => s.setActivePane)
   const setPaneProjection = useEditor((s) => s.setPaneProjection)
+  const rollPane = useEditor((s) => s.rollPane)
   const drag = useGizmoDrag(slot, projection, disabled)
   const ends = usePaneReading(slot, endsOf, sameGizmoEnds)
   const colors = sceneAxisColors(dark)
@@ -133,6 +179,10 @@ export function ViewGizmo({ slot, projection, disabled }: {
   const pick = (view: ViewProjection) => {
     setActivePane(slot)
     setPaneProjection(slot, view)
+  }
+  const roll = (turns: number) => {
+    setActivePane(slot)
+    rollPane(slot, turns)
   }
   return (
     <div
@@ -171,6 +221,12 @@ export function ViewGizmo({ slot, projection, disabled }: {
           disabled={disabled}
         />
       ))}
+      {isOrthoView(projection) && (
+        <>
+          <RollButton turns={-1} onRoll={roll} disabled={disabled} />
+          <RollButton turns={1} onRoll={roll} disabled={disabled} />
+        </>
+      )}
       <ViewTip
         label={viewProjectionLabels.perspective}
         action={PROJECTION_ACTIONS.perspective}
