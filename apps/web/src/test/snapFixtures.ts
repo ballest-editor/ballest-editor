@@ -7,12 +7,14 @@ import { identityTransform, itemFromPiece, newMapFile } from "../domain/factory"
 import type { Box } from "../domain/itemBounds"
 import type { Item } from "../domain/MapFile"
 import type { WorldMesh } from "../domain/meshElements"
+import { PrefabFile } from "../domain/PrefabFile"
 import { defaultSettings } from "../domain/Settings"
 import { defaultSnapConfig, type SnapConfig } from "../domain/snapConfig"
 import type { SnapItem, SnapView } from "../domain/snapFrame"
 import { cornersOf } from "../domain/snapRelation"
 import type { PaneCamera } from "../editor/paneCameras"
 import { useEditor } from "../editor/store"
+import { PREFAB_TEXT } from "./prefabs"
 
 /** A slab's two ends along X, as Track S's: each on the top middle of a 500 by 100 cap. */
 export const TRACK_ENDS = [
@@ -167,3 +169,16 @@ export const allSnapping: SnapConfig = {
   magnet: true,
   targets: { ...defaultSnapConfig.targets, grid: { ...defaultSnapConfig.targets.grid, enabled: true } }
 }
+
+/** Makes the open tab a definition's, the test prefab's, keeping its items. */
+export const openAsDefinition = () =>
+  useEditor.setState({
+    document: {
+      kind: "prefab",
+      tier: "user",
+      name: "P",
+      hash: "",
+      file: Schema.decodeSync(Schema.fromJsonString(PrefabFile))(PREFAB_TEXT),
+      sources: new Map()
+    }
+  })

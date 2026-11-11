@@ -23,7 +23,7 @@ import {
   updateSnap,
   updateSnapTarget
 } from "../editor/actions"
-import { snapConfigOf, useEditor } from "../editor/store"
+import { tabSnapOf, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
@@ -267,7 +267,8 @@ function TargetRow({ config, target, index, dragging, onDragStart, onDropAt }: {
  * target's parameters.
  */
 export function SnapAdvanced() {
-  const config = useEditor(snapConfigOf)
+  // as the tab keeps them: the grid's origin from the document's, so World is the 0, 0, 0 a definition shows
+  const config = useEditor(tabSnapOf)
   const [dragged, setDragged] = useState<SnapTarget | null>(null)
   return (
     <div className="flex flex-col gap-2" data-snap-advanced>

@@ -1,15 +1,12 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
-import { Schema } from "effect"
 import { identityTransform } from "../domain/factory"
 import { applyGroupDelta, type RigidDelta } from "../domain/groupTransform"
 import type { GroupPivot } from "../domain/MapSidecar"
-import { PrefabFile } from "../domain/PrefabFile"
 import { defaultSettings } from "../domain/Settings"
 import { defaultSnapConfig } from "../domain/snapConfig"
 import { annotationsOf, findGroup } from "../domain/structure"
 import { ORIGIN, rotatorToQuat } from "../domain/ueMath"
-import { PREFAB_TEXT } from "../test/prefabs"
-import { grouped, loadPieces } from "../test/snapFixtures"
+import { grouped, loadPieces, openAsDefinition } from "../test/snapFixtures"
 import { assertVec } from "../test/vec"
 import { previewMove } from "./snap/moveSession"
 import { selectionPivot, shownPivotDots, shownPivotPoint, shownTransform, snapConfigOf, useEditor } from "./store"
@@ -65,16 +62,7 @@ describe("a map's snap settings", () => {
   })
 
   it("doesn't dirty a definition, which keeps them in the editor's prefs", () => {
-    useEditor.setState({
-      document: {
-        kind: "prefab",
-        tier: "user",
-        name: "P",
-        hash: "",
-        file: Schema.decodeSync(Schema.fromJsonString(PrefabFile))(PREFAB_TEXT),
-        sources: new Map()
-      }
-    })
+    openAsDefinition()
     useEditor.getState().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
     assert.isFalse(useEditor.getState().dirty)
   })

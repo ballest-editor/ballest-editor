@@ -12,6 +12,15 @@ export const gridAxes = (config: SnapConfig): readonly [Vec3, Vec3, Vec3] => {
   return [{ x: c, y: s, z: 0 }, { x: -s, y: c, z: 0 }, { x: 0, y: 0, z: 1 }]
 }
 
+/**
+ * `config` with its grid's origin moved by `by`. A tab keeps that origin counted from its `documentOrigin`, and snapping
+ * wants it in the world.
+ */
+export const gridMovedBy = (config: SnapConfig, by: Vec3): SnapConfig => ({
+  ...config,
+  targets: { ...config.targets, grid: { ...config.targets.grid, origin: vecAdd(config.targets.grid.origin, by) } }
+})
+
 /** The grid point nearest `point`, each axis on its nearest line. */
 export const nearestGridPoint = (config: SnapConfig, point: Vec3): Vec3 => {
   const { origin } = config.targets.grid

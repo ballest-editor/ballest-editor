@@ -16,6 +16,7 @@ import type { Item } from "../../domain/MapFile"
 import { prefabSnapKeyOf } from "../../domain/MapPrefs"
 import type { Construction, EndRef } from "../../domain/MapSidecar"
 import { type FlipAxis, withMirrorMesh } from "../../domain/mirror"
+import { documentOrigin } from "../../domain/prefab"
 import {
   defaultSnapConfig,
   isPreset,
@@ -24,6 +25,7 @@ import {
   type SnapPreset,
   type SnapTarget
 } from "../../domain/snapConfig"
+import { gridMovedBy } from "../../domain/snapGrid"
 import {
   angleBetweenFaces,
   type ArrangeMarks,
@@ -75,13 +77,17 @@ import {
   selectionUnits,
   shownTransform,
   snapConfigOf,
+  tabSnapOf,
   useEditor
 } from "../store"
 import { run } from "./run"
 import { saveSettings } from "./startup"
 
-/** Gives the open tab `config`: a map's are saved with it, a definition's go in the editor's own prefs. */
-const applySnap = (config: SnapConfig) => {
+/**
+ * Gives the open tab `config`, as it keeps them (`tabSnapOf`): a map's are saved with it, a definition's go in the
+ * editor's own prefs.
+ */
+const keepSnap = (config: SnapConfig) => {
   const s = useEditor.getState()
   s.setTabSnap(config)
   if (s.document.kind !== "prefab") return
@@ -92,6 +98,10 @@ const applySnap = (config: SnapConfig) => {
     )
   )
 }
+
+/** Gives the open tab `config`, in the world as `snapConfigOf` reads them. */
+const applySnap = (config: SnapConfig) =>
+  keepSnap(gridMovedBy(config, vecSub(ORIGIN, documentOrigin(useEditor.getState().document))))
 
 /** Changes the tab's snap settings. */
 export const updateSnap = (patch: Partial<SnapConfig>) => applySnap({ ...snapConfigOf(useEditor.getState()), ...patch })
@@ -148,16 +158,16 @@ export const preferSnap = (preference: SnapPreference) => {
 }
 
 /** Whether the tab's snap settings are what new maps start on. */
-export const snapIsDefault = (s: EditorState): boolean => Equal.equals(snapConfigOf(s), s.settings.snapping)
+export const snapIsDefault = (s: EditorState): boolean => Equal.equals(tabSnapOf(s), s.settings.snapping)
 
 /** Makes the tab's snap settings, all of them, what new maps start on (docs/SNAPPING.md § Settings). */
 export const saveSnapDefaults = () => {
   const s = useEditor.getState()
-  return saveSettings({ ...s.settings, snapping: snapConfigOf(s) })
+  return saveSettings({ ...s.settings, snapping: tabSnapOf(s) })
 }
 
 /** Gives the tab the snap settings new maps start on. */
-export const resetSnapToDefaults = () => applySnap(useEditor.getState().settings.snapping)
+export const resetSnapToDefaults = () => keepSnap(useEditor.getState().settings.snapping)
 
 /** Whether what new maps start on is the factory's. */
 export const snapDefaultsAreFactory = (s: Pick<EditorState, "settings">): boolean =>
@@ -521,7 +531,9 @@ export const startGridOriginPick = () =>
     onPick: ({ point }) => updateSnapTarget("grid", { origin: point })
   })
 
-export const gridOriginToWorld = () => updateSnapTarget("grid", { origin: ORIGIN })
+/** The grid back on the document's origin: the world's, or a definition's 0, 0, 0 marker. */
+export const gridOriginToWorld = () =>
+  updateSnapTarget("grid", { origin: documentOrigin(useEditor.getState().document) })
 
 export const gridOriginToSelection = () => {
   const target = activePivotOf(useEditor.getState())
