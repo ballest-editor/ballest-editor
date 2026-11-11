@@ -403,18 +403,22 @@ export const copyStructure = (structure: Structure, keys: ReadonlySet<string>): 
   items: new Map([...structure.items].filter(([key]) => keys.has(key)))
 })
 
+/** The ids of every group in `nodes`, nested ones included. */
+export const treeGroupIds = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<string> =>
+  nodes.flatMap((node) => node.kind === "group" ? [node.id, ...treeGroupIds(node.children)] : [])
+
 /**
  * Adds a clip's items to `structure`, under the new keys `keyOf` gives for their source keys, keeping their names and
  * tags. The copies of nodes the tree still has go in beside them, in the same group: all of one group's copies as one
  * block after the last of their sources, in order, so a copied row stays a row rather than interleaving with the
  * original. Copies of nodes that have gone land at the end of the root. A group's copy is a new group of the same name
- * and shape.
+ * and shape, under the id `freshId` gives for its source's.
  */
 export const withPasted = (
   structure: Structure,
   clip: Structure,
   keyOf: ReadonlyMap<string, string>,
-  freshId: () => string = freshKey
+  freshId: (sourceId: string) => string = freshKey
 ): Structure => {
   const copyOf = (node: TreeNode): ReadonlyArray<TreeNode> => {
     if (node.kind === "group") {
@@ -423,7 +427,7 @@ export const withPasted = (
       const pivot = member === undefined ? node.pivot : { choice: "item" as const, key: member }
       return [{
         ...node,
-        id: freshId(),
+        id: freshId(node.id),
         children: node.children.flatMap(copyOf),
         ...(pivot !== undefined && { pivot })
       }]

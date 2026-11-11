@@ -8,6 +8,7 @@ import { placementTransform } from "../domain/factory"
 import { nodeKeys } from "../domain/groupSelection"
 import { applyGroupDelta, type RigidDelta } from "../domain/groupTransform"
 import { isPlayerStart } from "../domain/MapFile"
+import type { TreeNode } from "../domain/MapSidecar"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
 import { prefabOfItems } from "../domain/prefab"
@@ -1439,6 +1440,93 @@ describe("document structure", () => {
     assert.deepStrictEqual(shape(), [start, ["G", [a, b]], ["G", [copyA, copyB]], c])
     state().undo()
     assert.strictEqual(state().doc, before)
+  })
+
+  it("keeps a copy of a collapsed group collapsed, and an open one open, however it's duplicated", () => {
+    /** The groups of the copy that isn't the source, outermost first, and whether each is collapsed. */
+    const copiedFolds = (sources: ReadonlySet<string>) => {
+      const groups: Array<readonly [string, boolean]> = []
+      const walk = (nodes: ReadonlyArray<TreeNode>) => {
+        for (const node of nodes) {
+          if (node.kind !== "group") continue
+          if (!sources.has(node.id)) groups.push([node.name, state().collapsedGroups.has(node.id)])
+          walk(node.children)
+        }
+      }
+      walk(tree())
+      return groups
+    }
+    // `Outer` stays open; `Inner` inside it is collapsed
+    const { a, b, c, inner } = nestedGroups()
+    const [outer = ""] = tree().flatMap((node) => node.kind === "group" ? [node.id] : [])
+    const sources = new Set([outer, inner])
+    state().setGroupCollapsed(inner, true)
+    const expected: ReadonlyArray<readonly [string, boolean]> = [["Outer", false], ["Inner", true]]
+    const fresh = () => {
+      state().undo()
+      state().select([a, b, c])
+    }
+
+    state().select([a, b, c])
+    state().duplicateSelection()
+    assert.deepStrictEqual(copiedFolds(sources), expected)
+    fresh()
+
+    const copies = state().beginDuplicateDrag()!
+    const moved = new Map([...copies.values()].map((id) => [id, transformOf(id)]))
+    assert.isTrue(state().endDuplicateDrag(moved))
+    assert.deepStrictEqual(copiedFolds(sources), expected)
+    fresh()
+
+    state().repeatSelection({ count: { x: 3, y: 1, z: 1 }, spacing: { x: 1000, y: 0, z: 0 } })
+    assert.deepStrictEqual(copiedFolds(sources), [...expected, ...expected])
+    fresh()
+
+    state().copySelection()
+    state().paste()
+    assert.deepStrictEqual(copiedFolds(sources), expected)
+
+    // the clip remembers the folds, so a paste into another tab keeps them too
+    state().loadMap(startOnlyMap(), null, undefined, { into: "newTab" })
+    state().paste()
+    assert.deepStrictEqual(copiedFolds(sources), expected)
+  })
+
+  it("puts copies after the last copied link in chain order, and Repeat's copies in order", () => {
+    mapWithCubes(0, 100, 200, 300, 400)
+    const sources = state().doc.ids.slice(1)
+    const [, l2 = "", l3 = "", l4 = ""] = sources
+    state().select(sources)
+    state().chainSelection()
+    const chain = tree().find((node) => node.kind === "group")!
+    state().enterGroup(chain.id)
+    /** The chain's links in order: a source by its number, a copy by its x. */
+    const links = () =>
+      treeKeys(findGroup(tree(), chain.id)!.children).map((key) =>
+        sources.includes(key) ? `${sources.indexOf(key) + 1}` : `x${transformOf(key).translation.x}`
+      )
+
+    state().select([l4, l2])
+    state().duplicateSelection()
+    assert.deepStrictEqual(links(), ["1", "2", "3", "4", "x100", "x300", "5"])
+    state().undo()
+
+    state().select([l2, l3])
+    state().duplicateSelection()
+    assert.deepStrictEqual(links(), ["1", "2", "3", "x100", "x200", "4", "5"])
+    state().undo()
+
+    state().select([l2])
+    state().repeatSelection({ count: { x: 4, y: 1, z: 1 }, spacing: { x: 1000, y: 0, z: 0 } })
+    assert.deepStrictEqual(links(), ["1", "2", "x1100", "x2100", "x3100", "3", "4", "5"])
+
+    // outside a chain, the Outline lists them in order too
+    const { a } = threeCubes()
+    state().select([a])
+    state().repeatSelection({ count: { x: 4, y: 1, z: 1 }, spacing: { x: 1000, y: 0, z: 0 } })
+    const rows = treeKeys(tree())
+    const xs = rows.slice(rows.indexOf(a), rows.indexOf(a) + 4).map((key) => transformOf(key).translation.x)
+    assert.deepStrictEqual(xs, [0, 1000, 2000, 3000])
   })
 
   it("loads what a sidecar gives, keeping keys and structure", () => {
