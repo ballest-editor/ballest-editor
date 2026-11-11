@@ -9,6 +9,7 @@ import { setSlotMaterials, setTransforms } from "./edits"
 import { editTransform } from "./editTransform"
 import { newMapFile } from "./factory"
 import { applyGroupDelta, type GroupDelta } from "./groupTransform"
+import type { TreeNode } from "./MapSidecar"
 import { itemOfPrefab } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
 import {
@@ -17,7 +18,9 @@ import {
   instanceOrigin,
   instancesIn,
   instancesOfPrefab,
+  reshapedInstances,
   withRecordedOverrides,
+  withUnlinked,
   withUpdatedInstance
 } from "./prefabInstance"
 import {
@@ -386,6 +389,51 @@ describe("an instance's overrides", () => {
     const updated = withUpdatedInstance(doc, GROUP, swapped)!
     assert.notStrictEqual(instanceKeys(updated)[1], instanceKeys(doc)[1])
     assert.isUndefined(groupOf(updated).prefab?.overrides)
+  })
+})
+
+describe("an instance given members or losing them", () => {
+  /** `doc` with item `key` moved into or out of the instance. */
+  const regrouped = (doc: Doc, key: string, into: boolean): Doc => {
+    const item: TreeNode = { kind: "item", key }
+    const tree = doc.structure.tree.flatMap((node): ReadonlyArray<TreeNode> => {
+      if (node.kind === "item") return node.key === key && into ? [] : [node]
+      if (node.id !== GROUP) return [node]
+      return into
+        ? [{ ...node, children: [...node.children, item] }]
+        : [{ ...node, children: node.children.filter((child) => child.kind !== "item" || child.key !== key) }, item]
+    })
+    return { ...doc, structure: { ...doc.structure, tree } }
+  }
+
+  it("is found when an item joins it or leaves it, and not for a move, a reorder, a rename or an Update", () => {
+    const doc = placedDoc()
+    const [loose] = doc.ids
+    const [first, second] = instanceKeys(doc)
+    assert.deepStrictEqual(reshapedInstances(doc, regrouped(doc, loose!, true)).map(({ id }) => id), [GROUP])
+    assert.deepStrictEqual(reshapedInstances(doc, regrouped(doc, first!, false)).map(({ id }) => id), [GROUP])
+    assert.lengthOf(reshapedInstances(doc, moved(doc, first!, 500)), 0)
+    const tree = doc.structure.tree.map((node) =>
+      node.kind === "group"
+        ? { ...node, name: "Other", children: [{ kind: "item", key: second! }, { kind: "item", key: first! }] as const }
+        : node
+    )
+    assert.lengthOf(reshapedInstances(doc, { ...doc, structure: { ...doc.structure, tree } }), 0)
+    assert.lengthOf(reshapedInstances(doc, withUpdatedInstance(doc, GROUP, nextDefinition)!), 0)
+  })
+
+  it("isn't when it goes whole", () => {
+    const doc = placedDoc()
+    const tree = doc.structure.tree.filter((node) => node.kind === "item")
+    assert.lengthOf(reshapedInstances(doc, { ...doc, structure: { ...doc.structure, tree } }), 0)
+  })
+
+  it("is made a plain group by unlinking, its items as they are", () => {
+    const doc = placedDoc()
+    const unlinked = withUnlinked(doc, [GROUP])
+    assert.isUndefined(groupOf(unlinked).prefab)
+    assert.strictEqual(unlinked.map, doc.map)
+    assert.strictEqual(withUnlinked(unlinked, [GROUP]), unlinked)
   })
 })
 

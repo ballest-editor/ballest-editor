@@ -366,6 +366,15 @@ const recordedLink = (before: Doc, after: Doc, group: GroupNode, link: PrefabLin
   return list.length === 0 ? rest : { ...rest, overrides: list }
 }
 
+/** The instances an edit from `before` to `after` kept, linked as they were, with their members' keys then and now. */
+const keptInstances = (before: Doc, after: Doc) =>
+  instancesIn(after.structure.tree).flatMap((group) => {
+    const previous = findGroup(before.structure.tree, group.id)
+    return previous === undefined || previous.prefab !== group.prefab
+      ? []
+      : [{ group, keys: memberKeysOf(after, group), was: memberKeysOf(before, previous) }]
+  })
+
 /**
  * `after`, an edit of `before`, with what it changed of each instance's members recorded on the instance's link as
  * overrides (docs/DESKTOP.md § Prefabs): a member's own move, its paint, and whether it is hidden. An instance the
@@ -374,16 +383,28 @@ const recordedLink = (before: Doc, after: Doc, group: GroupNode, link: PrefabLin
 export const withRecordedOverrides = (before: Doc, after: Doc): Doc => {
   if (before.map.items === after.map.items && before.structure.items === after.structure.items) return after
   let structure = after.structure
-  for (const group of instancesIn(after.structure.tree)) {
-    const previous = findGroup(before.structure.tree, group.id)
-    if (previous === undefined || previous.prefab !== group.prefab) continue
-    const keys = memberKeysOf(after, group)
-    const was = memberKeysOf(before, previous)
+  for (const { group, keys, was } of keptInstances(before, after)) {
     if (keys.length !== was.length || keys.some((key, n) => key !== was[n])) continue
     const link = recordedLink(before, after, group, group.prefab, keys)
     if (link !== group.prefab) structure = withPrefabLink(structure, group.id, link) ?? structure
   }
   return structure === after.structure ? after : { ...after, structure }
+}
+
+/**
+ * The instances an edit from `before` to `after` gave members or took them from, which it would make plain groups
+ * (docs/DESKTOP.md § Prefabs). One the edit removed whole, or relinked, isn't among them.
+ */
+export const reshapedInstances = (before: Doc, after: Doc): ReadonlyArray<GroupNode & { prefab: PrefabLink }> =>
+  before.structure.tree === after.structure.tree ? [] : keptInstances(before, after).flatMap(({ group, keys, was }) => {
+    const then = new Set(was)
+    return keys.length === was.length && keys.every((key) => then.has(key)) ? [] : [group]
+  })
+
+/** `doc` with instances `groupIds` made plain groups, their items and the rest of the structure as they are. */
+export const withUnlinked = (doc: Doc, groupIds: ReadonlyArray<string>): Doc => {
+  const structure = groupIds.reduce((current, id) => withPrefabLink(current, id, undefined) ?? current, doc.structure)
+  return structure === doc.structure ? doc : { ...doc, structure }
 }
 
 /**

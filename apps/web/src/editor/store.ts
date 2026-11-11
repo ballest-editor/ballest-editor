@@ -94,7 +94,9 @@ import type { PrefabFile } from "../domain/PrefabFile"
 import {
   instanceOrigin,
   type PrefabDefinition,
+  reshapedInstances,
   withRecordedOverrides,
+  withUnlinked,
   withUpdatedInstance
 } from "../domain/prefabInstance"
 import type { RecoveredTab } from "../domain/recovery"
@@ -480,6 +482,8 @@ export type DialogState =
   | { readonly id: "importClash" } & ImportClash
   | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
   | { readonly id: "savePrefab" }
+  /** An edit would give the instances named members or take them away. */
+  | { readonly id: "unlinkInstances"; readonly names: ReadonlyArray<string> }
   | { readonly id: "namePrefab"; readonly afterSave?: Effect.Effect<void, unknown> }
   | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
   | { readonly id: "recoverUnsaved"; readonly tabs: ReadonlyArray<RecoveredTab> }
@@ -931,6 +935,11 @@ export interface EditorState extends TabState {
   /** Opens `dialog` in place of the open one (and its payload). */
   readonly openDialog: (dialog: DialogState) => void
   readonly closeDialog: () => void
+  /**
+   * The unlink prompt's answer: the edit it held goes ahead with those instances made plain groups, as one undo step, or
+   * is dropped. Closing the prompt drops it.
+   */
+  readonly resolveUnlinkPrompt: (unlink: boolean) => void
   readonly setGameWrite: (gameWrite: GameWrite | null) => void
   readonly setOpenedInGame: (fileName: string | null) => void
   readonly setCheatSheet: (cheatSheet: boolean) => void
@@ -1168,7 +1177,7 @@ export const useEditor = create<EditorState>()((set, get) => {
    * the doc; clears the redo stack. What the edit changed of a prefab instance's members is
    * recorded on its link as overrides.
    */
-  const commit = (edited: Doc, extra: Partial<EditorState> = {}, before?: DocState, description?: string) =>
+  const apply = (edited: Doc, extra: Partial<EditorState> = {}, before?: DocState, description?: string) =>
     set((s) => {
       if (noTabOpen(s)) return s
       const doc = withRecordedOverrides((before ?? s).doc, edited)
@@ -1181,6 +1190,31 @@ export const useEditor = create<EditorState>()((set, get) => {
         editedAt: new Date().toISOString()
       }
     })
+
+  /** An edit held while the unlink prompt asks about the instances it gives members or takes them from. */
+  let heldEdit: {
+    readonly edited: Doc
+    readonly extra: Partial<EditorState>
+    readonly before: DocState
+    readonly description: string | undefined
+    readonly groupIds: ReadonlyArray<string>
+  } | null = null
+
+  /**
+   * `apply`, unless the edit gives a prefab instance members or takes them away: that makes it a plain group, so the
+   * edit waits for the unlink prompt (docs/DESKTOP.md § Prefabs).
+   */
+  const commit = (edited: Doc, extra: Partial<EditorState> = {}, before?: DocState, description?: string) => {
+    const s = get()
+    const base = before ?? { doc: s.doc, selectedIds: s.selectedIds }
+    const reshaped = noTabOpen(s) ? [] : reshapedInstances(base.doc, edited)
+    if (reshaped.length === 0) {
+      apply(edited, extra, before, description)
+      return
+    }
+    heldEdit = { edited, extra, before: base, description, groupIds: reshaped.map(({ id }) => id) }
+    set({ dialog: { id: "unlinkInstances", names: reshaped.map(({ name }) => name) } })
+  }
 
   /**
    * Document indices of the selected items that can be copied, in selection order. A map has
@@ -2052,7 +2086,19 @@ export const useEditor = create<EditorState>()((set, get) => {
         })
       ),
     // Drops the payload with the dialog: the saveAs dialog takes its `afterSave` before it closes itself to save.
-    closeDialog: () => set({ dialog: null }),
+    closeDialog: () => {
+      if (get().dialog?.id === "unlinkInstances") get().resolveUnlinkPrompt(false)
+      else set({ dialog: null })
+    },
+    resolveUnlinkPrompt: (unlink) => {
+      const held = heldEdit
+      heldEdit = null
+      set({ dialog: null })
+      if (held === null) return
+      if (unlink) apply(withUnlinked(held.edited, held.groupIds), held.extra, held.before, held.description)
+      // an Alt+drag's copies are in the document already
+      else if (get().doc !== held.before.doc) set({ doc: held.before.doc, selectedIds: held.before.selectedIds })
+    },
     setGameWrite: (gameWrite) => set({ gameWrite }),
     setOpenedInGame: (openedInGame) => set({ openedInGame }),
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),

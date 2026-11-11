@@ -13,7 +13,7 @@ import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
 import { offsetEntry } from "../domain/numberEntry"
 import { prefabOfItems } from "../domain/prefab"
-import { checkInstance, definitionOf } from "../domain/prefabInstance"
+import { checkInstance, definitionOf, instancesIn } from "../domain/prefabInstance"
 import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { findGroup, numberedNameText, treeKeys } from "../domain/structure"
@@ -2059,6 +2059,48 @@ describe("groups and the selection", () => {
     if (group?.kind !== "group" || group.prefab === undefined) return
     assert.deepStrictEqual(group.prefab.overrides, [{ member: 1, paint: true }])
     assert.isTrue(checkInstance(state().doc, group, group.prefab).unmodified)
+  })
+
+  it("asks before an edit gives an instance members or takes them, and unlinks it only on yes", () => {
+    const keys = placedPair()
+    const id = instancesIn(state().doc.structure.tree)[0]?.id ?? ""
+    const steps = state().past.length
+    const deleteFirst = () => {
+      state().enterGroup(id)
+      state().select([keys[0]!])
+      state().deleteSelection()
+    }
+    deleteFirst()
+    assert.deepStrictEqual(state().dialog, { id: "unlinkInstances", names: ["Pair"] })
+    assert.include(state().doc.ids, keys[0])
+    assert.strictEqual(state().past.length, steps)
+    state().closeDialog()
+    assert.include(state().doc.ids, keys[0])
+    assert.strictEqual(state().past.length, steps)
+    deleteFirst()
+    state().resolveUnlinkPrompt(true)
+    assert.isNull(state().dialog)
+    assert.notInclude(state().doc.ids, keys[0])
+    const group = findGroup(state().doc.structure.tree, id)
+    assert.isTrue(group !== undefined && group.prefab === undefined)
+    assert.strictEqual(state().past.length, steps + 1)
+    state().undo()
+    assert.include(state().doc.ids, keys[0])
+    assert.isDefined(findGroup(state().doc.structure.tree, id)?.prefab)
+  })
+
+  it("puts an Alt+drag copy inside an instance back when the prompt is turned down", () => {
+    const keys = placedPair()
+    state().enterGroup(instancesIn(state().doc.structure.tree)[0]?.id ?? null)
+    state().select([keys[1]!])
+    const before = state().doc
+    const copy = state().beginDuplicateDrag()?.get(keys[1]!) ?? ""
+    const t = transformOf(copy)
+    assert.isTrue(state().endDuplicateDrag(new Map([[copy, { ...t, translation: { ...t.translation, z: 500 } }]])))
+    assert.strictEqual(state().dialog?.id, "unlinkInstances")
+    state().resolveUnlinkPrompt(false)
+    assert.strictEqual(state().doc, before)
+    assert.deepStrictEqual(state().selectedIds, [keys[1]!])
   })
 
   it("pivots a prefab instance on its origin, and follows a live move", () => {
