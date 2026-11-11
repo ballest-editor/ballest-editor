@@ -365,7 +365,7 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
         <span className="text-body text-fg-tertiary">{instanceStatusOf(found, current, unmodified)}</span>
         <span className="text-caption text-fg-tertiary">
           {overridden === 0
-            ? "Moving, painting or hiding its pieces keeps them as overrides, which it keeps as it follows its definition."
+            ? "Moving, painting, hiding or setting the properties of its pieces records overrides, which it keeps as it follows its definition."
             : `${counted(overridden, "piece")} ${overridden === 1 ? "overrides" : "override"} its definition.`}
         </span>
       </div>

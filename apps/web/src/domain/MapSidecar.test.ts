@@ -100,7 +100,7 @@ describe("MapSidecar", () => {
           scale3D: { x: 2, y: 1, z: 1 }
         },
         paint: true
-      }, { member: 3, hidden: true }]
+      }, { member: 3, properties: true, hidden: true }]
     })
     const text = JSON.stringify(good)
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(Schema.decodeSync(Codec)(text))), good)

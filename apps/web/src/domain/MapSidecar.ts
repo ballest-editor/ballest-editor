@@ -46,12 +46,14 @@ const MemberTransform = Schema.Struct({
 
 /**
  * What an instance changed of one of its members, which an Update keeps (docs/DESKTOP.md § Prefabs): its transform, its
- * paint (its meshes' materials and its surface) and whether it is hidden. `member` is its place in the definition.
+ * paint (its meshes and their materials, and its surface), its other properties and whether it is hidden. `member` is its
+ * place in the definition.
  */
 export const MemberOverride = Schema.Struct({
   member: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   transform: Schema.optionalKey(MemberTransform),
   paint: Schema.optionalKey(Schema.Literal(true)),
+  properties: Schema.optionalKey(Schema.Literal(true)),
   hidden: Schema.optionalKey(Schema.Literal(true))
 })
 export type MemberOverride = typeof MemberOverride.Type

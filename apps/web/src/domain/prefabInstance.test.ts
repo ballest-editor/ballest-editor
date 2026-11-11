@@ -5,7 +5,7 @@ import { expectVec } from "../test/vec"
 import fixture from "./bundledCatalog.json"
 import { Catalog, indexCatalog } from "./Catalog"
 import type { UeTransform } from "./coords"
-import { setSlotMaterials, setTransforms } from "./edits"
+import { setProperties, setSlotMaterials, setTransforms } from "./edits"
 import { editTransform } from "./editTransform"
 import { newMapFile } from "./factory"
 import { applyGroupDelta, type GroupDelta } from "./groupTransform"
@@ -358,6 +358,23 @@ describe("an instance's overrides", () => {
     const doc = edit(placedDoc(), (d) => withDelta(d, { kind: "scale", factor: 2, axis: "y" }, { x: 0, y: 5000, z: 0 }))
     assert.isNotEmpty(groupOf(doc).prefab?.overrides ?? [])
     assert.isTrue(check(doc).unmodified)
+  })
+
+  it("records a member's other properties, and an Update keeps them while it follows the definition otherwise", () => {
+    const strength = { list: "floatProperties", name: "Strength", type: "Float" } as const
+    const placed = placedDoc()
+    const index = placed.ids.indexOf(instanceKeys(placed)[1]!)
+    const doc = edit(
+      placed,
+      (d) => ({ ...d, map: Option.getOrThrow(setProperties(d.map, [index], [{ property: strength, value: 2 }])) })
+    )
+    assert.deepStrictEqual(overrideFields(groupOf(doc).prefab?.overrides), [{ member: 1, fields: ["properties"] }])
+    assert.isTrue(check(doc).unmodified)
+    const updated = withUpdatedInstance(doc, GROUP, nextDefinition)!
+    const second = updated.map.items[updated.ids.indexOf(instanceKeys(updated)[1]!)]!
+    assert.strictEqual(second.floatProperties.find((p) => p.propertyName === "Strength")?.currentValue, 2)
+    assert.closeTo(second.itemTransform.translation.x, FRAME.x + 2000, 0.01)
+    assert.isTrue(check(updated).unmodified)
   })
 
   it("records a hidden member, and drops that once it's shown again", () => {

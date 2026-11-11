@@ -268,8 +268,8 @@ export function UnlinkInstancesDialog({ open, onClose }: DialogProps) {
       onClose={onClose}
       title={one ? <>Unlink {names[0]}?</> : <>Unlink {names.length} instances?</>}
       description={one
-        ? "Adding or removing pieces makes this instance a plain group, and it stops following its prefab. Moving, painting or hiding a piece keeps it linked."
-        : "Adding or removing pieces makes these instances plain groups, and they stop following their prefabs. Moving, painting or hiding a piece keeps them linked."}
+        ? "Adding or removing pieces makes this instance a plain group, and it stops following its prefab. Editing a piece in place keeps it linked."
+        : "Adding or removing pieces makes these instances plain groups, and they stop following their prefabs. Editing a piece in place keeps them linked."}
     >
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

@@ -2,7 +2,7 @@
  * Prefab instances in a document (docs/DESKTOP.md § Prefabs): a group whose `prefab` link names the definition it was
  * placed from. An instance follows its definition while its items still match what was placed, allowing for its own
  * placement and its overrides: moving, turning or scaling the whole group doesn't count as an edit, and a member's own
- * move, paint or hiding is recorded on the link as an override (`withRecordedOverrides`), which an Update keeps.
+ * move, paint, property edit or hiding is recorded on the link as an override (`withRecordedOverrides`), which an Update keeps.
  */
 import type { PrefabRef } from "@ballest/contracts"
 import type { CatalogIndex } from "./Catalog"
@@ -208,6 +208,10 @@ const centreOf = (transforms: ReadonlyArray<UeTransform>): Vec3 => {
   return { x: x / n, y: y / n, z: z / n }
 }
 
+/** What a member can override, in the order they are named. */
+const OVERRIDE_FIELDS = ["transform", "paint", "properties", "hidden"] as const
+export type OverrideField = (typeof OVERRIDE_FIELDS)[number]
+
 /** An instance's overrides by member. */
 const overridesOf = (link: PrefabLink): ReadonlyMap<number, MemberOverride> =>
   new Map((link.overrides ?? []).map((override) => [override.member, override]))
@@ -247,10 +251,11 @@ export const checkInstance = (
     (top, next) => top === undefined || next.agreeing.size > top.agreeing.size ? next : top,
     undefined
   )
-  // a painted member's paint is its own, and its digest says nothing of the rest
-  const sameContent = items.every((item, index) =>
-    overrides.get(index)?.paint === true || contentOf(item) === expected[index]?.content
-  )
+  // a member's paint or properties of its own, and its digest says nothing of the rest
+  const sameContent = items.every((item, index) => {
+    const override = overrides.get(index)
+    return override?.paint === true || override?.properties === true || contentOf(item) === expected[index]?.content
+  })
   if (best !== undefined) {
     return {
       placement: best.placement,
@@ -320,9 +325,10 @@ const surfacePropertiesOf = (item: Item) =>
  * transform in the instance's frame, and its paint.
  */
 const withOverride = (fresh: Item, was: Item, override: MemberOverride, placement: Placement): Item => {
+  const own = override.properties === true ? withPropertiesOf(fresh, was) : fresh
   const moved = override.transform === undefined
-    ? fresh
-    : placedAs(fresh, placement, override.transform)
+    ? own
+    : placedAs(own, placement, override.transform)
   return override.paint === true
     ? {
       ...moved,
@@ -334,6 +340,37 @@ const withOverride = (fresh: Item, was: Item, override: MemberOverride, placemen
     }
     : moved
 }
+
+/** Whether a property is one of an item's own, not its transform's (a decal's size) or its paint's (its surface). */
+const isOwnProperty = (name: string) => !SCALE_PROPERTIES.has(name) && name !== SURFACE_PROPERTY
+
+/** `own`'s own properties, then `rest`'s others. */
+const mergedProperties = <P extends { readonly propertyName: string }>(
+  own: ReadonlyArray<P>,
+  rest: ReadonlyArray<P>
+): ReadonlyArray<P> => [
+  ...own.filter(({ propertyName }) => isOwnProperty(propertyName)),
+  ...rest.filter(({ propertyName }) => !isOwnProperty(propertyName))
+]
+
+/** `fresh` with `was`'s own properties in place of its own, its size and surface kept. */
+const withPropertiesOf = (fresh: Item, was: Item): Item => ({
+  ...fresh,
+  boolProperties: mergedProperties(was.boolProperties, fresh.boolProperties),
+  floatProperties: mergedProperties(was.floatProperties, fresh.floatProperties),
+  intProperties: mergedProperties(was.intProperties, fresh.intProperties),
+  textProperties: mergedProperties(was.textProperties, fresh.textProperties),
+  nameProperties: mergedProperties(was.nameProperties, fresh.nameProperties),
+  stringProperties: mergedProperties(was.stringProperties, fresh.stringProperties)
+})
+
+/** An item's own properties, in an order edits can't change. */
+const ownPropertiesOf = (item: Item): string =>
+  PropertyList.literals.flatMap((list) =>
+    item[list].flatMap(({ currentValue, propertyName }) =>
+      isOwnProperty(propertyName) ? [`${propertyName}=${JSON.stringify(currentValue)}`] : []
+    )
+  ).sort().join("|")
 
 /** Whether an edit changed an item's paint: its meshes' materials, or its surface. */
 const paintChanged = (before: Item, after: Item) =>
@@ -357,7 +394,7 @@ type OverrideFields = Omit<MemberOverride, "member">
  * `link` with what one edit, from `before` to `after`, changed of instance `group`'s members (`previous` before it)
  * recorded as overrides. A member that moved while another stayed put, even one already moved on its own, moved on its
  * own, and keeps where it is in the instance's frame; when every member moved, the instance did, and the ones out of
- * line with the rest moved on their own too. Paint and hidden are a member's own whatever moves.
+ * line with the rest moved on their own too. Paint, properties and hidden are a member's own whatever moves.
  */
 const recordedLink = (
   before: Doc,
@@ -371,7 +408,7 @@ const recordedLink = (
   const change = (member: number, edit: (was: OverrideFields) => OverrideFields) => {
     const { member: _, ...was } = overrides.get(member) ?? { member }
     const next = edit(was)
-    if (next.transform === undefined && next.paint === undefined && next.hidden === undefined) overrides.delete(member)
+    if (OVERRIDE_FIELDS.every((field) => next[field] === undefined)) overrides.delete(member)
     else overrides.set(member, { member, ...next })
   }
   const itemAt = (doc: Doc, key: string) => doc.map.items[indexOfKey(doc.ids, key)]
@@ -395,8 +432,9 @@ const recordedLink = (
   keys.forEach((key, member) => {
     const was = itemAt(before, key)
     const now = itemAt(after, key)
-    if (was !== undefined && now !== undefined && was !== now && paintChanged(was, now)) {
-      change(member, (fields) => ({ ...fields, paint: true }))
+    if (was !== undefined && now !== undefined && was !== now) {
+      if (paintChanged(was, now)) change(member, (fields) => ({ ...fields, paint: true }))
+      if (ownPropertiesOf(was) !== ownPropertiesOf(now)) change(member, (fields) => ({ ...fields, properties: true }))
     }
     const hidden = after.structure.items.get(key)?.hidden === true
     if (hidden !== (overrides.get(member)?.hidden === true)) {
@@ -422,7 +460,7 @@ const keptInstances = (before: Doc, after: Doc) =>
 
 /**
  * `after`, an edit of `before`, with what it changed of each instance's members recorded on the instance's link as
- * overrides (docs/DESKTOP.md § Prefabs): a member's own move, its paint, and whether it is hidden. An instance the
+ * overrides (docs/DESKTOP.md § Prefabs): a member's own move, its paint, its other properties and whether it is hidden. An instance the
  * edit placed, gave other members or relinked is left as it is.
  */
 export const withRecordedOverrides = (before: Doc, after: Doc): Doc => {
@@ -529,10 +567,6 @@ export const withUpdatedInstance = (
     }
   }
 }
-
-/** What a member can override, in the order they are named. */
-const OVERRIDE_FIELDS = ["transform", "paint", "hidden"] as const
-export type OverrideField = (typeof OVERRIDE_FIELDS)[number]
 
 /** A member of an instance that carries overrides: its instance, its place in the definition and what it overrides. */
 export interface OverriddenMember {
