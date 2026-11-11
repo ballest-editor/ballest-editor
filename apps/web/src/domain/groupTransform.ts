@@ -153,27 +153,45 @@ export type AxisEdit = { readonly kind: "set"; readonly value: number } | {
 }
 
 /**
- * The gizmo delta that turns `active` by `by` degrees about one rotator axis. Measured on
- * the active item's rotator round-tripped through the quaternion, so only the edited angle
- * changes even near gimbal lock, where the item's other rotator angles are ambiguous.
+ * What takes a unit whose transform is `unit` from the values it reads in `field` to `to`, every item of it along,
+ * about `pivot` (world): a location moves them all by the difference; a rotation turns them by the turn from the unit's
+ * rotator to `to`, both round-tripped through the quaternion, so only the angles changed turn, even near gimbal lock,
+ * where the other angles are ambiguous; a scale takes each item's axis by the unit's ratio along its own axes, and an
+ * item level with the unit there takes the value itself, not that value through a ratio's rounding. An axis `to` leaves
+ * as it reads is left alone.
  */
-export const rotatorOffset = (active: UeTransform, axis: Axis, by: number): GroupDelta => {
-  const rotator = readField(active, "rotation")
-  const from = writeField(active, "rotation", rotator).rotation
-  const to = writeField(active, "rotation", { ...rotator, [axis]: rotator[axis] + by }).rotation
-  return { kind: "rotate", rotation: quatNormalize(quatMul(to, quatConjugate(from))) }
+export const fieldTo = (
+  unit: UeTransform,
+  field: TransformField,
+  to: Vec3,
+  pivot: Vec3 = unit.translation
+): (t: UeTransform) => UeTransform => {
+  const from = readField(unit, field)
+  switch (field) {
+    case "translation": {
+      const delta: GroupDelta = { kind: "translate", offset: vecSub(to, from) }
+      return (t) => applyGroupDelta(t, pivot, delta)
+    }
+    case "rotation": {
+      const before = writeField(unit, "rotation", from).rotation
+      const after = writeField(unit, "rotation", to).rotation
+      const delta: GroupDelta = { kind: "rotate", rotation: quatNormalize(quatMul(after, quatConjugate(before))) }
+      return (t) => applyGroupDelta(t, pivot, delta)
+    }
+    case "scale3D": {
+      const along = (t: UeTransform, axis: Axis) => {
+        const own = t.scale3D[axis]
+        if (to[axis] === from[axis]) return own
+        return own === from[axis] || from[axis] === 0 ? clampScale(to[axis]) : clampScale(own * to[axis] / from[axis])
+      }
+      return (t) => scaleAbout(t, { x: along(t, "x"), y: along(t, "y"), z: along(t, "z") }, pivot)
+    }
+  }
 }
 
 /**
- * An inspector axis edit over a whole selection, as the change to make to each item's
- * transform from before the edit. Typed or scrubbed, an edit is what it takes the active
- * item's axis from its value to the new one, and every item takes that change as a gizmo
- * drag would, about `pivot` (by default the active item's origin): a location moves every
- * item by the same amount; a rotation turns the active item about the edited rotator axis and
- * the rest rigidly with it; a scale takes every item's axis by the same ratio, along its own
- * axes. That is what the game's panel does with a typed value (docs/qa/joins-and-typed-rotation.md),
- * so "set every item to 90" is a pasted row, not a typed one. Always applied to the transforms
- * from before the scrub, never to a live preview, so a scrub's steps don't compound.
+ * One axis of a unit's field taken to a value or changed by an amount, every item of the unit along about `pivot` (by
+ * default the unit's origin): `fieldTo` with the other two axes as they read.
  */
 export const selectionAxisEdit = (
   active: UeTransform,
@@ -182,21 +200,6 @@ export const selectionAxisEdit = (
   edit: AxisEdit,
   pivot: Vec3 = active.translation
 ): (t: UeTransform) => UeTransform => {
-  const from = readField(active, field)[axis]
-  const to = edit.kind === "set" ? edit.value : from + edit.by
-  switch (field) {
-    case "scale3D": {
-      // an item level with the active one takes the value itself, not that value through a ratio's rounding
-      const scaled = (v: number) => (v === from || from === 0 ? to : v * to / from)
-      return (t) => scaleAbout(t, { ...t.scale3D, [axis]: clampScale(scaled(t.scale3D[axis])) }, pivot)
-    }
-    case "translation": {
-      const delta: GroupDelta = { kind: "translate", offset: { x: 0, y: 0, z: 0, [axis]: to - from } }
-      return (t) => applyGroupDelta(t, pivot, delta)
-    }
-    case "rotation": {
-      const delta = rotatorOffset(active, axis, to - from)
-      return (t) => applyGroupDelta(t, pivot, delta)
-    }
-  }
+  const from = readField(active, field)
+  return fieldTo(active, field, { ...from, [axis]: edit.kind === "set" ? edit.value : from[axis] + edit.by }, pivot)
 }

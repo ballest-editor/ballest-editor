@@ -4,23 +4,47 @@ import fixture from "../domain/bundledCatalog.json"
 import { Catalog, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { placementTransform } from "../domain/factory"
-import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type TransformField } from "../domain/groupTransform"
+import { type FieldKind, type FieldView, readThing, sharedValue } from "../domain/fieldEdit"
+import { applyGroupDelta, type Axis, readField, type TransformField, writeField } from "../domain/groupTransform"
 import { extentOf } from "../domain/itemBounds"
+import { type NumberEntry, offsetEntry, parseNumberEntry, setEntry } from "../domain/numberEntry"
 import { localToWorld } from "../domain/pivot"
-import { quatConjugate, quatMul, rotateVec, rotatorToQuat, vecAdd } from "../domain/ueMath"
+import { quatConjugate, quatMul, quatNormalize, rotateVec, rotatorToQuat, vecAdd, vecSub } from "../domain/ueMath"
 import { assertVec } from "../test/vec"
+import { editSelectionField, pasteSelectionField, previewSelectionField, setSelectionPivot } from "./actions"
 import {
-  editSelectionAxis,
-  moveSelectionBy,
-  previewSelectionAxis,
-  setSelectionField,
-  setSelectionPivot,
-  setSelectionSize,
-  setSelectionUnitField
-} from "./actions"
-import { initialMap, pivotOf, selectionPivot, shownPivotPoint, shownTransform, unitExtentOf, useEditor } from "./store"
+  initialMap,
+  pivotOf,
+  pivotRowOf,
+  selectionPivot,
+  selectionThings,
+  shownPivotPoint,
+  shownTransform,
+  unitExtentOf,
+  useEditor
+} from "./store"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
+
+/** The Transform row a stored field is shown in, in centimetres. */
+const KINDS: Readonly<Record<TransformField, FieldKind>> = {
+  translation: "location",
+  rotation: "rotation",
+  scale3D: "scale"
+}
+const viewOf = (field: TransformField | "size" | "pivot"): FieldView => ({
+  kind: field === "size" || field === "pivot" ? field : KINDS[field],
+  perUnit: 1
+})
+const entry = (text: string): NumberEntry => parseNumberEntry(text)!
+/** Typing `text` into one field of a row. */
+const type = (field: TransformField | "size" | "pivot", axis: Axis, text: string) =>
+  editSelectionField(viewOf(field), axis, entry(text))
+const offset = (field: TransformField, axis: Axis, by: number) =>
+  editSelectionField(viewOf(field), axis, offsetEntry(by))
+const setTo = (field: TransformField, axis: Axis, value: number) =>
+  editSelectionField(viewOf(field), axis, setEntry(value))
+const paste = (field: TransformField | "size", value: Vec3) => pasteSelectionField(viewOf(field), value)
 const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
 const s = () => useEditor.getState()
 const docTransform = (id: string) => s().doc.map.items[s().doc.ids.indexOf(id)]!.itemTransform
@@ -62,6 +86,22 @@ const expectQuarterTurnAbout = (before: ReadonlyMap<string, UeTransform>, pivot:
   }
 }
 
+/**
+ * `t` with its own `field` changed by `by` on `axis`, about its origin: one piece edited alone (a cube's pivot is its
+ * origin), from its rotator round-tripped through the quaternion.
+ */
+const ownEdit = (t: UeTransform, field: TransformField, axis: Axis, by: number): UeTransform => {
+  if (field === "translation") return { ...t, translation: { ...t.translation, [axis]: t.translation[axis] + by } }
+  if (field === "scale3D") return { ...t, scale3D: { ...t.scale3D, [axis]: t.scale3D[axis] + by } }
+  const rotator = readField(t, "rotation")
+  const from = writeField(t, "rotation", rotator).rotation
+  const to = writeField(t, "rotation", { ...rotator, [axis]: rotator[axis] + by }).rotation
+  return applyGroupDelta(t, t.translation, {
+    kind: "rotate",
+    rotation: quatNormalize(quatMul(to, quatConjugate(from)))
+  })
+}
+
 const cases: ReadonlyArray<readonly [TransformField, Axis]> = [
   ["translation", "x"],
   ["translation", "z"],
@@ -82,7 +122,7 @@ describe("scrubbing a transform field over a turned multi-selection (#43)", () =
       const path = [...ramp(0, total, 80), ...ramp(total, total / 2, 80), ...ramp(total / 2, total, 40)]
       let last: ReadonlyMap<string, UeTransform> | undefined
       for (const by of path) {
-        previewSelectionAxis(field, axis, { kind: "offset", by })
+        previewSelectionField(viewOf(field), axis, offsetEntry(by))
         const shown = new Map(ids.map((id) => [id, shownTransform(s(), id)!]))
         if (last !== undefined) {
           // nothing jumps: consecutive previews stay within a step of each other
@@ -110,14 +150,12 @@ describe("scrubbing a transform field over a turned multi-selection (#43)", () =
         last = shown
         assert.strictEqual(s().past.length, steps, "a preview is not a step")
       }
-      previewSelectionAxis(field, axis, null)
-      editSelectionAxis(field, axis, { kind: "offset", by: total })
+      previewSelectionField(viewOf(field), axis, null)
+      offset(field, axis, total)
       assert.strictEqual(s().past.length, steps + 1)
 
-      const active = before.get(ids.at(-1)!)!
-      const once = selectionAxisEdit(active, field, axis, { kind: "offset", by: total })
       for (const id of ids) {
-        sameTransform(docTransform(id), once(before.get(id)!), id)
+        sameTransform(docTransform(id), ownEdit(before.get(id)!, field, axis, total), id)
         sameTransform(last!.get(id)!, docTransform(id), `${id} release`)
       }
       s().undo()
@@ -125,13 +163,15 @@ describe("scrubbing a transform field over a turned multi-selection (#43)", () =
     })
   }
 
-  it("turns the selection rigidly about the active item, like the gizmo", () => {
+  it("turns every piece where it stands by a change, whatever Together says (the editor's rules § 4)", () => {
     const { ids, before } = setup()
-    editSelectionAxis("rotation", "z", { kind: "offset", by: 90 })
-    expectQuarterTurnAbout(before, before.get(ids.at(-1)!)!.translation)
-    // the active item turns in place and only its yaw changes
-    const active = docTransform(ids.at(-1)!)
-    expectVec(readField(active, "rotation"), { x: 5, y: -15, z: -150 }, "active rotator")
+    offset("rotation", "z", 90)
+    for (const id of ids) {
+      expectVec(docTransform(id).translation, before.get(id)!.translation, id)
+      sameTransform(docTransform(id), ownEdit(before.get(id)!, "rotation", "z", 90), id)
+    }
+    // only the yaw changes
+    expectVec(readField(docTransform(ids.at(-1)!), "rotation"), { x: 5, y: -15, z: -150 }, "active rotator")
   })
 })
 
@@ -149,64 +189,54 @@ const withPivots = () => {
 const pivotPoint = (id: string, t = docTransform(id)) => localToWorld(t, pivotOf(s(), id).localPosition)
 
 describe("scrubbing with pivots (#51)", () => {
-  it("turns the selection about the active item's pivot, as the gizmo does", () => {
+  it("turns every piece about its own pivot, which stays put, whichever is active", () => {
     const { ids, before } = withPivots()
-    const activeId = ids.at(-1)!
-    const pivot = pivotPoint(activeId, before.get(activeId))
-    previewSelectionAxis("rotation", "y", { kind: "offset", by: 25 })
-    previewSelectionAxis("rotation", "y", null)
-    editSelectionAxis("rotation", "y", { kind: "offset", by: 25 })
-    expectVec(pivotPoint(activeId), pivot, "active pivot")
-    const turn = selectionAxisEdit(before.get(activeId)!, "rotation", "y", { kind: "offset", by: 25 })
-    const delta = { kind: "rotate", rotation: turn(before.get(activeId)!).rotation } as const
+    const pivots = new Map(ids.map((id) => [id, pivotPoint(id)]))
+    previewSelectionField(viewOf("rotation"), "y", offsetEntry(25))
+    previewSelectionField(viewOf("rotation"), "y", null)
+    offset("rotation", "y", 25)
     for (const id of ids) {
-      // the same rigid turn the gizmo applies, about the same point
-      const gizmo = applyGroupDelta(before.get(id)!, pivot, {
-        ...delta,
-        rotation: quatMul(delta.rotation, quatConjugate(before.get(activeId)!.rotation))
-      })
-      sameTransform(docTransform(id), gizmo, id)
+      expectVec(pivotPoint(id), pivots.get(id)!, id)
+      const turned = ownEdit(before.get(id)!, "rotation", "y", 25)
+      // the same turn as the piece alone, moved to keep its pivot
+      for (const v of [{ x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }]) {
+        expectVec(rotateVec(docTransform(id).rotation, v), rotateVec(turned.rotation, v), `${id} rotation`)
+      }
     }
   })
 
-  it("scales about the active item's pivot, which stays put", () => {
+  it("scales every piece about its own pivot, which stays put", () => {
     const { ids } = withPivots()
-    const activeId = ids.at(-1)!
-    for (
-      const edit of [
-        () => editSelectionAxis("scale3D", "z", { kind: "offset", by: 0.5 }),
-        () => editSelectionAxis("scale3D", "x", { kind: "set", value: 2 })
-      ]
-    ) {
-      const before = pivotPoint(activeId)
+    for (const edit of [() => offset("scale3D", "z", 0.5), () => setTo("scale3D", "x", 2)]) {
+      const before = new Map(ids.map((id) => [id, pivotPoint(id)]))
       edit()
-      expectVec(pivotPoint(activeId), before, activeId)
+      for (const id of ids) expectVec(pivotPoint(id), before.get(id)!, id)
     }
   })
 
-  it("takes a typed value as the change from the active item, rigid about its pivot, as the game does", () => {
-    // docs/qa/joins-and-typed-rotation.md: typing a yaw turns every piece by the change about the active pivot
+  it("sets every piece to a typed value about its own pivot, and changes each from its own by +=", () => {
     const { ids, before } = withPivots()
-    const activeId = ids.at(-1)!
-    const pivot = pivotPoint(activeId, before.get(activeId))
-    const yaw = readField(before.get(activeId)!, "rotation").z
-    editSelectionAxis("rotation", "z", { kind: "set", value: yaw + 90 })
-    expectVec(pivotPoint(activeId), pivot, "active pivot")
-    // the rotator wraps past 180, as the game's panel does (225 typed into 0 reads -135)
-    assert.closeTo((readField(docTransform(activeId), "rotation").z - (yaw + 90) + 720) % 360, 0, 1e-6)
-    expectQuarterTurnAbout(before, pivot)
-    // a typed location moves every item by the change; only a pasted row sets them all
-    const z = before.get(activeId)!.translation.z
-    editSelectionAxis("translation", "z", { kind: "set", value: z + 70 })
-    for (const id of ids) assert.closeTo(docTransform(id).translation.z, before.get(id)!.translation.z + 70, 1e-6)
-    setSelectionField("translation", { x: 1, y: 2, z: 3 })
-    for (const id of ids) expectVec(docTransform(id).translation, { x: 1, y: 2, z: 3 }, id)
+    const pivots = new Map(ids.map((id) => [id, pivotPoint(id)]))
+    type("rotation", "z", "90")
+    for (const id of ids) {
+      expectVec(pivotPoint(id), pivots.get(id)!, id)
+      assert.closeTo(readField(docTransform(id), "rotation").z, 90, 1e-6, id)
+    }
+    type("rotation", "z", "+= 90")
+    // 180 may read -180
+    for (const id of ids) assert.closeTo(Math.abs(readField(docTransform(id), "rotation").z), 180, 1e-6, id)
+    type("translation", "z", "+= 70")
+    for (const id of ids) {
+      assert.closeTo(docTransform(id).translation.z, before.get(id)!.translation.z + 70, 1e-6, id)
+    }
+    type("translation", "z", "3")
+    for (const id of ids) assert.closeTo(docTransform(id).translation.z, 3, 1e-6, id)
   })
 
   it("pastes a rotation about each item's own pivot", () => {
     const { ids } = withPivots()
     const before = new Map(ids.map((id) => [id, pivotPoint(id)]))
-    setSelectionField("rotation", { x: 10, y: 20, z: 30 })
+    paste("rotation", { x: 10, y: 20, z: 30 })
     for (const id of ids) {
       expectVec(pivotPoint(id), before.get(id)!, id)
       expectVec(readField(docTransform(id), "rotation"), { x: 10, y: 20, z: 30 }, id)
@@ -215,38 +245,58 @@ describe("scrubbing with pivots (#51)", () => {
 })
 
 describe("Each in the Inspector", () => {
-  it("scales every unit by the active one's ratio, not by its difference", () => {
+  it("sets every unit to a typed scale, and multiplies each by its own with *=, in Each as in Together", () => {
     const { ids } = setup()
-    s().togglePivotMode()
     const [a = "", b = "", active = ""] = ids
-    s().transformItems(new Map([[a, { ...docTransform(a), scale3D: { x: 2, y: 1, z: 1 } }]]))
-    editSelectionAxis("scale3D", "x", { kind: "set", value: 2 })
-    assert.closeTo(docTransform(a).scale3D.x, 4, 1e-9, "twice its own")
-    assert.closeTo(docTransform(b).scale3D.x, 2, 1e-9)
-    assert.closeTo(docTransform(active).scale3D.x, 2, 1e-9)
-    s().togglePivotMode()
+    for (const mode of ["each", "together"] as const) {
+      if (s().pivotMode !== mode) s().togglePivotMode()
+      s().transformItems(
+        new Map(
+          ([[a, 2], [b, 1], [active, 1]] as const).map((
+            [id, x]
+          ) => [id, { ...docTransform(id), scale3D: { x, y: 1, z: 1 } }])
+        )
+      )
+      type("scale3D", "x", "*= 2")
+      assert.deepStrictEqual([a, b, active].map((id) => docTransform(id).scale3D.x), [4, 2, 2], mode)
+      type("scale3D", "x", "3")
+      assert.deepStrictEqual([a, b, active].map((id) => docTransform(id).scale3D.x), [3, 3, 3], mode)
+    }
   })
 
-  it("carries the links after a link edited inside an entered chain, rigidly in Rigid and adding up link by link", () => {
+  it("moves only the links edited inside an entered chain, exactly, in either chain setting (the editor's rules § 5)", () => {
     const { ids } = setup()
-    const [, l2 = ""] = ids
+    const [, l2 = "", l3 = ""] = ids
     s().chainSelection()
     const chain = s().doc.structure.tree.find((n) => n.kind === "group")
     s().enterGroup(chain?.kind === "group" ? chain.id : null)
-    s().select([l2])
     const before = new Map(ids.map((id) => [id, docTransform(id)]))
-    // how far each link moves for a y move of 40 on link 2; the link before stays
-    const movesOf = () => {
-      editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
+    const movesOf = (edit: () => void) => {
+      edit()
       const moves = ids.map((id) => docTransform(id).translation.y - before.get(id)!.translation.y)
       s().undo()
       return moves
     }
-    assert.deepStrictEqual(movesOf(), [0, 40, 80], "a new chain goes link by link: the moves add up from link 2")
-    s().togglePivotMode()
-    assert.strictEqual(s().chainMode, "rigid")
-    assert.deepStrictEqual(movesOf(), [0, 40, 40], "Rigid: link 3 is carried")
-    s().togglePivotMode()
+    s().select([l2])
+    const y2 = before.get(l2)!.translation.y
+    for (const mode of ["links", "rigid"] as const) {
+      if (s().chainMode !== mode) s().togglePivotMode()
+      assert.deepStrictEqual(
+        movesOf(() => offset("translation", "y", 40)),
+        [0, 40, 0],
+        `${mode}: a scrub carries nothing`
+      )
+      assert.deepStrictEqual(movesOf(() => type("translation", "y", `${y2 + 40}`)), [0, 40, 0], `${mode}: typed`)
+      assert.deepStrictEqual(
+        movesOf(() => paste("translation", { ...before.get(l2)!.translation, y: y2 + 40 })),
+        [0, 40, 0],
+        `${mode}: pasted, as typed`
+      )
+    }
+    // two links take each its own worked-out value, in chain order
+    s().select([l3, l2])
+    type("translation", "y", "L(0, 100)")
+    assert.deepStrictEqual([l2, l3].map((id) => docTransform(id).translation.y), [0, 100])
     s().enterGroup(null)
   })
 
@@ -256,7 +306,7 @@ describe("Each in the Inspector", () => {
     s().select([...ids])
     for (const mode of ["together", "each"] as const) {
       if (s().pivotMode !== mode) s().togglePivotMode()
-      editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
+      offset("translation", "y", 40)
       assert.deepStrictEqual(ids.map((id) => docTransform(id).translation.y - before.get(id)!.translation.y), [
         40,
         40,
@@ -272,7 +322,7 @@ describe("Each in the Inspector", () => {
     s().togglePivotMode()
     const where = () => new Map(ids.map((id) => [id, pivotPoint(id)]))
     const pivots = where()
-    editSelectionAxis("rotation", "z", { kind: "set", value: readField(before.get(ids.at(-1)!)!, "rotation").z + 30 })
+    type("rotation", "z", "+= 30")
     for (const id of ids) {
       expectVec(pivotPoint(id), pivots.get(id)!, id)
       assert.closeTo(
@@ -305,7 +355,7 @@ describe("a whole group's Transform rows, over its frame", () => {
   it("moves the group by a typed location, so the frame lands on the value", () => {
     const { ids, before, unit } = grouped()
     const from = unit().translation
-    editSelectionAxis("translation", "x", { kind: "set", value: from.x + 250 })
+    setTo("translation", "x", from.x + 250)
     expectVec(unit().translation, { ...from, x: from.x + 250 }, "frame")
     for (const id of ids) {
       expectVec(docTransform(id).translation, vecAdd(before.get(id)!.translation, { x: 250, y: 0, z: 0 }), id)
@@ -315,7 +365,7 @@ describe("a whole group's Transform rows, over its frame", () => {
   it("turns the group rigidly about its pivot by a typed yaw, which the row then reads as the group's turn", () => {
     const { ids, before, unit } = grouped()
     const pivot = unit().translation
-    editSelectionAxis("rotation", "z", { kind: "set", value: 90 })
+    setTo("rotation", "z", 90)
     expectQuarterTurnAbout(before, pivot)
     for (const id of ids) {
       sameTransform(
@@ -330,17 +380,17 @@ describe("a whole group's Transform rows, over its frame", () => {
     expectVec(readField(unit(), "rotation"), { x: 0, y: 0, z: 90 }, "rotation")
     expectVec(unit().translation, pivot, "the pivot stays, on the box that turned with the group")
     // typing the value it already holds turns nothing
-    editSelectionAxis("rotation", "z", { kind: "set", value: 90 })
+    setTo("rotation", "z", 90)
     expectQuarterTurnAbout(before, pivot)
   })
 
   it("takes a pasted row as the group's new values: a turn to the pasted yaw, a scale by the ratio, a move there", () => {
     const { ids, before, unit } = grouped()
     const pivot = unit().translation
-    setSelectionUnitField("rotation", { x: 0, y: 0, z: 90 })
+    paste("rotation", { x: 0, y: 0, z: 90 })
     expectQuarterTurnAbout(before, pivot)
     const turned = new Map(ids.map((id) => [id, docTransform(id)]))
-    setSelectionUnitField("scale3D", { x: 1, y: 2, z: 1 })
+    paste("scale3D", { x: 1, y: 2, z: 1 })
     for (const id of ids) {
       sameTransform(
         docTransform(id),
@@ -349,14 +399,14 @@ describe("a whole group's Transform rows, over its frame", () => {
       )
     }
     const moved = new Map(ids.map((id) => [id, docTransform(id)]))
-    moveSelectionBy({ x: 5, y: 0, z: 0 })
-    for (const id of ids) assert.strictEqual(docTransform(id).translation.x, moved.get(id)!.translation.x + 5)
+    paste("translation", vecAdd(unit().translation, { x: 5, y: 0, z: 0 }))
+    for (const id of ids) assert.closeTo(docTransform(id).translation.x, moved.get(id)!.translation.x + 5, 1e-9)
   })
 
   it("scales every item by a typed factor about the pivot, along its own axes, and the row reads 1 again", () => {
     const { ids, before, unit } = grouped()
     const pivot = unit().translation
-    editSelectionAxis("scale3D", "y", { kind: "set", value: 2 })
+    setTo("scale3D", "y", 2)
     for (const id of ids) {
       sameTransform(
         docTransform(id),
@@ -404,7 +454,7 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     s().groupSelection()
     const { target } = unitNow()
     expectVec(target.unit.translation, target.pivot, "Location is the pivot")
-    editSelectionAxis("translation", "x", { kind: "set", value: 1000 })
+    setTo("translation", "x", 1000)
     const after = unitNow().target
     assertVec(after.pivot, { ...target.pivot, x: 1000 }, "the group moved so its pivot is at x = 1000")
     for (const id of ids) assert.closeTo(docTransform(id).translation.y, shownTransform(s(), id)!.translation.y, 1e-6)
@@ -443,7 +493,7 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     const id = cubeAt({ x: 0, y: 0, z: 5000 }, 30, "Left")
     s().transformItems(new Map([[id, { ...docTransform(id), scale3D: { x: -2, y: 1, z: 0.5 } }]]))
     const before = shownPivotPoint(s())!
-    setSelectionSize({ x: 500, y: 3000, z: 250 })
+    paste("size", { x: 500, y: 3000, z: 250 })
     // the cube is 1000 cm a side: a flipped X stays flipped
     expectVec(docTransform(id).scale3D, { x: -0.5, y: 3, z: 0.25 }, "scale")
     expectVec(shownPivotPoint(s())!, before, "pivot")
@@ -451,22 +501,22 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
 
   it("keeps the left face where it is and grows to the right", () => {
     const id = cubeAt({ x: 0, y: 0, z: 5000 }, 0, "Left")
-    editSelectionAxis("scale3D", "y", { kind: "set", value: 2 })
+    setTo("scale3D", "y", 2)
     expectVec(docTransform(id).translation, { x: 0, y: 500, z: 5000 }, "origin")
     expectVec(shownPivotPoint(s())!, { x: 0, y: -500, z: 5500 }, "pivot")
   })
 
   it("keeps the top where it is and grows downwards, on a turned piece too", () => {
     const id = cubeAt({ x: 3000, y: 0, z: 5000 }, 90, "Top")
-    editSelectionAxis("scale3D", "z", { kind: "set", value: 3 })
+    setTo("scale3D", "z", 3)
     expectVec(docTransform(id).translation, { x: 3000, y: 0, z: 3000 }, "origin")
     expectVec(shownPivotPoint(s())!, { x: 3000, y: 0, z: 6000 }, "pivot")
   })
 
   it("moves the piece by what its pivot moves, which is what the game's Location field does", () => {
     const id = cubeAt({ x: 0, y: 0, z: 5000 }, 0, "Left")
-    editSelectionAxis("scale3D", "y", { kind: "set", value: 2 })
-    editSelectionAxis("translation", "x", { kind: "offset", by: 100 })
+    setTo("scale3D", "y", 2)
+    offset("translation", "x", 100)
     expectVec(docTransform(id).translation, { x: 100, y: 500, z: 5000 }, "origin")
     expectVec(shownPivotPoint(s())!, { x: 100, y: -500, z: 5500 }, "pivot")
   })
@@ -489,5 +539,175 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     s().groupSelection()
     setSelectionPivot("Left")
     for (const id of ids) assert.strictEqual(pivotOf(s(), id).choice, "Default")
+  })
+})
+
+describe("a group, a whole chain and a loose piece in the fields, each one thing (#263)", () => {
+  beforeAll(() => useEditor.setState({ catalogIndex: indexCatalog(catalog) }))
+
+  /** Two cubes grouped, three chained and one loose, apart from one another, selected group, chain, piece. */
+  const mixed = () => {
+    s().loadMap(initialMap(), null)
+    if (s().pivotMode !== "together") s().togglePivotMode()
+    const place = (x: number, y: number) => {
+      s().placePiece(cube, placementTransform(cube, { x, y, z: 50 }))
+      return s().selectedIds[0]!
+    }
+    const group = [place(0, 0), place(1500, 300)]
+    s().select(group)
+    s().groupSelection()
+    const chain = [place(0, 5000), place(1000, 5000), place(2000, 5000)]
+    s().select(chain)
+    s().chainSelection()
+    const piece = place(9000, -4000)
+    const ids = [...group, ...chain, piece]
+    s().select(ids)
+    return { group, chain, piece, ids }
+  }
+  const things = () => selectionThings(s(), (id) => shownTransform(s(), id))!
+  const shown = (field: TransformField | "size" | "pivot", axis: Axis) =>
+    things().map((thing) => readThing(thing, viewOf(field))?.[axis])
+  const distance = (a: string, b: string) => {
+    const d = vecSub(docTransform(a).translation, docTransform(b).translation)
+    return Math.hypot(d.x, d.y, d.z)
+  }
+  /** Every distance inside the group and the chain, which no field edit may change but a scale. */
+  const shapeOf = ({ group, chain }: ReturnType<typeof mixed>) => [
+    distance(group[0]!, group[1]!),
+    distance(chain[0]!, chain[1]!),
+    distance(chain[1]!, chain[2]!),
+    distance(chain[0]!, chain[2]!)
+  ]
+  const expectShape = (actual: ReadonlyArray<number>, expected: ReadonlyArray<number>, message: string) =>
+    actual.forEach((d, i) => assert.closeTo(d, expected[i]!, 1e-6, message))
+
+  it("reads Multiple where the things differ, and the one value once a number sets them all", () => {
+    const setUp = mixed()
+    const shape = shapeOf(setUp)
+    assert.lengthOf(things(), 3, "a group, a chain and a piece are three things")
+    assert.isNull(sharedValue(shown("translation", "x"), 1e-6))
+    assert.strictEqual(sharedValue(shown("scale3D", "x"), 1e-6), 1, "they agree on a scale")
+    type("translation", "x", "500")
+    assert.strictEqual(sharedValue(shown("translation", "x"), 1e-6), 500)
+    expectShape(shapeOf(setUp), shape, "the group and the chain moved whole")
+  })
+
+  it("moves each thing by += from its own value", () => {
+    const setUp = mixed()
+    const before = new Map(setUp.ids.map((id) => [id, docTransform(id)]))
+    type("translation", "y", "+= 100")
+    for (const id of setUp.ids) {
+      assert.closeTo(docTransform(id).translation.y, before.get(id)!.translation.y + 100, 1e-6)
+    }
+    s().undo()
+    type("translation", "y", "+100")
+    for (const id of setUp.ids) {
+      assert.closeTo(docTransform(id).translation.y, before.get(id)!.translation.y + 100, 1e-6)
+    }
+  })
+
+  it("spaces them evenly with $prev + 300 and spreads them with L(0, 1000), in selection order", () => {
+    const setUp = mixed()
+    const shape = shapeOf(setUp)
+    const [first = 0] = shown("translation", "x")
+    type("translation", "x", "$prev + 300")
+    assert.deepStrictEqual(shown("translation", "x"), [first, first + 300, first + 600])
+    type("translation", "y", "L(0, 1000)")
+    assert.deepStrictEqual(shown("translation", "y"), [0, 500, 1000])
+    expectShape(shapeOf(setUp), shape, "nothing deformed")
+    // selected piece first, the piece leads
+    s().select([setUp.piece, ...setUp.group, ...setUp.chain])
+    type("translation", "y", "L(0, 1000)")
+    assert.strictEqual(docTransform(setUp.piece).translation.y, 0)
+    assert.deepStrictEqual(shown("translation", "y"), [0, 500, 1000])
+  })
+
+  it("takes a pasted row exactly as its three values typed, and never collapses the group", () => {
+    const setUp = mixed()
+    const shape = shapeOf(setUp)
+    for (
+      const [field, value] of [
+        ["translation", { x: 100, y: 200, z: 300 }],
+        ["rotation", { x: 0, y: 0, z: 90 }],
+        ["scale3D", { x: 2, y: 1, z: 0.5 }]
+      ] as const
+    ) {
+      const steps = s().past.length
+      paste(field, value)
+      const pasted = new Map(setUp.ids.map((id) => [id, docTransform(id)]))
+      while (s().past.length > steps) s().undo()
+      for (const axis of ["x", "y", "z"] as const) type(field, axis, `${value[axis]}`)
+      for (const id of setUp.ids) sameTransform(docTransform(id), pasted.get(id)!, `${field} ${id}`)
+      // a group holds no scale of its own, so its Scale reads 1 again after one
+      if (field !== "scale3D") {
+        for (const axis of ["x", "y", "z"] as const) {
+          assert.closeTo(sharedValue(shown(field, axis), 1e-6) ?? Number.NaN, value[axis], 1e-6, `${field} ${axis}`)
+        }
+        expectShape(shapeOf(setUp), shape, field)
+      }
+      while (s().past.length > steps) s().undo()
+    }
+  })
+
+  it("scales the group and the chain whole about their pivots, so their gaps scale with them", () => {
+    const setUp = mixed()
+    const gap = docTransform(setUp.group[1]!).translation.x - docTransform(setUp.group[0]!).translation.x
+    type("scale3D", "x", "2")
+    assert.closeTo(
+      docTransform(setUp.group[1]!).translation.x - docTransform(setUp.group[0]!).translation.x,
+      gap * 2,
+      1e-6
+    )
+    for (const id of setUp.ids) assert.closeTo(docTransform(id).scale3D.x, 2, 1e-9, id)
+  })
+
+  it("lands every pivot on a typed Position, moving each thing whole", () => {
+    const setUp = mixed()
+    const shape = shapeOf(setUp)
+    type("pivot", "x", "700")
+    assert.deepStrictEqual(shown("pivot", "x"), [700, 700, 700])
+    expectShape(shapeOf(setUp), shape, "moved whole")
+  })
+
+  it("shows the combined pivot in Together, which moves everything as one, and each one's own in Each", () => {
+    const setUp = mixed()
+    const before = new Map(setUp.ids.map((id) => [id, docTransform(id)]))
+    const together = pivotRowOf(s())!
+    assert.isFalse(together.each)
+    assertVec(together.points[0]!, selectionPivot(s(), (id) => shownTransform(s(), id))!.pivot, "where the gizmo sits")
+    // what the Position field does in Together: the change that brings the combined pivot to 500, for every thing
+    editSelectionField(viewOf("pivot"), "x", offsetEntry(500 - together.points[0]!.x))
+    assert.closeTo(pivotRowOf(s())!.points[0]!.x, 500, 1e-6)
+    for (const id of setUp.ids) {
+      assert.closeTo(
+        docTransform(id).translation.x - before.get(id)!.translation.x,
+        500 - together.points[0]!.x,
+        1e-6,
+        id
+      )
+    }
+    s().togglePivotMode()
+    assert.isUndefined(pivotRowOf(s()), "in Each every pivot is its thing's Location already")
+    s().select([setUp.piece])
+    setSelectionPivot("Top")
+    s().select(setUp.ids)
+    const each = pivotRowOf(s())!
+    assert.isTrue(each.each)
+    assert.lengthOf(each.points, 3)
+    assert.strictEqual(each.active, 2, "the piece, selected last")
+    s().togglePivotMode()
+  })
+
+  it("keeps a whole chain's flip when its own Size is pasted back", () => {
+    const { chain } = mixed()
+    s().select(chain)
+    const [root = ""] = chain
+    s().transformItems(new Map([[root, { ...docTransform(root), scale3D: { x: -1, y: 1, z: 1 } }]]))
+    const before = new Map(chain.map((id) => [id, docTransform(id)]))
+    const [thing] = things()
+    paste("size", readThing(thing!, viewOf("size"))!)
+    for (const id of chain) sameTransform(docTransform(id), before.get(id)!, id)
+    type("size", "x", "*= 2")
+    assert.strictEqual(docTransform(root).scale3D.x, -2, "a size keeps the flip")
   })
 })

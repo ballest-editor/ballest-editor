@@ -16,8 +16,8 @@ const copiedRows = new Map<ClipKey, Vec3>()
 
 /**
  * A row's clipboard button: its menu, or Shift+click shortcuts, copies the row's three values and pastes a copy of the
- * same kind of row. What a paste does is the row's to say (`onPaste`): a piece's Transform row sets every item, a
- * group's takes the group there, a pivot's Position moves the selection so the pivot lands there.
+ * same kind of row. What a paste does is the row's to say (`onPaste`): the row's three values typed, so every selected
+ * thing takes them, each one whole.
  */
 export function RowClipboard({ clipKey, label, value, onPaste }: {
   readonly clipKey: ClipKey

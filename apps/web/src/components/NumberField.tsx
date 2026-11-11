@@ -3,7 +3,14 @@ import { Label } from "@workspace/ui/components/label"
 import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react"
 import { cancelsGesture } from "../domain/Keybinds"
-import { applyNumberEntry, parseNumberEntry, scrubbedValue, scrubSpeedOf } from "../domain/numberEntry"
+import {
+  applyNumberEntry,
+  isRelativeEntry,
+  type NumberEntry,
+  parseNumberEntry,
+  scrubbedValue,
+  scrubSpeedOf
+} from "../domain/numberEntry"
 import { clearStatusHint, showStatusHint, type StatusHint } from "../editor/statusHint"
 import { useEditor } from "../editor/store"
 
@@ -140,13 +147,21 @@ const RELATIVE_TYPING_HINT: StatusHint = [
   { text: "Type arithmetic such as (200 + 50) / 2; use +=50, -=20, *2 or /2 for relative edits" }
 ]
 
+/** The grammar of a field over several things (`workOutEntry`). */
+const SELECTION_TYPING_HINT: StatusHint = [
+  ...TYPING_HINT,
+  {
+    text: "A number sets them all; +=, -=, *= or /= changes each from its own; L(0, 1000) spreads them; $prev, $i count"
+  }
+]
+
 /** Shows the field's hint in the status bar while it is hovered or typed in. */
-function useFieldHint(scrubbable: boolean) {
+function useFieldHint(scrubbable: boolean, typingHint: StatusHint) {
   const owner = useId()
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const hint = focused
-    ? scrubbable ? RELATIVE_TYPING_HINT : TYPING_HINT
+    ? typingHint
     : hovered && scrubbable
     ? SCRUB_HINT
     : null
@@ -169,14 +184,18 @@ function useFieldHint(scrubbable: boolean) {
  * moves faster when the snap is coarse); typed values aren't snapped. A field that scrubs also takes relative entry:
  * `+=50`, `-=20`, `*2` and `/2` typed over its text act on the value. Negative numbers are absolute.
  * Arithmetic with parentheses works both when replacing the text and editing it in place. A null `value`
- * is mixed (several items that disagree): the input is blank, typing sets them all, a scrub starts from 0, and a
- * relative entry is refused. `format` and `parse` replace plain decimals, for a value that reads as something else (a
- * time of day). While it's hovered or typed in, the status bar says what the mouse and keys do (`useFieldHint`).
+ * is Multiple (several things that disagree): the input is blank, typing sets them all, a scrub starts from 0, and a
+ * relative entry is refused unless `onEntry` takes it. `onEntry`, in place of `onCommit`, gets what's typed as an entry
+ * for a field over several things to work out for each (`workOutEntry`). `format` and `parse` replace plain decimals,
+ * for a value that reads as something else (a time of day). While it's hovered or typed in, the status bar says what
+ * the mouse and keys do (`useFieldHint`).
  */
 export function NumberField(props: {
   readonly label: string
   readonly value: number | null
-  readonly onCommit: (value: number) => void
+  readonly onCommit?: (value: number) => void
+  /** What's typed, as an entry, for a field over several things; replaces `onCommit` for typing. */
+  readonly onEntry?: (entry: NumberEntry) => void
   /**
    * Live value while the label is scrubbed; null when the scrub ends or is cancelled.
    * `from` is the value the scrub started from.
@@ -215,15 +234,21 @@ export function NumberField(props: {
   const shown = (value: number) => props.format?.(value) ?? round(value).toFixed(digits)
   const text = draft ?? (props.value === null ? "" : shown(props.value))
   const scrubbable = props.onScrub !== undefined
-  const fieldHint = useFieldHint(scrubbable)
+  const fieldHint = useFieldHint(
+    scrubbable,
+    props.onEntry !== undefined ? SELECTION_TYPING_HINT : scrubbable ? RELATIVE_TYPING_HINT : TYPING_HINT
+  )
   const parse = props.parse ?? ((typed: string) => typed.trim() === "" ? null : Number(typed))
   const commitValue = (n: number | null) => {
-    if (n !== null && Number.isFinite(n) && n !== props.value) props.onCommit(n)
+    if (n !== null && Number.isFinite(n) && n !== props.value) props.onCommit?.(n)
   }
   const commitEntry = (typed: string) => {
     const entry = parseNumberEntry(typed)
     if (entry === null) return
-    if (entry.kind === "set") commitValue(entry.value)
+    if (props.onEntry !== undefined) {
+      // the value every thing holds already changes nothing
+      if (entry.op !== "set" || entry.constant === undefined || entry.constant !== props.value) props.onEntry(entry)
+    } else if (!isRelativeEntry(entry)) commitValue(entry.constant ?? applyNumberEntry(entry, props.value ?? 0))
     else if (props.value !== null) commitValue(round(applyNumberEntry(entry, props.value)))
   }
   const commit = () => {
@@ -242,7 +267,7 @@ export function NumberField(props: {
     snapFrom: props.snapFrom,
     round,
     onScrub: props.onScrub,
-    onCommit: props.onScrubCommit ?? props.onCommit,
+    onCommit: props.onScrubCommit ?? ((value) => props.onCommit?.(value)),
     onClick: () => {
       input.current?.focus()
       input.current?.select()
@@ -278,7 +303,7 @@ export function NumberField(props: {
           scrubbable && "cursor-ew-resize focus:cursor-text"
         )}
         value={text}
-        placeholder={props.value === null ? "Mixed" : undefined}
+        placeholder={props.value === null ? "Multiple" : undefined}
         {...scrubHandlers}
         onBeforeInput={(e) => {
           const { selectionEnd, selectionStart, value } = e.currentTarget

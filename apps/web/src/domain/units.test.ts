@@ -1,15 +1,12 @@
 import { assert, describe, it } from "@effect/vitest"
 import { assertVec } from "../test/vec"
 import type { Quat4, UeTransform, Vec3 } from "./coords"
-import { identityTransform } from "./factory"
 import {
   applyGroupDelta,
   forUnit,
   type GroupDelta,
   landedPoint,
-  readField,
   type RigidDelta,
-  rotatorOffset,
   selectionAxisEdit
 } from "./groupTransform"
 import type { Box } from "./itemBounds"
@@ -780,14 +777,6 @@ describe("pivot dots and Point pivots", () => {
     }
     const part = new Map([["a", applyGroupDelta(at(0), ORIGIN, landing)]])
     assert.isUndefined(withCarriedFrames(structure, (k) => before.get(k), part, through), "part of its group")
-  })
-
-  it("reads a rotator offset about a unit's own axis for the Inspector", () => {
-    const t = at(0, 0, 0, 45)
-    const d = rotatorOffset(t, "z", 10)
-    const out = applyGroupDelta(t, ORIGIN, d)
-    assert.closeTo(readField(out, "rotation").z, 55, 1e-6)
-    assert.deepStrictEqual(identityTransform().rotation, { x: 0, y: 0, z: 0, w: 1 })
   })
 })
 

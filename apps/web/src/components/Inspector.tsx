@@ -23,14 +23,13 @@ import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-gr
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { createElement, Fragment, memo, type ReactNode, useEffect, useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
-import type { CatalogIndex } from "../domain/Catalog"
-import type { UeTransform, Vec3 } from "../domain/coords"
+import type { Vec3 } from "../domain/coords"
 import { creatorChipText, mapCreatorLabel } from "../domain/creator"
-import { editTransform, isDecal } from "../domain/editTransform"
+import { isDecal } from "../domain/editTransform"
 import { mapLabelOf } from "../domain/factory"
+import { type FieldKind, type FieldView, readThing, sharedValue, type Thing } from "../domain/fieldEdit"
 import { counted, groupTrail, selectedNodes, soleGroupOf, unitSummaryOf } from "../domain/groupSelection"
-import { type Axis, readField, type TransformField } from "../domain/groupTransform"
-import { extentOf, sizeAt } from "../domain/itemBounds"
+import type { Axis, TransformField } from "../domain/groupTransform"
 import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
@@ -39,18 +38,15 @@ import { documentOrigin } from "../domain/prefab"
 import { gridScrubOf, scaleSnapStep, snapsGrid, snapsRotation } from "../domain/snapConfig"
 import { idOf, pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
-import { ORIGIN, vecAdd, vecSub } from "../domain/ueMath"
-import { pivotModeFor, pivotUnitOf } from "../domain/units"
+import { ORIGIN, vecScale } from "../domain/ueMath"
 import type { MapValidation } from "../domain/validateMap"
 import {
   deleteSelection,
   duplicateSelection,
-  editSelectionAxis,
-  previewSelectionAxis,
+  editSelectionField,
+  pasteSelectionField,
   revealProject,
-  setSelectionField,
-  setSelectionSize,
-  setSelectionUnitField,
+  scrubSelectionField,
   updateSettings
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
@@ -58,11 +54,11 @@ import {
   type EditorState,
   noTabOpen,
   selectedIndices,
-  selectionPivot,
+  selectionThings,
+  selectionUnits,
   shownTransform,
   shownValidation,
   snapConfigOf,
-  unitExtentOf,
   useCreator,
   useEditor,
   useOpenPrefab
@@ -357,20 +353,26 @@ interface TransformRowSpec {
 
 const AXIS_LABELS: Readonly<Record<Axis, string>> = { x: "X", y: "Y", z: "Z" }
 
+/** Whom the rows speak of: one item, one whole group, or several things (the editor's rules § 4). */
+type RowsOf = "item" | "group" | "things"
+
 /**
- * The rows for an item (its own transform) or a whole group: a group has no stored origin, so its Location is its pivot
- * and lives in the Pivot section as Position; here it has a turn and a scale to apply about that.
+ * The rows for an item (its own transform), a whole group, or several things: a group has no stored origin, so its
+ * Location is its pivot, and it has a turn and a scale to apply about that.
  */
-const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<TransformRowSpec> => {
+const transformRows = (units: "cm" | "m", of: RowsOf): ReadonlyArray<TransformRowSpec> => {
+  const length = units === "m" ? "meters" : "centimeters"
   const location: TransformRowSpec = {
     field: "translation",
     label: "Location",
     unit: units,
-    help: of === "item"
-      ? `The piece's origin, as the map stores it, in ${units === "m" ? "meters" : "centimeters"}, Z up`
-      : `Where the group is: its pivot, or the origin of the member it pivots on, in ${
-        units === "m" ? "meters" : "centimeters"
-      }, Z up. A change moves the whole group`,
+    help: {
+      item: `The piece's origin, as the map stores it, in ${length}, Z up`,
+      group:
+        `Where the group is: its pivot, or the origin of the member it pivots on, in ${length}, Z up. A value moves the whole group there`,
+      things:
+        `Where each one is: a piece's origin, a group's pivot, in ${length}, Z up. A number moves every one there whole; +=100 moves each from where it is`
+    }[of],
     axisLabels: AXIS_LABELS,
     step: units === "m" ? 0.01 : 1,
     digits: units === "m" ? 3 : 1,
@@ -382,9 +384,12 @@ const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<T
       field: "rotation",
       label: "Rotation",
       unit: "°",
-      help: of === "item"
-        ? "Degrees: roll, pitch, yaw"
-        : "Degrees: roll, pitch, yaw. A group holds no turn of its own, so a value here turns it by that much about its pivot",
+      help: {
+        item: "Degrees: roll, pitch, yaw",
+        group: "Degrees: roll, pitch, yaw, the group's own turn. A value turns it there about its pivot",
+        things:
+          "Degrees: roll, pitch, yaw. A number turns every one to it about its own pivot; +=90 turns each from its own"
+      }[of],
       axisLabels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
       step: 1,
       digits: 1
@@ -393,9 +398,13 @@ const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<T
       field: "scale3D",
       label: "Scale",
       unit: "×",
-      help: of === "item"
-        ? "A factor of the piece's own size"
-        : "A group holds no scale of its own, so a value here scales its items by that much about its pivot, each along its own axes",
+      help: {
+        item: "A factor of the piece's own size",
+        group:
+          "A group holds no scale of its own, so a value here scales its items by that much about its pivot, each along its own axes",
+        things:
+          "A number gives every one that scale about its own pivot; *=2 doubles each. A group holds no scale, so it reads 1 and scales by the value"
+      }[of],
       axisLabels: AXIS_LABELS,
       step: 0.01,
       digits: 2
@@ -416,16 +425,18 @@ const DECAL_SIZE_ROW: TransformRowSpec = {
 }
 
 /**
- * The Scale row as a size: the piece's bounds along its own axes at its scale (domain/itemBounds), in display units. A
- * change scales the selection as the factor row does, by the ratio it makes of the active item's size.
+ * The Scale row as a size: each thing's bounds along its own axes at its scale (domain/itemBounds), in display units. A
+ * change scales each thing as the factor row does, by the ratio it makes of its own size.
  */
-const sizeRow = (units: "cm" | "m", of: "item" | "group"): TransformRowSpec => ({
+const sizeRow = (units: "cm" | "m", of: RowsOf): TransformRowSpec => ({
   field: "scale3D",
   label: "Size",
   unit: units,
-  help: of === "item"
-    ? "The piece's size along its own axes. A change scales it"
-    : "The box around the group's items, or the size of the member it pivots on. A change scales the group",
+  help: {
+    item: "The piece's size along its own axes. A change scales it",
+    group: "The size of the member the group pivots on. A change scales the group",
+    things: "Each one's size along its own axes. A number sizes every one to it; *=2 doubles each"
+  }[of],
   axisLabels: AXIS_LABELS,
   step: units === "m" ? 0.01 : 1,
   digits: units === "m" ? 3 : 1,
@@ -491,43 +502,45 @@ function ScaleModeToggle({ units, sizeKnown, unknown }: {
 }
 
 /**
- * One editable row over the whole selection: its name and unit, its clipboard button (`RowClipboard`), then an X/Y/Z
- * field each, side by side while a big coordinate still fits. The fields show the selection's unit: the active item,
- * or a whole group's frame. A typed value takes the unit's axis there and the rest of the selection follows by the
- * same change, as a scrub does and as the game's panel does, so a selection keeps its spread; items that differ from
- * the unit are marked Mixed. A paste is the row's `onPaste`. With snapping on, a scrub lands on the grid or rotation
- * step. `perUnit` converts each axis's display value to the stored one (a size to its scale). `origin` is the point a
- * location reads from (`documentOrigin`): shown, typed, copied and pasted values are measured from it, scrubs aren't
- * touched. `mode` is a control after the label (Scale's factor or size).
+ * One editable row over the selected things (the editor's rules § 4): its name and unit, its clipboard button
+ * (`RowClipboard`), then an X/Y/Z field each, side by side while a big coordinate still fits. A field shows the value
+ * every thing holds, or Multiple where they differ. What's typed is worked out for each thing from its own value and
+ * takes each one whole (`editSelectionField`), a scrub changes each by the same amount, and a paste is its three values
+ * typed. With snapping on, a scrub lands on the grid, rotation or scale step. `mode` is a control after the label
+ * (Scale's factor or size).
  */
 function TransformRow(props: {
   readonly row: TransformRowSpec
-  /** The unit's transform as shown (live while a drag or scrub is in progress). */
-  readonly unit: UeTransform
-  /** The axes on which the selection's items differ from the unit. */
-  readonly mixed: ReadonlySet<Axis>
-  /** What a copy of the row reads, in stored units. */
+  readonly view: FieldView
+  /** Every thing's values as shown (live while a drag or scrub is in progress), in selection order. */
+  readonly values: ReadonlyArray<Vec3 | undefined>
+  /** What a copy reads, in stored units: the active thing's values. */
   readonly copyValue: Vec3
-  /** What a paste of three values does to the selection. */
-  readonly onPaste: (value: Vec3) => void
-  readonly perUnit: Readonly<Record<Axis, number>>
-  /** The leading item's local size (cm), which a snapped Scale scrub keeps on the grid; none for a group. */
-  readonly extent?: Vec3 | undefined
+  /** The active thing's size at scale 1 (cm), which a snapped Scale scrub keeps on the grid. */
+  readonly extent: Vec3 | undefined
   /** The clipboard's kind of row, when it isn't the field's (a size). */
   readonly clipKey?: ClipKey
   readonly mode?: ReactNode
-  /** Where the row's 0 is, for a location; the world's origin otherwise. */
-  readonly origin?: Vec3
 }) {
   const snapping = useEditor(snapConfigOf)
-  const { row, perUnit, origin = ORIGIN } = props
-  const { field } = row
-  // Scrubs follow the tool bar's snapping, in display units: the grid for a location or a size, the step for rotation.
-  const snap = row.grid !== undefined
-    ? snapsGrid(snapping) ? snapping.gridSize / row.grid : undefined
-    : field === "rotation" && snapsRotation(snapping)
-    ? snapping.rotationStep
-    : undefined
+  const { row, view, extent } = props
+  // Scrubs follow the tool bar's snapping, in display units: the grid for a location or a size, the step for rotation,
+  // and for a scale the factor that keeps the active thing's size on the grid.
+  const snapOf = (axis: Axis): number | undefined => {
+    if (view.kind === "scale" || view.kind === "size") {
+      const step = scaleSnapStep(snapping, extent?.[axis])
+      if (view.kind === "scale" || step === undefined) return step
+      return extent === undefined ? undefined : step * extent[axis] / view.perUnit
+    }
+    if (row.grid !== undefined) return snapsGrid(snapping) ? snapping.gridSize / row.grid : undefined
+    return snapsRotation(snapping) ? snapping.rotationStep : undefined
+  }
+  // a location lands on the grid's own lines, counted from its origin
+  const snapFromOf = (axis: Axis): number | undefined => {
+    // as measured from where the row reads 0
+    const lattice = view.kind === "location" ? gridScrubOf(snapping, axis, view.origin) : undefined
+    return lattice === undefined ? undefined : lattice.from / view.perUnit
+  }
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex h-6 items-center justify-between gap-2">
@@ -541,51 +554,30 @@ function TransformRow(props: {
           </Tooltip>
           {props.mode}
         </div>
-        {props.mixed.size > 0 && (
-          <Tooltip>
-            <TooltipTrigger render={<span className="ml-auto text-caption text-fg-tertiary" />}>Mixed</TooltipTrigger>
-            <TooltipContent side="left">
-              {`The items differ on ${
-                [...props.mixed].map((a) => AXIS_LABELS[a]).join(", ")
-              }: the active one is shown, and a change here moves them all together`}
-            </TooltipContent>
-          </Tooltip>
-        )}
         <RowClipboard
-          clipKey={props.clipKey ?? field}
+          clipKey={props.clipKey ?? row.field}
           label={row.label}
-          value={vecSub(props.copyValue, origin)}
-          onPaste={(value) => props.onPaste(vecAdd(value, origin))}
+          value={props.copyValue}
+          onPaste={(value) => pasteSelectionField(view, value)}
         />
       </div>
       <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
-        {axes.map((axis) => {
-          const value = (readField(props.unit, field)[axis] - origin[axis]) / perUnit[axis]
-          const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit[axis] }) as const
-          // a location lands on the grid's own lines, counted from its origin as measured from where the row reads 0
-          const lattice = field === "translation" ? gridScrubOf(snapping, axis, origin) : undefined
-          return (
-            <NumberField
-              key={axis}
-              label={row.axisLabels[axis]}
-              value={value}
-              onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit[axis] + origin[axis] })}
-              onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
-              onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
-              step={row.step}
-              snap={field === "scale3D"
-                ? (() => {
-                  const step = scaleSnapStep(snapping, props.extent?.[axis])
-                  return step === undefined ? undefined : step / Math.abs(perUnit[axis])
-                })()
-                : snap}
-              snapFrom={lattice === undefined ? undefined : lattice.from / perUnit[axis]}
-              digits={row.digits}
-              handleClassName={AXIS_BG_CLASSES[axis]}
-              handleText={AXIS_LABELS[axis]}
-            />
-          )
-        })}
+        {axes.map((axis) => (
+          <NumberField
+            key={axis}
+            label={row.axisLabels[axis]}
+            // what the field shows rounded tells the things apart
+            value={sharedValue(props.values.map((v) => v?.[axis]), 10 ** -row.digits / 2)}
+            onEntry={(entry) => editSelectionField(view, axis, entry)}
+            {...scrubSelectionField(view, axis)}
+            step={row.step}
+            snap={snapOf(axis)}
+            snapFrom={snapFromOf(axis)}
+            digits={row.digits}
+            handleClassName={AXIS_BG_CLASSES[axis]}
+            handleText={AXIS_LABELS[axis]}
+          />
+        ))}
       </div>
     </div>
   )
@@ -777,67 +769,41 @@ const ItemDetails = memo(function ItemDetails({ item, index }: { readonly item: 
   )
 })
 
-/** The axes on which any of `values` differs from `reference`. */
-const differingAxes = (reference: Vec3, values: ReadonlyArray<Vec3>, tolerance = 1e-6): Set<Axis> =>
-  new Set(AXES.filter((axis) => values.some((v) => Math.abs(v[axis] - reference[axis]) > tolerance)))
+/** The row a transform field is in. */
+const FIELD_KINDS: Readonly<Record<TransformField, FieldKind>> = {
+  translation: "location",
+  rotation: "rotation",
+  scale3D: "scale"
+}
 
-/** The axes on which any of `transforms` differs from `unit`, in the field's units. */
-const mixedAxes = (unit: UeTransform, transforms: ReadonlyArray<UeTransform>, field: TransformField): Set<Axis> =>
-  differingAxes(readField(unit, field), transforms.map((t) => readField(t, field)))
+/** Whether a thing is one item, not a group of them. */
+const isItemThing = ({ unit }: Thing) => unit.id === unit.anchor
 
-const uniform = (n: number): Readonly<Record<Axis, number>> => ({ x: n, y: n, z: n })
+/** What the rows' help and the Size choice speak of: one item, one group, or several things. */
+const rowsOf = (things: ReadonlyArray<Thing>): RowsOf =>
+  things.length > 1 ? "things" : things.every(isItemThing) ? "item" : "group"
 
-/** The Scale row's props as a size: `extent` is the active item's, `items` and `transforms` line up. */
-const sizeRowProps = (
-  { unit, active, extent, items, transforms, catalog, perUnit }: {
-    readonly unit: UeTransform
-    readonly active: UeTransform
-    readonly extent: Vec3
-    readonly items: ReadonlyArray<Item>
-    readonly transforms: ReadonlyArray<UeTransform>
-    readonly catalog: CatalogIndex | null
-    readonly perUnit: number
-  }
-) => {
-  const sizes = items.flatMap((item, i) => {
-    const own = extentOf(item, catalog)
-    const t = transforms[i]
-    return own === undefined || t === undefined ? [] : [sizeAt(own, t.scale3D)]
-  })
-  const sign = (axis: Axis) => (unit.scale3D[axis] < 0 ? -1 : 1)
-  return {
-    // a display value times this is the active item's scale for that size, flipped as it is
-    perUnit: {
-      x: sign("x") * perUnit / extent.x,
-      y: sign("y") * perUnit / extent.y,
-      z: sign("z") * perUnit / extent.z
-    },
-    mixed: differingAxes(sizeAt(extent, unit.scale3D), sizes, 1e-3),
-    copyValue: sizeAt(extent, active.scale3D),
-    onPaste: setSelectionSize,
-    clipKey: "size"
-  } as const
+const SIZE_UNKNOWN: Readonly<Record<RowsOf, string>> = {
+  item: "This piece's size isn't known",
+  group:
+    "A group's items scale along their own axes, so it has no one size. Pivot it on a member to size it by that member",
+  things:
+    "Not every one of these has a size: a group's items scale along their own axes, so it has none unless it pivots on a member"
 }
 
 /**
- * The Transform section: the selection's unit, edited as one thing, the same rows for a piece and a group. For items
- * that is the active one with the rest following; for a whole group it is its frame, with the group's items as
- * `transforms` only to mark what differs. `extent` is the unit's own size at scale 1 (`unitExtentOf`), which gives the
- * Scale row its Size mode and a snapped scrub its grid.
+ * The Transform section: the selected things, each edited as one, with the same rows for a piece, a group and several
+ * (the editor's rules § 4). `active` is the thing holding the last selected item, which a copy reads and whose size
+ * a snapped Scale scrub keeps on the grid. `items` are the selected items when every thing is one, so decals get their
+ * Size row.
  */
-function TransformSection({ of, unit, transforms, active, extent, items = NO_ITEMS, children }: {
-  readonly of: "item" | "group"
-  readonly unit: UeTransform
-  readonly transforms: ReadonlyArray<UeTransform>
-  /** The active item's document transform, which a copy reads; a group's copy reads the unit as shown. */
-  readonly active?: UeTransform | undefined
-  readonly extent: Vec3 | undefined
-  /** The selected items, in line with `transforms`, whose sizes mark a Size row Mixed; none for a group. */
+function TransformSection({ things, active, items = NO_ITEMS, children }: {
+  readonly things: ReadonlyArray<Thing>
+  readonly active: Thing
   readonly items?: ReadonlyArray<Item>
   readonly children?: ReactNode
 }) {
   const units = useEditor((s) => s.settings.general.units)
-  const catalog = useEditor((s) => s.catalogIndex)
   const scaleMode = useEditor((s) => s.settings.panels.inspectorScale)
   // a definition's tab reads its locations from the prefab's frame, where the origin marker is
   const origin = useEditor((s) => documentOrigin(s.document))
@@ -845,52 +811,36 @@ function TransformSection({ of, unit, transforms, active, extent, items = NO_ITE
   const perUnit = units === "m" ? 100 : 1
   // a decal's scale is its size already
   const decals = items.length > 0 && items.every(isDecal)
+  const of = rowsOf(things)
+  const sizeKnown = things.every((thing) => thing.extent !== undefined)
+  const rowProps = (row: TransformRowSpec, view: FieldView) => {
+    const copied = readThing(active, view)
+    return {
+      row,
+      view,
+      values: things.map((thing) => readThing(thing, view)),
+      copyValue: copied === undefined ? ORIGIN : vecScale(copied, view.perUnit),
+      extent: active.extent
+    }
+  }
   return (
     <Section id="transform" title="Transform" className="@container gap-2">
       {transformRows(units, of).map((row) => {
-        const props = {
-          row,
-          unit,
-          mixed: of === "item" ? mixedAxes(unit, transforms, row.field) : EMPTY_AXES,
-          copyValue: readField(active ?? unit, row.field),
-          // a piece's paste sets every item; a group's takes the group there, as typing the three values would
-          onPaste: (value: Vec3) =>
-            of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value),
-          extent,
-          perUnit: uniform(row.field === "translation" ? perUnit : 1),
-          origin: row.field === "translation" ? origin : ORIGIN
-        }
-        if (row.field !== "scale3D") return <TransformRow key={row.field} {...props} />
-        if (decals) return <TransformRow key={row.field} {...props} row={DECAL_SIZE_ROW} />
-        const mode = (
-          <ScaleModeToggle
-            units={units}
-            sizeKnown={extent !== undefined}
-            unknown={of === "item"
-              ? "This piece's size isn't known"
-              : "A group's items scale along their own axes, so it has no one size. Pivot it on a member to size it by that member"}
-          />
-        )
-        if (extent === undefined || scaleMode === "factor") {
+        const view: FieldView = row.field === "translation"
+          ? { kind: "location", perUnit, origin }
+          : { kind: FIELD_KINDS[row.field], perUnit: 1 }
+        if (row.field !== "scale3D") return <TransformRow key={row.field} {...rowProps(row, view)} />
+        if (decals) return <TransformRow key={row.field} {...rowProps(DECAL_SIZE_ROW, view)} />
+        const mode = <ScaleModeToggle units={units} sizeKnown={sizeKnown} unknown={SIZE_UNKNOWN[of]} />
+        if (!sizeKnown || scaleMode === "factor") {
           // the toggle says it's a factor
-          return <TransformRow key={row.field} {...props} row={{ ...row, unit: "" }} mode={mode} />
+          return <TransformRow key={row.field} {...rowProps({ ...row, unit: "" }, view)} mode={mode} />
         }
-        const size = sizeRowProps({ unit, active: active ?? unit, extent, items, transforms, catalog, perUnit })
         return (
           <TransformRow
             key={row.field}
-            {...props}
-            {...size}
-            // a group's pasted size scales it to that size, as typing the three values would
-            onPaste={of === "item"
-              ? size.onPaste
-              : (value: Vec3) =>
-                setSelectionUnitField("scale3D", {
-                  x: value.x / extent.x,
-                  y: value.y / extent.y,
-                  z: value.z / extent.z
-                })}
-            row={sizeRow(units, of)}
+            {...rowProps(sizeRow(units, of), { kind: "size", perUnit })}
+            clipKey="size"
             mode={mode}
           />
         )
@@ -900,45 +850,33 @@ function TransformSection({ of, unit, transforms, active, extent, items = NO_ITE
   )
 }
 
-const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
 const NO_ITEMS: ReadonlyArray<Item> = []
-const EMPTY_AXES: ReadonlySet<Axis> = new Set()
 
 /**
  * Everything that edits the selection's items, all of them at once. A whole group's items get no Transform section:
  * the group has its own, over its frame.
  */
-function ItemEditor({ items, ids, transforms, placed, transform, unit, extent, groupUnit, unitIndex }: {
-  /** The gizmo's unit as shown, which the Transform rows edit: a piece, a whole group, or a chain's first link. */
-  readonly unit: UeTransform | undefined
-  /** That unit's own size at scale 1 (`unitExtentOf`). */
-  readonly extent: Vec3 | undefined
-  /** Whether that unit is a group among the selection rather than one of `items`. */
-  readonly groupUnit: boolean
-  /** The unit's index in `items`, -1 when it is a group. */
-  readonly unitIndex: number
+function ItemEditor({ items, ids, placed, transform, things, active: activeThing }: {
+  /** The selected things as shown, in selection order, which the Transform rows edit one by one. */
+  readonly things: ReadonlyArray<Thing>
+  /** The thing holding the last selected item. */
+  readonly active: Thing | undefined
   readonly items: ReadonlyArray<Item>
   readonly ids: ReadonlyArray<string>
-  readonly transforms: ReadonlyArray<UeTransform>
   readonly placed: ReadonlyArray<PlacedItem>
   readonly transform: boolean
 }) {
-  const active = items.at(-1)
-  const shownActive = transforms.at(-1)
   const painted = useMemo(() => items.map((item, i) => ({ item, id: ids[i] ?? "" })), [items, ids])
   const properties = useMemo(() => selectionProperties(placed), [placed])
-  if (active === undefined || shownActive === undefined) return null
+  if (items.length === 0) return null
   return (
     <>
-      {transform && (
+      {transform && activeThing !== undefined && (
         <>
           <TransformSection
-            of={groupUnit ? "group" : "item"}
-            unit={unit ?? shownActive}
-            transforms={transforms}
-            active={groupUnit ? unit : editTransform(items[unitIndex] ?? active)}
-            extent={extent}
-            items={groupUnit ? NO_ITEMS : items}
+            things={things}
+            active={activeThing}
+            items={things.every(isItemThing) ? items : NO_ITEMS}
           >
             <FlipSection items={placed} />
           </TransformSection>
@@ -993,18 +931,13 @@ export function Inspector() {
   // show in the viewport straight away, rather than after the sections a selection mounts.
   const selectedIds = useAfterPaint(useEditor((s) => s.selectedIds))
   const doc = useEditor((s) => s.doc)
-  // Selected items in selection order, with their shown transforms (live while the gizmo drags or a field scrubs;
-  // committed on release). Kept while they are the same items, so an edit elsewhere in the map renders none of this.
+  // Selected items in selection order. Kept while they are the same items, so an edit elsewhere in the map renders none
+  // of this.
   const indices = useShallow(sameArray<number>)(selectedIndices({ doc, selectedIds }))
   const items = useShallow(sameArray<Item>)(indices.flatMap((index) => doc.map.items[index] ?? []))
   const ids = useShallow(sameArray<string>)(indices.map((index) => doc.ids[index] ?? ""))
+  // live while the gizmo drags or a field scrubs, committed on release
   const preview = useEditor((s) => s.preview)
-  // As `shownTransform` reads them, but memoised: `editTransform` builds a decal's or an elevator's transform afresh
-  // each call, and a selector returning fresh objects would re-render without end.
-  const transforms = useMemo(
-    () => items.map((item, i) => preview?.get(ids[i] ?? "") ?? editTransform(item)),
-    [items, ids, preview]
-  )
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const tree = useEditor((s) => s.doc.structure.tree)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
@@ -1012,27 +945,18 @@ export function Inspector() {
     () => soleGroupOf(tree, selectedIds, enteredGroupId),
     [tree, selectedIds, enteredGroupId]
   )
-  // The selection's gizmo target as shown, whose unit the Transform rows edit. Read from the store at the time, since
-  // it is built afresh from the items' shown transforms and a selector returning it would re-render without end.
-  const pivotMode = useEditor((s) => s.pivotMode)
-  const chainMode = useEditor((s) => s.chainMode)
+  // The selected things as shown, which the Transform rows edit one by one, and the one holding the active item. Read
+  // from the store at the time, since they are built afresh from the items' shown transforms and a selector returning
+  // them would re-render without end.
   const previewLanding = useEditor((s) => s.previewLanding)
-  const target = useMemo(() => {
+  const { things, active } = useMemo(() => {
     const s = { ...useEditor.getState(), selectedIds }
-    return selectionPivot(s, (id) => shownTransform(s, id))
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the target is built from, read inside
-  }, [doc, preview, previewLanding, catalogIndex, pivotMode, chainMode, selectedIds, enteredGroupId])
-  const frame = target?.unit
-  const unitNode = target === undefined
-    ? undefined
-    : pivotUnitOf(target.selection, pivotModeFor({ pivotMode, chainMode }, target.selection))
-  const unitKey = unitNode?.id
-  const groupUnit = unitKey !== undefined && !ids.includes(unitKey)
-  const unitIndex = unitKey === undefined ? -1 : ids.indexOf(unitKey)
-  const extent = useMemo(() => {
-    if (unitNode === undefined) return undefined
-    return unitExtentOf(useEditor.getState(), unitNode)
-  }, [unitNode])
+    const transformOf = (id: string) => shownTransform(s, id)
+    const shown = selectionThings(s, transformOf) ?? []
+    const activeUnit = selectionUnits(s, transformOf)?.active
+    return { things: shown, active: shown.find((thing) => thing.unit.id === activeUnit?.id) }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the store values the things are built from, read inside
+  }, [doc, preview, previewLanding, catalogIndex, selectedIds, enteredGroupId])
 
   // Kept from one render to the next, so the sections that take it skip the renders a drag or a scrub causes.
   const placed = useMemo(
@@ -1075,13 +999,10 @@ export function Inspector() {
     <ItemEditor
       items={items}
       ids={ids}
-      transforms={transforms}
       placed={placed}
       transform={group === undefined}
-      unit={frame}
-      extent={extent}
-      groupUnit={groupUnit}
-      unitIndex={unitIndex}
+      things={things}
+      active={active}
     />
   )
 
@@ -1108,8 +1029,8 @@ export function Inspector() {
               />
               <ContentsSection items={items} />
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
-              {frame !== undefined && (
-                <TransformSection of="group" unit={frame} transforms={transforms} extent={extent}>
+              {active !== undefined && (
+                <TransformSection things={things} active={active}>
                   <FlipSection items={placed} group />
                 </TransformSection>
               )}

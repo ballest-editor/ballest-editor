@@ -11,6 +11,7 @@ import { isPlayerStart } from "../domain/MapFile"
 import type { TreeNode } from "../domain/MapSidecar"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
+import { offsetEntry } from "../domain/numberEntry"
 import { prefabOfItems } from "../domain/prefab"
 import { definitionOf } from "../domain/prefabInstance"
 import { defaultSettings } from "../domain/Settings"
@@ -18,9 +19,10 @@ import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { findGroup, numberedNameText, treeKeys } from "../domain/structure"
 import { lightingOf } from "../domain/sunlight"
 import { surfaceOf } from "../domain/surface"
+import { applyDelta, pivotModeFor } from "../domain/units"
 import { defaultViewLayout, maximisedSlotOf } from "../domain/viewLayout"
 import type { ProjectState } from "../services/Platform"
-import { editSelectionAxis, selectAll, selectAllInGroup } from "./actions/selection"
+import { editSelectionField, selectAll, selectAllInGroup } from "./actions/selection"
 import { paintTargetOf, pickedBrushOf } from "./paintTarget"
 import {
   areaCandidates,
@@ -39,6 +41,7 @@ import {
   PREFAB_TAB_STAYS_HERE,
   saveProblemOf,
   selectionPivot,
+  selectionUnits,
   shownChainStart,
   shownGizmoSpace,
   shownGroupFrame,
@@ -2437,9 +2440,21 @@ describe("hide, isolate and lock", () => {
     state().setItemFlag([c], "locked", true)
     state().enterGroup(chain)
     state().select([a])
-    assert.isFalse(editSelectionAxis("translation", "y", { kind: "offset", by: 100 }))
+    // a gizmo move of link 1 carries the links after it
+    const selection = selectionUnits(state(), transformOf)!
+    const carried = applyDelta(
+      selection,
+      pivotModeFor(state(), selection),
+      new Map([a, b, c].map((key) => [key, transformOf(key)])),
+      { kind: "translate", offset: { x: 0, y: 100, z: 0 } }
+    )
+    assert.isFalse(state().transformItems(carried))
     assert.deepStrictEqual([a, b, c].map((key) => transformOf(key).translation.y), [0, 0, 0])
     assert.isTrue(refusedNaming(c))
+    // an Inspector field carries nothing (the editor's rules § 5), so link 1 moves alone
+    assert.isTrue(editSelectionField({ kind: "location", perUnit: 1 }, "y", offsetEntry(100)))
+    assert.deepStrictEqual([a, b, c].map((key) => transformOf(key).translation.y), [100, 0, 0])
+    state().undo()
     const before = state().doc
     assert.isFalse(state().layChain(chain, { kind: "helix", axis: { x: 0, y: 0, z: 1 }, turn: 30, rise: 0 }))
     assert.strictEqual(state().doc, before)
