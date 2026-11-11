@@ -19,6 +19,7 @@ import {
   lockRefusalOf,
   pickableOf,
   type PickerRequest,
+  shownGizmoSpace,
   shownOf,
   snapConfigOf,
   useEditor
@@ -165,6 +166,8 @@ export function SnapInput() {
         box: selection.box,
         ends: selection.ends,
         rotation: target.rotation,
+        // a body drag goes where the pointer is, and a lock on the axes the Move gizmo shows
+        lockFrame: shownGizmoSpace(s) === "local" ? target.rotation : undefined,
         constraint: surfaceOf(pointer.pane),
         grab: from.at,
         ray: gameRayOf(raycaster.ray),

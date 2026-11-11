@@ -6,7 +6,7 @@ import { defaultKeybinds } from "../../domain/Keybinds"
 import { defaultSnapConfig, type SnapConfig, type SnapKind } from "../../domain/snapConfig"
 import type { Ray } from "../../domain/snapFrame"
 import { findGroup } from "../../domain/structure"
-import { ORIGIN, rotatorToQuat, vecAdd, vecScale, vecSub } from "../../domain/ueMath"
+import { ORIGIN, rotateVec, rotatorToQuat, vecAdd, vecScale, vecSub } from "../../domain/ueMath"
 import { applyDelta } from "../../domain/units"
 import { allSnapping, grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { assertVec } from "../../test/vec"
@@ -175,16 +175,46 @@ describe("MoveSession", () => {
     assert.isTrue(free.delta?.kind === "translate" && free.delta.frame === axes)
   })
 
-  it("gives a world move no axes, and drops a local one's under a lock, which is on the grid's", () => {
-    const axes = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
+  it("gives a world move no axes, and a lock in World is on the grid's", () => {
     const [a = ""] = load(defaultSnapConfig)
     const world = moving(a).pointAt(137, 42).delta
     assert.isTrue(world?.kind === "translate" && world.frame === undefined)
-    const { rayAt, session } = moving(a, { x: 0, y: 0, z: 0 }, axes)
+    const { rayAt, session } = moving(a)
     session.toggleLock({ axis: "x", plane: false })
     const { px, ray } = rayAt(137, 42)
     const locked = session.update(ray, px, up).delta
     assert.isTrue(locked?.kind === "translate" && locked.frame === undefined)
+    assertVec(offsetOf(locked) ?? ORIGIN, { x: 137, y: 0, z: 0 }, "along the world's x")
+  })
+
+  /** A move locked to X with the gizmo in Local on axes turned 30°, the pointer at (200, 100). */
+  const lockedInLocal = (config: SnapConfig) => {
+    const axes = yawTo(30)
+    const [a = ""] = load(config)
+    const { rayAt, session } = moving(a, ORIGIN, undefined, { lockFrame: axes })
+    session.toggleLock({ axis: "x", plane: false })
+    const { px, ray } = rayAt(200, 100)
+    const along = (v: Vec3) => v.x * Math.cos(Math.PI / 6) + v.y * Math.sin(Math.PI / 6)
+    return { axes, along, delta: session.update(ray, px, up).delta, update: () => session.update(ray, px, up), session }
+  }
+
+  it("locks along the gizmo's local axes in Local, which each unit takes as its own", () => {
+    const { along, axes, delta, session, update } = lockedInLocal(defaultSnapConfig)
+    assert.isTrue(delta?.kind === "translate" && delta.frame === axes)
+    // the pointer's point put square onto the line at 30°
+    const length = along({ x: 200, y: 100, z: 0 })
+    assertVec(offsetOf(delta) ?? ORIGIN, rotateVec(axes, { x: length, y: 0, z: 0 }), "along its own x")
+    session.toggleLock({ axis: "z", plane: true })
+    assertVec(offsetOf(update().delta) ?? ORIGIN, { x: 200, y: 100, z: 0 }, "in the plane square to its z")
+  })
+
+  it("steps the grid along the gizmo's local axes under a lock in Local", () => {
+    const { along, axes, delta } = lockedInLocal(onlyGrid())
+    const offset = offsetOf(delta) ?? ORIGIN
+    const step = useEditor.getState().snap?.gridSize ?? 0
+    const steps = Math.round(along(offset) / step)
+    assert.isAbove(steps, 0)
+    assertVec(offset, rotateVec(axes, { x: steps * step, y: 0, z: 0 }), "whole steps along its own x")
   })
 
   it("lands the pivot it's given, which for a whole group is the group's and not an item's", () => {
