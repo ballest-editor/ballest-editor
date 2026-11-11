@@ -7,9 +7,9 @@ description: Check Ballest Editor in a real browser or the desktop app against t
 
 Logic gets a test, not a browser (AGENTS.md § Verifying). This is for what only a running app shows. It runs once, in the agent that integrates the work; a delegated agent doesn't start a dev server or a browser unless its brief says to.
 
-## Declared states first
+## T3 Code's browser preview first
 
-To see, measure or compare a view that has a state, use [`pnpm app-driver`](../../../tools/app-driver/README.md) or the `ballest-app-driver` MCP tools, not the steps below. They start the app in isolation, pin what moves, cover desktop surfaces, and return a summary and a contact sheet. A state worth repeating goes in a `*.states.ts` file. The helper here is for a quick look at something no state reaches.
+In T3 Code, do the integrated pass with its browser preview tools (`preview_open` on this checkout's dev server, then `preview_snapshot`, `preview_act`, `preview_evaluate`). They read the page as text, click and type, and take screenshots. Use the helper under "Drive it" for what the preview can't do: the viewport while its tab is off screen (see Traps), real pointer drags, snapping, and frame timing.
 
 ## Start the app
 

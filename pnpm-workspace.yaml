@@ -6,7 +6,6 @@ packages:
   - "tools/release"
   - "tools/driver"
   - "tools/map"
-  - "tools/app-driver"
 
 allowBuilds:
   esbuild: true
