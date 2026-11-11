@@ -84,7 +84,7 @@ Each axis has a default, and a state runs once there. An `anchor: true` state ad
 
 Comparable in-app states (complex vs simple map, selection, pane count, popped-out panels) are either two states that differ in one field, or one state under two axis values. `compare` accepts both.
 
-From T3: `scripts/mobile-e2e/poses.ts` (a declared variation with a `pending` reason). Departure: T3 runs every journey on every pose; here only anchors run the twin, so the sweep stays cheap enough for every PR.
+From T3: `scripts/mobile-e2e/poses.ts` (a declared variation with a `pending` reason). Departure: T3 runs every journey on every pose; here only anchors run the twin, so a full sweep stays cheap enough to run on request.
 
 ### 4. States are reached through a dev hook; real input only where input is the subject
 
@@ -111,7 +111,7 @@ And after load:
 
 - **Animation.** The app's motion setting is off, and a style turns off every transition, animation and caret.
 - **Shaders.** The hook pins the game time the glows and the air read.
-- **WebGL.** SwiftShader: slow, but the same on every machine and in CI. `--gpu` opts into the real GPU for `frames` only.
+- **WebGL.** SwiftShader: slow, but the same on every machine. `--gpu` opts into the real GPU for `frames` only.
 - **Window.** The `window` axis through device metrics, at scale 1.
 - **Cost.** Software WebGL draws whatever is open, so states about a dialog, settings page or menu sit over the start
   map, and only states about a map open one. Browser captures can run side by side with `--jobs`, each in its own
@@ -176,18 +176,16 @@ commit, which any worktree can produce in minutes. `run --name <name>` gives a r
 
 From T3: `render-metrics.ts` `run` and `compare <before> <after>` with two checkouts, exactly.
 
-### 10. CI runs the coverage check always, the sweep when app code changes, and never a model
+### 10. The app driver is a design tool; CI runs only the coverage check
 
-- `pnpm check:everything` gains the coverage test (§ 2) and the states' typecheck. Cheap, every PR.
-- `.github/workflows/app-driver.yml` runs `run --smoke --jobs 3` (every state at default axes on software WebGL, checks
-  graded, captures kept as a workflow artifact) when a PR or `main` touches `apps/`, `packages/`, the tool or the
-  lockfile. It has its own workflow so those paths can skip it, and it isn't a required check. Images are an artifact,
-  not a comment, until the job is proven quiet; a failing check or an unsettled state fails the job.
-- `compare` against `main` and the PR comment with a changed-states sheet come after the sweep has been stable
-  for a few weeks.
+The app driver answers "what does this look like now" and "what changed between these two commits". It doesn't answer "is the app still correct": that is the tests' job, at the lowest layer that fails, and the desktop launch is #69's.
+
+- `pnpm check:everything` runs the coverage test (§ 2) and the states' typecheck. Cheap, every PR, and it is what lets a redesign capture every view before and after.
+- No workflow runs the states. From #228 to #252 a workflow ran `run --smoke` on every PR that touched the app. Every failure in its history was a stale state, a flake or a timeout, never a regression, and at 80 states it ran past its 30-minute limit. Its pictures were compared to nothing.
+- A state that has drifted from the app is found by the next person who runs it, so whoever changes a view runs its states (AGENTS.md "Verifying") and fixes any that can't be reached.
 - `review` (§ 11) never runs in CI.
 
-From T3: AGENTS.md "Verifying" (CI owns the full suite; visual bugs get before/after captures as proof, not tests).
+From T3: `scripts/mobile-behavior`, `mobile-e2e` and `render-metrics.ts` run by hand, never in CI; T3's CI covers the UI with component tests in Vitest's browser mode.
 
 ### 11. Model review is a separate, stateless, schema-checked step
 
@@ -203,7 +201,7 @@ From T3: `scripts/mobile-e2e/review.ts`, nearly verbatim.
 
 ### 12. CLI first, MCP second, one service
 
-The commands are in [the README](../../tools/app-driver/README.md). `serve` exposes the same operations as MCP tools through one service, as `tools/driver` does. Agents use the tools; scripts and CI use the CLI. `app_step` and `app_evaluate` run one step or expression on a scratch page, so an agent never again writes a CDP client by hand.
+The commands are in [the README](../../tools/app-driver/README.md). `serve` exposes the same operations as MCP tools through one service, as `tools/driver` does. Agents use the tools; scripts and people use the CLI. `app_step` and `app_evaluate` run one step or expression on a scratch page, so an agent never again writes a CDP client by hand.
 
 From T3: `--list` and `--case` on `mobile-behavior`; from this repo, the game driver's CLI-plus-MCP shape.
 
