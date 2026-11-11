@@ -373,11 +373,13 @@ export class MapFiles extends Context.Service<MapFiles, {
         const file = yield* fileOf(project, fileName)
         // Importing a file of this very project changes nothing.
         if (same(source, file)) return { _tag: "Imported", map: yield* info(project, fileName) } as const
-        if (!replace && (yield* exists(file))) return { _tag: "Clash", fileName } as const
+        const replacing = yield* exists(file)
+        if (!replace && replacing) return { _tag: "Clash", fileName } as const
         const bytes = yield* fs.readFile(source).pipe(Effect.mapError(projectError("read", source)))
         yield* backupStore.overwrite(backupsFolderIn(path, project), file, text)
-        // the map it replaced takes its sidecar along; an import's own structure comes from its file
-        yield* retireSidecar(project, fileName)
+        // the map it replaced keeps its sidecar, which the page re-matches to the import and writes back, sending this
+        // one to the backups; a sidecar with no map is a leftover, and an import's own structure comes from its file
+        if (!replacing) yield* retireSidecar(project, fileName)
 
         const origin = { path: source, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
         // A map imported from the game's maps folder under its own name is that file's export from the start.

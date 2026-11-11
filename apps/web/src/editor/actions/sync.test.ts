@@ -110,6 +110,29 @@ describe("sync", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
+  it.effect("keeps the tab's isolation and closed groups through what the game saved", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: text })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      const [, , a = "", b = "", c = ""] = s().doc.ids
+      const group = s().groupItems([a, b], "Pair")!
+      yield* saveMapFile
+      yield* exportToGameEffect
+      yield* checkExportsEffect
+      s().setGroupCollapsed(group, true)
+      s().select([c])
+      s().toggleIsolation()
+      const outside = s().isolation?.outside
+      assert.isTrue(outside?.has(a))
+      disk.files.set(inGame, savedInGame(disk.files.get(inGame) ?? "", 3.5))
+      yield* checkExportsEffect
+      assert.strictEqual(s().doc.map.worldSettings.directionalLight.timeOfDay, 3.5)
+      assert.deepStrictEqual(s().isolation?.outside, outside)
+      assert.deepStrictEqual([...s().collapsedGroups], [group])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
   it.effect("asks about a map with unsaved edits, and Use game version keeps them in the backups", () => {
     const disk = diskWithPlugin({ [projectFile(name)]: text })
     return Effect.gen(function*() {

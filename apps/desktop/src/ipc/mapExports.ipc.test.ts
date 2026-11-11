@@ -94,8 +94,12 @@ describe("MapExports over IPC", () => {
           _tag: "Clash",
           fileName: name
         })
+        // The map it replaces keeps its sidecar, for the page to match to the import.
+        const sidecar = JSON.stringify({ mapHash: hash })
+        yield* fake.invoke(InvokeChannels.writeSidecar, { fileName: name, text: sidecar })
         yield* fake.invoke(InvokeChannels.importMap, { ...again, replace: true })
         assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", name)), "{\"v\":2}")
+        assert.deepInclude(yield* fake.invoke(InvokeChannels.readMap, { fileName: name }), { sidecar })
         assert.lengthOf(yield* fs.readDirectory(path.join(project, ".ballest", "backups")), 1)
 
         // A file from elsewhere has an origin but no export.

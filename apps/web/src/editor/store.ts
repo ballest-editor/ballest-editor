@@ -572,6 +572,8 @@ interface TabOptions {
   readonly loaded?: DocStructure | undefined
   readonly viewLayout?: ViewLayout | undefined
   readonly document?: TabDocument
+  /** A new version of the map the tab holds: it keeps its isolation and closed groups over what is still there. */
+  readonly keepView?: boolean
 }
 
 /** The project the welcome window's pick is opening, and how far it has got (`EditorState.enteringProject`). */
@@ -1030,6 +1032,19 @@ const freshTabState = (
   }
 }
 
+/** `tab` with what `before`, the tab it replaces, left out and closed, over the keys and groups it still has. */
+const withViewOf = (tab: TabState, before: TabState | undefined): TabState => {
+  if (before === undefined) return tab
+  const keys = new Set(tab.doc.ids)
+  const outside = [...before.isolation?.outside ?? []].filter((key) => keys.has(key))
+  const { tree } = tab.doc.structure
+  return {
+    ...tab,
+    isolation: outside.length === 0 ? null : { outside: new Set(outside) },
+    collapsedGroups: new Set([...before.collapsedGroups].filter((id) => findGroup(tree, id) !== undefined))
+  }
+}
+
 /**
  * What the top of the store holds with no tab open, as its fields can't be absent. Nothing shows it: `commit` refuses to
  * edit it, and it has no items, so it can't be selected, saved or left with anything to lose.
@@ -1413,8 +1428,15 @@ export const useEditor = create<EditorState>()((set, get) => {
     mapShownRequest: 0,
 
     loadMap: (map, file, floorHeight, options) => {
-      const tab = freshTabState(map, file, floorHeight, options)
       const into = options?.into ?? "active"
+      const before = options?.keepView !== true
+        ? undefined
+        : typeof into === "object"
+        ? tabStateOf(get(), into.tabId)
+        : into === "active"
+        ? activeTabOf(get())
+        : undefined
+      const tab = withViewOf(freshTabState(map, file, floorHeight, options), before)
       if (typeof into === "object" && into.tabId !== get().tabId) {
         updateTab(into.tabId, () => tab)
         return

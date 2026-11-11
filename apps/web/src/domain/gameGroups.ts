@@ -10,7 +10,16 @@ import { itemsBoxOf } from "./itemBounds"
 import type { EditorGroup, MapFile } from "./MapFile"
 import type { GroupNode, GroupPivot, TreeNode } from "./MapSidecar"
 import { pivotAt } from "./pivot"
-import { DEFAULT_GROUP_NAME, freshKey, itemNode, type Structure, treeKeys } from "./structure"
+import {
+  DEFAULT_GROUP_NAME,
+  freshKey,
+  idOf,
+  itemNode,
+  rewriteTree,
+  type Structure,
+  treeKeys,
+  wholeNodes
+} from "./structure"
 import { IDENTITY_QUAT } from "./ueMath"
 import { frameOfBox, turnedBy, type UnitContext, unitOf } from "./units"
 
@@ -144,4 +153,46 @@ export const structureFromGame = (
     groupAt.get(index) ?? (grouped.has(index) ? [] : itemNode(key))
   )
   return { tree, items: new Map() }
+}
+
+/** Every group in `nodes`, at any depth. */
+const groupsIn = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<GroupNode> =>
+  nodes.flatMap((node) => node.kind === "group" ? [node, ...groupsIn(node.children)] : [])
+
+const membersKey = (keys: ReadonlyArray<string>) => [...keys].sort().join(" ")
+
+/**
+ * `tree` with `group` around the items `keys`: a group with all its items among them goes in whole, the others' items
+ * leave them, and it sits where the first of them was at the root.
+ */
+const withGroupAround = (tree: ReadonlyArray<TreeNode>, group: GroupNode, keys: ReadonlySet<string>) => {
+  const children = wholeNodes(tree, keys)
+  const taken = new Set(children.map(idOf))
+  const at = tree.findIndex((node) => treeKeys([node]).some((key) => keys.has(key)))
+  return [
+    ...tree.slice(0, at),
+    { ...group, children },
+    ...rewriteTree(tree.slice(at), (node) => taken.has(idOf(node)) ? [] : [node])
+  ]
+}
+
+/**
+ * `tree` with the game groups of `map` that it doesn't have yet: groups made in the in-game editor since the editor
+ * last wrote the file (docs/PROJECTS.md § The files). A game group with the items of one of the tree's groups is that
+ * group. Any other comes in as `structureFromGame` makes it, around the groups it took whole and the items it took from
+ * others. A tree group the file has no game group for stays: a save in the game may drop every group.
+ */
+export const withGroupsFromGame = (
+  tree: ReadonlyArray<TreeNode>,
+  map: MapFile,
+  ids: ReadonlyArray<string>,
+  catalog: CatalogIndex | null
+): ReadonlyArray<TreeNode> => {
+  if ((map.editorState?.groups.length ?? 0) === 0) return tree
+  const known = new Set(groupsIn(tree).map((group) => membersKey(treeKeys(group.children))))
+  return structureFromGame(map, ids, catalog).tree.reduce((merged, node) => {
+    if (node.kind !== "group") return merged
+    const keys = treeKeys(node.children)
+    return known.has(membersKey(keys)) ? merged : withGroupAround(merged, node, new Set(keys))
+  }, tree)
 }

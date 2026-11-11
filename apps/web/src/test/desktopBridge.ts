@@ -603,10 +603,12 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     importMap: async ({ source, fileName, text, replace }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
       if (source === projectFile(fileName, current())) return { _tag: "Imported", map: mapOf(fileName) } as const
-      if (has(fileName) && !replace) return { _tag: "Clash", fileName } as const
+      const replacing = has(fileName)
+      if (replacing && !replace) return { _tag: "Clash", fileName } as const
       const original = disk.files.get(source) ?? ""
       await write(fileName, text)
-      disk.files.delete(sidecarFile(fileName, current()))
+      // the map it replaced keeps its sidecar, as in main
+      if (!replacing) disk.files.delete(sidecarFile(fileName, current()))
       const origin = { path: source, hash: testHash(original), at: TIME }
       const fromGame = source === `${TEST_MAPS_FOLDER}/${fileName}`
       const links = linksOf(current())
