@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
+import { allSnapping } from "../test/snapFixtures"
 import {
   askedOrder,
   defaultSnapConfig,
@@ -14,6 +15,7 @@ import {
   snapsRotation,
   snapsScale,
   type SnapTarget,
+  targetOn,
   targetSummary,
   turnSnapOf,
   withPreset,
@@ -26,8 +28,19 @@ const withConnectors = (config: SnapConfig, patch: Partial<SnapConfig["targets"]
 })
 
 describe("snapConfig", () => {
-  it("starts on Grid first with every target on, as the game's feel", () => {
-    assert.deepStrictEqual(priorityOf(defaultSnapConfig), [
+  it("starts with nothing snapping, on Grid first with every target's own switch on", () => {
+    assert.deepStrictEqual(priorityOf(defaultSnapConfig), [])
+    assert.isFalse(snapsGrid(defaultSnapConfig))
+    assert.isFalse(snapsRotation(defaultSnapConfig))
+    assert.isFalse(snapsScale(defaultSnapConfig))
+    assert.deepStrictEqual(priorityOf({ ...defaultSnapConfig, magnet: true }), [
+      "connectors",
+      "mesh",
+      "construction",
+      "tracking",
+      "alignment"
+    ])
+    assert.deepStrictEqual(priorityOf(allSnapping), [
       "grid",
       "connectors",
       "mesh",
@@ -40,11 +53,11 @@ describe("snapConfig", () => {
   })
 
   it("Pieces first keeps the grid as the fallback", () => {
-    assert.strictEqual(priorityOf(withPreset(defaultSnapConfig, "piecesFirst")).at(-1), "grid")
+    assert.strictEqual(priorityOf(withPreset(allSnapping, "piecesFirst")).at(-1), "grid")
   })
 
   it("moves a row, and a target that is off drops out of the order it is read in", () => {
-    const moved = withTargetMoved(defaultSnapConfig, "alignment", 0)
+    const moved = withTargetMoved(allSnapping, "alignment", 0)
     assert.strictEqual(priorityOf(moved)[0], "alignment")
     const off = {
       ...moved,
@@ -55,7 +68,7 @@ describe("snapConfig", () => {
   })
 
   it("reads an order that lost or repeats a target as a whole one", () => {
-    const short = { ...defaultSnapConfig, order: ["mesh", "mesh"] as const }
+    const short = { ...allSnapping, order: ["mesh", "mesh"] as const }
     assert.deepStrictEqual(priorityOf(short), [
       "mesh",
       "grid",
@@ -67,24 +80,24 @@ describe("snapConfig", () => {
   })
 
   it("takes a connector's own range over the general threshold", () => {
-    assert.strictEqual(rangeOf(defaultSnapConfig, "connectors"), 12)
+    assert.strictEqual(rangeOf(allSnapping, "connectors"), 12)
     const own = {
-      ...defaultSnapConfig,
-      targets: { ...defaultSnapConfig.targets, connectors: { ...defaultSnapConfig.targets.connectors, range: 30 } }
+      ...allSnapping,
+      targets: { ...allSnapping.targets, connectors: { ...allSnapping.targets.connectors, range: 30 } }
     }
     assert.strictEqual(rangeOf(own, "connectors"), 30)
     assert.strictEqual(rangeOf(own, "mesh"), 12)
   })
 
   it("scales a connector's range by its pull, and nothing else's", () => {
-    assert.strictEqual(defaultSnapConfig.targets.connectors.weight, 1)
-    assert.strictEqual(rangeOf(withConnectors(defaultSnapConfig, { weight: 2 }), "connectors"), 24)
-    assert.strictEqual(rangeOf(withConnectors(defaultSnapConfig, { weight: 0.5, range: 30 }), "connectors"), 15)
-    assert.strictEqual(rangeOf(withConnectors(defaultSnapConfig, { weight: 4 }), "mesh"), 12)
+    assert.strictEqual(allSnapping.targets.connectors.weight, 1)
+    assert.strictEqual(rangeOf(withConnectors(allSnapping, { weight: 2 }), "connectors"), 24)
+    assert.strictEqual(rangeOf(withConnectors(allSnapping, { weight: 0.5, range: 30 }), "connectors"), 15)
+    assert.strictEqual(rangeOf(withConnectors(allSnapping, { weight: 4 }), "mesh"), 12)
   })
 
   it("asks Connectors ahead of Grid and Mesh only while it pulls harder than even", () => {
-    const gridFirst = withConnectors(defaultSnapConfig, { weight: 2 })
+    const gridFirst = withConnectors(allSnapping, { weight: 2 })
     assert.deepStrictEqual(askedOrder(gridFirst), [
       "connectors",
       "grid",
@@ -93,10 +106,10 @@ describe("snapConfig", () => {
       "tracking",
       "alignment"
     ])
-    assert.deepStrictEqual(askedOrder(defaultSnapConfig), priorityOf(defaultSnapConfig))
+    assert.deepStrictEqual(askedOrder(allSnapping), priorityOf(allSnapping))
     assert.deepStrictEqual(
-      askedOrder(withConnectors(defaultSnapConfig, { weight: 0.5 })),
-      priorityOf(defaultSnapConfig)
+      askedOrder(withConnectors(allSnapping, { weight: 0.5 })),
+      priorityOf(allSnapping)
     )
     const behindTracking = withTargetMoved(withTargetMoved(gridFirst, "connectors", 5), "tracking", 0)
     assert.deepStrictEqual(askedOrder(behindTracking), [
@@ -115,42 +128,52 @@ describe("snapConfig", () => {
     assert.notInclude(askedOrder(withConnectors(gridFirst, { enabled: false })), "connectors")
   })
 
-  it("snaps the grid, a turn and a scale only under snapping as a whole, which Ctrl turns off", () => {
-    const all = { ...defaultSnapConfig, enabled: true, rotationEnabled: true, scaleEnabled: true }
+  it("snaps the grid, a turn and a scale by their own switches, magnet or not, and Ctrl turns them off", () => {
+    const all = { ...allSnapping, rotationEnabled: true, scaleEnabled: true }
+    const noMagnet = { ...all, magnet: false }
     assert.isTrue(snapsGrid(all))
-    assert.isFalse(snapsGrid({ ...all, enabled: false }))
+    assert.isTrue(snapsGrid(noMagnet))
     assert.isFalse(snapsGrid({ ...all, targets: { ...all.targets, grid: { ...all.targets.grid, enabled: false } } }))
     assert.isTrue(snapsRotation(all))
+    assert.isTrue(snapsRotation(noMagnet))
     assert.isFalse(snapsRotation(all, true))
-    assert.isFalse(snapsRotation({ ...all, enabled: false }, true))
     assert.isFalse(snapsRotation({ ...all, rotationEnabled: false }))
-    assert.isFalse(snapsScale({ ...all, enabled: false }))
-    assert.isTrue(snapsScale(all))
+    assert.isTrue(snapsScale(noMagnet))
+    assert.isFalse(snapsScale(noMagnet, true))
+    assert.isFalse(snapsScale({ ...all, scaleEnabled: false }))
+  })
+
+  it("asks the grid alone with the magnet off, and every target on with it on", () => {
+    assert.deepStrictEqual(priorityOf({ ...allSnapping, magnet: false }), ["grid"])
+    assert.deepStrictEqual(askedOrder({ ...allSnapping, magnet: false }), ["grid"])
+    assert.isFalse(targetOn({ ...allSnapping, magnet: false }, "connectors"))
+    assert.isTrue(targetOn({ ...allSnapping, magnet: false }, "grid"))
+    assert.isTrue(targetOn(allSnapping, "connectors"))
   })
 
   it("summarises each target in one line", () => {
-    assert.strictEqual(targetSummary(defaultSnapConfig, "grid", "cm"), "10 cm, world origin")
-    assert.strictEqual(targetSummary(defaultSnapConfig, "connectors", "cm"), "12 px, match rotation")
+    assert.strictEqual(targetSummary(allSnapping, "grid", "cm"), "10 cm, world origin")
+    assert.strictEqual(targetSummary(allSnapping, "connectors", "cm"), "12 px, match rotation")
     const moved = {
-      ...defaultSnapConfig,
+      ...allSnapping,
       targets: {
-        ...defaultSnapConfig.targets,
-        grid: { ...defaultSnapConfig.targets.grid, origin: { x: 137, y: 0, z: 0 }, yaw: 30 }
+        ...allSnapping.targets,
+        grid: { ...allSnapping.targets.grid, origin: { x: 137, y: 0, z: 0 }, yaw: 30 }
       }
     }
     assert.strictEqual(targetSummary(moved, "grid", "cm"), "10 cm, own origin, 30°")
     assert.strictEqual(
-      targetSummary(withConnectors(defaultSnapConfig, { weight: 2 }), "connectors", "cm"),
+      targetSummary(withConnectors(allSnapping, { weight: 2 }), "connectors", "cm"),
       "12 px, match rotation, pull ×2"
     )
     assert.strictEqual(
-      targetSummary(withConnectors(defaultSnapConfig, { range: 30, matchRotation: false }), "connectors", "cm"),
+      targetSummary(withConnectors(allSnapping, { range: 30, matchRotation: false }), "connectors", "cm"),
       "30 px, keep rotation"
     )
   })
 
   it("narrows to the kinds held, the priority list keeping its order among them", () => {
-    const piecesFirst = withPreset(defaultSnapConfig, "piecesFirst")
+    const piecesFirst = withPreset(allSnapping, "piecesFirst")
     assert.deepStrictEqual(priorityOf(narrowedTo(piecesFirst, ["connectors"])), ["connectors"])
     assert.deepStrictEqual(priorityOf(narrowedTo(piecesFirst, ["alignment"])), ["tracking", "alignment"])
     assert.deepStrictEqual(priorityOf(narrowedTo(piecesFirst, ["mesh", "connectors"])), ["connectors", "mesh"])
@@ -160,30 +183,35 @@ describe("snapConfig", () => {
 
   it("keeps the grid off under every key: J, M and L each narrow to a target, and none to the grid", () => {
     assert.deepStrictEqual(SNAP_KINDS, ["connectors", "mesh", "alignment"])
-    for (const kind of SNAP_KINDS) assert.isFalse(narrowedTo(defaultSnapConfig, [kind]).targets.grid.enabled)
+    for (const kind of SNAP_KINDS) assert.isFalse(narrowedTo(allSnapping, [kind]).targets.grid.enabled)
   })
 
-  it("turns snapping on for the kind held, even a target that was off", () => {
+  it("turns the magnet on for the kind held, even a target that was off", () => {
     const off = {
-      ...defaultSnapConfig,
-      enabled: false,
-      targets: { ...defaultSnapConfig.targets, mesh: { ...defaultSnapConfig.targets.mesh, enabled: false } }
+      ...allSnapping,
+      magnet: false,
+      targets: { ...allSnapping.targets, mesh: { ...allSnapping.targets.mesh, enabled: false } }
     }
     const narrowed = narrowedTo(off, ["mesh"])
-    assert.isTrue(narrowed.enabled)
+    assert.isTrue(narrowed.magnet)
     assert.deepStrictEqual(priorityOf(narrowed), ["mesh"])
     assert.strictEqual(narrowed.targets.mesh.sharpAngle, off.targets.mesh.sharpAngle)
   })
 
-  it("stops a turn with snapping as a whole, steps it with its own switch, and narrows under a held key", () => {
-    const off = { ...defaultSnapConfig, rotationEnabled: false, scaleEnabled: false }
+  it("steps a turn by its own switch, stops it on the targets that are on, and narrows under a held key", () => {
+    const off = { ...allSnapping, magnet: false, rotationEnabled: false, scaleEnabled: false }
     const stops: ReadonlyArray<SnapTarget> = ["grid", "connectors", "mesh", "alignment"]
-    assert.deepStrictEqual(turnSnapOf(off, "turn", [], false), { step: false, targets: [] })
+    assert.deepStrictEqual(turnSnapOf(off, "turn", [], false), { step: false, targets: ["grid"] })
     const rotates = { ...off, rotationEnabled: true }
-    assert.deepStrictEqual(turnSnapOf(rotates, "turn", [], false), { step: false, targets: [] })
-    const on = { ...rotates, enabled: true }
+    assert.deepStrictEqual(turnSnapOf(rotates, "turn", [], false), { step: true, targets: ["grid"] })
+    assert.deepStrictEqual(turnSnapOf(defaultSnapConfig, "turn", [], false), { step: false, targets: [] })
+    assert.deepStrictEqual(turnSnapOf({ ...defaultSnapConfig, rotationEnabled: true }, "turn", [], false), {
+      step: true,
+      targets: []
+    })
+    const on = { ...rotates, magnet: true }
     assert.deepStrictEqual(turnSnapOf(on, "turn", [], false), { step: true, targets: stops })
-    assert.deepStrictEqual(turnSnapOf({ ...off, enabled: true }, "scale", [], false), {
+    assert.deepStrictEqual(turnSnapOf({ ...off, magnet: true }, "scale", [], false), {
       step: false,
       targets: ["mesh"]
     })
@@ -195,23 +223,23 @@ describe("snapConfig", () => {
       step: false,
       targets: ["mesh"]
     })
-    // with snapping off a key brings its kind's stops, and not the step, which waits on the magnet
-    assert.deepStrictEqual(turnSnapOf(rotates, "turn", ["mesh"], false), { step: false, targets: ["mesh"] })
+    // with the magnet off a key brings its kind's stops, and the step is still Rotate's own
+    assert.deepStrictEqual(turnSnapOf(rotates, "turn", ["mesh"], false), { step: true, targets: ["mesh"] })
     assert.deepStrictEqual(turnSnapOf(off, "scale", ["mesh"], false), { step: false, targets: ["mesh"] })
   })
 
   it("snaps nothing in a turn or a scale while Ctrl is held, a narrowing key with it or not", () => {
-    const on = { ...defaultSnapConfig, enabled: true, rotationEnabled: true, scaleEnabled: true }
+    const on = { ...allSnapping, rotationEnabled: true, scaleEnabled: true }
     const none = { step: false, targets: [] }
     assert.deepStrictEqual(turnSnapOf(on, "turn", [], true), none)
     assert.deepStrictEqual(turnSnapOf(on, "turn", ["connectors"], true), none)
     assert.deepStrictEqual(turnSnapOf(on, "scale", ["mesh"], true), none)
-    // with snapping off already, Ctrl does nothing
-    assert.deepStrictEqual(turnSnapOf({ ...on, enabled: false }, "turn", [], true), none)
+    // with the magnet off, Ctrl still holds the grid and the step off
+    assert.deepStrictEqual(turnSnapOf({ ...on, magnet: false }, "turn", [], true), none)
   })
 
   it("leaves a scale alone under a key that means nothing to it", () => {
-    const on = { ...defaultSnapConfig, enabled: true, rotationEnabled: true, scaleEnabled: true }
+    const on = { ...allSnapping, rotationEnabled: true, scaleEnabled: true }
     assert.deepStrictEqual(turnSnapOf(on, "scale", ["alignment"], false), turnSnapOf(on, "scale", [], false))
     assert.deepStrictEqual(turnSnapOf(on, "scale", ["connectors"], false), { step: true, targets: ["mesh"] })
   })
@@ -230,6 +258,45 @@ describe("snapConfig", () => {
       }
     }
     assert.deepStrictEqual(Schema.decodeSync(SnapConfig)(before), defaultSnapConfig)
+  })
+
+  describe("a config saved while the magnet gated all of snapping", () => {
+    const { magnet: _, ...current } = allSnapping
+    const gated = (enabled: boolean) => ({ ...current, enabled, rotationEnabled: true, scaleEnabled: true })
+
+    it("reads one saved off as it behaved: the grid, Rotate and Scale off with the magnet", () => {
+      const decoded = Schema.decodeSync(SnapConfig)(gated(false))
+      assert.isFalse(decoded.magnet)
+      assert.isFalse(decoded.targets.grid.enabled)
+      assert.isFalse(decoded.rotationEnabled)
+      assert.isFalse(decoded.scaleEnabled)
+      assert.isTrue(decoded.targets.mesh.enabled, "each target's own switch is kept")
+      assert.deepStrictEqual(priorityOf(decoded), [])
+    })
+
+    it("reads one saved on as it was, with the magnet on", () => {
+      const decoded = Schema.decodeSync(SnapConfig)(gated(true))
+      assert.isTrue(decoded.magnet)
+      assert.isTrue(decoded.targets.grid.enabled)
+      assert.isTrue(decoded.rotationEnabled)
+      assert.isTrue(decoded.scaleEnabled)
+    })
+
+    it("reads the old defaults as the new ones, so a map on the defaults snaps as it did", () => {
+      const oldDefaults = {
+        ...current,
+        enabled: false,
+        targets: { ...current.targets, grid: { ...current.targets.grid, enabled: true } }
+      }
+      assert.deepStrictEqual(Schema.decodeSync(SnapConfig)(oldDefaults), defaultSnapConfig)
+    })
+
+    it("is saved in the current form", () => {
+      const decoded = Schema.decodeSync(SnapConfig)(gated(true))
+      const saved = Schema.encodeSync(SnapConfig)(decoded)
+      assert.propertyVal(saved, "magnet", true)
+      assert.notProperty(saved, "enabled")
+    })
   })
 
   it("round-trips through its schema", () => {
@@ -258,11 +325,11 @@ describe("snapConfig", () => {
 
 describe("scale snap units", () => {
   it("uses the grid dimension for both size fields and handles, independently of percent snapping", () => {
-    const config = { ...defaultSnapConfig, enabled: true, gridSize: 50 }
-    assert.strictEqual(scaleSnapStep(config, 1000), 0.05)
+    const config = { ...allSnapping, magnet: false, gridSize: 50 }
+    assert.strictEqual(scaleSnapStep(config, 1000), 0.05, "the grid's own switch, magnet or not")
     assert.isUndefined(scaleSnapStep(config, undefined))
     assert.isUndefined(scaleSnapStep(config, 1000, true))
-    assert.isUndefined(scaleSnapStep({ ...config, enabled: false }, 1000))
+    assert.isUndefined(scaleSnapStep(defaultSnapConfig, 1000))
     assert.isUndefined(scaleSnapStep({ ...config, scaleToGrid: false }, 1000))
     assert.strictEqual(scaleSnapStep({ ...config, scaleToGrid: false, scaleEnabled: true, scaleStep: 10 }, 1000), 0.1)
   })

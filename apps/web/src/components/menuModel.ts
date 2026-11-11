@@ -399,7 +399,7 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
       {
         kind: "check",
         label: "Snapping",
-        checked: state.snapping.enabled,
+        checked: state.snapping.magnet,
         run: toggleSnapping,
         shortcut: "snapToggle"
       }

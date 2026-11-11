@@ -158,10 +158,10 @@ Within one target the nearest candidate wins, measured in screen pixels in the a
 
 ### Affect
 
-Which transforms snapping applies to. Move is always on. Rotate and Scale are toggles, as the angle pill is. All three sit under snapping as a whole, the magnet in the view bar (§ The snap menu): with it off nothing snaps, whatever each toggle says, and Ctrl holds it off (§ Modifiers).
+Which transforms snapping applies to. Move is always on. Rotate and Scale are toggles, as the angle pill is. Each switch stands on its own: the grid, Rotate's step and Scale's step snap whenever their switch is on, and the magnet in the view bar (§ The snap menu) is snapping to pieces, every target but the grid (`targetOn`). With the magnet off a move still lands on the grid and a turn still takes its step; Ctrl holds all of it off for the drag (§ Modifiers). Nothing snaps by default: the magnet, the grid, Rotate and Scale all start off. A snap config saved while the magnet gated everything reads as it behaved (`ungatedSnapping`): saved off, its grid, Rotate and Scale come off with it.
 
 - **Move**: the base lands on a target.
-- **Rotate**: a turn with Snap on stops where the selection meets something, whatever the Rotate toggle says; Rotate is the step, which the turn takes between stops. With Snap off nothing snaps, a turn included, as the magnet gates every transform (§ The snap menu). Ctrl holds snapping off for the drag, and a held key (§ Modifiers) keeps the stops to one target, the step still as Rotate says. The stops, from the targets that are on:
+- **Rotate**: a turn stops where the selection meets something, from the targets that are on, whatever the Rotate toggle says; Rotate is the step, which the turn takes between stops, magnet or not. With the magnet off only the grid's stop is left. Ctrl holds snapping off for the drag, and a held key (§ Modifiers) keeps the stops to one target, the step still as Rotate says. The stops, from the targets that are on:
   - **Touching** (Mesh): where the selection first touches a neighbour it reaches, each way round. A corner or edge middle of the selection's mesh, or of its bounds until the mesh has loaded, comes onto one of the neighbour's flat faces, or one of the neighbour's onto one of the selection's, within 1 cm. A neighbour the selection already touches or overlaps as the turn starts, their boxes within 1 cm, has been met: it offers no touch either way for the whole turn, and its flush, aligned and end stops count all the way round. Two pieces joined end to end don't stop "touching" at 45°.
   - **Flush** (Mesh): where a face of the selection comes into the plane of a face of a neighbour, within 1 cm, facing it or facing the same way: a door swung shut on a wall, or a side brought level with the side beside it.
   - **Aligned** (Alignment): where one of the selection's axes comes along one of a neighbour's. "Aligned with Track L on X and Y" names the axes that meet their own, and "Square to Track L" is one laid along another.
@@ -183,7 +183,7 @@ Snapping measures a drag on the items that take it as the gizmo shows it (`leadi
 
 ## Numeric steps
 
-The magnet is the master switch for all snapping. Grid enables translation snapping; **Snap size to grid** in the snap menu also uses its spacing for resizing. Both inspector scrubs and scale handles use this size setting, regardless of whether the inspector displays a factor or a dimension. Typed values and expressions are exact and bypass snapping.
+None of these waits on the magnet. Grid enables translation snapping; **Snap size to grid** in the snap menu also uses its spacing for resizing. Both inspector scrubs and scale handles use this size setting, regardless of whether the inspector displays a factor or a dimension. Typed values and expressions are exact and bypass snapping.
 
 | Operation                         | Rule                                                                                                                                                                            |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -247,7 +247,7 @@ A body drag in an orthographic pane keeps its depth, as a rise along the view wo
 
 | Key           | While dragging                                                                                                                                                                                                             |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ctrl held     | Snapping off while it is held, the magnet's whole say: nothing snaps. With snapping off already it does nothing. Blender and Unreal both have a key for this, and it is the one key a user needs to know.                  |
+| Ctrl held     | Snapping off while it is held: nothing snaps, the grid and the steps included. With nothing on already it does nothing. Blender and Unreal both have a key for this, and it is the one key a user needs to know.           |
 | Shift held    | Holds the current target, if the selection is on one. It stays on the edge, plane or line, sliding along it past the threshold, and no other target takes over. Combined with Ctrl, the held target still holds.           |
 | X, Y, Z       | Locks the move to that world axis (or the grid's axis, when rotated), as SketchUp's arrow keys do. A snap target still sets the value along the locked axis. Pressing again unlocks.                                       |
 | Shift+X, Y, Z | Locks to the plane perpendicular to that axis.                                                                                                                                                                             |
@@ -256,7 +256,7 @@ A body drag in an orthographic pane keeps its depth, as a rise along the view wo
 | L held        | Alignment and Tracking only, during a move or a turn. L for line up: A flies the camera left.                                                                                                                              |
 | Escape        | Cancels the drag (`cancelDrag`, a keybind of its own). With no drag, clears acquired tracking points.                                                                                                                      |
 
-J, M and L narrow snapping to their kind for as long as they are held, and let go of it when they come up. The kind keeps its parameters, its range and its place in the priority list, holding two keys keeps both kinds, and the grid is off under any of them. A turn under one still takes the step as Rotation says. One of these held with snapping off turns it on for that kind, and Ctrl held with it turns it off again. Shift still holds the current target whatever it is. A key that means nothing to the drag (L in a scale) does nothing. Nothing else hears them while the drag lasts, so one rebound onto a fly key doesn't also fly. They count from the press on a handle or the selection's body, and a key held before the press doesn't.
+J, M and L narrow snapping to their kind for as long as they are held, and let go of it when they come up. The kind keeps its parameters, its range and its place in the priority list, holding two keys keeps both kinds, and the grid is off under any of them. A turn under one still takes the step as Rotation says. One of these held with the magnet off turns it on for that kind, and Ctrl held with it turns it off again. Shift still holds the current target whatever it is. A key that means nothing to the drag (L in a scale) does nothing. Nothing else hears them while the drag lasts, so one rebound onto a fly key doesn't also fly. They count from the press on a handle or the selection's body, and a key held before the press doesn't.
 
 J held alone makes a move a join and nothing else. The selection doesn't follow the pointer: it stays where the drag started, and the end it would carry under the pointer is drawn as the base's dot, until that end shows within three times the Connectors range of another end it can join, when the selection jumps to the join. Off it, it goes back to where it started, not to the pointer. Nothing has to be reached on the way, as nothing is moving: what is in range when the pointer gets there is taken, as by a pick. Released, it lands where it is, joined or back at the start, as one undo step. Under J in a turn only end stops stop it, under M only touches and flush faces, under L only aligned axes.
 
@@ -270,13 +270,13 @@ Dragging a piece out of the palette lands by the same targets and priority as a 
 
 ## The snap menu
 
-Snapping has one place: the magnet in the view bar, the pill in the viewport's top right, between World/Local and the grid pill. Its icon turns snapping as a whole on and off, N by default (`snapToggle`), and is pressed while snapping is on; its chevron opens the snap menu. Beside it the grid pill and the angle pill keep the quick forms: each icon turns its kind on and off, and each value picks its step. With the magnet off nothing snaps, and the pills and the menu's rows stay working but dimmed, to say they wait on it. Ctrl inverts the magnet for one drag (§ Modifiers). The View menu's Snap section has Snapping alone, with its key; the Panes and Display pills hold nothing of snapping's.
+Snapping has one place: the magnet in the view bar, the pill in the viewport's top right, between World/Local and the grid pill. Its icon turns snapping to pieces on and off, N by default (`snapToggle`), and is pressed while it is on; its chevron opens the snap menu. Beside it the grid pill and the angle pill keep the quick forms: each icon turns its kind on and off, and each value picks its step, whatever the magnet says (§ Affect). With the magnet off the menu's Snaps to and Prefer rows stay working but dimmed, to say they wait on it. Ctrl holds all snapping off for one drag (§ Modifiers). The View menu's Snap section has Snapping alone, with its key; the Panes and Display pills hold nothing of snapping's.
 
 The menu names the targets in the user's words: **Ends** is Connectors, **Pieces** is Mesh, **Planes** is Construction, and **Guides** is Alignment and Tracking together. These pages and the code keep the targets' own names.
 
 The plain screen, top to bottom (`components/SnapMagnet.tsx`):
 
-- **Snapping**: the magnet's switch.
+- **Snapping**: the magnet's switch, snapping to pieces.
 - **Grid**, **Angle** (a turn's step), **Scale factor**: each a step, typed or picked from the list, and a switch. Picking a step turns that one on.
 - **Snaps to**: Ends, Pieces and Guides, each a switch. Planes joins them once the map has a construction plane or axis.
 - **Prefer**: Grid or Pieces. It sets the priority to Grid first or Pieces first (§ Priority) and Connectors' Pull back to ×1, so the order alone decides. Any other order or pull presses neither and says Custom.
@@ -335,7 +335,7 @@ Connectors need, per piece, the ends: position and the two directions in the pie
 
 All of this is the editor's, none of it the game's, so it goes in the map's sidecar ([PROJECTS.md](PROJECTS.md) § The files):
 
-- The snap settings for the map, the snap menu's rows: base, affect, steps, each target's toggle and parameters, and the priority order. The user's rows (§ Settings) aren't in it, and a sidecar from before they moved still reads, without them.
+- The snap settings for the map, the snap menu's rows: base, affect, steps, each target's toggle and parameters, and the priority order. The user's rows (§ Settings) aren't in it, and a sidecar from before they moved still reads, without them. The magnet is `magnet`; one saved as `enabled`, from when it gated all of snapping, reads as it behaved (§ Affect).
 - The grid's origin and rotation.
 - Construction planes and axes, named.
 - Joints: pairs of item ends that met. They are recorded when a connector snap commits and dropped when either item moves away or is deleted, here or in a save from the in-game editor.

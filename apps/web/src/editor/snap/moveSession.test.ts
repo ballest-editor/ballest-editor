@@ -8,7 +8,7 @@ import type { Ray } from "../../domain/snapFrame"
 import { findGroup } from "../../domain/structure"
 import { ORIGIN, rotatorToQuat, vecAdd, vecScale, vecSub } from "../../domain/ueMath"
 import { applyDelta } from "../../domain/units"
-import { grouped, loadPieces, lookDown } from "../../test/snapFixtures"
+import { allSnapping, grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { assertVec } from "../../test/vec"
 import { PaneCamera } from "../paneCameras"
 import { selectionPivot, shownTransform, useEditor } from "../store"
@@ -56,14 +56,13 @@ const moving = (key: string, pivot: Vec3 = { x: 0, y: 0, z: 0 }, frame?: Quat4, 
 }
 
 const onlyGrid = (over: Partial<SnapConfig> = {}): SnapConfig => ({
-  ...defaultSnapConfig,
-  enabled: true,
+  ...allSnapping,
   targets: {
-    ...defaultSnapConfig.targets,
-    connectors: { ...defaultSnapConfig.targets.connectors, enabled: false },
-    mesh: { ...defaultSnapConfig.targets.mesh, enabled: false },
-    tracking: { ...defaultSnapConfig.targets.tracking, enabled: false },
-    alignment: { ...defaultSnapConfig.targets.alignment, enabled: false }
+    ...allSnapping.targets,
+    connectors: { ...allSnapping.targets.connectors, enabled: false },
+    mesh: { ...allSnapping.targets.mesh, enabled: false },
+    tracking: { ...allSnapping.targets.tracking, enabled: false },
+    alignment: { ...allSnapping.targets.alignment, enabled: false }
   },
   ...over
 })
@@ -111,7 +110,7 @@ describe("MoveSession", () => {
   beforeEach(() => endSnapDisplay())
 
   it("moves free with snapping off, and Ctrl doesn't turn it on", () => {
-    const [a = ""] = load({ ...onlyGrid(), enabled: false })
+    const [a = ""] = load(defaultSnapConfig)
     const { rayAt, session } = moving(a)
     const { px, ray } = rayAt(137, 42)
     const free = session.update(ray, px, up)
@@ -128,6 +127,20 @@ describe("MoveSession", () => {
     assert.isUndefined(session.update(ray, px, { off: true, hold: false }).hit)
   })
 
+  it("lands on the grid with the magnet off, and not on a piece's corner, which waits on the magnet", () => {
+    const [a = ""] = load({ ...onlyGrid(), magnet: false })
+    const { rayAt, session } = moving(a)
+    const { px, ray } = rayAt(137, 42)
+    assert.deepStrictEqual(session.update(ray, px, up).hit?.landing, { x: 140, y: 40, z: 0 })
+    assert.isUndefined(session.update(ray, px, { off: true, hold: false }).hit, "Ctrl still snaps nothing")
+    const off = towardsCorner({ ...onlyCorners(false), magnet: false })
+    off.pointPast(-20)
+    assert.isUndefined(off.pointPast(1).hit)
+    const on = towardsCorner(onlyCorners(false))
+    on.pointPast(-20)
+    assert.strictEqual(on.pointPast(1).hit?.target, "mesh")
+  })
+
   it("keeps a held target under Ctrl, and lets go when Shift does", () => {
     const [a = ""] = load(onlyGrid())
     const { rayAt, session } = moving(a)
@@ -140,7 +153,7 @@ describe("MoveSession", () => {
   })
 
   it("locks to an axis, and a second press lets go", () => {
-    const [a = ""] = load({ ...onlyGrid(), enabled: false })
+    const [a = ""] = load(defaultSnapConfig)
     const { rayAt, session } = moving(a)
     const { px, ray } = rayAt(137, 42)
     session.toggleLock({ axis: "x", plane: false })
@@ -164,7 +177,7 @@ describe("MoveSession", () => {
 
   it("gives a world move no axes, and drops a local one's under a lock, which is on the grid's", () => {
     const axes = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
-    const [a = ""] = load({ ...onlyGrid(), enabled: false })
+    const [a = ""] = load(defaultSnapConfig)
     const world = moving(a).pointAt(137, 42).delta
     assert.isTrue(world?.kind === "translate" && world.frame === undefined)
     const { rayAt, session } = moving(a, { x: 0, y: 0, z: 0 }, axes)
@@ -367,8 +380,8 @@ describe("MoveSession snap-and-go", () => {
     assert.isUndefined(pointWith(1, ["mesh"], true).hit, "Ctrl turns off what the key narrowed to")
   })
 
-  it("snaps to the kind held with snapping off, and Ctrl turns that off again", () => {
-    const { corner, rayAt, session } = towardsCorner({ ...onlyCorners(true), enabled: false })
+  it("snaps to the kind held with the magnet off, and Ctrl turns that off again", () => {
+    const { corner, rayAt, session } = towardsCorner({ ...onlyCorners(false), magnet: false })
     const pointWith = (by: number, keys: Partial<typeof up> & { readonly only?: ReadonlyArray<SnapKind> }) =>
       session.update(rayAt(corner.x + by, corner.y).ray, rayAt(corner.x + by, corner.y).px, { ...up, ...keys })
     assert.isUndefined(pointWith(-20, {}).hit)
@@ -553,7 +566,7 @@ describe("a body drag in perspective", () => {
 
   it("keeps a point grabbed above the ground under the pointer, instead of running ahead on the ground plane", () => {
     const [a = ""] = loadPieces([ORIGIN])
-    useEditor.getState().setTabSnap({ ...onlyGrid(), enabled: false })
+    useEditor.getState().setTabSnap(defaultSnapConfig)
     // held by its top, 300 cm up, and the pointer moved to where that top would show 400 cm along y
     const grab = { x: 0, y: 0, z: 300 }
     const moved = { x: 0, y: 400, z: 0 }
@@ -575,8 +588,8 @@ describe("a landing that turns a group with a Point pivot", () => {
       y: 0,
       z: 0
     }])
-    const { connectors } = defaultSnapConfig.targets
-    const grid = { ...defaultSnapConfig.targets.grid, enabled: false }
+    const { connectors } = allSnapping.targets
+    const grid = { ...allSnapping.targets.grid, enabled: false }
     useEditor.getState().setTabSnap(onlyGrid({
       targets: { ...onlyGrid().targets, connectors: { ...connectors, enabled: true }, grid }
     }))

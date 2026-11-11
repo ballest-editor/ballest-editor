@@ -10,6 +10,7 @@ import { applyGroupDelta } from "../../domain/groupTransform"
 import { placedBoxOf } from "../../domain/itemBounds"
 import type { ItemTransform } from "../../domain/MapFile"
 import { localToWorld, pivotFor } from "../../domain/pivot"
+import { priorityOf } from "../../domain/snapConfig"
 import type { ScreenPoint, SnapFrame, SnapHit, SnapItem } from "../../domain/snapFrame"
 import { shownMarks } from "../../domain/snapRelation"
 import { moveOf, resolveSnap } from "../../domain/snapResolve"
@@ -51,7 +52,7 @@ export const snappedDrop = (
   off: boolean
 ): SnappedDrop | undefined => {
   const config = snapConfigOf(s)
-  if (!config.enabled || off) return undefined
+  if (off || priorityOf(config).length === 0) return undefined
   const transform = placementTransform(piece, ORIGIN)
   const item = itemFromPiece(piece, transform)
   const pivot = localToWorld(transform, pivotFor(item, s.catalogIndex, "Bottom")?.localPosition ?? ORIGIN)

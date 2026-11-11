@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
+import { allSnapping } from "../test/snapFixtures"
 import { expectVec } from "../test/vec"
 import type { UeTransform } from "./coords"
 import { identityTransform } from "./factory"
@@ -267,16 +268,18 @@ describe("selectionBases", () => {
       up: { x: 0, y: 0, z: 1 },
       profile: "Track"
     }
-    const bases = selectionBases(defaultSnapConfig, { ...selection, ends: [end] })
+    const bases = selectionBases(allSnapping, { ...selection, ends: [end] })
     assert.deepStrictEqual(bases.map(({ start }) => start), [end.position])
-    const constrained = selectionBases(defaultSnapConfig, { ...selection, ends: [end] }, line)
+    const constrained = selectionBases(allSnapping, { ...selection, ends: [end] }, line)
     assert.deepStrictEqual(constrained.map(({ label }) => label), ["End", "Pivot", "Near face", "Center", "Far face"])
     const off = {
-      ...defaultSnapConfig,
-      targets: { ...defaultSnapConfig.targets, connectors: { ...defaultSnapConfig.targets.connectors, enabled: false } }
+      ...allSnapping,
+      targets: { ...allSnapping.targets, connectors: { ...allSnapping.targets.connectors, enabled: false } }
     }
-    assert.deepStrictEqual(selectionBases(off, { ...selection, ends: [end] }).map(({ start }) => start), [
-      selection.pivot
-    ])
+    for (const config of [off, { ...allSnapping, magnet: false }]) {
+      assert.deepStrictEqual(selectionBases(config, { ...selection, ends: [end] }).map(({ start }) => start), [
+        selection.pivot
+      ])
+    }
   })
 })

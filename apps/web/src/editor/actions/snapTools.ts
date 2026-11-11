@@ -99,10 +99,10 @@ export const updateSnapTarget = <T extends SnapTarget>(target: T, patch: Partial
   applySnap({ ...config, targets: { ...config.targets, [target]: { ...config.targets[target], ...patch } } })
 }
 
-/** Turns snapping as a whole on or off: the magnet, and what Ctrl inverts during a drag. */
-export const toggleSnapping = () => updateSnap({ enabled: !snapConfigOf(useEditor.getState()).enabled })
+/** Turns the magnet on or off: snapping to every target but the grid (docs/SNAPPING.md § Affect). */
+export const toggleSnapping = () => updateSnap({ magnet: !snapConfigOf(useEditor.getState()).magnet })
 
-/** Picks the grid's step, and turns the Grid target on to use it: snapping as a whole keeps its own say. */
+/** Picks the grid's step, and turns the Grid target on to use it. */
 export const pickGridSize = (gridSize: number) => {
   const config = snapConfigOf(useEditor.getState())
   applySnap({ ...config, gridSize, targets: { ...config.targets, grid: { ...config.targets.grid, enabled: true } } })

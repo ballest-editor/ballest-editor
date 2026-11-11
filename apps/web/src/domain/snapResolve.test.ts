@@ -19,7 +19,7 @@ const on = (config: SnapConfig, ...targets: ReadonlyArray<SnapTarget>): SnapConf
   const { alignment, connectors, construction, grid, mesh, tracking } = config.targets
   return {
     ...config,
-    enabled: true,
+    magnet: true,
     targets: {
       grid: turned("grid", grid),
       connectors: turned("connectors", connectors),

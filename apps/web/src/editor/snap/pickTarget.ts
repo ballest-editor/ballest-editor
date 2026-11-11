@@ -32,7 +32,7 @@ const pickingConfig = (config: SnapConfig, accepts: Accepts): SnapConfig => {
   const { connectors, mesh } = config.targets
   return {
     ...config,
-    enabled: true,
+    magnet: true,
     targets: {
       ...config.targets,
       grid: { ...config.targets.grid, enabled: !onlyFaces && !anchor && config.targets.grid.enabled },

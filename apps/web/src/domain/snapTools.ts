@@ -6,7 +6,7 @@ import type { WorldEnd } from "./connectors"
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { type Box, boxCentreOf } from "./itemBounds"
 import type { ConstructionAxis, ConstructionPlane } from "./MapSidecar"
-import type { SnapConfig } from "./snapConfig"
+import { type SnapConfig, targetOn } from "./snapConfig"
 import { axesOf, type BasePoint, type Constraint } from "./snapFrame"
 import {
   IDENTITY_QUAT,
@@ -454,7 +454,7 @@ const stationBases = ({ max, min }: Box, constraint: Constraint): ReadonlyArray<
 
 /** What the Base setting names: a selection's ends when Connectors is on and it has any, else the setting's own points. */
 const chosenBases = (config: SnapConfig, { box, ends, pivot }: BaseSelection): ReadonlyArray<BasePoint> => {
-  if (config.targets.connectors.enabled && ends.length > 0) {
+  if (targetOn(config, "connectors") && ends.length > 0) {
     return ends.map((end) => ({ start: end.position, label: "End", end }))
   }
   switch (config.base) {

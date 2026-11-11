@@ -64,7 +64,7 @@ import { ViewTip, ViewTipBoundary } from "./ViewTip"
  */
 export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
   const units = useEditor((s) => s.settings.general.units)
-  const { enabled, gridSize, rotationEnabled, rotationStep, targets } = useEditor(snapConfigOf)
+  const { gridSize, rotationEnabled, rotationStep, targets } = useEditor(snapConfigOf)
 
   return (
     <ViewTipBoundary>
@@ -86,7 +86,6 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
               icon={<IconGrid4x4 />}
               label="Snap to grid"
               enabled={targets.grid.enabled}
-              snapping={enabled}
               onToggle={(pressed) => updateSnapTarget("grid", { enabled: pressed })}
               value={gridSize}
               options={GRID_SIZES}
@@ -100,7 +99,6 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
               icon={<IconAngle />}
               label="Snap angle"
               enabled={rotationEnabled}
-              snapping={enabled}
               onToggle={(pressed) => updateSnap({ rotationEnabled: pressed })}
               value={rotationStep}
               options={ROTATION_STEPS}
@@ -435,15 +433,13 @@ function DisplayControl({ disabled }: { readonly disabled: boolean }) {
 }
 
 /**
- * One kind of gizmo snapping: the icon turns it on and off, the value next to it picks the step and turns it on. Both
- * stay working while snapping as a whole (the magnet beside them) is off, and are dimmed to say they wait on it.
+ * One kind of gizmo snapping: the icon turns it on and off, the value next to it picks the step and turns it on. Neither
+ * waits on the magnet beside them, which is snapping to pieces (docs/SNAPPING.md § Affect).
  */
 function SnapGroup<V extends number>(props: {
   readonly icon: ReactNode
   readonly label: string
   readonly enabled: boolean
-  /** Snapping as a whole. */
-  readonly snapping: boolean
   readonly onToggle: (pressed: boolean) => void
   readonly value: V
   readonly options: ReadonlyArray<V>
@@ -454,25 +450,20 @@ function SnapGroup<V extends number>(props: {
   readonly format: (value: V) => string
   readonly disabled: boolean
 }) {
-  const { enabled, disabled, snapping } = props
+  const { enabled, disabled } = props
   const items = Object.fromEntries(props.options.map((v) => [v, props.format(v)]))
 
   return (
     <>
       <ViewTip
-        label={`${props.label}: ${enabled ? "on" : "off"}${snapping ? "" : " (snapping is off)"}`}
-        action={snapping ? undefined : "snapToggle"}
+        label={`${props.label}: ${enabled ? "on" : "off"}`}
         render={
           <Toggle
             pressed={enabled}
             onPressedChange={props.onToggle}
             disabled={disabled}
             aria-label={props.label}
-            className={cn(
-              SEGMENT,
-              "aria-pressed:bg-primary/12",
-              snapping ? "aria-pressed:text-foreground" : "text-fg-disabled aria-pressed:text-fg-tertiary"
-            )}
+            className={cn(SEGMENT, "aria-pressed:bg-primary/12 aria-pressed:text-foreground")}
             {...noFocus}
           />
         }
@@ -495,7 +486,7 @@ function SnapGroup<V extends number>(props: {
               className={cn(
                 SEGMENT,
                 "border-none bg-transparent px-2 tabular-nums data-[size=default]:h-full dark:bg-transparent [&>svg]:hidden @max-[42rem]/corner:px-1 @max-[42rem]/corner:*:data-[slot=select-value]:hidden @max-[42rem]/corner:[&>svg]:block",
-                enabled && snapping ? "text-foreground" : snapping ? "text-fg-tertiary" : "text-fg-disabled"
+                enabled ? "text-foreground" : "text-fg-tertiary"
               )}
             />
           }
