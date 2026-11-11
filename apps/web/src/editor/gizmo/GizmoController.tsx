@@ -14,7 +14,6 @@ import {
   movedAlikeKeys,
   type PivotMode,
   pivotModeFor,
-  pivotUnitOf,
   type SelectionUnits,
   turnAccumulates
 } from "../../domain/units"
@@ -350,7 +349,7 @@ export function GizmoController() {
       const items = constraint === undefined
         ? snapItemsOf(s, new Set(target.transforms.keys()), config.targets.mesh.sharpAngle)
         : []
-      const unit = pivotUnitOf(target.selection, pivotMode)
+      const unit = target.selection.active
       const extent = unitExtentOf(s, unit)
       // a caret scales two axes by one factor, measured on the first of them
       const scaleKey = spec.kind === "scalePlane" && spec.axis !== undefined ? pairOf(spec.axis)[0] : spec.axis ?? "x"

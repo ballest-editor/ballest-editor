@@ -266,9 +266,9 @@ export interface SelectionUnits {
   /** In tree order. */
   readonly units: ReadonlyArray<Unit>
   /**
-   * The unit holding the active (last selected) item: where the gizmo sits and what its axes follow, in Together and
-   * Each alike. For loose items it is the active item, as the game pivots several pieces (docs/qa/gizmo-scale.md); for
-   * a whole group, the group's frame.
+   * The unit holding the active (last clicked) item: where the gizmo sits and what its axes follow, in Together and Each
+   * alike, what Align lines up on, and inside an entered chain the link the pass runs from. For loose items it is the
+   * active item, as the game pivots several pieces (docs/qa/gizmo-scale.md); for a whole group, the group's frame.
    */
   readonly active: Unit
   /**
@@ -311,22 +311,6 @@ export const reachableKeys = (
   const entered = enteredGroupId === null ? undefined : findGroup(tree, enteredGroupId)
   return entered?.chain === true ? [...new Set([...selectedIds, ...treeKeys([entered])])] : selectedIds
 }
-
-/**
- * The first link an edit in Each runs from inside an entered chain: the first selected. The pass takes the edit as that
- * link does, so the gizmo sits on it.
- */
-const passHeadOf = ({ chain, units }: SelectionUnits): Unit | undefined => {
-  const selected = new Set(units.map((unit) => unit.id))
-  return chain?.find((link) => selected.has(link.id))
-}
-
-/**
- * The unit an edit by `mode` is measured on, and the gizmo sits on: the active unit, or in Each inside an entered chain
- * the first selected link, which the pass runs from.
- */
-export const pivotUnitOf = (selection: SelectionUnits, mode: PivotMode): Unit =>
-  effectivePivotMode(mode, selection) === "each" ? passHeadOf(selection) ?? selection.active : selection.active
 
 /**
  * The effective mode: Each needs two or more units, or a link inside an entered chain; else a selection is Together
@@ -621,21 +605,20 @@ const moveDown = (
 }
 
 /**
- * The pass down a chain in Each, from the first selected link to its end, selected or not, as the edit takes that
+ * The pass down a chain in Each, from `head`, the active link, to its end, selected or not, as the edit takes that
  * link. A turn bends it (`bend`), a move adds up down it (`moveDown`), and a scale resizes every link and keeps the joints
  * meeting (`scaleDown`); growth grows each, link by link.
  */
 const chainPass = (
   out: Map<string, UeTransform>,
   links: ReadonlyArray<Unit>,
-  selected: (link: Unit) => boolean,
+  head: Unit,
   transforms: ReadonlyMap<string, UeTransform>,
   edit: UnitEdit,
   growth: ChainGrowth | undefined
 ) => {
-  const from = links.findIndex(selected)
-  const head = links[from]
-  if (head === undefined) return
+  const from = links.findIndex((link) => link.id === head.id)
+  if (from < 0) return
   const f = edit(head)
   const motion = motionOf(f, head.pivot)
   if (motion === "move") {
@@ -676,7 +659,7 @@ export const applyUnitEdit = (
   const { chain, units } = selection
   const selected = new Set(units.map((unit) => unit.id))
   if (effectivePivotMode(mode, selection) === "together") {
-    const unit = pivotUnitOf(selection, mode)
+    const unit = selection.active
     const f = edit(unit)
     // a move or turn of a link carries the links after it rigidly
     const carries = chain !== undefined && motionOf(f, unit.pivot) !== undefined
@@ -687,7 +670,7 @@ export const applyUnitEdit = (
     return out
   }
   if (chain !== undefined) {
-    chainPass(out, chain, (link) => selected.has(link.id), transforms, edit, selection.growth)
+    chainPass(out, chain, selection.active, transforms, edit, selection.growth)
     return out
   }
   // a whole chain is one thing: it takes its edit whole, about its own pivot, as a group does
@@ -708,43 +691,34 @@ export const applyDelta = (
   applyUnitEdit(selection, delta.kind === "rigid" ? "together" : mode, transforms, deltaEdit(delta))
 
 /**
- * Each unit moved whole by its own offset, as Align and Distribute do. Inside an entered chain a selected link takes
- * exactly its offset, and the links after it follow by that offset as far as the next selected link.
+ * Each unit moved whole by its own offset, as Align and Distribute do: they only move, and never inside an entered chain,
+ * where moving a link alone would open its joints.
  */
 export const applyUnitOffsets = (
-  { chain, units }: SelectionUnits,
+  { units }: SelectionUnits,
   transforms: ReadonlyMap<string, UeTransform>,
   offsetOf: (unit: Unit) => Vec3
 ): ReadonlyMap<string, UeTransform> => {
   const out = new Map<string, UeTransform>()
-  const move = (keys: ReadonlyArray<string>, by: Vec3) =>
-    applyTo(out, keys, transforms, (t) => ({ ...t, translation: vecAdd(t.translation, by) }))
-  const selected = new Map(units.map((unit) => [unit.id, unit]))
-  let carried: Vec3 | undefined
-  for (const link of chain ?? []) {
-    const own = selected.get(link.id)
-    if (own !== undefined) carried = offsetOf(own)
-    if (carried !== undefined) move(link.keys, carried)
-    selected.delete(link.id)
+  for (const unit of units) {
+    const by = offsetOf(unit)
+    applyTo(out, unit.keys, transforms, (t) => ({ ...t, translation: vecAdd(t.translation, by) }))
   }
-  for (const unit of selected.values()) move(unit.keys, offsetOf(unit))
   return out
 }
 
 /**
  * The items snapping measures an edit by `mode` on: those that take it as the gizmo shows it. In Together that is every
  * unit, and in Each only the active one, as the others go along their own axes or about their own pivots. Inside an
- * entered chain in Each the edit runs down from the first selected link, so that link alone leads: the links after take
- * it again and again, and a link carried along isn't one either.
+ * entered chain in Each the edit runs down from the active link, so that link alone leads: the links after take it again
+ * and again, and a link carried along isn't one either.
  */
-export const leadingKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> => {
-  if (effectivePivotMode(mode, selection) !== "each") return selection.units.flatMap((unit) => unit.keys)
-  return passHeadOf(selection)?.keys ?? selection.active.keys
-}
+export const leadingKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> =>
+  effectivePivotMode(mode, selection) === "each" ? selection.active.keys : selection.units.flatMap((unit) => unit.keys)
 
 /**
  * The items that take a move along the world's axes as dragged, so any of them can lead it: every unit, except inside
- * an entered chain in Each, where only the first selected link does (`leadingKeys`).
+ * an entered chain in Each, where only the active link does (`leadingKeys`).
  */
 export const movedAlikeKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> =>
   effectivePivotMode(mode, selection) === "each" && selection.chain !== undefined
@@ -861,6 +835,6 @@ export const pivotDotsOf = (
   mode: PivotMode,
   boxOf: UnitContext["boxOf"]
 ): ReadonlyArray<PivotDotSpec> => {
-  const units = effectivePivotMode(mode, selection) === "each" ? selection.units : [pivotUnitOf(selection, mode)]
+  const units = effectivePivotMode(mode, selection) === "each" ? selection.units : [selection.active]
   return units.map((unit) => ({ id: unit.id, pivot: unit.pivot, inside: insideBox(unit.pivot, boxOf(unit.keys)) }))
 }

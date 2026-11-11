@@ -136,18 +136,18 @@ const LINK_BY_LINK = {
 
 /**
  * A chain on its own (`isShownChain`): taken whole (Rigid), or link by link, from link 1 or inside an entered chain from
- * the first selected link, in the words of what the tool's drag does to it: Bend, Spread or Stretch.
+ * the active link, the last clicked, in the words of what the tool's drag does to it: Bend, Spread or Stretch.
  */
 function ChainToggle({ disabled }: { readonly disabled: boolean }) {
   const links = useEditor((s) => s.chainMode === "links")
   const edit = useEditor((s) =>
     s.tool === "rotate" || s.tool === "translate" || s.tool === "scale" ? CHAIN_EDITS[s.tool] : LINK_BY_LINK
   )
-  // inside an entered chain an edit runs from the first selected link
+  // inside an entered chain an edit runs from the active link
   const inside = useEditor((s) => selectionUnits(s, (id) => shownTransform(s, id))?.chain !== undefined)
   const togglePivotMode = useEditor((s) => s.togglePivotMode)
   const label = links
-    ? `${edit.word}: ${edit.tip}, from ${inside ? "the first selected link" : "link 1"} to the end`
+    ? `${edit.word}: ${edit.tip}, from ${inside ? "the active link" : "link 1"} to the end`
     : inside
     ? "Rigid: the selected links move and turn as one, and carry the links after them"
     : "Rigid: the chain moves, turns and scales as one piece"

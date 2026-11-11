@@ -44,7 +44,6 @@ import {
   pathOrder,
   pivotDotsOf,
   pivotModeFor,
-  pivotUnitOf,
   type SelectionUnits,
   selectionUnitsOf,
   turnAccumulates,
@@ -137,13 +136,12 @@ describe("units of a selection", () => {
     const ctx = contextOf(tree, transforms)
     const one = selectionUnitsOf(["b", "c"], null, ctx)!
     assert.strictEqual(effectivePivotMode("each", one), "together")
-    assert.strictEqual(pivotUnitOf(one, "each").id, "g", "one whole group pivots on itself")
+    assert.strictEqual(one.active.id, "g", "one whole group pivots on itself")
     const two = selectionUnitsOf(["a", "b", "c"], null, ctx)!
     assert.strictEqual(effectivePivotMode("each", two), "each")
-    assert.strictEqual(pivotUnitOf(two, "together").id, "g", "the active item's group, whole")
+    assert.strictEqual(two.active.id, "g", "the active item's group, whole")
     const loose = selectionUnitsOf(["b", "c", "a"], null, ctx)!
-    assert.strictEqual(pivotUnitOf(loose, "together").id, "a", "a loose active item, as the game pivots pieces")
-    assert.strictEqual(pivotUnitOf(two, "each").id, "g")
+    assert.strictEqual(loose.active.id, "a", "a loose active item, as the game pivots pieces")
   })
 
   it("puts a group's pivot on a face of its box, a member, or a frozen point", () => {
@@ -267,6 +265,8 @@ describe("chains", () => {
   const links = ["l1", "l2", "l3", "l4", "l5"]
   const transforms = new Map(links.map((key, i) => [key, at(i * 1000)]))
   const chain = group("chain", links.map(item), { chain: true })
+  /** Every link selected inside the chain, link 1 clicked last, so the pass runs from it. */
+  const fromFirst = [...links.slice(1), "l1"]
 
   it("turns a whole chain beside another unit as one thing in Each, rigidly about its first link", () => {
     const withX = selectionUnitsOf(
@@ -285,7 +285,7 @@ describe("chains", () => {
 
   it("turns each link by the angle about its own moved pivot inside an entered chain, so the turns accumulate", () => {
     const out = applyUnitEdit(
-      selectionUnitsOf(links, "chain", contextOf([chain], transforms))!,
+      selectionUnitsOf(fromFirst, "chain", contextOf([chain], transforms))!,
       "each",
       transforms,
       deltaEdit(turn(10))
@@ -359,9 +359,9 @@ describe("chains", () => {
 
   const xs = (out: ReadonlyMap<string, UeTransform>) => links.map((key) => out.get(key)?.translation.x)
 
-  it("moves each link in Each by the move from the one before, from the first selected link to the end", () => {
-    // l2 to the end: l1 stays where the chain starts
-    const sel = selectionUnitsOf(["l2", "l3", "l4", "l5"], "chain", contextOf([chain], transforms))!
+  it("moves each link in Each by the move from the one before, from the active link to the end", () => {
+    // l2 clicked last: l1 stays where the chain starts
+    const sel = selectionUnitsOf(["l3", "l4", "l5", "l2"], "chain", contextOf([chain], transforms))!
     const along = applyUnitEdit(
       sel,
       "each",
@@ -378,7 +378,7 @@ describe("chains", () => {
     assert.deepStrictEqual(links.map((key) => across.get(key)?.translation.y), [undefined, 100, 200, 300, 400])
     // grown: linear 100% moves them 50, 100, 150, 200, 250 more than the one before
     const grown = group("chain", links.map(item), { chain: true, growth: { curve: "linear", percent: 100 } })
-    const whole = selectionUnitsOf(links, "chain", contextOf([grown], transforms))!
+    const whole = selectionUnitsOf(fromFirst, "chain", contextOf([grown], transforms))!
     const spaced = applyUnitEdit(
       whole,
       "each",
@@ -389,7 +389,7 @@ describe("chains", () => {
   })
 
   it("opens every joint of a curve along itself when the drag is along the first link", () => {
-    const sel = (t: ReadonlyMap<string, UeTransform>) => selectionUnitsOf(links, "chain", contextOf([chain], t))!
+    const sel = (t: ReadonlyMap<string, UeTransform>) => selectionUnitsOf(fromFirst, "chain", contextOf([chain], t))!
     const arc = new Map([...transforms, ...applyUnitEdit(sel(transforms), "each", transforms, deltaEdit(turn(40)))])
     // along the first link's own X, as the gizmo in Local shows it
     const offset = rotateVec(arc.get("l1")!.rotation, { x: 50, y: 0, z: 0 })
@@ -404,7 +404,7 @@ describe("chains", () => {
 
   it("stacks links piled on one pivot along the drag", () => {
     const pile = new Map(links.map((key) => [key, at(0)]))
-    const sel = selectionUnitsOf(links, "chain", contextOf([chain], pile))!
+    const sel = selectionUnitsOf(fromFirst, "chain", contextOf([chain], pile))!
     const up = applyUnitEdit(sel, "each", pile, deltaEdit({ kind: "translate", offset: { x: 0, y: 0, z: 100 } }))
     assert.deepStrictEqual(links.map((key) => up.get(key)!.translation.z), [100, 200, 300, 400, 500])
     assert.deepStrictEqual(links.map((key) => up.get(key)!.translation.x), [0, 0, 0, 0, 0])
@@ -413,7 +413,7 @@ describe("chains", () => {
   it("resizes a chain scaled in Each and keeps its joints meeting, and tapers it with growth", () => {
     const whole = (growth?: ChainGrowth) =>
       selectionUnitsOf(
-        links,
+        fromFirst,
         "chain",
         contextOf(
           [group("chain", links.map(item), { chain: true, ...(growth !== undefined && { growth }) })],
@@ -431,7 +431,7 @@ describe("chains", () => {
     assert.deepStrictEqual(xs(tapered), [0, 2000, 6000, 14000, 30000])
     // across a bent chain, each step grows along its own link
     const arc = new Map([...transforms, ...applyUnitEdit(whole(), "each", transforms, deltaEdit(turn(90)))])
-    const bent = applyUnitEdit(selectionUnitsOf(links, "chain", contextOf([chain], arc))!, "each", arc, double)
+    const bent = applyUnitEdit(selectionUnitsOf(fromFirst, "chain", contextOf([chain], arc))!, "each", arc, double)
     for (const [from, to] of [["l1", "l2"], ["l2", "l3"]] as const) {
       const step = vecSub(bent.get(to)!.translation, bent.get(from)!.translation)
       assert.closeTo(vecLength(step), 2000, 1e-6, `${from} to ${to}`)
@@ -443,7 +443,7 @@ describe("chains", () => {
     const keys = ["g1", "g2", "g3"]
     const turned = new Map(keys.map((key, i) => [`${key}i`, at(i * 1000, 0, 0, 90)]))
     const tree = [group("chain", keys.map((key) => group(key, [item(`${key}i`)])), { chain: true })]
-    const sel = selectionUnitsOf(keys.map((key) => `${key}i`), "chain", contextOf(tree, turned))!
+    const sel = selectionUnitsOf(["g2i", "g3i", "g1i"], "chain", contextOf(tree, turned))!
     const out = applyUnitEdit(sel, "each", turned, deltaEdit({ kind: "scale", factor: 2, axis: "x" }))
     keys.forEach((key, i) => {
       assert.closeTo(out.get(`${key}i`)!.scale3D.x, 2, 1e-9, key)
@@ -451,11 +451,15 @@ describe("chains", () => {
     })
   })
 
-  it("sits the gizmo in Each inside an entered chain on the first selected link, which the pass runs from", () => {
-    const sel = selectionUnitsOf(["l3", "l5"], "chain", contextOf([chain], transforms))!
-    assert.strictEqual(pivotUnitOf(sel, "each").id, "l3")
-    assert.strictEqual(pivotUnitOf(sel, "together").id, "l5", "Together keeps the game's rule")
-    assert.deepStrictEqual(leadingKeys(sel, "each"), ["l3"])
+  it("sits the gizmo inside an entered chain on the active link, the last clicked, which the pass runs from", () => {
+    const sel = selectionUnitsOf(["l2", "l4"], "chain", contextOf([chain], transforms))!
+    assert.strictEqual(sel.active.id, "l4")
+    assert.deepStrictEqual(leadingKeys(sel, "each"), ["l4"])
+    // l4 was clicked last, so the bend runs from it, and l2, selected first, stays
+    const out = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
+    assert.deepStrictEqual([...out.keys()], ["l4", "l5"])
+    assert.closeTo(yawOf(out.get("l4")!), 10, 1e-6, "the active link takes the turn dragged, as the gizmo shows it")
+    assert.closeTo(yawOf(out.get("l5")!), 20, 1e-6)
   })
 
   it("carries the links after a link moved or turned in Together, and pushes them after a scale", () => {
@@ -469,18 +473,12 @@ describe("chains", () => {
     assert.strictEqual(scaled.get("l4")!.scale3D.x, 1, "and the links after keep their size")
   })
 
-  it("moves each unit whole by its own offset, a selected link's being its own and passing to the links after it", () => {
+  it("moves each unit whole by its own offset, a whole chain as one", () => {
     const by = (x: number): Vec3 => ({ x, y: 0, z: 0 })
     const moved = (sel: SelectionUnits, offsets: Readonly<Record<string, number>>) => {
       const out = applyUnitOffsets(sel, transforms, (unit) => by(offsets[unit.id] ?? 0))
       return new Map([...out].map(([key, t]) => [key, t.translation.x]))
     }
-    const inside = selectionUnitsOf(["l2", "l4"], "chain", contextOf([chain], transforms))!
-    assert.deepStrictEqual(
-      moved(inside, { l2: 100, l4: 0 }),
-      new Map([["l2", 1100], ["l3", 2100], ["l4", 3000], ["l5", 4000]]),
-      "from the first selected link down, and l4 stays put"
-    )
     const whole = selectionUnitsOf(links, null, contextOf([chain], transforms))!
     assert.strictEqual(moved(whole, { chain: 100 }).size, links.length, "a whole chain is one unit")
     assert.strictEqual(moved(whole, { chain: 100 }).get("l5"), 4100)
@@ -492,9 +490,9 @@ describe("chains", () => {
     assert.sameMembers([...carriedKeys(selectionUnitsOf(links, null, ctx)!)], [...links])
   })
 
-  it("bends from the first selected link to the end in Each, selected or not", () => {
-    // l3 alone is one unit, so Each needs a second: l5 selected too
-    const sel = selectionUnitsOf(["l3", "l5"], "chain", contextOf([chain], transforms))!
+  it("bends from the active link to the end in Each, selected or not", () => {
+    // l5 selected too, then l3 clicked last
+    const sel = selectionUnitsOf(["l5", "l3"], "chain", contextOf([chain], transforms))!
     const out = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
     assert.isUndefined(out.get("l1"))
     assert.isUndefined(out.get("l2"))
@@ -528,7 +526,7 @@ describe("chains", () => {
   it("grows each link's turn by the chain's growth: by a share of the first turn, or compounding", () => {
     const sel = (growth: ChainGrowth) =>
       selectionUnitsOf(
-        links,
+        fromFirst,
         "chain",
         contextOf([group("chain", links.map(item), { chain: true, growth })], transforms)
       )!
@@ -540,9 +538,9 @@ describe("chains", () => {
     yaws({ curve: "linear", percent: 50 }).forEach((yaw, i) => assert.closeTo(yaw, [10, 25, 45, 70, 100][i]!, 1e-6))
     // compound 100%: 10, 20, 40, 80, 160 on their own, which wraps the last one past 180
     yaws({ curve: "compound", percent: 100 }).forEach((yaw, i) => assert.closeTo(yaw, [10, 30, 70, 150, -50][i]!, 1e-6))
-    // inside the chain it counts from the first bending link
+    // inside the chain it counts from the first bending link, the active one
     const entered = selectionUnitsOf(
-      ["l4", "l5"],
+      ["l5", "l4"],
       "chain",
       contextOf(
         [group("chain", links.map(item), { chain: true, growth: { curve: "linear", percent: 100 } })],
@@ -696,13 +694,13 @@ describe("a snapped drag under the setting", () => {
     assert.deepStrictEqual(leadingKeys(selectionUnitsOf(["l2"], "chain", chainContext)!, "together"), ["l2"])
   })
 
-  it("is led in Each by a whole chain, one thing, and inside an entered chain by the first selected link", () => {
+  it("is led in Each by a whole chain, one thing, and inside an entered chain by the active link", () => {
     const whole = selectionUnitsOf(["x", ...links], null, chainContext)!
     assert.deepStrictEqual(leadingKeys(whole, "each"), [...links], "the active unit is the chain, whole")
     assert.deepStrictEqual(movedAlikeKeys(whole, "each"), [...links, "x"], "a loose piece moves as dragged too")
     assert.deepStrictEqual(movedAlikeKeys(whole, "together"), [...links, "x"])
     const entered = selectionUnitsOf(["l3", "l2"], "chain", chainContext)!
-    assert.deepStrictEqual(leadingKeys(entered, "each"), ["l2"], "the first selected inside the chain")
+    assert.deepStrictEqual(leadingKeys(entered, "each"), ["l2"], "the last clicked inside the chain")
     assert.deepStrictEqual(movedAlikeKeys(entered, "each"), ["l2"])
   })
 
@@ -900,7 +898,7 @@ describe("a group's frame", () => {
     const each = applyDelta(sel, "each", transforms, local)
     assertVec(each.get("a")!.translation, { x: 0, y: 100, z: 0 }, "g along its x, the world's y")
     assertVec(each.get("b")!.translation, { x: 5100, y: 0, z: 0 }, "h along its own x")
-    assert.deepStrictEqual(pivotUnitOf(sel, "together").transform.rotation, yawed(90), "Together: the active group's")
+    assert.deepStrictEqual(sel.active.transform.rotation, yawed(90), "Together: the active group's")
     const together = applyDelta(sel, "together", transforms, local)
     assertVec(together.get("b")!.translation, { x: 5000, y: 100, z: 0 }, "h goes along g's x too")
   })
