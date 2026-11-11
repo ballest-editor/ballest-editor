@@ -87,7 +87,7 @@ import {
 } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { localToWorld, type Pivot, pivotAt } from "../domain/pivot"
-import { isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/prefab"
+import { documentOrigin, isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/prefab"
 import type { PrefabFile } from "../domain/PrefabFile"
 import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
 import type { RecoveredTab } from "../domain/recovery"
@@ -96,6 +96,7 @@ import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import type { SnapConfig, SnapTarget, SnapTransform } from "../domain/snapConfig"
 import type { SnapRelation, TrackedPoint } from "../domain/snapFrame"
+import { gridMovedBy } from "../domain/snapGrid"
 import { type ArrangeOp, type FaceMeeting, mirroredPoint, type MirrorPlane } from "../domain/snapTools"
 import {
   annotationsOf,
@@ -134,7 +135,7 @@ import {
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import { SURFACE_PROPERTY, surfaceOf, type Surfaces } from "../domain/surface"
 import { isSamePoint, trackedIn, trackedOn } from "../domain/trackedPoints"
-import { sameVec, vecAdd, vecSub } from "../domain/ueMath"
+import { ORIGIN, sameVec, vecAdd, vecSub } from "../domain/ueMath"
 import { type MapValidation, validateMap } from "../domain/validateMap"
 import {
   clampSplit,
@@ -2443,9 +2444,26 @@ export const lockRefusalOf = (
     } can't change. Unlock them first.`
 }
 
-/** The snap settings in force: the tab's own, else what a new map starts on. */
-export const snapConfigOf = (s: Pick<TabState, "snap"> & Pick<EditorState, "settings">): SnapConfig =>
+/**
+ * The snap settings as the tab keeps them: its own, else what a new map starts on. The grid's origin counts from the
+ * document's origin (`documentOrigin`), so a definition's grid runs through its 0, 0, 0 marker.
+ */
+export const tabSnapOf = (s: Pick<TabState, "snap"> & Pick<EditorState, "settings">): SnapConfig =>
   s.snap ?? s.settings.snapping
+
+const snapInWorld = new WeakMap<SnapConfig, { readonly origin: Vec3; readonly config: SnapConfig }>()
+
+/** The snap settings in force, in the world: `tabSnapOf` off the document's origin. The same object until either changes. */
+export const snapConfigOf = (s: Pick<TabState, "snap" | "document"> & Pick<EditorState, "settings">): SnapConfig => {
+  const kept = tabSnapOf(s)
+  const origin = documentOrigin(s.document)
+  if (sameVec(origin, ORIGIN)) return kept
+  const cached = snapInWorld.get(kept)
+  if (cached !== undefined && sameVec(cached.origin, origin)) return cached.config
+  const config = gridMovedBy(kept, origin)
+  snapInWorld.set(kept, { origin, config })
+  return config
+}
 
 /** The sun as shown: the live preview, else the document. */
 export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? lightingOf(s.doc.map.worldSettings)

@@ -3,12 +3,14 @@ import { indexCatalog } from "../../domain/Catalog"
 import { editTransform } from "../../domain/editTransform"
 import { itemsBoxOf } from "../../domain/itemBounds"
 import { MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "../../domain/mirror"
+import { PREFAB_TAB_FRAME } from "../../domain/prefab"
 import { defaultSettings } from "../../domain/Settings"
 import { defaultSnapConfig, SNAP_PRESETS, withTargetMoved } from "../../domain/snapConfig"
+import { nearestGridPoint } from "../../domain/snapGrid"
 import { defaultSnapPrefs } from "../../domain/snapPrefs"
 import { annotationsOf, findGroup } from "../../domain/structure"
-import { rotatorToQuat } from "../../domain/ueMath"
-import { catalogWithEnds, endAlongX, grouped, loadPieces, lookDown } from "../../test/snapFixtures"
+import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
+import { catalogWithEnds, endAlongX, grouped, loadPieces, lookDown, openAsDefinition } from "../../test/snapFixtures"
 import { activePaneCamera } from "../paneCameras"
 import { pickerSkips } from "../snap/pickTarget"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
@@ -21,6 +23,7 @@ import {
   arrangePlanOf,
   distributeSelection,
   gridOriginToSelection,
+  gridOriginToWorld,
   gridYawToSelection,
   mirrorSelection,
   pickGridSize,
@@ -535,6 +538,39 @@ describe("grid origin", () => {
     const { grid } = snapConfigOf(useEditor.getState()).targets
     assert.strictEqual(grid.origin.x, 250)
     assert.closeTo(grid.yaw, 0, 1e-9)
+  })
+})
+
+describe("a definition's grid", () => {
+  const s = () => useEditor.getState()
+  beforeEach(() => {
+    load([0])
+    openAsDefinition()
+  })
+
+  it("counts from the prefab's origin, so its 0, 0, 0 marker is on the grid", () => {
+    const config = snapConfigOf(s())
+    assert.deepStrictEqual(config.targets.grid.origin, PREFAB_TAB_FRAME)
+    assert.deepStrictEqual(nearestGridPoint(config, PREFAB_TAB_FRAME), PREFAB_TAB_FRAME)
+    assert.strictEqual(snapConfigOf(s()), config, "the same object while nothing changes, as a selector needs")
+  })
+
+  it("keeps a picked origin where it was picked, and World puts it back on the prefab's origin", () => {
+    startGridOriginPick()
+    pickWith({ point: { x: 137, y: 5, z: 0 } })
+    assert.deepStrictEqual(snapConfigOf(s()).targets.grid.origin, { x: 137, y: 5, z: 0 })
+    gridOriginToWorld()
+    assert.deepStrictEqual(snapConfigOf(s()).targets.grid.origin, PREFAB_TAB_FRAME)
+    assert.isTrue(snapIsDefault(s()))
+  })
+
+  it("makes what new maps start on without the prefab's origin, and takes them back with it", () => {
+    updateSnap({ gridSize: 37 })
+    void saveSnapDefaults()
+    assert.deepStrictEqual(s().settings.snapping.targets.grid.origin, ORIGIN)
+    resetSnapToDefaults()
+    assert.deepStrictEqual(snapConfigOf(s()).targets.grid.origin, PREFAB_TAB_FRAME)
+    void saveSettings(defaultSettings)
   })
 })
 

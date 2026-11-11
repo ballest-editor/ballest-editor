@@ -58,7 +58,7 @@ Where the base can land. Each target is a row in the snap menu's Advanced with i
 The grid as today, with #84's additions:
 
 - **Steps** for position, rotation and scale, each chosen from a list or typed. Scale steps are a percentage (10%, 25%, 50%, 100%) and apply along the item's own axes, as the game scales.
-- **Origin**: the world's 0, 0, 0; a point picked in the viewport (any snap target can be the pick); or the selection, which puts the origin on the active pivot. "Grid origin to selection" is the move that makes a piece sitting at 137 cm the thing everything else lines up with.
+- **Origin**: the world's 0, 0, 0 (a definition's tab counts it from the prefab's own 0, 0, 0, so World puts it on the marker); a point picked in the viewport (any snap target can be the pick); or the selection, which puts the origin on the active pivot. "Grid origin to selection" is the move that makes a piece sitting at 137 cm the thing everything else lines up with.
 - **Rotation**: the grid can take the selection's yaw, so a track built at 30° to the world gets a grid along it. Only yaw: a tilted grid is a construction plane's job.
 - The ortho panes' grid and the perspective floor grid draw the configured grid, origin and rotation included, so what is seen is what snaps.
 
