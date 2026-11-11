@@ -44,7 +44,9 @@ runTurbo(
   ["run", "dev", ...mode.filters.map((filter) => `--filter=${filter}`), "--env-mode=loose", ...turboArgs],
   modeName,
   {
-    env: { PORT: String(port), HOST: mode.host, VITE_DEV_SERVER_URL: url },
-    ownGroup: true
+    // dev-electron sends SIGUSR2 here when the app quits on its own, so the whole session ends with it.
+    env: { PORT: String(port), HOST: mode.host, VITE_DEV_SERVER_URL: url, BALLEST_DEV_RUNNER_PID: String(process.pid) },
+    ownGroup: true,
+    quitOn: "SIGUSR2"
   }
 )

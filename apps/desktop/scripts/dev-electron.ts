@@ -82,10 +82,15 @@ const start = () => {
   child.once("exit", (code, signal) => {
     if (current !== child) return
     current = null
-    // Not restarted here: a main process that fails at startup would bring its error box back in a loop.
-    if (!shuttingDown) {
-      log(`Electron exited (${signal ?? code}); it starts again when main or preload changes`)
+    if (shuttingDown) return
+    // Quitting the app (its last window closed, Ctrl+Q) ends the session: Electron exits 0 on its own. A restart
+    // stops it from here, and the `current !== child` check above already left.
+    if (code === 0 && signal === null && stopRunner()) {
+      log("app quit, stopping pnpm dev:desktop")
+      return
     }
+    // Not restarted here: a main process that fails at startup would bring its error box back in a loop.
+    log(`Electron exited (${signal ?? code}); it starts again when main or preload changes`)
   })
 }
 
@@ -126,6 +131,22 @@ const shutdown = async (exitCode: number) => {
   await restartQueue
   await stop()
   process.exit(exitCode)
+}
+
+/**
+ * Asks the runner (tools/dev/src/dev-runner.ts) to end the whole `pnpm dev:desktop`: on SIGUSR2 it stops turbo's tasks
+ * and exits 0. False without a runner, or where the signal can't be sent (Windows has no SIGUSR2): then the session
+ * stays up as after a crash.
+ */
+const stopRunner = (): boolean => {
+  const runner = Number(process.env["BALLEST_DEV_RUNNER_PID"])
+  if (!Number.isInteger(runner) || runner <= 0) return false
+  try {
+    process.kill(runner, "SIGUSR2")
+    return true
+  } catch {
+    return false
+  }
 }
 
 for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143], ["SIGHUP", 129]] as const) {
