@@ -1,5 +1,5 @@
 import type { PrefabInfo, PrefabTier } from "@ballest/contracts"
-import { IconBoxMultiple, IconDots } from "@tabler/icons-react"
+import { IconBoxMultiple, IconDots, IconWorld } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@workspace/ui/components/context-menu"
 import {
@@ -35,7 +35,6 @@ import { StripButton } from "./dock/StripButton"
 import { EmptySection } from "./EmptySection"
 import { THUMBNAIL_TILE, useSeen } from "./PieceThumbnail"
 import { SectionTitle } from "./SectionTitle"
-import { SitePrefabsSection } from "./SitePrefabs"
 
 /** Everything in the definition, framed whole; a glyph until that has rendered, and for a file that won't read. */
 export function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
@@ -215,13 +214,14 @@ const DESKTOP_TIERS: ReadonlyArray<{ readonly tier: PrefabTier; readonly hint: s
 const BROWSER_TIERS: typeof DESKTOP_TIERS = [{ tier: "user", hint: "Kept in memory until the page closes." }]
 
 /**
- * The library of prefabs (docs/DESKTOP.md § Prefabs), one section per tier, then ballestrecords.com's on the desktop. A
+ * The library of prefabs (docs/DESKTOP.md § Prefabs), one section per tier, with Browse ballestrecords… on the desktop. A
  * browser has the one tier, in memory.
  */
 export function PrefabsPanel() {
   const prefabs = useEditor((s) => s.prefabs)
   const projects = useEditor((s) => s.capabilities.projects)
   const site = useEditor((s) => s.capabilities.site)
+  const openDialog = useEditor((s) => s.openDialog)
   const hasProject = useEditor((s) => s.project?.current != null)
   const [query, setQuery] = useState("")
   const terms = termsOf(query)
@@ -239,6 +239,16 @@ export function PrefabsPanel() {
           if (e.key === "Escape") setQuery("")
         }}
       />
+      {site && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="justify-start"
+          onClick={() => openDialog({ id: "siteGallery" })}
+        >
+          <IconWorld /> Browse ballestrecords…
+        </Button>
+      )}
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3">
           {(projects ? DESKTOP_TIERS : BROWSER_TIERS).map(({ hint, tier }) => (
@@ -262,7 +272,6 @@ export function PrefabsPanel() {
                 : <EmptySection line="No prefabs yet." />}
             </section>
           ))}
-          {site && <SitePrefabsSection query={query} />}
         </div>
       </ScrollArea>
     </aside>

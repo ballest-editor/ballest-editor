@@ -2,6 +2,7 @@ import { SITE_URL, type SitePrefab, type SitePrefabPage } from "@ballest/contrac
 import { IconDots, IconWorld } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@workspace/ui/components/context-menu"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@workspace/ui/components/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +10,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
+import { Input } from "@workspace/ui/components/input"
+import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, useEffect, useState } from "react"
@@ -26,14 +29,13 @@ import { NO_TAB_OPEN, noTabOpen, useEditor, useOpenPrefab } from "../editor/stor
 import { StripButton } from "./dock/StripButton"
 import { EmptySection } from "./EmptySection"
 import { THUMBNAIL_TILE, useSeen } from "./PieceThumbnail"
-import { SectionTitle } from "./SectionTitle"
 
-/** How long the filter rests before the site is searched. */
+/** How long the search rests before the site is asked. */
 const SEARCH_DELAY_MS = 300
 
 const pageOf = (slug: string) => `${SITE_URL}/prefab/${encodeURIComponent(slug)}`
 
-/** The site's own picture of the prefab, asked for once the row comes into view; a glyph until then and without one. */
+/** The site's own picture of the prefab, asked for once the card comes into view; a glyph until then and without one. */
 function SiteThumbnail({ slug }: { readonly slug: string }) {
   const { ref, seen } = useSeen()
   const [url, setUrl] = useState<string | null>(null)
@@ -48,27 +50,38 @@ function SiteThumbnail({ slug }: { readonly slug: string }) {
     }
   }, [seen, slug])
   return (
-    <span ref={ref} className="flex shrink-0">
+    <span ref={ref} className="flex w-full">
       {url === null
         ? (
-          <span className={cn("grid size-6 place-items-center rounded-control text-fg-secondary", THUMBNAIL_TILE)}>
-            <IconWorld className="size-4" />
+          <span
+            className={cn(
+              "grid aspect-square w-full place-items-center rounded-control text-fg-secondary",
+              THUMBNAIL_TILE
+            )}
+          >
+            <IconWorld className="size-8" />
           </span>
         )
-        : <img src={url} alt="" className={cn("size-6 rounded-control object-cover", THUMBNAIL_TILE)} />}
+        : <img src={url} alt="" className={cn("aspect-square w-full rounded-control object-cover", THUMBNAIL_TILE)} />}
     </span>
   )
 }
 
 /** A site prefab's menu, from its ⋮ and from a right-click. */
-function SitePrefabMenuItems({ prefab }: { readonly prefab: SitePrefab }) {
+function SitePrefabMenuItems({ onPlace, prefab }: { readonly onPlace: () => void; readonly prefab: SitePrefab }) {
   const hasProject = useEditor((s) => s.project?.current != null)
   const inDefinition = useOpenPrefab() !== null
   const noTab = useEditor(noTabOpen)
   return (
     <>
       <span title={noTab ? NO_TAB_OPEN : undefined}>
-        <DropdownMenuItem disabled={noTab} onClick={() => void placeSitePrefab(prefab)}>
+        <DropdownMenuItem
+          disabled={noTab}
+          onClick={() => {
+            onPlace()
+            void placeSitePrefab(prefab)
+          }}
+        >
           Place in {inDefinition ? "prefab" : "map"}
         </DropdownMenuItem>
       </span>
@@ -89,33 +102,30 @@ function SitePrefabMenuItems({ prefab }: { readonly prefab: SitePrefab }) {
   )
 }
 
-/** One site prefab: a click places it (taking it into a tier first), and its menu has the rest. */
-function SitePrefabRow({ prefab }: { readonly prefab: SitePrefab }) {
+/** One site prefab as a card: a click places it, closing the window, and its menu has the rest: ⋮, or a right-click. */
+function SitePrefabCard({ onPlace, prefab }: { readonly onPlace: () => void; readonly prefab: SitePrefab }) {
   const place = (e: MouseEvent<HTMLButtonElement>) => {
     // as in the tiers' rows, only a real click places
     if (e.detail === 0) return
+    onPlace()
     void placeSitePrefab(prefab)
-    e.currentTarget.blur()
   }
   return (
     <ContextMenu>
       <ContextMenuTrigger
         render={<li />}
-        className="group flex h-8 min-w-0 items-center gap-1 rounded-control pr-1 transition-colors focus-ring-row hover:bg-hover active:bg-pressed data-popup-open:bg-hover"
+        className="group relative flex min-w-0 flex-col rounded-control p-1 transition-colors hover:bg-hover active:bg-pressed data-popup-open:bg-hover"
       >
         <button
           type="button"
           title={prefab.description === "" ? prefab.name : prefab.description}
-          className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-control pl-2 text-left focus-visible:outline-none"
+          className="flex min-w-0 flex-col gap-1 rounded-control text-left focus-ring"
           onClick={place}
         >
           <SiteThumbnail slug={prefab.slug} />
-          <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate text-body">{prefab.name}</span>
-            <span className="truncate text-caption text-fg-tertiary">{prefab.uploader.name}</span>
-          </span>
-          <span className="shrink-0 text-caption text-fg-tertiary">
-            {prefab.pieces} item{prefab.pieces === 1 ? "" : "s"}
+          <span className="truncate text-body">{prefab.name}</span>
+          <span className="truncate text-caption text-fg-tertiary">
+            {prefab.uploader.name} · {prefab.pieces} item{prefab.pieces === 1 ? "" : "s"}
           </span>
         </button>
         <DropdownMenu>
@@ -124,19 +134,19 @@ function SitePrefabRow({ prefab }: { readonly prefab: SitePrefab }) {
               <StripButton
                 label="More actions"
                 aria-label={`More for ${prefab.name}`}
-                className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[popup-open]:opacity-100"
+                className="absolute top-2 right-2 bg-card/80 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[popup-open]:opacity-100"
               />
             }
           >
             <IconDots />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <SitePrefabMenuItems prefab={prefab} />
+            <SitePrefabMenuItems prefab={prefab} onPlace={onPlace} />
           </DropdownMenuContent>
         </DropdownMenu>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <SitePrefabMenuItems prefab={prefab} />
+        <SitePrefabMenuItems prefab={prefab} onPlace={onPlace} />
       </ContextMenuContent>
     </ContextMenu>
   )
@@ -189,13 +199,16 @@ interface Answer {
 }
 
 /**
- * ballestrecords.com's gallery (docs/DESKTOP.md § Prefabs), searched by the panel's filter, most favourited first, a page
- * at a time. Desktop only: the page's own requests stay on its own origin, so main asks the site.
+ * ballestrecords.com's gallery (docs/DESKTOP.md § Prefabs) in a window over the editor, opened by the Prefabs panel's
+ * Browse ballestrecords…: players' prefabs as cards, most favourited first, a page at a time, with a search of its own.
+ * Desktop only: the page's own requests stay on its own origin, so main asks the site.
  */
-export function SitePrefabsSection({ query }: { readonly query: string }) {
+export function SiteGalleryDialog({ onClose, open }: { readonly onClose: () => void; readonly open: boolean }) {
+  const [query, setQuery] = useState("")
   const [attempt, setAttempt] = useState(0)
   const [answer, setAnswer] = useState<Answer | null>(null)
   useEffect(() => {
+    if (!open) return
     let live = true
     const timer = setTimeout(() => {
       void listSitePrefabs(query, null).then((page) => {
@@ -208,7 +221,7 @@ export function SitePrefabsSection({ query }: { readonly query: string }) {
       live = false
       clearTimeout(timer)
     }
-  }, [query, attempt])
+  }, [open, query, attempt])
   const gallery: Gallery = answer?.query === query && answer.attempt === attempt
     ? answer.gallery
     : { _tag: "Loading" }
@@ -220,47 +233,59 @@ export function SitePrefabsSection({ query }: { readonly query: string }) {
     })
   }
   return (
-    <section className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2 px-2">
-        <Tooltip>
-          <TooltipTrigger render={<div className="w-fit" />}>
-            <SectionTitle>ballestrecords.com</SectionTitle>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            Players' prefabs. Placing one keeps a copy in the project, or in the game without one.
-          </TooltipContent>
-        </Tooltip>
-        <SiteAccountButton />
-      </div>
-      {gallery._tag === "Loading"
-        ? <EmptySection line="Loading…" />
-        : gallery._tag === "Unreachable"
-        ? (
-          <EmptySection line="Couldn't reach ballestrecords.com.">
-            <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>Try again</Button>
-          </EmptySection>
-        )
-        : gallery.page.prefabs.length === 0
-        ? <EmptySection line={query.trim() === "" ? "No prefabs yet." : "Nothing matches the filter."} />
-        : (
-          <>
-            <ul className="flex flex-col gap-0.5">
-              {gallery.page.prefabs.map((prefab) => <SitePrefabRow key={prefab.slug} prefab={prefab} />)}
-            </ul>
-            {gallery.page.next !== null && (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={gallery.more}
-                onClick={() => {
-                  if (gallery.page.next !== null) more(gallery.page, gallery.page.next)
-                }}
-              >
-                {gallery.more ? "Loading…" : `More (${gallery.page.total - gallery.page.prefabs.length})`}
-              </Button>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="flex h-[80vh] flex-col sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>ballestrecords</DialogTitle>
+          <DialogDescription>
+            Players' prefabs from ballestrecords.com. Placing one keeps a copy in the project, or in the game without
+            one.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center gap-3">
+          <Input
+            type="search"
+            aria-label="Search ballestrecords"
+            placeholder="Search players' prefabs…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <SiteAccountButton />
+        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          {gallery._tag === "Loading"
+            ? <EmptySection line="Loading…" />
+            : gallery._tag === "Unreachable"
+            ? (
+              <EmptySection line="Couldn't reach ballestrecords.com.">
+                <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>Try again</Button>
+              </EmptySection>
+            )
+            : gallery.page.prefabs.length === 0
+            ? <EmptySection line={query.trim() === "" ? "No prefabs yet." : "Nothing matches the search."} />
+            : (
+              <div className="flex flex-col gap-2">
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
+                  {gallery.page.prefabs.map((prefab) => (
+                    <SitePrefabCard key={prefab.slug} prefab={prefab} onPlace={onClose} />
+                  ))}
+                </ul>
+                {gallery.page.next !== null && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={gallery.more}
+                    onClick={() => {
+                      if (gallery.page.next !== null) more(gallery.page, gallery.page.next)
+                    }}
+                  >
+                    {gallery.more ? "Loading…" : `More (${gallery.page.total - gallery.page.prefabs.length})`}
+                  </Button>
+                )}
+              </div>
             )}
-          </>
-        )}
-    </section>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -51,6 +51,7 @@ import { RecoverUnsavedDialog } from "./RecoverUnsavedDialog"
 import { ReplaceInGameDialog } from "./ReplaceInGameDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SettingsDialog } from "./SettingsDialog"
+import { SiteGalleryDialog } from "./SitePrefabs"
 import { StatusBar } from "./StatusBar"
 import { SyncConflictDialog } from "./SyncConflictDialog"
 import { Toasts } from "./Toasts"
@@ -218,6 +219,7 @@ export function Editor() {
       <RenamePrefabDialog open={dialog === "renamePrefab"} onClose={close} />
       <DeletePrefabDialog open={dialog === "deletePrefab"} onClose={close} />
       <UploadPrefabDialog open={dialog === "uploadPrefab"} onClose={close} />
+      <SiteGalleryDialog open={dialog === "siteGallery"} onClose={close} />
       <KeybindCheatSheet />
       <Toasts />
     </TooltipProvider>
