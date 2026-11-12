@@ -1,8 +1,16 @@
-import type { PrefabTier } from "@ballest/contracts"
+import {
+  type PrefabRef,
+  type PrefabTier,
+  SITE_DESCRIPTION_LIMIT,
+  SITE_MAX_TAGS,
+  SITE_NAME_LIMIT,
+  SiteTag
+} from "@ballest/contracts"
 import { Button } from "@workspace/ui/components/button"
 import { DialogFooter } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { Textarea } from "@workspace/ui/components/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type ReactNode, useState } from "react"
@@ -19,8 +27,10 @@ import {
   renamePrefab,
   saveNewPrefab,
   saveSelectionAsPrefab,
+  signInToSite,
   suggestNewPrefabName,
-  suggestPrefabName
+  suggestPrefabName,
+  uploadPrefab
 } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { TitledDialog } from "./TitledDialog"
@@ -275,6 +285,119 @@ export function UnlinkInstancesDialog({ open, onClose }: DialogProps) {
         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
         <Button onClick={() => useEditor.getState().resolveUnlinkPrompt(true)}>Unlink</Button>
       </DialogFooter>
+    </TitledDialog>
+  )
+}
+
+/** The site's limits on a prefab's page, as its upload checks them. */
+const UPLOAD_RULES = { name: SITE_NAME_LIMIT, description: SITE_DESCRIPTION_LIMIT, tags: SITE_MAX_TAGS } as const
+
+function UploadForm({ onClose, prefab }: { readonly onClose: () => void; readonly prefab: PrefabRef }) {
+  const [name, setName] = useState(prefab.name)
+  const [description, setDescription] = useState("")
+  const [tags, setTags] = useState<ReadonlyArray<SiteTag>>([])
+  const [uploading, setUploading] = useState(false)
+  const trimmed = name.trim()
+  const valid = trimmed !== "" && trimmed.length <= UPLOAD_RULES.name &&
+    description.length <= UPLOAD_RULES.description
+  return (
+    <form
+      className="contents"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (!valid || uploading) return
+        setUploading(true)
+        void uploadPrefab(prefab, { name: trimmed, description: description.trim(), tags }).then((uploaded) => {
+          setUploading(false)
+          if (uploaded) onClose()
+        })
+      }}
+    >
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="upload-name">Name</Label>
+        <Input
+          id="upload-name"
+          autoFocus
+          value={name}
+          maxLength={UPLOAD_RULES.name}
+          aria-invalid={trimmed === ""}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="upload-description">Description</Label>
+        <Textarea
+          id="upload-description"
+          className="min-h-16"
+          value={description}
+          maxLength={UPLOAD_RULES.description}
+          placeholder="What it is, and where it fits (optional)"
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Tags, up to {UPLOAD_RULES.tags}</Label>
+        <ToggleGroup
+          multiple
+          className="flex-wrap"
+          value={[...tags]}
+          onValueChange={(picked) => {
+            const known = picked.filter((tag): tag is SiteTag => SiteTag.literals.some((literal) => literal === tag))
+            if (known.length <= UPLOAD_RULES.tags) setTags(known)
+          }}
+        >
+          {SiteTag.literals.map((tag) => (
+            <ToggleGroupItem
+              key={tag}
+              value={tag}
+              disabled={!tags.includes(tag) && tags.length >= UPLOAD_RULES.tags}
+            >
+              {tag}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="submit" disabled={!valid || uploading}>{uploading ? "Uploading…" : "Upload"}</Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+/**
+ * A prefab's Upload to ballestrecords.com… (docs/DESKTOP.md § Prefabs): the page it gets on the site, under the player's
+ * Steam name. Signed out, it signs in first.
+ */
+export function UploadPrefabDialog({ open, onClose }: DialogProps) {
+  const prefab = useEditor((s) => s.dialog?.id === "uploadPrefab" ? s.dialog.prefab : null)
+  const signedIn = useEditor((s) => s.siteAccount._tag === "SignedIn")
+  const [signingIn, setSigningIn] = useState(false)
+  return (
+    <TitledDialog
+      open={open}
+      onClose={onClose}
+      title="Upload to ballestrecords.com"
+      description={signedIn
+        ? "Anyone can find it there and place it in their maps. You can take it down from its page."
+        : "Uploading needs a sign-in with Steam, which opens in the browser."}
+    >
+      {prefab === null ? null : signedIn
+        ? <UploadForm key={`${prefab.tier}/${prefab.name}`} prefab={prefab} onClose={onClose} />
+        : (
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              disabled={signingIn}
+              onClick={() => {
+                setSigningIn(true)
+                void signInToSite().finally(() => setSigningIn(false))
+              }}
+            >
+              {signingIn ? "Waiting for the browser…" : "Sign in"}
+            </Button>
+          </DialogFooter>
+        )}
     </TitledDialog>
   )
 }

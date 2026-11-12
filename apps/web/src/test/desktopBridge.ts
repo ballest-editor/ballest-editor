@@ -23,10 +23,15 @@ import type {
   ProjectMap,
   ProjectTarget,
   SendFeedbackResult,
+  SiteAccount,
+  SitePrefab,
+  SiteSignInResult,
+  SiteUploadResult,
   UnloadKind,
   UnsavedChoice,
   UnsavedPrompt,
   UpdateState,
+  UploadPrefabPayload,
   UsageStatsState
 } from "@ballest/contracts"
 import {
@@ -140,7 +145,22 @@ export interface TestDisk {
     usage: UsageStatsState
     readonly errors: Array<{ readonly message: string; readonly stack: string }>
   }
+  /**
+   * ballestrecords.com: its prefabs (with their files), in gallery order, 2 to a page; who is signed in; what the next
+   * sign-ins and uploads answer (signed in as `TEST_STEAM_ID`, and uploaded as `uploaded-N`, once they run out).
+   */
+  readonly site: {
+    readonly prefabs: Array<SitePrefab & { readonly text: string; readonly thumb: string | null }>
+    account: SiteAccount
+    readonly signIns: Array<SiteSignInResult>
+    readonly uploads: Array<UploadPrefabPayload & { readonly text: string }>
+    readonly uploadAnswers: Array<SiteUploadResult>
+    readonly queries: Array<{ readonly query: string; readonly cursor: number | null }>
+  }
 }
+
+export const TEST_STEAM_ID = "76561198000000001"
+export const TEST_SITE_PAGE = 2
 
 export const TEST_MAPS_FOLDER = "/game/UserSavedMaps"
 export const TEST_PREFABS_FOLDER = "/game/SaveGames/Prefabs"
@@ -257,7 +277,8 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
     answers: [],
     usage: { enabled: true, noticeShown: false, collecting: true },
     errors: []
-  }
+  },
+  site: { prefabs: [], account: { _tag: "SignedOut" }, signIns: [], uploads: [], uploadAnswers: [], queries: [] }
 })
 
 const PublishedId = Schema.fromJsonString(Schema.Struct({
@@ -862,6 +883,44 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     reportError: (error) => {
       disk.feedback.errors.push(error)
       return Promise.resolve()
+    },
+    listSitePrefabs: ({ cursor, query }) => {
+      disk.site.queries.push({ query, cursor })
+      const q = query.trim().toLowerCase()
+      const found = disk.site.prefabs.filter((p) => p.name.toLowerCase().includes(q))
+      const from = cursor ?? 0
+      const next = from + TEST_SITE_PAGE < found.length ? from + TEST_SITE_PAGE : null
+      return Promise.resolve({
+        total: found.length,
+        next,
+        prefabs: found.slice(from, from + TEST_SITE_PAGE).map(({ text: _text, thumb: _thumb, ...prefab }) => prefab)
+      })
+    },
+    readSitePrefabThumb: ({ slug }) => Promise.resolve(disk.site.prefabs.find((p) => p.slug === slug)?.thumb ?? null),
+    readSitePrefab: ({ slug }) => {
+      const prefab = disk.site.prefabs.find((p) => p.slug === slug)
+      return prefab === undefined ? fail("ballestrecords.com answered 404.") : Promise.resolve({ text: prefab.text })
+    },
+    siteAccount: () => Promise.resolve(disk.site.account),
+    signInToSite: () => {
+      const result = disk.site.signIns.shift() ??
+        { _tag: "SignedIn", steamId: TEST_STEAM_ID, expiresAt: "2099-01-01T00:00:00.000Z" }
+      if (result._tag === "SignedIn") disk.site.account = result
+      return Promise.resolve(result)
+    },
+    signOutOfSite: () => {
+      disk.site.account = { _tag: "SignedOut" }
+      return Promise.resolve()
+    },
+    uploadPrefab: (payload) => {
+      if (disk.site.account._tag === "SignedOut") return Promise.resolve({ _tag: "SignedOut" })
+      const found = prefabText(payload.prefab.tier, payload.prefab.name)
+      if (found === undefined) return fail(`No prefab ${payload.prefab.name}`)
+      disk.site.uploads.push({ ...payload, text: found.text })
+      const slug = `uploaded-${disk.site.uploads.length}`
+      return Promise.resolve(
+        disk.site.uploadAnswers.shift() ?? { _tag: "Uploaded", slug, url: `https://ballestrecords.com/prefab/${slug}` }
+      )
     }
   }
   return bridge

@@ -22,6 +22,8 @@ import { Projects } from "../project/Projects"
 import { Recovery } from "../project/Recovery"
 import { type WindowEntry, WindowRegistry } from "../project/WindowRegistry"
 import { DesktopSettings, DesktopSettingsFile } from "../settings/DesktopSettings"
+import { SiteAccount, SiteSeal } from "../site/SiteAccount"
+import { SiteClient } from "../site/SiteClient"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
 import { CollectClient } from "../usage/CollectClient"
 import { UsageStats } from "../usage/UsageStats"
@@ -171,6 +173,31 @@ const collectLayer = Layer.succeed(
   )
 )
 
+/**
+ * ballestrecords.com, answering each request from `siteAnswers` by its path (a status and a JSON or text body; an
+ * `ArrayBuffer` for a thumbnail) and keeping what it was sent in `siteRequests`. A path with no answer queued is a 404.
+ */
+export const siteRequests: Array<{
+  readonly method: string
+  readonly url: string
+  readonly headers: Readonly<Record<string, string>>
+  readonly body: string | FormData | undefined
+}> = []
+export const siteAnswers = new Map<string, Array<{ readonly status: number; readonly body?: unknown }>>()
+const siteLayer = Layer.succeed(
+  SiteClient,
+  SiteClient.make("https://records.test", (url, init) => {
+    siteRequests.push({ method: init.method, url, headers: init.headers, body: init.body })
+    const answer = siteAnswers.get(new URL(url).pathname)?.shift() ?? { status: 404, body: { error: "not found" } }
+    const { body, status } = answer
+    if (body instanceof ArrayBuffer) {
+      return Promise.resolve(new Response(body, { status, headers: { "content-type": "image/webp" } }))
+    }
+    if (typeof body === "string") return Promise.resolve(new Response(body, { status }))
+    return Promise.resolve(body === undefined ? new Response(null, { status }) : Response.json(body, { status }))
+  })
+)
+
 /** Stands in for starting a copy of the app: records each project, and fails while `failing.now` is set. */
 const fakeLauncher = () => {
   const started: Array<string> = []
@@ -249,7 +276,11 @@ export const withHandlers = <A, E>(
       UsageStats,
       UsageStats.make(path.join(dir, "userData", "usage-queue.json"), { home: dir, user: "" })
     )
-    const services = Layer.merge(Layer.effect(GamePlay, GamePlay.make), usage).pipe(
+    const account = Layer.effect(SiteAccount, SiteAccount.make(path.join(dir, "userData", "site-account.json"))).pipe(
+      Layer.provideMerge(siteLayer),
+      Layer.provide(Layer.mergeAll(SiteSeal.plain, shellLayer))
+    )
+    const services = Layer.mergeAll(Layer.effect(GamePlay, GamePlay.make), usage, account).pipe(
       Layer.provideMerge(projects),
       Layer.provide(Layer.mergeAll(shellLayer, windowLayer)),
       Layer.provideMerge(collectLayer),

@@ -3,6 +3,15 @@ import type { InvokeChannels, PushChannels } from "./channels"
 import { ERROR_TEXT_LIMIT, FeedbackForm, FeedbackReceipt } from "./collect"
 import { CHARACTERS_PER_FILE } from "./limits"
 import { isMapFileName, isPrefabName, PREFAB_NAME_RULE } from "./names"
+import {
+  ListSitePrefabsPayload,
+  SiteAccount,
+  SitePrefabPage,
+  SiteSignInResult,
+  SiteSlugPayload,
+  SiteUploadFields,
+  SiteUploadResult
+} from "./site"
 
 /** Runtime versions of the desktop app, for bug reports and the about dialog. */
 export const DesktopVersions = Schema.Struct({
@@ -818,6 +827,16 @@ const ReportErrorPayload = Schema.Struct({
   stack: Schema.String.check(Schema.isMaxLength(REPORTED_ERROR_LIMIT))
 })
 
+/** A prefab's file as the site serves it, for the page to write into a tier (docs/DESKTOP.md § Prefabs). */
+const SitePrefabText = Schema.Struct({ text: FileText })
+
+/** A site thumbnail as a data URL (`img-src` takes `data:`); null when the site has none. */
+const SiteThumbnail = Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_000_000)))
+
+/** `uploadPrefab`: a prefab of a tier, with what the site shows beside it. Main reads the file itself. */
+export const UploadPrefabPayload = Schema.Struct({ prefab: PrefabRef, fields: SiteUploadFields })
+export type UploadPrefabPayload = typeof UploadPrefabPayload.Type
+
 /** What a bridge method takes and gives: its payload's schema and its result's, neither needing services. */
 interface DesktopMethodSchemas {
   readonly payload: Schema.ConstraintCodec<unknown>
@@ -1008,7 +1027,24 @@ export const DesktopMethods = {
    */
   setUsageStats: { payload: SetUsageStatsPayload, result: UsageStatsState },
   /** Keeps an unhandled error from the page for the next usage batch; nothing while usage statistics are off. */
-  reportError: { payload: ReportErrorPayload, result: Schema.Void }
+  reportError: { payload: ReportErrorPayload, result: Schema.Void },
+  /** One page of ballestrecords.com's prefabs, from main, which anyone may read. */
+  listSitePrefabs: { payload: ListSitePrefabsPayload, result: SitePrefabPage },
+  /** A site prefab's thumbnail. */
+  readSitePrefabThumb: { payload: SiteSlugPayload, result: SiteThumbnail },
+  /** A site prefab's file, for the page to decode and write into a tier; main writes nothing. */
+  readSitePrefab: { payload: SiteSlugPayload, result: SitePrefabText },
+  /** Whether the player is signed in to the site on this machine. */
+  siteAccount: { payload: noPayload, result: SiteAccount },
+  /**
+   * Signs in to the site through the player's browser (the site's ADR 0017): main listens on the loopback address,
+   * opens the site's sign-in, trades the code that comes back for a token and keeps it, sealed, in `<userData>`.
+   */
+  signInToSite: { payload: noPayload, result: SiteSignInResult },
+  /** Forgets the token. */
+  signOutOfSite: { payload: noPayload, result: Schema.Void },
+  /** Uploads a prefab of a tier to the site under the player's sign-in. */
+  uploadPrefab: { payload: UploadPrefabPayload, result: SiteUploadResult }
 } as const satisfies { readonly [K in keyof typeof InvokeChannels]: DesktopMethodSchemas }
 
 /** What main pushes to the page (`webContents.send` on `PushChannels[name]`), by the bridge member that listens. */

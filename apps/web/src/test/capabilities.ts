@@ -7,7 +7,8 @@ export const DESKTOP: PlatformCapabilities = {
   launchGame: true,
   play: true,
   updates: true,
-  feedback: true
+  feedback: true,
+  site: true
 }
 
 export const BROWSER: PlatformCapabilities = {
@@ -16,5 +17,6 @@ export const BROWSER: PlatformCapabilities = {
   launchGame: false,
   play: false,
   updates: false,
-  feedback: false
+  feedback: false,
+  site: false
 }

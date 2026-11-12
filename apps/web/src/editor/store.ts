@@ -9,6 +9,7 @@ import {
   NOTIFICATION_LIMIT,
   type PrefabInfos,
   type PrefabRef,
+  type SiteAccount,
   type UpdateState
 } from "@ballest/contracts"
 import { type Effect, Option } from "effect"
@@ -487,6 +488,8 @@ export type DialogState =
   | { readonly id: "unlinkInstances"; readonly names: ReadonlyArray<string> }
   | { readonly id: "namePrefab"; readonly afterSave?: Effect.Effect<void, unknown> }
   | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
+  /** Upload to ballestrecords.com… on a prefab of either tier (desktop). */
+  | { readonly id: "uploadPrefab"; readonly prefab: PrefabRef }
   | { readonly id: "recoverUnsaved"; readonly tabs: ReadonlyArray<RecoveredTab> }
 export type Dialog = DialogState["id"]
 
@@ -629,6 +632,8 @@ export interface EditorState extends TabState {
   readonly updateChecked: boolean
   /** Usage statistics' switch and whether this build sends them, once main has said; null in a browser. */
   readonly usageStats: UsageStatsState | null
+  /** Whether the player is signed in to ballestrecords.com here, as main last said (docs/DESKTOP.md § Prefabs). */
+  readonly siteAccount: SiteAccount
   /** Every notification, newest first, at most `NOTIFICATION_LIMIT`. */
   readonly notifications: ReadonlyArray<NotificationRecord>
   /** Immediate feedback waiting for `showToasts`, newest first, at most `NOTIFICATION_LIMIT`. Never kept. */
@@ -785,6 +790,7 @@ export interface EditorState extends TabState {
   readonly setUpdate: (update: UpdateState) => void
   readonly setUpdateChecked: (updateChecked: boolean) => void
   readonly setUsageStats: (usageStats: UsageStatsState) => void
+  readonly setSiteAccount: (siteAccount: SiteAccount) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform, options?: TransformOptions) => void
   /**
    * Adds `items` as one new group called `name`, selected, as one undo step: a prefab placed, as an instance when `link`
@@ -1422,7 +1428,8 @@ export const useEditor = create<EditorState>()((set, get) => {
       launchGame: false,
       play: false,
       updates: false,
-      feedback: false
+      feedback: false,
+      site: false
     },
     runtimeVersions: null,
     gamePaths: null,
@@ -1432,6 +1439,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     gamePathProblem: null,
     update: null,
     usageStats: null,
+    siteAccount: { _tag: "SignedOut" },
     updateChecked: false,
     notifications: [],
     toasts: [],
@@ -1607,6 +1615,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setUpdate: (update) => set({ update }),
     setUpdateChecked: (updateChecked) => set({ updateChecked }),
     setUsageStats: (usageStats) => set({ usageStats }),
+    setSiteAccount: (siteAccount) => set({ siteAccount }),
 
     placePiece: (piece, transform, options) => {
       const item = validateItem(itemFromPiece(piece, transform))

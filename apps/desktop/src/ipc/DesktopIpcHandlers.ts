@@ -6,6 +6,7 @@ import { notificationHandlers } from "./methods/notifications"
 import { pingHandlers } from "./methods/ping"
 import { projectHandlers } from "./methods/project"
 import { shellHandlers } from "./methods/shell"
+import { siteHandlers } from "./methods/site"
 import { updateHandlers } from "./methods/updates"
 import { usageHandlers } from "./methods/usage"
 import { windowHandlers } from "./methods/window"
@@ -19,7 +20,8 @@ const handlers = {
   ...gameHandlers,
   ...notificationHandlers,
   ...updateHandlers,
-  ...usageHandlers
+  ...usageHandlers,
+  ...siteHandlers
 } satisfies DesktopIpcHandlers
 
 /** The services the handlers need, together. */

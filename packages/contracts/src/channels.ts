@@ -75,7 +75,14 @@ export const InvokeChannels = {
   sendFeedback: "ballest:feedback:send",
   usageStats: "ballest:usage:get",
   setUsageStats: "ballest:usage:set",
-  reportError: "ballest:usage:reportError"
+  reportError: "ballest:usage:reportError",
+  listSitePrefabs: "ballest:site:listPrefabs",
+  readSitePrefabThumb: "ballest:site:readPrefabThumb",
+  readSitePrefab: "ballest:site:readPrefab",
+  siteAccount: "ballest:site:account",
+  signInToSite: "ballest:site:signIn",
+  signOutOfSite: "ballest:site:signOut",
+  uploadPrefab: "ballest:site:uploadPrefab"
 } as const
 
 /** Main → renderer (`webContents.send`): one channel per subscription in `DesktopPushes`. */

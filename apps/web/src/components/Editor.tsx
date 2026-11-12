@@ -41,7 +41,8 @@ import {
   NamePrefabDialog,
   RenamePrefabDialog,
   SavePrefabDialog,
-  UnlinkInstancesDialog
+  UnlinkInstancesDialog,
+  UploadPrefabDialog
 } from "./PrefabDialogs"
 import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
@@ -216,6 +217,7 @@ export function Editor() {
       <UnlinkInstancesDialog open={dialog === "unlinkInstances"} onClose={close} />
       <RenamePrefabDialog open={dialog === "renamePrefab"} onClose={close} />
       <DeletePrefabDialog open={dialog === "deletePrefab"} onClose={close} />
+      <UploadPrefabDialog open={dialog === "uploadPrefab"} onClose={close} />
       <KeybindCheatSheet />
       <Toasts />
     </TooltipProvider>

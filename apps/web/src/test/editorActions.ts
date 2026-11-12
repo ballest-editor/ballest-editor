@@ -1,16 +1,22 @@
 /** What the editor actions' tests share: the layers over a test disk, the store, samples and edits. */
 import { Effect, Layer } from "effect"
+import type { CatalogIndex } from "../domain/Catalog"
+import type { Vec3 } from "../domain/coords"
 import { mapLabelOf } from "../domain/factory"
 import { lightingOf } from "../domain/sunlight"
 import { freshMapEffect, newMapEffect } from "../editor/actions/maps"
+import { spreadPlacement } from "../editor/actions/placement"
+import { checkPrefabs } from "../editor/actions/prefabs"
 import { saveMapAsEffect } from "../editor/actions/save"
 import { hasProject, refreshProject } from "../editor/actions/shared"
+import { sceneRegistry } from "../editor/sceneRegistry"
 import { type DialogState, isBlankTab, useEditor } from "../editor/store"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
 import { Platform } from "../services/Platform"
 import { makeTestDisk, projectFile, testBridge, type TestDisk } from "../test/desktopBridge"
+import { VIEW_DOWN } from "../test/placementView"
 import { listSamples, readSample } from "../test/samples"
 
 export const s = () => useEditor.getState()
@@ -113,3 +119,18 @@ export const untilTrue = (done: () => boolean) =>
   Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 1))).pipe(
     Effect.repeat({ until: done, times: 100 })
   )
+
+/**
+ * A saved map called Big Loop and the catalog, with no notifications, for the prefabs' tests: placements land at `aim`,
+ * and `setUp` puts the prefabs on the disk before the tiers are looked at.
+ */
+export const startPrefabMap = (catalogIndex: CatalogIndex, aim: Vec3, setUp: () => void) =>
+  Effect.gen(function*() {
+    yield* reset
+    useEditor.setState({ notifications: [], toasts: [], prefabs: [], catalogIndex })
+    sceneRegistry.placementPoint = (width, height) => spreadPlacement(aim, width, VIEW_DOWN, height)
+    setUp()
+    yield* createNewMap("Big Loop", "Isaac")
+    yield* checkPrefabs
+    return s().tabId
+  })
