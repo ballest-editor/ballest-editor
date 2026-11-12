@@ -43,6 +43,8 @@ export const mountSitePreview = async (
   renderer.setClearColor(0x000000, 0)
   const scene = litScene()
   scene.add(group)
+  // the box reads each mesh's world matrix, which nothing has worked out yet
+  group.updateMatrixWorld(true)
   const box = new THREE.Box3().setFromObject(group)
   const centre = tupleOf(box.getCenter(new THREE.Vector3()))
   const radius = box.getSize(new THREE.Vector3()).length() / 2 || 1
