@@ -146,7 +146,11 @@ describe("ballestrecords.com over IPC", () => {
         })
         const upload = {
           prefab: { tier: "project", name: "loop" },
-          fields: { name: "My loop", description: "", tags: ["Loop"] }
+          fields: { name: "My loop", description: "", tags: ["Loop"] },
+          view: {
+            angle: { from: [0.6, 0.4, 0.7], zoom: 1.5, pan: [0, 0.1, 0] },
+            picture: "data:image/png;base64,iVBORw0KGgo="
+          }
         }
         const uploading = fake.invokeAs(SiteUploadResult, InvokeChannels.uploadPrefab, upload)
         assert.deepStrictEqual(yield* uploading, { _tag: "SignedOut" })
@@ -173,6 +177,13 @@ describe("ballestrecords.com over IPC", () => {
         if (form instanceof FormData) {
           assert.strictEqual(form.get("name"), "My loop")
           assert.deepStrictEqual(form.getAll("tags"), ["Loop"])
+          const angle = form.get("angle")
+          assert.deepStrictEqual(typeof angle === "string" ? JSON.parse(angle) : null, upload.view.angle)
+          const picture = form.get("picture")
+          assert.deepStrictEqual(
+            picture instanceof Blob ? [...new Uint8Array(yield* Effect.promise(() => picture.arrayBuffer()))] : null,
+            [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+          )
           const file = form.get("file")
           assert.strictEqual(file instanceof Blob ? yield* Effect.promise(() => file.text()) : null, prefabText)
         }

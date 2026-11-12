@@ -46,13 +46,13 @@ export const siteHandlers = {
     yield* (yield* SiteAccount).signOut
   }),
   /** Reads the prefab's file itself, so only a tier's own prefab goes up, and a refused token is forgotten. */
-  uploadPrefab: Effect.fn("ipc.uploadPrefab")(function*({ fields, prefab }) {
+  uploadPrefab: Effect.fn("ipc.uploadPrefab")(function*({ fields, prefab, view }) {
     const account = yield* SiteAccount
     const token = yield* account.token
     if (Option.isNone(token)) return { _tag: "SignedOut" } satisfies SiteUploadResult
     const { text } = yield* (yield* Prefabs).read(prefab)
     const site = yield* SiteClient
-    return yield* site.upload(token.value, fields, text).pipe(
+    return yield* site.upload(token.value, fields, text, view).pipe(
       Effect.map((slug): SiteUploadResult => ({
         _tag: "Uploaded",
         slug,

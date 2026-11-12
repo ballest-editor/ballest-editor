@@ -80,6 +80,35 @@ export const SiteUploadFields = Schema.Struct({
 })
 export type SiteUploadFields = typeof SiteUploadFields.Type
 
+/** How far an angle's zoom and pan may go, as the site checks them (its `checkAngle`). */
+export const SITE_ZOOM_RANGE = [0.05, 20] as const
+export const SITE_PAN_MAX = 10
+
+const Vec3 = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])
+
+/**
+ * The view the uploader picked for the prefab's picture on the site (its `PrefabAngle`): the card, the page and where its
+ * viewer starts. It is relative to the prefab's bounds, so it frames the same at any size. `from`: from where the camera
+ * looks to the camera, in the renderer's frame (y up). `zoom`: the camera's distance over the one that just fits the
+ * whole prefab. `pan`: where it looks, from the prefab's centre, in radii.
+ */
+export const SiteAngle = Schema.Struct({
+  from: Vec3,
+  zoom: Schema.Finite.check(
+    Schema.isGreaterThanOrEqualTo(SITE_ZOOM_RANGE[0]),
+    Schema.isLessThanOrEqualTo(SITE_ZOOM_RANGE[1])
+  ),
+  pan: Vec3
+})
+export type SiteAngle = typeof SiteAngle.Type
+
+/** An upload's picked view, and a PNG of it (a data URL) for the site's moderators; null when none was picked. */
+export const SiteUploadView = Schema.NullOr(Schema.Struct({
+  angle: SiteAngle,
+  picture: Schema.NullOr(Schema.String.check(Schema.isMaxLength(1_400_000)))
+}))
+export type SiteUploadView = typeof SiteUploadView.Type
+
 /**
  * `uploadPrefab`'s result. `Uploaded`: its page. `SignedOut`: no sign-in, or one the site no longer takes (it is
  * forgotten). `Limited`: the hourly uploads are spent until `nextAt`. `Refused`: the site's reasons, as it words them.

@@ -3,7 +3,14 @@
  * into a tier to place or keep, and the sign-in that lets a tier's prefab go up to the site. Main does the requests and
  * keeps the token; the page only sees what they answered.
  */
-import type { PrefabRef, PrefabTier, SitePrefab, SitePrefabPage, SiteUploadFields } from "@ballest/contracts"
+import type {
+  PrefabRef,
+  PrefabTier,
+  SitePrefab,
+  SitePrefabPage,
+  SiteUploadFields,
+  SiteUploadView
+} from "@ballest/contracts"
 import { Effect } from "effect"
 import { freePrefabName } from "../../domain/prefab"
 import { Platform } from "../../services/Platform"
@@ -107,12 +114,12 @@ export const signOutOfSite = () => run(signOutOfSiteEffect)
 export const startUploadPrefab = (prefab: PrefabRef) => useEditor.getState().openDialog({ id: "uploadPrefab", prefab })
 
 /**
- * The upload dialog's Upload: the tier's prefab goes up under `fields`. True once it is on the site (its toast links to
+ * The upload dialog's Upload: the tier's prefab goes up under `fields`, with the view picked for its picture. True once it is on the site (its toast links to
  * its page); false with a notification saying why not, and a refused token signs the player out.
  */
-export const uploadPrefabEffect = (prefab: PrefabRef, fields: SiteUploadFields) =>
+export const uploadPrefabEffect = (prefab: PrefabRef, fields: SiteUploadFields, view: SiteUploadView = null) =>
   Effect.gen(function*() {
-    const result = yield* (yield* Platform).uploadPrefab({ prefab, fields })
+    const result = yield* (yield* Platform).uploadPrefab({ prefab, fields, view })
     const { notify, setSiteAccount } = useEditor.getState()
     switch (result._tag) {
       case "Uploaded":
@@ -145,5 +152,5 @@ export const uploadPrefabEffect = (prefab: PrefabRef, fields: SiteUploadFields) 
     }
   })
 
-export const uploadPrefab = async (prefab: PrefabRef, fields: SiteUploadFields) =>
-  await run(uploadPrefabEffect(prefab, fields)) ?? false
+export const uploadPrefab = async (prefab: PrefabRef, fields: SiteUploadFields, view: SiteUploadView) =>
+  await run(uploadPrefabEffect(prefab, fields, view)) ?? false

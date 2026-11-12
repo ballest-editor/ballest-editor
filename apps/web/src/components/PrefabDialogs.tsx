@@ -13,7 +13,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useCallback, useRef, useState } from "react"
 import {
   isPrefabName,
   isSamePrefab,
@@ -32,7 +32,9 @@ import {
   suggestPrefabName,
   uploadPrefab
 } from "../editor/actions"
+import type { SitePreview } from "../editor/sitePreview"
 import { useEditor } from "../editor/store"
+import { SiteAnglePicker } from "./SiteAnglePicker"
 import { TitledDialog } from "./TitledDialog"
 import { useOnOpen } from "./useOnOpen"
 
@@ -297,6 +299,10 @@ function UploadForm({ onClose, prefab }: { readonly onClose: () => void; readonl
   const [description, setDescription] = useState("")
   const [tags, setTags] = useState<ReadonlyArray<SiteTag>>([])
   const [uploading, setUploading] = useState(false)
+  const preview = useRef<SitePreview | null>(null)
+  const onPreview = useCallback((ready: SitePreview | null) => {
+    preview.current = ready
+  }, [])
   const trimmed = name.trim()
   const valid = trimmed !== "" && trimmed.length <= UPLOAD_RULES.name &&
     description.length <= UPLOAD_RULES.description
@@ -307,12 +313,14 @@ function UploadForm({ onClose, prefab }: { readonly onClose: () => void; readonl
         e.preventDefault()
         if (!valid || uploading) return
         setUploading(true)
-        void uploadPrefab(prefab, { name: trimmed, description: description.trim(), tags }).then((uploaded) => {
+        const fields = { name: trimmed, description: description.trim(), tags }
+        void uploadPrefab(prefab, fields, preview.current?.take() ?? null).then((uploaded) => {
           setUploading(false)
           if (uploaded) onClose()
         })
       }}
     >
+      <SiteAnglePicker prefab={prefab} onReady={onPreview} />
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="upload-name">Name</Label>
         <Input

@@ -10,7 +10,8 @@ import {
   SiteSignInResult,
   SiteSlugPayload,
   SiteUploadFields,
-  SiteUploadResult
+  SiteUploadResult,
+  SiteUploadView
 } from "./site"
 
 /** Runtime versions of the desktop app, for bug reports and the about dialog. */
@@ -834,7 +835,7 @@ const SitePrefabText = Schema.Struct({ text: FileText })
 const SiteThumbnail = Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_000_000)))
 
 /** `uploadPrefab`: a prefab of a tier, with what the site shows beside it. Main reads the file itself. */
-export const UploadPrefabPayload = Schema.Struct({ prefab: PrefabRef, fields: SiteUploadFields })
+export const UploadPrefabPayload = Schema.Struct({ prefab: PrefabRef, fields: SiteUploadFields, view: SiteUploadView })
 export type UploadPrefabPayload = typeof UploadPrefabPayload.Type
 
 /** What a bridge method takes and gives: its payload's schema and its result's, neither needing services. */

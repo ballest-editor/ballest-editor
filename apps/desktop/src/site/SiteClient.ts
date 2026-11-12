@@ -3,7 +3,8 @@ import {
   SITE_URL,
   type SitePrefabPage,
   SitePrefabPage as SitePrefabPageSchema,
-  type SiteUploadFields
+  type SiteUploadFields,
+  type SiteUploadView
 } from "@ballest/contracts"
 import { Config, Context, Effect, Layer, Option, Schema } from "effect"
 
@@ -39,6 +40,12 @@ const PAGE = 50
 
 const jsonOf = (response: Response): Promise<unknown> => response.json().catch(() => null)
 
+/** A PNG data URL's bytes; null for anything else. */
+const pngOf = (dataUrl: string): Uint8Array<ArrayBuffer> | null => {
+  const prefix = "data:image/png;base64,"
+  return dataUrl.startsWith(prefix) ? new Uint8Array(Buffer.from(dataUrl.slice(prefix.length), "base64")) : null
+}
+
 /**
  * ballestrecords.com's Prefab API (the site's ADR 0016 and 0017), reached from main so the page's `connect-src` stays
  * as it is. Reads need nothing; an upload carries the app token `SiteAccount` keeps, which never reaches the page.
@@ -54,8 +61,13 @@ export class SiteClient extends Context.Service<SiteClient, {
   readonly file: (slug: string) => Effect.Effect<string, SiteError>
   /** Trades a sign-in's code and the secret behind its challenge for an app token. */
   readonly trade: (code: string, verifier: string) => Effect.Effect<SiteToken, SiteError>
-  /** Uploads a prefab's text under `token`; its slug. */
-  readonly upload: (token: string, fields: SiteUploadFields, text: string) => Effect.Effect<string, SiteError>
+  /** Uploads a prefab's text under `token`, with the view picked for its picture; its slug. */
+  readonly upload: (
+    token: string,
+    fields: SiteUploadFields,
+    text: string,
+    view: SiteUploadView
+  ) => Effect.Effect<string, SiteError>
 }>()("ballest/desktop/site/SiteClient") {
   static readonly make = (base: string, fetch: SiteFetch) => {
     const request = <A>(
@@ -114,12 +126,17 @@ export class SiteClient extends Context.Service<SiteClient, {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ code, code_verifier: verifier })
         }, jsonOf).pipe(Effect.flatMap(decoded("/api/auth/app/token", SiteToken))),
-      upload: (token, { description, name, tags }, text) => {
+      upload: (token, { description, name, tags }, text, view) => {
         const form = new FormData()
         form.set("name", name)
         form.set("description", description)
         for (const tag of tags) form.append("tags", tag)
         form.set("file", new Blob([text], { type: "application/json" }), "prefab.json")
+        if (view !== null) {
+          form.set("angle", JSON.stringify(view.angle))
+          const png = view.picture === null ? null : pngOf(view.picture)
+          if (png !== null) form.set("picture", new Blob([png], { type: "image/png" }), "picture.png")
+        }
         return request(
           "/api/prefabs",
           { method: "POST", headers: { authorization: `Bearer ${token}` }, body: form },
