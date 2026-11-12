@@ -214,7 +214,7 @@ const DESKTOP_TIERS: ReadonlyArray<{ readonly tier: PrefabTier; readonly hint: s
 const BROWSER_TIERS: typeof DESKTOP_TIERS = [{ tier: "user", hint: "Kept in memory until the page closes." }]
 
 /**
- * The library of prefabs (docs/DESKTOP.md § Prefabs), one section per tier, with Browse ballestrecords… on the desktop. A
+ * The library of prefabs (docs/DESKTOP.md § Prefabs), one section per tier, with Browse ballestrecords beside the filter on the desktop. A
  * browser has the one tier, in memory.
  */
 export function PrefabsPanel() {
@@ -229,26 +229,30 @@ export function PrefabsPanel() {
     prefabs.filter((p) => p.tier === tier && terms.every((term) => p.name.toLowerCase().includes(term)))
   return (
     <aside className="flex h-full min-w-0 flex-col gap-2 bg-card p-2">
-      <Input
-        type="search"
-        aria-label="Filter the prefabs"
-        placeholder="Filter prefabs…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setQuery("")
-        }}
-      />
-      {site && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="justify-start"
-          onClick={() => openDialog({ id: "siteGallery" })}
-        >
-          <IconWorld /> Browse ballestrecords…
-        </Button>
-      )}
+      <div className="flex items-center gap-1">
+        <Input
+          type="search"
+          aria-label="Filter the prefabs"
+          placeholder="Filter prefabs…"
+          className="min-w-0 flex-1"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setQuery("")
+          }}
+        />
+        {site && (
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button variant="outline" size="icon-sm" aria-label="Browse ballestrecords" />}
+              onClick={() => openDialog({ id: "siteGallery" })}
+            >
+              <IconWorld />
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Browse ballestrecords</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3">
           {(projects ? DESKTOP_TIERS : BROWSER_TIERS).map(({ hint, tier }) => (

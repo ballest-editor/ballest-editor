@@ -490,7 +490,7 @@ export type DialogState =
   | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
   /** Upload to ballestrecords.com… on a prefab of either tier (desktop). */
   | { readonly id: "uploadPrefab"; readonly prefab: PrefabRef }
-  /** The Prefabs panel's Browse ballestrecords… (desktop). */
+  /** The Prefabs panel's Browse ballestrecords (desktop). */
   | { readonly id: "siteGallery" }
   | { readonly id: "recoverUnsaved"; readonly tabs: ReadonlyArray<RecoveredTab> }
 export type Dialog = DialogState["id"]

@@ -200,7 +200,7 @@ interface Answer {
 
 /**
  * ballestrecords.com's gallery (docs/DESKTOP.md § Prefabs) in a window over the editor, opened by the Prefabs panel's
- * Browse ballestrecords…: players' prefabs as cards, most favourited first, a page at a time, with a search of its own.
+ * Browse ballestrecords: players' prefabs as cards, most favourited first, a page at a time, with a search of its own.
  * Desktop only: the page's own requests stay on its own origin, so main asks the site.
  */
 export function SiteGalleryDialog({ onClose, open }: { readonly onClose: () => void; readonly open: boolean }) {
