@@ -48,18 +48,30 @@ export const readSitePrefabThumb = async (slug: string): Promise<string | null> 
 export const siteTierOf = (s: Pick<EditorState, "capabilities" | "project">): PrefabTier =>
   s.capabilities.projects && inNamedProject(s) ? "project" : "user"
 
+/** `own`, then `own_2`, `own_3`... of `names`: where an earlier take of a site prefab named `own` may be. */
+const takenAs = (own: string, names: ReadonlySet<string>): ReadonlyArray<string> => {
+  const numberOf = (name: string) =>
+    name === own ? 1 : name.startsWith(`${own}_`) && /^\d+$/.test(name.slice(own.length + 1))
+      ? Number(name.slice(own.length + 1))
+      : null
+  return [...names].flatMap((name) => {
+    const n = numberOf(name)
+    return n === null ? [] : [{ name, n }]
+  }).sort((a, b) => a.n - b.n).map(({ name }) => name)
+}
+
 /**
  * The site prefab's file written into `tier`, under its name made a prefab name, numbered clear of the tier's. When the
- * tier already has it under that name, byte for byte, that one is used: placing it twice doesn't make two copies.
+ * tier already has it, byte for byte, under that name or one numbered from it, that one is used: placing it twice
+ * doesn't make two copies, even when the plain name went to another prefab.
  */
 export const takeSitePrefabEffect = Effect.fn("takeSitePrefabEffect")(function*(prefab: SitePrefab, tier: PrefabTier) {
   const platform = yield* Platform
   const text = yield* platform.readSitePrefab(prefab.slug)
   const names = new Set(useEditor.getState().prefabs.filter((p) => p.tier === tier).map((p) => p.name))
-  const own = freePrefabName(prefab.name, new Set())
-  if (names.has(own)) {
-    const there = yield* platform.readPrefab({ tier, name: own }).pipe(Effect.option)
-    if (there._tag === "Some" && there.value.text === text) return { tier, name: own } satisfies PrefabRef
+  for (const name of takenAs(freePrefabName(prefab.name, new Set()), names)) {
+    const there = yield* platform.readPrefab({ tier, name }).pipe(Effect.option)
+    if (there._tag === "Some" && there.value.text === text) return { tier, name } satisfies PrefabRef
   }
   const ref: PrefabRef = { tier, name: freePrefabName(prefab.name, names) }
   yield* platform.writePrefab({ ...ref, text, replace: false })
@@ -92,7 +104,12 @@ export const signInToSiteEffect = Effect.gen(function*() {
   switch (result._tag) {
     case "SignedIn":
       setSiteAccount(result)
-      notify("info", "Signed in to ballestrecords.com", { kind: "siteSignedIn" })
+      notify("info", "Signed in to ballestrecords.com", {
+        kind: "siteSignedIn",
+        ...(result.remembered
+          ? {}
+          : { body: "This system has no keystore to keep the sign-in safe, so it lasts until Ballest Editor closes." })
+      })
       return
     case "Cancelled":
       return

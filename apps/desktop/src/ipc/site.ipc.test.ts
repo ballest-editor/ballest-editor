@@ -1,8 +1,8 @@
 import { InvokeChannels, SiteAccount, SitePrefabPage, SiteSignInResult, SiteUploadResult } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Fiber, Schema } from "effect"
+import { Effect, Fiber, FileSystem, Schema } from "effect"
 import { createHash } from "node:crypto"
-import { opened, siteAnswers, siteRequests, withHandlers } from "./handlersHarness"
+import { keystore, opened, siteAnswers, siteRequests, withHandlers } from "./handlersHarness"
 
 const prefab = {
   slug: "loop-de-loop",
@@ -106,7 +106,7 @@ describe("ballestrecords.com over IPC", () => {
         assert.strictEqual(asked.searchParams.get("code_challenge_method"), "S256")
         assert.match(asked.searchParams.get("redirect_uri") ?? "", /^http:\/\/127\.0\.0\.1:\d+\/callback$/)
         assert.include(page, "Signed in")
-        assert.deepInclude(result, { _tag: "SignedIn", steamId: token.id })
+        assert.deepInclude(result, { _tag: "SignedIn", steamId: token.id, remembered: true })
 
         const body = sent("/api/auth/app/token").at(-1)?.body
         const trade = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({
@@ -133,6 +133,42 @@ describe("ballestrecords.com over IPC", () => {
         assert.include(page, "cancelled")
         assert.deepStrictEqual(yield* fake.invokeAs(SiteAccount, InvokeChannels.siteAccount), { _tag: "SignedOut" })
       })
+    ))
+
+  it.live("keeps the token in memory only, never on disk, when the OS has no keystore", () =>
+    withHandlers(({ dir, fake }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        keystore.available = false
+        answer("/api/auth/app/token", { status: 200, body: token })
+        const { result } = yield* signIn(fake, "code")
+        assert.deepInclude(result, { _tag: "SignedIn", steamId: token.id, remembered: false })
+        assert.deepInclude(yield* fake.invokeAs(SiteAccount, InvokeChannels.siteAccount), {
+          _tag: "SignedIn",
+          remembered: false
+        })
+        assert.isFalse(yield* fs.exists(`${dir}/userData/site-account.json`))
+
+        yield* fake.invoke(InvokeChannels.writePrefab, {
+          tier: "project",
+          name: "loop",
+          text: prefabText,
+          replace: false
+        })
+        answer("/api/prefabs", { status: 201, body: { slug: "my-loop" } })
+        yield* fake.invoke(InvokeChannels.uploadPrefab, {
+          prefab: { tier: "project", name: "loop" },
+          fields: { name: "My loop", description: "", tags: [] },
+          view: null
+        })
+        assert.strictEqual(sent("/api/prefabs").at(-1)?.headers["authorization"], `Bearer ${token.token}`)
+
+        yield* fake.invoke(InvokeChannels.signOutOfSite)
+        assert.deepStrictEqual(yield* fake.invokeAs(SiteAccount, InvokeChannels.siteAccount), { _tag: "SignedOut" })
+      }).pipe(Effect.ensuring(Effect.sync(() => {
+        keystore.available = true
+        siteRequests.length = 0
+      })))
     ))
 
   it.live("uploads a tier's prefab under the token, and tells each refusal apart", () =>

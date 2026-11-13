@@ -229,7 +229,12 @@ export function SiteGalleryDialog({ onClose, open }: { readonly onClose: () => v
     setAnswer({ query, attempt, gallery: { _tag: "Loaded", page, more: true } })
     void listSitePrefabs(query, next).then((after) => {
       const joined = after === null ? page : { ...after, prefabs: [...page.prefabs, ...after.prefabs] }
-      setAnswer({ query, attempt, gallery: { _tag: "Loaded", page: joined, more: false } })
+      // a page that comes back after the search changed belongs to the old one: the new search's answer stays
+      setAnswer((current) =>
+        current?.query === query && current.attempt === attempt
+          ? { query, attempt, gallery: { _tag: "Loaded", page: joined, more: false } }
+          : current
+      )
     })
   }
   return (

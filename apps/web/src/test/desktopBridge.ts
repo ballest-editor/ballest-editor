@@ -904,7 +904,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     siteAccount: () => Promise.resolve(disk.site.account),
     signInToSite: () => {
       const result = disk.site.signIns.shift() ??
-        { _tag: "SignedIn", steamId: TEST_STEAM_ID, expiresAt: "2099-01-01T00:00:00.000Z" }
+        { _tag: "SignedIn", steamId: TEST_STEAM_ID, expiresAt: "2099-01-01T00:00:00.000Z", remembered: true }
       if (result._tag === "SignedIn") disk.site.account = result
       return Promise.resolve(result)
     },

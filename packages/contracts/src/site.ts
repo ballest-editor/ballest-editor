@@ -57,16 +57,22 @@ export type ListSitePrefabsPayload = typeof ListSitePrefabsPayload.Type
 
 export const SiteSlugPayload = Schema.Struct({ slug: SiteSlug })
 
-/** Whether the player is signed in to the site here, as whom, and until when. */
+/**
+ * A sign-in: as whom, until when, and whether it is `remembered` past this run of the app. It isn't when the OS has no
+ * keystore to seal the token in, so the token is kept in memory only.
+ */
+const SignedIn = { steamId: Text(20), expiresAt: IsoTime, remembered: Schema.Boolean }
+
+/** Whether the player is signed in to the site here, and the sign-in. */
 export const SiteAccount = Schema.TaggedUnion({
   SignedOut: {},
-  SignedIn: { steamId: Text(20), expiresAt: IsoTime }
+  SignedIn
 })
 export type SiteAccount = typeof SiteAccount.Type
 
 /** `signInToSite`'s result: the account, or why not. `Cancelled`: the browser came back without a sign-in. */
 export const SiteSignInResult = Schema.TaggedUnion({
-  SignedIn: { steamId: Text(20), expiresAt: IsoTime },
+  SignedIn,
   Cancelled: {},
   Failed: { message: Schema.String }
 })

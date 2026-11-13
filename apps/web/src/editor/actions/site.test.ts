@@ -63,7 +63,7 @@ describe("ballestrecords.com actions", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("take a site prefab under a free name when the tier has another of its name", () => {
+  it.effect("take a site prefab under a free name when the tier has another of its name, and use that copy again", () => {
     const disk = makeTestDisk()
     return Effect.gen(function*() {
       yield* started(disk)
@@ -75,6 +75,11 @@ describe("ballestrecords.com actions", () => {
       const ref = yield* takeSitePrefabEffect(LOOP, "user")
       assert.deepStrictEqual(ref, { tier: "user", name: "Loop_de_loop_2" })
       assert.strictEqual(disk.files.get(userPrefabFile("Loop_de_loop_2")), PREFAB_TEXT)
+      assert.deepStrictEqual(yield* takeSitePrefabEffect(LOOP, "user"), ref)
+      assert.deepStrictEqual(s().prefabs.filter((p) => p.tier === "user").map((p) => p.name).sort(), [
+        "Loop_de_loop",
+        "Loop_de_loop_2"
+      ])
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

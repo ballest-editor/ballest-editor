@@ -184,6 +184,16 @@ export const siteRequests: Array<{
   readonly body: string | FormData | undefined
 }> = []
 export const siteAnswers = new Map<string, Array<{ readonly status: number; readonly body?: unknown }>>()
+
+/** Whether the OS has a keystore to seal the site token in: plain in tests, and none while `available` is off. */
+export const keystore = { available: true }
+const siteSeal = Layer.succeed(
+  SiteSeal,
+  SiteSeal.of({
+    seal: (text) => Effect.sync(() => keystore.available ? Option.some(text) : Option.none()),
+    open: Effect.succeedSome
+  })
+)
 const siteLayer = Layer.succeed(
   SiteClient,
   SiteClient.make("https://records.test", (url, init) => {
@@ -278,7 +288,7 @@ export const withHandlers = <A, E>(
     )
     const account = Layer.effect(SiteAccount, SiteAccount.make(path.join(dir, "userData", "site-account.json"))).pipe(
       Layer.provideMerge(siteLayer),
-      Layer.provide(Layer.mergeAll(SiteSeal.plain, shellLayer))
+      Layer.provide(Layer.mergeAll(siteSeal, shellLayer))
     )
     const services = Layer.mergeAll(Layer.effect(GamePlay, GamePlay.make), usage, account).pipe(
       Layer.provideMerge(projects),

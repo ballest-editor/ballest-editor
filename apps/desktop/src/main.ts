@@ -53,19 +53,21 @@ const layerElectron = Layer.mergeAll(
   DesktopIpc.layer(Electron.ipcMain)
 )
 
-/** The site token at rest, sealed with the OS's own keystore where it has one (`safeStorage`). */
+/**
+ * The site token at rest, sealed with the OS's own keystore (`safeStorage`). Without one there is no seal, and
+ * `SiteAccount` keeps the token in memory rather than write it down plain.
+ */
 const layerSiteSeal = Layer.succeed(
   SiteSeal,
   SiteSeal.of({
     seal: (text) =>
-      Effect.promise(async () =>
+      Effect.tryPromise(async () =>
         await Electron.safeStorage.isAsyncEncryptionAvailable()
-          ? `safe:${(await Electron.safeStorage.encryptStringAsync(text)).toString("base64")}`
-          : `plain:${text}`
-      ),
+          ? Option.some(`safe:${(await Electron.safeStorage.encryptStringAsync(text)).toString("base64")}`)
+          : Option.none<string>()
+      ).pipe(Effect.orElseSucceed(() => Option.none())),
     open: (sealed) =>
       Effect.tryPromise(async () => {
-        if (sealed.startsWith("plain:")) return Option.some(sealed.slice("plain:".length))
         if (!sealed.startsWith("safe:") || !(await Electron.safeStorage.isAsyncEncryptionAvailable())) {
           return Option.none<string>()
         }

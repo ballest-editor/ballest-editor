@@ -1,26 +1,42 @@
 import type { SiteAccount as SiteAccountState, SiteSignInResult } from "@ballest/contracts"
-import { Context, Deferred, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
+import { Context, Deferred, Effect, FileSystem, Layer, Option, Path, Ref, Schema } from "effect"
 import { createHash, randomBytes } from "node:crypto"
 import * as Http from "node:http"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 import { ElectronShell } from "../electron/ElectronShell"
 import { SiteClient } from "./SiteClient"
 
-/** How the token is sealed at rest: Electron's `safeStorage` (main.ts), or plain in tests. */
+/**
+ * How the token is sealed at rest: Electron's `safeStorage` (main.ts), or plain in tests. `seal` is none when the OS
+ * has no keystore: the token is then never written down, and the sign-in lasts until the app quits.
+ */
 export class SiteSeal extends Context.Service<SiteSeal, {
-  readonly seal: (text: string) => Effect.Effect<string>
+  readonly seal: (text: string) => Effect.Effect<Option.Option<string>>
   readonly open: (sealed: string) => Effect.Effect<Option.Option<string>>
-}>()("ballest/desktop/site/SiteSeal") {
-  static readonly plain = Layer.succeed(
-    SiteSeal,
-    SiteSeal.of({ seal: Effect.succeed, open: Effect.succeedSome })
-  )
-}
+}>()("ballest/desktop/site/SiteSeal") {}
 
 /** What `<userData>/site-account.json` holds: whose token, until when, and the token sealed. */
 const AccountFile = Schema.Struct({ steamId: Schema.String, expiresAt: Schema.String, sealed: Schema.String })
 type AccountFile = typeof AccountFile.Type
 const decodeFile = Schema.decodeUnknownEffect(Schema.fromJsonString(AccountFile))
+
+/** A sign-in that is kept: whose, until when, whether on disk, and its token, opened only when a request needs it. */
+interface Held {
+  readonly steamId: string
+  readonly expiresAt: string
+  readonly remembered: boolean
+  readonly token: Effect.Effect<Option.Option<string>>
+}
+
+/** A sign-in without a keystore to seal it in: in memory only, for this run of the app. */
+interface InMemory {
+  readonly steamId: string
+  readonly expiresAt: string
+  readonly token: string
+}
+
+const unexpired = <A extends { readonly expiresAt: string }>(account: Option.Option<A>) =>
+  Option.filter(account, (a) => Date.parse(a.expiresAt) > Date.now())
 
 /** How long the browser has to come back with a sign-in. */
 const SIGN_IN_WINDOW = "5 minutes"
@@ -38,7 +54,7 @@ type Answer = { readonly _tag: "Code"; readonly code: string } | { readonly _tag
  * The player's sign-in to ballestrecords.com (the site's ADR 0017; docs/DESKTOP.md § Prefabs). Signing in opens the
  * site's `/api/auth/app` in the browser with a loopback callback, a state and a PKCE challenge; the browser comes back
  * to a one-request server on 127.0.0.1 with a code, which main trades with the secret behind the challenge. The token
- * lives 30 days, sealed, and only main reads it.
+ * lives 30 days, sealed on disk, or in memory for this run when there is no keystore; only main reads it.
  */
 export class SiteAccount extends Context.Service<SiteAccount, {
   readonly state: Effect.Effect<SiteAccountState>
@@ -54,17 +70,33 @@ export class SiteAccount extends Context.Service<SiteAccount, {
     const site = yield* SiteClient
     const shell = yield* ElectronShell
 
-    const read = fs.readFileString(file).pipe(
-      Effect.flatMap(decodeFile),
-      Effect.option,
-      Effect.map(Option.filter((account: AccountFile) => Date.parse(account.expiresAt) > Date.now()))
+    const inMemory = yield* Ref.make(Option.none<InMemory>())
+
+    const read: Effect.Effect<Option.Option<Held>> = Effect.gen(function*() {
+      const held = yield* Ref.get(inMemory)
+      if (Option.isSome(held)) {
+        const { token, ...rest } = held.value
+        return unexpired(Option.some({ ...rest, remembered: false, token: Effect.succeedSome(token) }))
+      }
+      const saved = yield* fs.readFileString(file).pipe(Effect.flatMap(decodeFile), Effect.option)
+      return unexpired(
+        Option.map(saved, ({ sealed, ...rest }): Held => ({ ...rest, remembered: true, token: sealer.open(sealed) }))
+      )
+    })
+    const signOut = Ref.set(inMemory, Option.none()).pipe(
+      Effect.andThen(fs.remove(file, { force: true })),
+      Effect.ignore
     )
-    const signOut = fs.remove(file, { force: true }).pipe(Effect.ignore)
     const state = Effect.map(
       read,
       Option.match({
         onNone: (): SiteAccountState => ({ _tag: "SignedOut" }),
-        onSome: ({ expiresAt, steamId }): SiteAccountState => ({ _tag: "SignedIn", steamId, expiresAt })
+        onSome: ({ expiresAt, remembered, steamId }): SiteAccountState => ({
+          _tag: "SignedIn",
+          steamId,
+          expiresAt,
+          remembered
+        })
       })
     )
 
@@ -121,10 +153,18 @@ export class SiteAccount extends Context.Service<SiteAccount, {
       if (came.value._tag === "Denied") return { _tag: "Cancelled" } satisfies SiteSignInResult
       const token = yield* site.trade(came.value.code, verifier)
       const expiresAt = new Date(Date.now() + token.expiresIn * 1000).toISOString()
-      const account: AccountFile = { steamId: token.id, expiresAt, sealed: yield* sealer.seal(token.token) }
-      yield* fs.makeDirectory(path.dirname(file), { recursive: true })
-      yield* fs.writeFileString(file, JSON.stringify(account))
-      return { _tag: "SignedIn", steamId: token.id, expiresAt } satisfies SiteSignInResult
+      const sealed = yield* sealer.seal(token.token)
+      yield* signOut
+      if (Option.isNone(sealed)) {
+        // no keystore: never write the token down unsealed
+        yield* Ref.set(inMemory, Option.some({ steamId: token.id, expiresAt, token: token.token }))
+      } else {
+        const account: AccountFile = { steamId: token.id, expiresAt, sealed: sealed.value }
+        yield* fs.makeDirectory(path.dirname(file), { recursive: true })
+        yield* fs.writeFileString(file, JSON.stringify(account))
+      }
+      const remembered = Option.isSome(sealed)
+      return { _tag: "SignedIn", steamId: token.id, expiresAt, remembered } satisfies SiteSignInResult
     })).pipe(
       Effect.catch((error) =>
         Effect.logWarning("Couldn't sign in to ballestrecords.com", error).pipe(
@@ -137,7 +177,7 @@ export class SiteAccount extends Context.Service<SiteAccount, {
       read,
       Option.match({
         onNone: () => Effect.succeed(Option.none<string>()),
-        onSome: ({ sealed }) => sealer.open(sealed)
+        onSome: (held) => held.token
       })
     )
 
