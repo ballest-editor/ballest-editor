@@ -245,22 +245,26 @@ export const newPrefabProblem = (s: EditorState): string | undefined =>
  * New prefab: an empty definition in a tab of its own, as New map is a map's. It asks nothing and writes nothing, and it
  * goes by Untitled prefab until the first Save names it, which the game's two items hold back (`prefabSaveProblem`).
  */
-export const newPrefabEffect = Effect.sync(() => {
+export const newPrefabEffect = Effect.sync(() => openUntitledPrefab(NEW_PREFAB_NAME, []))
+
+/**
+ * An unsaved definition holding `items`, in a tab of its own, called `wanted` or the next free number of it. Items it
+ * starts with are unsaved edits, so closing the tab asks; its first Save names it.
+ */
+export const openUntitledPrefab = (wanted: string, items: ReadonlyArray<Item>): void => {
   const s = useEditor.getState()
   if (newPrefabProblem(s) !== undefined) return
   const taken = new Set(tabLabels(s))
-  const name = nextFreeName(NEW_PREFAB_NAME, (label) => taken.has(label))
-  const file = prefabOfItems([], s.catalogIndex)
-  const document: PrefabDocument = {
-    kind: "prefab",
-    tier: newPrefabTier(s),
-    name,
-    file,
-    hash: "",
-    sources: new Map()
-  }
-  s.loadMap(mapOfPrefab(name, file, s.catalogIndex), null, undefined, { document, fresh: true, into: "addedTab" })
-})
+  const name = nextFreeName(wanted, (label) => taken.has(label))
+  const file = prefabOfItems(items, s.catalogIndex)
+  const document: PrefabDocument = { kind: "prefab", tier: newPrefabTier(s), name, file, hash: "", sources: new Map() }
+  s.loadMap(mapOfPrefab(name, file, s.catalogIndex), null, undefined, {
+    document,
+    fresh: true,
+    dirty: items.length > 0,
+    into: "addedTab"
+  })
+}
 
 export const startNewPrefab = () => run(newPrefabEffect)
 

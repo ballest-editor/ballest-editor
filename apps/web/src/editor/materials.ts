@@ -751,12 +751,35 @@ const materialForMesh = (
   return material
 }
 
-/** Assigns game materials to every primitive under `root` by UE slot index. */
+const flatShaded = new WeakMap<THREE.MeshStandardMaterial, THREE.MeshStandardMaterial>()
+
+/**
+ * `material` shaded by each triangle's own plane instead of the mesh's normals. There is one per material, so the
+ * meshes that use it still share a material; a copy doesn't carry the shader patch, so it is installed again.
+ */
+const flatShadedOf = (material: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial => {
+  const cached = flatShaded.get(material)
+  if (cached !== undefined) return cached
+  const flat = material.clone()
+  flat.flatShading = true
+  const patch = patches.get(material)
+  if (patch !== undefined) patchShader(flat, patch)
+  flatShaded.set(material, flat)
+  return flat
+}
+
+/**
+ * Assigns game materials to every primitive under `root` by UE slot index, flat-shaded for a mesh whose faces are
+ * all planar (`isFlatFaced` in visuals.ts).
+ */
 export const applySlotMaterials = (
   root: THREE.Object3D,
   table: MaterialTable | null,
-  slotMaterials: ReadonlyArray<string | undefined>
+  slotMaterials: ReadonlyArray<string | undefined>,
+  flat = false
 ): void =>
   root.traverse((object) => {
-    if (isMesh(object)) object.material = materialForMesh(table, slotMaterials[slotIndexOf(object)], object)
+    if (!isMesh(object)) return
+    const material = materialForMesh(table, slotMaterials[slotIndexOf(object)], object)
+    object.material = flat ? flatShadedOf(material) : material
   })

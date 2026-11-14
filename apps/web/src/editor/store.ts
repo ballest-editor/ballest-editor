@@ -475,6 +475,7 @@ export type DialogState =
       | "newProject"
       | "newDraft"
       | "recover"
+      | "approximate"
   }
   | { readonly id: "saveAs"; readonly afterSave?: Effect.Effect<void, unknown> }
   | { readonly id: "settings"; readonly category?: SettingsCategory }

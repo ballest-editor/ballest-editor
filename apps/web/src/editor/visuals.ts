@@ -14,6 +14,18 @@ export const glbUrl = (glb: string | null | undefined): string | undefined =>
   glb === undefined || glb === null || glb.length === 0 ? undefined : assetUrl(glb)
 
 /**
+ * The meshes whose faces are all planar, by asset path (a baked mirror mesh draws as its source, so that one's). They
+ * are drawn flat-shaded: the Pyramid's own normals lean across each face, which shows as folds once a scale flattens
+ * it into a plate.
+ */
+const FLAT_FACED_MESHES: ReadonlySet<string> = new Set([
+  "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Meshes/SM_Pyramid.SM_Pyramid"
+])
+
+export const isFlatFaced = (mesh: MeshInfo | undefined): boolean =>
+  mesh !== undefined && FLAT_FACED_MESHES.has(mesh.meshAssetPath)
+
+/**
  * The `userData` field each drawn visual carries its `Visual.key` in, so a raycast hit knows which of the item's meshes
  * it is (editor/paintTarget.ts).
  */

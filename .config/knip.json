@@ -40,6 +40,10 @@
       // Imported by path; the dependency is what makes turbo rebuild this tool's hash when the domain code changes.
       "ignoreDependencies": ["@ballest/web"]
     },
+    "tools/approximate": {
+      // Imported by path, as tools/map does.
+      "ignoreDependencies": ["@ballest/web"]
+    },
     "packages/ballest-driver": {},
     // Each function's entry is bundled by build/vercelBuild.ts, which the build script runs.
     "apps/collect": {

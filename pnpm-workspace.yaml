@@ -6,6 +6,7 @@ packages:
   - "tools/release"
   - "tools/driver"
   - "tools/map"
+  - "tools/approximate"
 
 allowBuilds:
   esbuild: true

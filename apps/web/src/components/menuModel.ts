@@ -43,6 +43,7 @@ import {
   reimportMap,
   selectConnected,
   selectionPrefabProblem,
+  startApproximate,
   startFlush,
   startGridOriginPick,
   startMeasure,
@@ -187,6 +188,8 @@ export interface MenuState {
   /** How many measurements the map keeps. */
   readonly measurements: number
   readonly units: "cm" | "m"
+  /** Whether Settings › Beta has Approximate 3D model on. */
+  readonly approximate: boolean
   readonly layout: ViewLayout
   /** What the active pane looks along. */
   readonly projection: ViewProjection
@@ -488,7 +491,9 @@ const toolsMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
     item("Grid origin to selection", gridOriginToSelection, selectionOff),
     item("Grid rotation to selection", gridYawToSelection, selectionOff),
     SEPARATOR,
-    item("Select connected", selectConnected, selectionOff)
+    item("Select connected", selectConnected, selectionOff),
+    // Beta (Settings › Beta): it needs no tab, since its result opens in a prefab tab of its own.
+    ...(state.approximate ? [SEPARATOR, item("Approximate 3D model…", startApproximate)] : [])
   ]
 }
 
@@ -570,7 +575,7 @@ export const useMenus = (): Menus => {
   const openedInGame = useEditor((s) => s.openedInGame !== null && s.openedInGame === s.file?.name)
   const dockPanels = useViewMenuPanels()
   const openPanels = useOpenPanels()
-  const { general } = useEditor((s) => s.settings)
+  const { general, beta } = useEditor((s) => s.settings)
   const snapping = useEditor(snapConfigOf)
   const undoDescription = useEditor((s) => s.past.at(-1)?.description)
   const redoDescription = useEditor((s) => s.future[0]?.description)
@@ -607,6 +612,7 @@ export const useMenus = (): Menus => {
     selectionCount,
     measurements,
     units: general.units,
+    approximate: beta.approximate,
     layout,
     projection,
     update,

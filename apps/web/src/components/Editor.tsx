@@ -27,6 +27,7 @@ import { APP_TITLE, type Dialog, isChooserRequired, isWelcomeShown, useEditor, w
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { AboutDialog } from "./AboutDialog"
+import { LazyApproximateDialog } from "./approximate/LazyApproximateDialog"
 import { Dock } from "./dock/Dock"
 import { blurChromeAfterClick } from "./dock/popoutWindow"
 import { ChooserSkeleton, startsOnChooser } from "./EditorSkeleton"
@@ -214,6 +215,7 @@ export function Editor() {
         onClose={close}
       />
       <SavePrefabDialog open={dialog === "savePrefab"} onClose={close} />
+      <LazyApproximateDialog open={dialog === "approximate"} onClose={close} />
       <NamePrefabDialog open={dialog === "namePrefab"} onClose={close} />
       <UnlinkInstancesDialog open={dialog === "unlinkInstances"} onClose={close} />
       <RenamePrefabDialog open={dialog === "renamePrefab"} onClose={close} />

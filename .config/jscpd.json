@@ -12,7 +12,8 @@
     "../tools/dev/src",
     "../tools/release/src",
     "../tools/driver/src",
-    "../tools/map/src"
+    "../tools/map/src",
+    "../tools/approximate/src"
   ],
   "format": ["typescript", "tsx", "javascript"],
   "ignore": ["**/routeTree.gen.ts", "../packages/ui/src/components/**"],

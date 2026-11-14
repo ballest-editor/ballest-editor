@@ -269,6 +269,37 @@ describe("three materials", () => {
     assert.closeTo(materialFor(table, FADED).normalScale.x, 0.64, 1e-6)
   })
 
+  it("gives flat-faced meshes one flat-shaded material per paint, patched as the paint is, and leaves the paint alone", () => {
+    const table = parseMaterialsFile(materialsFile)
+    const root = new THREE.Group()
+    const outlined = primitive("0:Base"), other = primitive("0:Base"), plain = primitive("1:Side")
+    root.add(outlined, other, plain)
+    const paint = materialFor(table, OUTLINE)
+    applySlotMaterials(root, table, [OUTLINE, BLUE], true)
+    const flat = outlined.material
+    assert.instanceOf(flat, THREE.MeshStandardMaterial)
+    assert.notStrictEqual(flat, paint)
+    assert.isTrue(flat.flatShading)
+    assert.isFalse(paint.flatShading)
+    // one material for every flat mesh in the paint, so they still draw as one batch
+    assert.strictEqual(other.material, flat)
+    // the same shader patch, compiled into a program of its own kind
+    assert.isDefined(shaderPatchOf(paint))
+    assert.strictEqual(shaderPatchOf(flat), shaderPatchOf(paint))
+    assert.strictEqual(flat.customProgramCacheKey(), paint.customProgramCacheKey())
+    assert.deepStrictEqual(flat.defines, paint.defines)
+    // a paint without a patch gets none
+    const flatBlue = plain.material
+    assert.instanceOf(flatBlue, THREE.MeshStandardMaterial)
+    assert.isTrue(flatBlue.flatShading)
+    assert.isUndefined(shaderPatchOf(flatBlue))
+    // asked again, the same materials; asked without, the paint itself
+    applySlotMaterials(root, table, [OUTLINE, BLUE], true)
+    assert.strictEqual(outlined.material, flat)
+    applySlotMaterials(root, table, [OUTLINE, BLUE])
+    assert.strictEqual(outlined.material, paint)
+  })
+
   it("assigns materials per primitive by UE slot index", () => {
     const table = parseMaterialsFile(materialsFile)
     const root = new THREE.Group()
