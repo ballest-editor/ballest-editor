@@ -12,7 +12,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
+import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, useEffect, useState } from "react"
 import { PREFAB_NEEDS_PROJECT, prefabTierLabel } from "../domain/prefab"
@@ -21,24 +21,45 @@ import {
   listSitePrefabs,
   openExternalLink,
   placeSitePrefab,
-  readSitePrefabThumb,
-  signInToSite,
-  signOutOfSite
+  readSitePrefabThumb
 } from "../editor/actions"
 import { NO_TAB_OPEN, noTabOpen, useEditor, useOpenPrefab } from "../editor/store"
 import { StripButton } from "./dock/StripButton"
 import { EmptySection } from "./EmptySection"
-import { THUMBNAIL_TILE, useSeen } from "./PieceThumbnail"
+import { THUMBNAIL_TILE, ThumbnailSkeleton, useSeen } from "./PieceThumbnail"
 
 /** How long the search rests before the site is asked. */
 const SEARCH_DELAY_MS = 300
 
 const pageOf = (slug: string) => `${SITE_URL}/prefab/${encodeURIComponent(slug)}`
 
-/** The site's own picture of the prefab, asked for once the card comes into view; a glyph until then and without one. */
+/** How many cards stand in for the gallery while the site answers: a few rows of the window. */
+const SKELETON_CARDS = 15
+
+const CARD_GRID = "grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2"
+
+/** The gallery before the site has answered: cards in the shape of the ones to come. */
+function GallerySkeleton() {
+  return (
+    <ul aria-label="Loading" className={CARD_GRID}>
+      {Array.from({ length: SKELETON_CARDS }, (_, i) => (
+        <li key={i} className="flex min-w-0 flex-col gap-1 p-1">
+          <ThumbnailSkeleton className="aspect-square w-full" />
+          <Skeleton className="my-1 h-3 w-3/4" />
+          <Skeleton className="my-0.5 h-2.5 w-1/2" />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * The site's own picture of the prefab, asked for once the card comes into view: the skeleton until it has answered, and
+ * a glyph for a prefab without one.
+ */
 function SiteThumbnail({ slug }: { readonly slug: string }) {
   const { ref, seen } = useSeen()
-  const [url, setUrl] = useState<string | null>(null)
+  const [url, setUrl] = useState<string | null | undefined>(undefined)
   useEffect(() => {
     if (!seen) return
     let live = true
@@ -51,7 +72,9 @@ function SiteThumbnail({ slug }: { readonly slug: string }) {
   }, [seen, slug])
   return (
     <span ref={ref} className="flex w-full">
-      {url === null
+      {url === undefined
+        ? <ThumbnailSkeleton className="aspect-square w-full" />
+        : url === null
         ? (
           <span
             className={cn(
@@ -152,40 +175,6 @@ function SitePrefabCard({ onPlace, prefab }: { readonly onPlace: () => void; rea
   )
 }
 
-/** Sign in, or who is signed in with a way out: what uploading needs. */
-function SiteAccountButton() {
-  const account = useEditor((s) => s.siteAccount)
-  const [signingIn, setSigningIn] = useState(false)
-  if (account._tag === "SignedIn") {
-    return (
-      <Tooltip>
-        <TooltipTrigger
-          render={<Button variant="link" className="h-auto border-0 px-0 text-caption" />}
-          onClick={() => void signOutOfSite()}
-        >
-          Sign out
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Signed in, so prefabs can be uploaded from their menus</TooltipContent>
-      </Tooltip>
-    )
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={<Button variant="link" className="h-auto border-0 px-0 text-caption" />}
-        disabled={signingIn}
-        onClick={() => {
-          setSigningIn(true)
-          void signInToSite().finally(() => setSigningIn(false))
-        }}
-      >
-        {signingIn ? "Signing in…" : "Sign in"}
-      </TooltipTrigger>
-      <TooltipContent side="bottom">With Steam, in the browser, to upload prefabs</TooltipContent>
-    </Tooltip>
-  )
-}
-
 type Gallery =
   | { readonly _tag: "Loading" }
   | { readonly _tag: "Unreachable" }
@@ -247,19 +236,16 @@ export function SiteGalleryDialog({ onClose, open }: { readonly onClose: () => v
             one.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex items-center gap-3">
-          <Input
-            type="search"
-            aria-label="Search ballestrecords"
-            placeholder="Search players' prefabs…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <SiteAccountButton />
-        </div>
+        <Input
+          type="search"
+          aria-label="Search ballestrecords"
+          placeholder="Search players' prefabs…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
         <ScrollArea className="min-h-0 flex-1">
           {gallery._tag === "Loading"
-            ? <EmptySection line="Loading…" />
+            ? <GallerySkeleton />
             : gallery._tag === "Unreachable"
             ? (
               <EmptySection line="Couldn't reach ballestrecords.com.">
@@ -270,7 +256,7 @@ export function SiteGalleryDialog({ onClose, open }: { readonly onClose: () => v
             ? <EmptySection line={query.trim() === "" ? "No prefabs yet." : "Nothing matches the search."} />
             : (
               <div className="flex flex-col gap-2">
-                <ul className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
+                <ul className={CARD_GRID}>
                   {gallery.page.prefabs.map((prefab) => (
                     <SitePrefabCard key={prefab.slug} prefab={prefab} onPlace={onClose} />
                   ))}

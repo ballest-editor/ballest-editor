@@ -1,3 +1,4 @@
+import { IconCube } from "@tabler/icons-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { createElement, type ReactNode, useEffect, useRef, useState } from "react"
 import type { CatalogPiece } from "../domain/Catalog"
@@ -11,6 +12,18 @@ import { lightGlyphOf } from "./outlineGlyphs"
  * white piece reads in light and a near-black one in dark. Alpha, so it stays neutral on whatever panel it sits on.
  */
 export const THUMBNAIL_TILE = "bg-foreground/14"
+
+/** A thumbnail that hasn't come yet: its tile, with a cube that pulses. `className` gives the tile its size. */
+export function ThumbnailSkeleton({ className }: { readonly className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("grid place-items-center rounded-control text-fg-tertiary", THUMBNAIL_TILE, className)}
+    >
+      <IconCube className="size-2/5 animate-pulse" stroke={1.5} />
+    </span>
+  )
+}
 
 /** True from the first time the element comes into view, so a long list only renders what gets looked at. */
 export const useSeen = () => {
