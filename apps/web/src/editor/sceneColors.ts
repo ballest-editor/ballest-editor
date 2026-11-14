@@ -7,6 +7,7 @@
  * - `pointer`: cyan, what a click or a drop would act on, the chrome's own interactive hue: the hover, the paint tool's
  *   target, what a snap lands on;
  * - `blocked`: red, where the pointer's action won't go;
+ * - `chain`: orchid, a selected chain's box, so a chain reads apart from a group at a glance: redder than `reference`;
  * - `reference`: violet, what is drawn to measure by and isn't in the map's pieces: guides and construction geometry;
  * - `context`: no hue, what frames the work and isn't a choice: the entered group, the pivot dot.
  *
@@ -18,6 +19,7 @@ export const SCENE_ROLES = {
     active: "#ffe08a",
     pointer: "#5ce1ff",
     blocked: "#ff5a5f",
+    chain: "#d775f4",
     reference: "#b69cff",
     context: "#ffffff"
   },
@@ -26,6 +28,7 @@ export const SCENE_ROLES = {
     active: "#7a2e05",
     pointer: "#0a6f94",
     blocked: "#c0182a",
+    chain: "#8b1ea7",
     reference: "#6236c9",
     context: "#1f2430"
   }

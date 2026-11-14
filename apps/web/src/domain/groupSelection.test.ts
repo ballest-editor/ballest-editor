@@ -18,6 +18,7 @@ import {
   selectionSummaryOf,
   unitSummaryOf
 } from "./groupSelection"
+import type { TreeNode } from "./MapSidecar"
 
 const tree = nestedTree
 
@@ -173,26 +174,42 @@ describe("selectionSummaryOf", () => {
 describe("groupBoxTargets", () => {
   it("boxes each group whole in the selection, and no group for loose items", () => {
     assert.deepStrictEqual(groupBoxTargets(tree, ["a", "b", "e"], null), [
-      { id: "inner", keys: ["a", "b"], entered: false },
-      { id: "solo", keys: ["e"], entered: false }
+      { id: "inner", keys: ["a", "b"], entered: false, chain: false },
+      { id: "solo", keys: ["e"], entered: false, chain: false }
     ])
     assert.deepStrictEqual(groupBoxTargets(tree, ["d", "c"], null), [])
   })
 
   it("keeps the entered group's box, quiet, with a child selected or nothing", () => {
-    const entered = { id: "outer", keys: ["a", "b", "c"], entered: true }
+    const entered = { id: "outer", keys: ["a", "b", "c"], entered: true, chain: false }
     assert.deepStrictEqual(groupBoxTargets(tree, ["c"], "outer"), [entered])
     assert.deepStrictEqual(groupBoxTargets(tree, [], "outer"), [entered])
     assert.deepStrictEqual(groupBoxTargets(tree, ["a", "b"], "outer"), [
-      { id: "inner", keys: ["a", "b"], entered: false },
+      { id: "inner", keys: ["a", "b"], entered: false, chain: false },
       entered
+    ])
+  })
+
+  it("says which boxes are chains, so they can be told from groups", () => {
+    const chain: TreeNode = {
+      kind: "group",
+      id: "links",
+      name: "links",
+      tags: [],
+      children: [item("a"), item("b")],
+      chain: true
+    }
+    const chained = [chain, group("plain", item("c"))]
+    assert.deepStrictEqual(groupBoxTargets(chained, ["a", "b", "c"], null), [
+      { id: "links", keys: ["a", "b"], entered: false, chain: true },
+      { id: "plain", keys: ["c"], entered: false, chain: false }
     ])
   })
 
   it("keeps the box quiet with everything in the entered group selected: that is its members, not the group", () => {
     assert.deepStrictEqual(groupBoxTargets(tree, ["a", "b", "c"], "outer"), [
-      { id: "inner", keys: ["a", "b"], entered: false },
-      { id: "outer", keys: ["a", "b", "c"], entered: true }
+      { id: "inner", keys: ["a", "b"], entered: false, chain: false },
+      { id: "outer", keys: ["a", "b", "c"], entered: true, chain: false }
     ])
   })
 })
