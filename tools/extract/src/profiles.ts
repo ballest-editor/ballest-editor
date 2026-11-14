@@ -1,6 +1,6 @@
-// The cross-sections ends come in (docs/qa/connectors.md § Profiles): each family's caps as the meshes have them. Two
-// ends fit when their profiles are the same, so a cap that differs in area, size or the height of its running surface
-// is a profile of its own.
+// The cross-sections ends come in (docs/qa/connectors.md § What is covered): each family's caps as the meshes have
+// them. Two ends fit when their profiles are the same, so a cap that differs in area, size or the height of its running
+// surface is a profile of its own.
 import type { CapMeasure } from "./caps.ts"
 
 /** A cap a profile takes: what its measures must be, within `AREA_SHARE` and `SIZE_CM`. */

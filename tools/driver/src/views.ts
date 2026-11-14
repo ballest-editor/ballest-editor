@@ -1,8 +1,8 @@
 import type { Vec3 } from "./handler.ts"
 
-// The standard views of a piece (docs/DRIVER.md § Piece views): fixed names and directions, so renders of two pieces,
-// or of one piece across two game versions, line up. Pure camera arithmetic; the game's frame is UE's (cm, Z up,
-// left-handed; pitch up, yaw around Z).
+// The standard views of a piece (docs/DRIVER.md § Pivots and the gizmo): fixed names and directions, so renders of two
+// pieces, or of one piece across two game versions, line up. Pure camera arithmetic; the game's frame is UE's (cm, Z
+// up, left-handed; pitch up, yaw around Z).
 
 export interface View {
   readonly name: string
