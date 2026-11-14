@@ -3,8 +3,8 @@ import * as THREE from "three"
 import type { Quat4 } from "../domain/coords"
 import { IDENTITY_QUAT, ORIGIN, rotatorToQuat } from "../domain/ueMath"
 import type { GroupFrame } from "../domain/units"
-import { BRACKET, GroupBox } from "./groupBox"
-import { LINE_WIDTH } from "./screenLines"
+import { GROUP_DASH, GroupBox } from "./groupBox"
+import { DASH, LINE_WIDTH } from "./screenLines"
 
 /** A frame in the game's axes from the origin, `x` by `y` by `z` cm, turned by `rotation`. */
 const boxOf = (x: number, y: number, z: number, at = 0, rotation: Quat4 = IDENTITY_QUAT): GroupFrame => ({
@@ -13,8 +13,8 @@ const boxOf = (x: number, y: number, z: number, at = 0, rotation: Quat4 = IDENTI
   halfExtents: { x: x / 2, y: y / 2, z: z / 2 }
 })
 
-/** Each bracket's run along its edge, and whether it leaves a corner of `box`. */
-const bracketsOf = (box: GroupBox) => {
+/** Each drawn segment's run along the world axes it moves on, and its ends. */
+const edgesOf = (box: GroupBox) => {
   const { instanceStart: from, instanceEnd: to } = box.geometry.attributes
   return Array.from({ length: box.geometry.instanceCount }, (_, i) => {
     const a = [from?.getX(i) ?? 0, from?.getY(i) ?? 0, from?.getZ(i) ?? 0]
@@ -30,24 +30,17 @@ describe("GroupBox", () => {
     assert.isFalse(box.visible)
   })
 
-  it("marks the group's corners: a bracket from each corner along each of its three edges", () => {
+  it("draws the group's box whole: its 12 edges, corner to corner, with nothing added round it", () => {
     const box = new GroupBox()
-    box.update(boxOf(10, 10, 10))
+    box.update(boxOf(10, 20, 30))
     assert.isTrue(box.visible)
-    const brackets = bracketsOf(box)
-    assert.lengthOf(brackets, 24)
-    for (const { run } of brackets) assert.deepStrictEqual(run, [10 * BRACKET.ofEdge])
+    const edges = edgesOf(box)
+    assert.lengthOf(edges, 12)
+    const runs = edges.map(({ run }) => run).sort((a, b) => (a[0] ?? 0) - (b[0] ?? 0))
+    assert.deepStrictEqual(runs, [[10], [10], [10], [10], [20], [20], [20], [20], [30], [30], [30], [30]])
     box.geometry.computeBoundingBox()
-    assert.deepStrictEqual(box.geometry.boundingBox?.max.toArray(), [10, 10, 10])
-  })
-
-  it("keeps a long, flat group's brackets to its corners", () => {
-    // 5400 long, 800 wide, 300 high: the middle size, 800, sets the most a bracket reaches
-    const box = new GroupBox()
-    box.update(boxOf(5400, 800, 300))
-    const runs = bracketsOf(box).map(({ run }) => run[0] ?? 0)
-    assert.closeTo(Math.max(...runs), 800 * BRACKET.ofMiddle, 1e-6)
-    assert.closeTo(Math.min(...runs), 300 * BRACKET.ofEdge, 1e-6)
+    assert.deepStrictEqual(box.geometry.boundingBox?.min.toArray(), [0, 0, 0])
+    assert.deepStrictEqual(box.geometry.boundingBox?.max.toArray(), [10, 30, 20])
   })
 
   it("turns the game's frame into the scene's", () => {
@@ -75,8 +68,8 @@ describe("GroupBox", () => {
       rotation: rotatorToQuat({ roll: 0, pitch: 0, yaw: 45 }),
       halfExtents: { x: 100, y: 10, z: 10 }
     })
-    const along = bracketsOf(box).filter(({ run }) => run.length === 1)
-    assert.lengthOf(along, 8, "only the upright edges keep to one world axis")
+    const along = edgesOf(box).filter(({ run }) => run.length === 1)
+    assert.lengthOf(along, 4, "only the upright edges keep to one world axis")
   })
 
   it("follows its items", () => {
@@ -87,12 +80,17 @@ describe("GroupBox", () => {
     assert.strictEqual(box.geometry.boundingBox?.max.x, 60)
   })
 
-  it("quietens for the entered group, and is never dashed: dashes mean hidden", () => {
+  it("is dashed in a dash of its own, shorter than the hidden one", () => {
+    const box = new GroupBox()
+    assert.strictEqual(box.material.customProgramCacheKey(), "group-box")
+    assert.isBelow(GROUP_DASH.on + GROUP_DASH.off, DASH.on + DASH.off)
+  })
+
+  it("quietens for the entered group", () => {
     const box = new GroupBox()
     box.setLook("#ffffff", true)
     assert.isBelow(box.material.opacity, 1)
     assert.strictEqual(box.material.linewidth, LINE_WIDTH.light)
-    assert.isFalse(box.material.dashed)
     box.setLook("#ff0000", false)
     assert.strictEqual(box.material.opacity, 1)
     assert.strictEqual(box.material.linewidth, LINE_WIDTH.outline)

@@ -731,14 +731,19 @@ function HoveredOutlines() {
   return keys.map((id) => <HoveredOutline key={id} id={id} />)
 }
 
-/** A whole group's box (see groupBox.ts), following its items: the selection's colour, or no hue when entered. */
-function GroupBoxView({ id, entered }: { readonly id: string; readonly entered: boolean }) {
+/**
+ * A whole group's box (see groupBox.ts), following its items: the selection's colour, a chain's own colour, or no hue
+ * when entered.
+ */
+function GroupBoxView(
+  { chain, entered, id }: { readonly id: string; readonly entered: boolean; readonly chain: boolean }
+) {
   const box = useMemo(() => new GroupBox(), [])
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => {
     const roles = sceneRoles(dark)
-    box.setLook(entered ? roles.context : roles.selected, entered)
-  }, [box, dark, entered])
+    box.setLook(entered ? roles.context : chain ? roles.chain : roles.selected, entered)
+  }, [box, dark, entered, chain])
   useEffect(() => () => box.dispose(), [box])
   const doc = useEditor((s) => s.doc)
   const preview = useEditor((s) => s.preview)
@@ -804,7 +809,7 @@ function GroupBoxes() {
   const selectedIds = useShownSelection()
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
   const targets = useMemo(() => groupBoxTargets(tree, selectedIds, enteredGroupId), [tree, selectedIds, enteredGroupId])
-  return targets.map(({ id, entered }) => <GroupBoxView key={id} id={id} entered={entered} />)
+  return targets.map(({ chain, entered, id }) => <GroupBoxView key={id} id={id} entered={entered} chain={chain} />)
 }
 
 /** The prefab's (0, 0, 0), in a definition's tab alone (see prefabOrigin.ts). */

@@ -163,11 +163,15 @@ export const selectionSummaryOf = (
   return { name: groups.length === 0 ? items : `${items} · ${counted(groups.length, "group")}`, ordinal: undefined }
 }
 
-/** A group drawn as a box in the viewport. `entered` is the quiet one, standing for the group clicks are inside. */
+/**
+ * A group drawn as a box in the viewport. `entered` is the quiet one, standing for the group clicks are inside; `chain`
+ * says the group is a chain, whose box has a colour of its own.
+ */
 export interface GroupBoxTarget {
   readonly id: string
   readonly keys: ReadonlyArray<string>
   readonly entered: boolean
+  readonly chain: boolean
 }
 
 /** The groups the viewport boxes: every one whole in the selection, and the entered group, selected or not. */
@@ -178,10 +182,13 @@ export const groupBoxTargets = (
 ): ReadonlyArray<GroupBoxTarget> => {
   const selected = selectedGroupIds(tree, selectedIds, enteredGroupId)
   const quiet = enteredGroupId === null ? [] : [enteredGroupId]
-  return [
-    ...selected.map((id) => ({ id, keys: nodeKeys(tree, id), entered: false })),
-    ...quiet.map((id) => ({ id, keys: nodeKeys(tree, id), entered: true }))
-  ]
+  const target = (id: string, entered: boolean) => ({
+    id,
+    keys: nodeKeys(tree, id),
+    entered,
+    chain: findGroup(tree, id)?.chain === true
+  })
+  return [...selected.map((id) => target(id, false)), ...quiet.map((id) => target(id, true))]
 }
 
 /** Whether grouping the selection would change anything: one whole group is a group already. */

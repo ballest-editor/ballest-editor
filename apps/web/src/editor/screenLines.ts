@@ -1,7 +1,7 @@
 /**
  * The line language of what the editor draws over the scene (docs/design/ui-system.md § Scene colours): one set of
  * weights, and one dash, which means "hidden" wherever it is drawn: a selected piece behind another, a snap box's far
- * side. Lines are three's fat lines (`LineSegments2` with a `LineMaterial`), so they have a width in pixels, round ends
+ * side. A group's box has a shorter dash of its own (groupBox.ts). Lines are three's fat lines (`LineSegments2` with a `LineMaterial`), so they have a width in pixels, round ends
  * and antialiased edges, and their dashes are measured on screen.
  *
  * A dash is counted in pixels along its own segment and fitted to it, so a segment starts and ends on a dash and two
@@ -14,7 +14,7 @@ import { LineMaterial, type LineMaterialParameters } from "three/examples/jsm/li
 
 /** Line weights, in CSS pixels. */
 export const LINE_WIDTH = {
-  /** The selection's outline, the paint tool's target, a group's corners. */
+  /** The selection's outline, the paint tool's target, a group's box. */
   outline: 2,
   /** What only would be acted on: the hover, a hidden part, a guide. */
   light: 1.5,
@@ -22,8 +22,14 @@ export const LINE_WIDTH = {
   hairline: 1
 } as const
 
-/** The one dash, in CSS pixels. */
-export const DASH = { on: 6, off: 4 } as const
+/** A dash's lengths on and off, in CSS pixels. */
+export interface Dash {
+  readonly on: number
+  readonly off: number
+}
+
+/** The hidden dash, in CSS pixels. */
+export const DASH: Dash = { on: 6, off: 4 }
 
 /** Where three's line shader takes an edit; each must be in it once (`screenLines.test.ts`). */
 export const LINE_SHADER_ANCHORS = {
@@ -71,10 +77,10 @@ export const editLineShader =
 const glsl = (n: number) => n.toFixed(2)
 
 /**
- * The dash, measured on screen. `flow` is GLSL for a float, 1 where the segment's dashes carry on from its neighbours';
- * none fits every segment's own.
+ * A dash measured on screen, the hidden one unless `dash` says otherwise. `flow` is GLSL for a float, 1 where the
+ * segment's dashes carry on from its neighbours'; none fits every segment's own.
  */
-export const screenDashes = (flow?: string): LineShaderEdit => ({
+export const screenDashes = (flow?: string, dash: Dash = DASH): LineShaderEdit => ({
   vertexHeader: `varying vec2 vDashAlong;
 varying float vDashRun;
 varying vec3 vDashScreen;
@@ -88,7 +94,7 @@ varying float vDashFlow;`,
       vDashScreen = vec3( clip.xy * resolution * 0.5, clip.w );
       vDashAxis = abs( screenRun );
       // a segment shorter than two dashes is part of a curve, whatever its kind: fitted, it would be all dash
-      vDashFlow = max( ${flow ?? "0.0"}, 1.0 - step( ${glsl(2 * (DASH.on + DASH.off))}, vDashRun ) );
+      vDashFlow = max( ${flow ?? "0.0"}, 1.0 - step( ${glsl(2 * (dash.on + dash.off))}, vDashRun ) );
     }`,
   fragmentHeader: `varying vec2 vDashAlong;
 varying float vDashRun;
@@ -96,17 +102,17 @@ varying vec3 vDashScreen;
 varying vec2 vDashAxis;
 varying float vDashFlow;`,
   fragmentStart: `{
-      float dashPeriod = ${glsl(DASH.on + DASH.off)};
-      float dashOn = ${glsl(DASH.on)};
+      float dashPeriod = ${glsl(dash.on + dash.off)};
+      float dashOn = ${glsl(dash.on)};
       float dashAt;
       if ( vDashFlow > 0.5 ) {
         vec2 screen = vDashScreen.xy / vDashScreen.z;
         dashAt = vDashAxis.x >= vDashAxis.y ? screen.x : screen.y;
       } else {
         // a whole number of dashes, so the segment starts and ends on one
-        float count = max( 1.0, floor( ( vDashRun + ${glsl(DASH.off)} ) / dashPeriod + 0.5 ) );
-        dashPeriod = ( vDashRun + ${glsl(DASH.off)} ) / count;
-        dashOn = dashPeriod * ${glsl(DASH.on / (DASH.on + DASH.off))};
+        float count = max( 1.0, floor( ( vDashRun + ${glsl(dash.off)} ) / dashPeriod + 0.5 ) );
+        dashPeriod = ( vDashRun + ${glsl(dash.off)} ) / count;
+        dashOn = dashPeriod * ${glsl(dash.on / (dash.on + dash.off))};
         dashAt = vDashAlong.x / vDashAlong.y;
       }
       if ( mod( dashAt, dashPeriod ) > dashOn ) discard;
