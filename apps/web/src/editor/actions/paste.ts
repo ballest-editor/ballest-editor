@@ -1,7 +1,7 @@
 /**
  * Paste. In the tab the items came from they go back where they were copied, like the game. Anywhere else that place
  * means nothing, so they're placed anew, as a whole: in a map where a palette piece would go, in a definition's tab
- * centred on the prefab's origin (docs/DESKTOP.md § Edit).
+ * centred on the prefab's origin (docs/DESKTOP.md § Menus).
  */
 import type { Vec3 } from "../../domain/coords"
 import { boxCentreOf, itemsBoxOf } from "../../domain/itemBounds"

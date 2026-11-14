@@ -1,9 +1,8 @@
 import { Schema } from "effect"
 
-// ballestrecords.com's Prefab gallery (docs/DESKTOP.md § Prefabs › ballestrecords.com), as main reaches it: the list
-// anyone may read, each prefab's file and thumbnail, and an upload under a sign-in made through the player's browser
-// (the site's ADR 0017). Main makes every request, so the page's `connect-src` stays as it is, and the token never
-// reaches the page.
+// ballestrecords.com's Prefab gallery (docs/DESKTOP.md § Prefabs), as main reaches it: the list anyone may read, each
+// prefab's file and thumbnail, and an upload under a sign-in made through the player's browser (the site's ADR 0017).
+// Main makes every request, so the page's `connect-src` stays as it is, and the token never reaches the page.
 
 /** Where the gallery is; `BALLEST_RECORDS_URL` points a build elsewhere (a preview of the site). */
 export const SITE_URL = "https://ballestrecords.com"

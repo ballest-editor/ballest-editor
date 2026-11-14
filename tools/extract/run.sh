@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Extract Ballest level-editor piece meshes (glb), assets/catalog.json, keybinds.json, materials.json + textures, registry.json.
 #
-#   nix run .#extract -- [GAME_DIR] [options]        (or: nix develop -c tools/extract/run.sh ...)
+#   nix develop -c tools/extract/run.sh [GAME_DIR] [options]
 #
 # GAME_DIR  default: ~/.local/share/Steam/steamapps/common/Ballest of Them All (read only, never written)
 # Options:

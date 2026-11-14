@@ -124,7 +124,10 @@ export interface GroupNode {
    * axes are these. A turn of the whole group adds to it. Absent, the world's axes, as Ctrl+G makes a group.
    */
   readonly rotation?: Quat4
-  /** A chain: its children, in this order, are its links, each hanging off the one before (docs/DESKTOP.md § Chains). */
+  /**
+   * A chain: its children, in this order, are its links, each hanging off the one before (docs/DESKTOP.md § Group
+   * pivots and chains).
+   */
   readonly chain?: true
   /** A chain's growth; absent on a plain group. */
   readonly growth?: ChainGrowth
