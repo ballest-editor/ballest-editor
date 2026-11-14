@@ -31,7 +31,7 @@ import { applySlotMaterials } from "./materials"
 import { batchMeshesOf } from "./meshBatches"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
-import { glbUrl, type Visual, VISUAL_KEY, visualsOf } from "./visuals"
+import { glbUrl, isFlatFaced, type Visual, VISUAL_KEY, visualsOf } from "./visuals"
 import { fixSceneWinding } from "./winding"
 
 const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
@@ -108,9 +108,11 @@ function BoundsBox(
 
 /** A glb in UE local space, re-expressed in the scene frame by the UE -> three matrix. */
 function GlbMesh(
-  { url, slotMaterials, visualKey }: {
+  { flat, url, slotMaterials, visualKey }: {
     readonly url: string
     readonly slotMaterials: ReadonlyArray<string | undefined>
+    /** Whether the mesh is flat-faced (`isFlatFaced`), and so flat-shaded. */
+    readonly flat: boolean
     readonly visualKey: string
   }
 ) {
@@ -130,7 +132,7 @@ function GlbMesh(
     root.add(scene)
     return root
   }, [gltf])
-  useLayoutEffect(() => applySlotMaterials(object, table, slotMaterials), [object, table, slotMaterials])
+  useLayoutEffect(() => applySlotMaterials(object, table, slotMaterials, flat), [object, table, slotMaterials, flat])
   useLayoutEffect(() => batchMeshesOf(object), [object])
   useLayoutEffect(() => {
     object.userData[VISUAL_KEY] = visualKey
@@ -169,7 +171,7 @@ function MeshVisual(
   return (
     <GlbBoundary url={url} fallback={box}>
       <Suspense fallback={<LoadingHint bounds={mesh?.bounds} />}>
-        <GlbMesh url={url} slotMaterials={slotMaterials} visualKey={visualKey} />
+        <GlbMesh url={url} slotMaterials={slotMaterials} flat={isFlatFaced(mesh)} visualKey={visualKey} />
       </Suspense>
     </GlbBoundary>
   )

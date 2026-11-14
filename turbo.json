@@ -125,6 +125,7 @@
         "tools/release/**",
         "tools/driver/**",
         "tools/map/**",
+        "tools/approximate/**",
         "!**/node_modules/**",
         "!**/dist/**",
         "!**/dist-electron/**"
@@ -145,7 +146,8 @@
         "tools/dev/src/**",
         "tools/release/src/**",
         "tools/driver/src/**",
-        "tools/map/src/**"
+        "tools/map/src/**",
+        "tools/approximate/src/**"
       ]
     },
     "//#format:check": {

@@ -512,6 +512,21 @@ export function SettingsDialog(props: {
         )
       },
       {
+        id: "approximate",
+        ...setting("beta", "approximate"),
+        label: "Approximate 3D models",
+        description: "Adds Approximate 3D model… to the Tools menu: a prefab of pieces shaped like a 3D file.",
+        info:
+          "Still taking shape: it may change or go away. Reads GLB, glTF, STL, OBJ, PLY, 3MF and FBX files, and fitting one can take half a minute.",
+        keywords: "approximate import model mesh stl glb obj 3d prefab plates beta",
+        control: (
+          <Switch
+            checked={settings.beta.approximate}
+            onCheckedChange={(v) => update("beta", { approximate: v })}
+          />
+        )
+      },
+      {
         id: "fov",
         ...setting("camera", "fovPreset"),
         label: "Field of view",

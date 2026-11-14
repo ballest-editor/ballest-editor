@@ -15,6 +15,8 @@
     "release:mock-server": "node tools/release/src/main.ts mock-server",
     "driver": "node tools/driver/src/main.ts",
     "map": "node --import ./tools/map/src/register.ts tools/map/src/main.ts",
+    "approximate-bench": "node --import ./tools/map/src/register.ts tools/approximate/src/bench.ts",
+    "approximate-golden": "node --import ./tools/map/src/register.ts tools/approximate/src/golden.ts",
     "test": "node tools/dev/src/run-turbo.ts test",
     "typecheck": "node tools/dev/src/run-turbo.ts typecheck",
     "lint": "pnpm lint:files apps packages tools",

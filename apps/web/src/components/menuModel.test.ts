@@ -32,6 +32,7 @@ const state = (over: Partial<MenuState> = {}): MenuState => ({
   selectionCount: 0,
   measurements: 0,
   units: "cm",
+  approximate: false,
   layout: defaultViewLayout,
   projection: "perspective",
   update: null,
@@ -200,5 +201,21 @@ describe("the menus", () => {
       entries(over).find(({ label }) => label === "Re-import from game")?.reason
     assert.include(reason({}), "Export this map first")
     assert.isNull(reason({ reimportable: "map.balledit" }))
+  })
+})
+
+describe("the Tools menu's Approximate 3D model", () => {
+  const found = (over?: Partial<MenuState>) => find("approximate 3d", over)
+
+  it("is only there with the beta switch on, and never in File", () => {
+    assert.deepStrictEqual(found(), [])
+    assert.deepStrictEqual(found({ approximate: true }), ["Tools › Approximate 3D model…"])
+    assert.deepStrictEqual(found({ approximate: true, capabilities: BROWSER }), ["Tools › Approximate 3D model…"])
+  })
+
+  it("needs no tab open", () => {
+    const row = entries({ approximate: true, noTabOff: "Open a map first." })
+      .find(({ label }) => label === "Approximate 3D model…")
+    assert.strictEqual(row?.reason, null)
   })
 })

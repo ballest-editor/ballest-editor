@@ -1,0 +1,13 @@
+{
+  "name": "@ballest/approximate",
+  "private": true,
+  "type": "module",
+  "description": "`pnpm approximate-bench`: the 3D model approximation methods side by side on sample models, at equal piece counts",
+  "scripts": {
+    "typecheck": "effect-tsgo tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@ballest/web": "workspace:*",
+    "@types/node": "^22.20.5"
+  }
+}

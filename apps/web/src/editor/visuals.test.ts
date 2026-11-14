@@ -2,7 +2,8 @@ import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { Catalog, indexCatalog } from "../domain/Catalog"
 import { identityTransform, itemFromPiece } from "../domain/factory"
-import { visualsOf } from "./visuals"
+import { hasCatalog, readCatalog } from "../test/samples"
+import { isFlatFaced, visualsOf } from "./visuals"
 
 const CUBE = "/Engine/BasicShapes/Cube.Cube"
 const BEAM = "/Game/Art/UsedMarketPlace/StylizedFX_Collection_q/M_AJ_LandRay.M_AJ_LandRay"
@@ -107,5 +108,26 @@ describe("visualsOf, 0.4.1", () => {
       true,
       false
     ])
+  })
+})
+
+describe("isFlatFaced", () => {
+  it.skipIf(!hasCatalog)("is the catalog's Pyramid, mirrored or not, and no rounded or box piece", () => {
+    const index = indexCatalog(readCatalog())
+    const flatOf = (className: string, mirrored = false) => {
+      const piece = [...index.pieceByClass.values()].find((p) => p.className === className)
+      if (piece === undefined) throw new Error(`no ${className}`)
+      const item = itemFromPiece(piece, identityTransform())
+      const baked = index.mirrorMeshes.get(piece.meshAssetPath ?? "")
+      const drawn = mirrored && baked !== undefined
+        ? { ...item, meshComponents: item.meshComponents.map((mc) => ({ ...mc, meshAssetPath: baked })) }
+        : item
+      return visualsOf(drawn, index).map((v) => isFlatFaced(v.mesh))
+    }
+    assert.deepStrictEqual(flatOf("MP_Pyramid"), [true])
+    assert.deepStrictEqual(flatOf("MP_Pyramid", true), [true])
+    assert.deepStrictEqual(flatOf("MP_Cone"), [false])
+    assert.deepStrictEqual(flatOf("BP_Prim_Cube"), [false])
+    assert.isFalse(isFlatFaced(undefined))
   })
 })

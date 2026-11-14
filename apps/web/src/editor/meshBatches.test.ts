@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
+import { parseMaterialsFile } from "../domain/Materials"
+import { materialsFile, OUTLINE } from "../test/materials"
+import { applySlotMaterials } from "./materials"
 import { batchMeshesOf, isShown, MeshBatches, traverseShown } from "./meshBatches"
 
 const geometry = new THREE.BoxGeometry(1, 1, 1)
@@ -150,6 +153,24 @@ describe("MeshBatches", () => {
     expect(mesh.visible).toBe(true)
     expect(sync()).toBe(true)
     expect(instancedUnder(batches)).toHaveLength(0)
+  })
+
+  it("batches flat-shaded meshes of one paint together, apart from the smooth ones, when the materials change", () => {
+    const { add, batches, sync } = setUp()
+    const table = parseMaterialsFile(materialsFile)
+    const items = [add(100), add(200), add(300)]
+    for (const { group } of items) applySlotMaterials(group, table, [OUTLINE])
+    sync()
+    expect(instancedUnder(batches).map(placesOf)).toEqual([[100, 200, 300]])
+    // The first two turn out to be flat-faced, as when ItemObject's effect runs again.
+    for (const { group } of items.slice(0, 2)) applySlotMaterials(group, table, [OUTLINE], true)
+    sync()
+    const flat = items[0]?.mesh.material
+    expect(flat).not.toBe(items[2]?.mesh.material)
+    expect(instancedUnder(batches).map((batch) => [batch.material === flat, placesOf(batch)])).toEqual([
+      [false, [300]],
+      [true, [100, 200]]
+    ])
   })
 
   it("makes room for as many meshes as come", () => {

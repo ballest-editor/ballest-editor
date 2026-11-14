@@ -131,7 +131,9 @@ export const GizmoSettings = Schema.Struct({
 /** Features still taking shape, off until turned on in Settings › Beta. */
 export const BetaSettings = Schema.Struct({
   /** Lay along in a chain's Inspector section: Straight and Helix (docs/design/pivot-modes-and-chains.md). */
-  chainLay: Schema.Boolean
+  chainLay: Schema.Boolean,
+  /** Tools › Approximate 3D model: a prefab of pieces shaped like a 3D file (docs/APPROXIMATE.md). */
+  approximate: Schema.Boolean
 })
 
 export const Settings = Schema.Struct({
@@ -185,7 +187,7 @@ export const defaultSettings: Settings = {
     paintView: "row"
   },
   gizmo: { size: "m", showForGroups: true },
-  beta: { chainLay: false }
+  beta: { chainLay: false, approximate: false }
 }
 
 /** The fixed grid colours older saves stored; they now mean "automatic". */

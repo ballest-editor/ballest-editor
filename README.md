@@ -61,6 +61,7 @@ The web review build is the same editor in a browser, without anything that need
 | [docs/PROJECTS.md](docs/PROJECTS.md)                                     | Projects, maps and exports: the model, the files on disk, the design to come    |
 | [docs/DESKTOP.md](docs/DESKTOP.md)                                       | How the desktop app behaves and why                                             |
 | [docs/SNAPPING.md](docs/SNAPPING.md)                                     | Snapping: the feature design for bases, targets, priority and the tools on them |
+| [docs/APPROXIMATE.md](docs/APPROXIMATE.md)                               | Approximate 3D model (beta): a prefab of pieces shaped like a 3D file           |
 | [docs/DRIVER.md](docs/DRIVER.md)                                         | The game driver: its design and what was measured                               |
 | [docs/design/ui-system.md](docs/design/ui-system.md)                     | The UI's type, greys, radii and spacing: the one system every view follows      |
 | [docs/design/keybinding-contexts.md](docs/design/keybinding-contexts.md) | Where a keybind works: the drag, tool and platform conditions on every action   |
@@ -74,6 +75,7 @@ The web review build is the same editor in a browser, without anything that need
 | [tools/release](tools/release/README.md)                                 | Installers and releases                                                         |
 | [tools/driver](tools/driver/README.md)                                   | Running the game driver                                                         |
 | [tools/map](tools/map/README.md)                                         | Inspecting, validating, diffing and generating maps                             |
+| [tools/approximate](tools/approximate/README.md)                         | Benchmarking the 3D model approximation methods, and checking a change to them  |
 
 ## Notice
 

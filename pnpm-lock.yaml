@@ -325,6 +325,9 @@ importers:
       effect:
         specifier: ^4.0.6
         version: 4.0.6
+      meshoptimizer:
+        specifier: 1.1.1
+        version: 1.1.1
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -440,6 +443,15 @@ importers:
       tailwindcss:
         specifier: ^4
         version: 4.3.3
+
+  tools/approximate:
+    devDependencies:
+      '@ballest/web':
+        specifier: workspace:*
+        version: link:../../apps/web
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
 
   tools/dev:
     devDependencies:
