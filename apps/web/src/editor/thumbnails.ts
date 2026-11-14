@@ -270,18 +270,34 @@ interface Stage {
   readonly camera: THREE.PerspectiveCamera
 }
 
-let stage: Stage | undefined
-const newStage = (): Stage => {
-  const canvas = document.createElement("canvas")
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
-  renderer.setClearColor(0x000000, 0)
+/** A scene with the viewport's lights, so a picture matches what gets placed. */
+export const litScene = (): THREE.Scene => {
   const scene = new THREE.Scene()
-  // The viewport's lights, so a thumbnail matches what gets placed.
   scene.add(new THREE.AmbientLight(0xffffff, 0.6))
   scene.add(new THREE.HemisphereLight("#dfe8ff", "#30302a", 0.8))
   const sun = new THREE.DirectionalLight(0xffffff, 1.6)
   sun.position.set(3000, 8000, 2000)
   scene.add(sun)
+  return scene
+}
+
+/** Everything a definition's items draw, each where it stands, for a view of its own (the upload's angle picker). */
+export const buildDefinition = async (
+  items: ReadonlyArray<Item>,
+  index: CatalogIndex,
+  table: MaterialTable
+): Promise<THREE.Group | undefined> => {
+  const group = await buildItems(items, index, table)
+  if (group !== undefined) await whenTexturesReady(texturesOf(group), TEXTURE_WAIT_MS)
+  return group
+}
+
+let stage: Stage | undefined
+const newStage = (): Stage => {
+  const canvas = document.createElement("canvas")
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
+  renderer.setClearColor(0x000000, 0)
+  const scene = litScene()
   const camera = new THREE.PerspectiveCamera(FOV, 1)
   return { renderer, scene, camera }
 }

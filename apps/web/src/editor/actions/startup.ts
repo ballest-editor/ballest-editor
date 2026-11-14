@@ -16,6 +16,7 @@ import { offerRecovery } from "./recovery"
 import { followRecovery } from "./recoverySnapshots"
 import { run, runUntilCleanup } from "./run"
 import { refreshProject } from "./shared"
+import { loadSiteAccountEffect } from "./site"
 import { checkExportsEffect } from "./sync"
 import { leavingFor } from "./unsaved"
 
@@ -113,6 +114,7 @@ export const loadPlatform = () =>
       if (capabilities.exportToGame) yield* checkGameLinkEffect
       yield* checkExportsEffect
       yield* loadUsageStatsEffect
+      yield* loadSiteAccountEffect
       // last: a dialog that opens takes another's place, and this is the one not to miss
       yield* offerRecovery
     })

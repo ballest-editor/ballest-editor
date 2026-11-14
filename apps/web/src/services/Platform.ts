@@ -49,9 +49,14 @@ import type {
   ReimportMapPayload,
   RenamePrefabPayload,
   SendFeedbackResult,
+  SiteAccount,
+  SitePrefabPage,
+  SiteSignInResult,
+  SiteUploadResult,
   UnloadKind,
   UnsavedChoice,
   UpdateState,
+  UploadPrefabPayload,
   UsageStatsState,
   WriteMapThumbnailPayload,
   WritePrefabPayload
@@ -109,6 +114,8 @@ export interface PlatformCapabilities {
   readonly updates: boolean
   /** Help › Send feedback, and anonymous usage statistics (docs/DESKTOP.md § Feedback and usage statistics). */
   readonly feedback: boolean
+  /** ballestrecords.com's prefabs: browsing, placing and uploading (docs/DESKTOP.md § Prefabs). */
+  readonly site: boolean
 }
 
 /**
@@ -327,6 +334,19 @@ export class Platform extends Context.Service<Platform, {
     readonly enabled?: boolean
     readonly noticeShown?: boolean
   }) => Effect.Effect<UsageStatsState, PlatformError>
+  /** One page of ballestrecords.com's prefabs, most favourited first (desktop). */
+  readonly listSitePrefabs: (query: string, cursor: number | null) => Effect.Effect<SitePrefabPage, PlatformError>
+  /** A site prefab's thumbnail as a data URL; null when it has none (desktop). */
+  readonly readSitePrefabThumb: (slug: string) => Effect.Effect<string | null, PlatformError>
+  /** A site prefab's file, as text (desktop). */
+  readonly readSitePrefab: (slug: string) => Effect.Effect<string, PlatformError>
+  /** Whether the player is signed in to the site here (desktop; a browser never is). */
+  readonly siteAccount: Effect.Effect<SiteAccount, PlatformError>
+  /** Signs in to the site through the browser (desktop). */
+  readonly signInToSite: Effect.Effect<SiteSignInResult, PlatformError>
+  readonly signOutOfSite: Effect.Effect<void, PlatformError>
+  /** Uploads a tier's prefab to the site (desktop). */
+  readonly uploadPrefab: (payload: UploadPrefabPayload) => Effect.Effect<SiteUploadResult, PlatformError>
   /** Keeps an unhandled error for the next usage batch (desktop, while usage statistics are on). */
   readonly reportError: (message: string, stack: string) => Effect.Effect<void, PlatformError>
 }>()("ballest/services/Platform") {
@@ -347,7 +367,8 @@ const browserCapabilities: PlatformCapabilities = {
   launchGame: false,
   play: false,
   updates: false,
-  feedback: false
+  feedback: false,
+  site: false
 }
 
 /** Main's errors arrive as "Error invoking remote method '<channel>': ProjectError: <message>". */
@@ -412,7 +433,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
       launchGame: true,
       play: true,
       updates: true,
-      feedback: true
+      feedback: true,
+      site: true
     },
     runtimeVersions: bridge.versions,
     pickMapFile: call("pickImport").pipe(Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))),
@@ -491,6 +513,13 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     sendFeedback: (form) => call("sendFeedback", form),
     usageStats: call("usageStats"),
     setUsageStats: (patch) => call("setUsageStats", patch),
+    listSitePrefabs: (query, cursor) => call("listSitePrefabs", { query, cursor }),
+    readSitePrefabThumb: (slug) => call("readSitePrefabThumb", { slug }),
+    readSitePrefab: (slug) => call("readSitePrefab", { slug }).pipe(Effect.map(({ text }) => text)),
+    siteAccount: call("siteAccount"),
+    signInToSite: call("signInToSite"),
+    signOutOfSite: call("signOutOfSite"),
+    uploadPrefab: (payload) => call("uploadPrefab", payload),
     reportError: (message, stack) =>
       call("reportError", {
         message: message.slice(0, REPORTED_ERROR_LIMIT),
@@ -679,6 +708,13 @@ const makeBrowser = (): Platform["Service"] => {
     sendFeedback: () => desktopOnly,
     usageStats: Effect.succeed({ enabled: false, noticeShown: true, collecting: false }),
     setUsageStats: () => desktopOnly,
+    listSitePrefabs: () => desktopOnly,
+    readSitePrefabThumb: () => Effect.succeed(null),
+    readSitePrefab: () => desktopOnly,
+    siteAccount: Effect.succeed({ _tag: "SignedOut" }),
+    signInToSite: desktopOnly,
+    signOutOfSite: Effect.void,
+    uploadPrefab: () => desktopOnly,
     reportError: () => Effect.void
   })
 }

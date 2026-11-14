@@ -1,5 +1,5 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Option } from "effect"
 import * as Electron from "electron"
 import { program } from "./app/DesktopApp"
 import { DesktopEnvironment } from "./app/DesktopEnvironment"
@@ -23,6 +23,8 @@ import { layerProjects } from "./project/layers"
 import { Recovery } from "./project/Recovery"
 import { WindowRegistry } from "./project/WindowRegistry"
 import { DesktopSettings } from "./settings/DesktopSettings"
+import { SiteAccount, SiteSeal } from "./site/SiteAccount"
+import { SiteClient } from "./site/SiteClient"
 import { DesktopUpdates } from "./updates/DesktopUpdates"
 import { CollectClient } from "./usage/CollectClient"
 import { UsageStats } from "./usage/UsageStats"
@@ -51,6 +53,32 @@ const layerElectron = Layer.mergeAll(
   DesktopIpc.layer(Electron.ipcMain)
 )
 
+/**
+ * The site token at rest, sealed with the OS's own keystore (`safeStorage`). Without one there is no seal, and
+ * `SiteAccount` keeps the token in memory rather than write it down plain.
+ */
+const layerSiteSeal = Layer.succeed(
+  SiteSeal,
+  SiteSeal.of({
+    seal: (text) =>
+      Effect.tryPromise(async () =>
+        await Electron.safeStorage.isAsyncEncryptionAvailable()
+          ? Option.some(`safe:${(await Electron.safeStorage.encryptStringAsync(text)).toString("base64")}`)
+          : Option.none<string>()
+      ).pipe(Effect.orElseSucceed(() => Option.none())),
+    open: (sealed) =>
+      Effect.tryPromise(async () => {
+        if (!sealed.startsWith("safe:") || !(await Electron.safeStorage.isAsyncEncryptionAvailable())) {
+          return Option.none<string>()
+        }
+        const { result } = await Electron.safeStorage.decryptStringAsync(
+          Buffer.from(sealed.slice("safe:".length), "base64")
+        )
+        return Option.some(result)
+      }).pipe(Effect.orElseSucceed(() => Option.none()))
+  })
+)
+
 const layerGame = Layer.mergeAll(GameCreator.layer, GameLink.layer).pipe(
   Layer.provideMerge(Layer.mergeAll(GamePaths.layer, GameProcess.layer)),
   Layer.provide(SteamLibrary.layer),
@@ -68,9 +96,12 @@ const layerDesktopRuntime = Layer.mergeAll(
   WindowLauncher.layer,
   NotificationLog.layer,
   GamePlay.layer,
-  UsageStats.layer
+  UsageStats.layer,
+  SiteAccount.layer
 ).pipe(
   Layer.provideMerge(CollectClient.layer((url, init) => Electron.net.fetch(url, init))),
+  Layer.provideMerge(SiteClient.layer((url, init) => Electron.net.fetch(url, init))),
+  Layer.provideMerge(layerSiteSeal),
   Layer.provideMerge(layerProjectsAndGame),
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),

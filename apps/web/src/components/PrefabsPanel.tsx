@@ -1,5 +1,5 @@
 import type { PrefabInfo, PrefabTier } from "@ballest/contracts"
-import { IconBoxMultiple, IconDots } from "@tabler/icons-react"
+import { IconBoxMultiple, IconDots, IconWorld } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@workspace/ui/components/context-menu"
 import {
@@ -13,7 +13,7 @@ import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useState } from "react"
+import { type MouseEvent, useEffect, useMemo, useState } from "react"
 import { termsOf } from "../domain/outline"
 import { PREFAB_NEEDS_PROJECT, PREFAB_TIER_HINTS, prefabTierLabel } from "../domain/prefab"
 import { instancesOfPrefab } from "../domain/prefabInstance"
@@ -24,13 +24,15 @@ import {
   placePrefab,
   readDefinitionItems,
   revealPrefabs,
-  selectInstances
+  selectInstances,
+  startUploadPrefab
 } from "../editor/actions"
 import { startPrefabDrag } from "../editor/prefabDrag"
 import { NO_TAB_OPEN, noTabOpen, useEditor, useOpenPrefab } from "../editor/store"
 import { definitionThumbnailFor } from "../editor/thumbnails"
 import { focusViewport } from "../editor/Viewport"
 import { StripButton } from "./dock/StripButton"
+import { EmptySection } from "./EmptySection"
 import { THUMBNAIL_TILE, useSeen } from "./PieceThumbnail"
 import { SectionTitle } from "./SectionTitle"
 
@@ -70,6 +72,7 @@ export function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
 /** A prefab's menu, the same from its ⋮ and from a right-click. Mounted only while one of them is open. */
 function PrefabMenuItems({ prefab }: { readonly prefab: PrefabInfo }) {
   const projects = useEditor((s) => s.capabilities.projects)
+  const site = useEditor((s) => s.capabilities.site)
   const hasProject = useEditor((s) => s.project?.current != null)
   const openDialog = useEditor((s) => s.openDialog)
   const inDefinition = useOpenPrefab() !== null
@@ -96,6 +99,11 @@ function PrefabMenuItems({ prefab }: { readonly prefab: PrefabInfo }) {
             Copy to {prefabTierLabel(otherTier, projects).toLowerCase()}
           </DropdownMenuItem>
         </span>
+      )}
+      {site && (
+        <DropdownMenuItem disabled={!readable} onClick={() => startUploadPrefab(ref)}>
+          Upload to ballestrecords.com…
+        </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={() => openDialog({ id: "deletePrefab", prefab: ref })}>Delete…</DropdownMenuItem>
@@ -186,16 +194,6 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
   )
 }
 
-/** A section with nothing to list: one line, centred, and what to do about it underneath if there is anything. */
-export function EmptySection({ children, line }: { readonly children?: ReactNode; readonly line: string }) {
-  return (
-    <div className="flex flex-col items-center gap-2 px-2 py-1 text-center">
-      <p className="text-body text-fg-tertiary">{line}</p>
-      {children}
-    </div>
-  )
-}
-
 /** Untitled Project has no project tier: its section names the project from here. */
 function NoProject() {
   const openDialog = useEditor((s) => s.openDialog)
@@ -215,10 +213,15 @@ const DESKTOP_TIERS: ReadonlyArray<{ readonly tier: PrefabTier; readonly hint: s
 
 const BROWSER_TIERS: typeof DESKTOP_TIERS = [{ tier: "user", hint: "Kept in memory until the page closes." }]
 
-/** The library of prefabs (docs/DESKTOP.md § Prefabs), one section per tier. A browser has the one tier, in memory. */
+/**
+ * The library of prefabs (docs/DESKTOP.md § Prefabs), one section per tier, with Browse ballestrecords beside the filter on the desktop. A
+ * browser has the one tier, in memory.
+ */
 export function PrefabsPanel() {
   const prefabs = useEditor((s) => s.prefabs)
   const projects = useEditor((s) => s.capabilities.projects)
+  const site = useEditor((s) => s.capabilities.site)
+  const openDialog = useEditor((s) => s.openDialog)
   const hasProject = useEditor((s) => s.project?.current != null)
   const [query, setQuery] = useState("")
   const terms = termsOf(query)
@@ -226,16 +229,30 @@ export function PrefabsPanel() {
     prefabs.filter((p) => p.tier === tier && terms.every((term) => p.name.toLowerCase().includes(term)))
   return (
     <aside className="flex h-full min-w-0 flex-col gap-2 bg-card p-2">
-      <Input
-        type="search"
-        aria-label="Filter the prefabs"
-        placeholder="Filter prefabs…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setQuery("")
-        }}
-      />
+      <div className="flex items-center gap-1">
+        <Input
+          type="search"
+          aria-label="Filter the prefabs"
+          placeholder="Filter prefabs…"
+          className="min-w-0 flex-1"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setQuery("")
+          }}
+        />
+        {site && (
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button variant="outline" size="icon-sm" aria-label="Browse ballestrecords" />}
+              onClick={() => openDialog({ id: "siteGallery" })}
+            >
+              <IconWorld />
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Browse ballestrecords</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3">
           {(projects ? DESKTOP_TIERS : BROWSER_TIERS).map(({ hint, tier }) => (

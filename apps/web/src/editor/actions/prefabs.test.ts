@@ -21,12 +21,10 @@ import {
   type TestDisk,
   userPrefabFile
 } from "../../test/desktopBridge"
-import { createNewMap, layerFor, reset, s } from "../../test/editorActions"
+import { createNewMap, layerFor, reset, s, startPrefabMap } from "../../test/editorActions"
 import { objectAt, parseJson } from "../../test/json"
-import { VIEW_DOWN } from "../../test/placementView"
 import { changedPrefab, overrideFields, PREFAB_TEXT } from "../../test/prefabs"
 import { repoRoot } from "../../test/samples"
-import { sceneRegistry } from "../sceneRegistry"
 import {
   isBlankTab,
   isUnsavedTab,
@@ -41,7 +39,6 @@ import {
 import { restorePrefabBackupEffect } from "./backups"
 import { exportToGameEffect, playEffect } from "./exportPlay"
 import { openProjectMapFile } from "./maps"
-import { spreadPlacement } from "./placement"
 import {
   checkPrefabs,
   deletePrefabEffect,
@@ -80,15 +77,7 @@ const toastsOf = (kind: string) => s().toasts.filter((n) => n.kind === kind)
 
 /** A saved map and the catalog, with the fixture in the game's prefabs folder. */
 const started = (disk: TestDisk) =>
-  Effect.gen(function*() {
-    yield* reset
-    useEditor.setState({ notifications: [], toasts: [], prefabs: [], catalogIndex: indexCatalog(parsed) })
-    sceneRegistry.placementPoint = (width, height) => spreadPlacement(AIM, width, VIEW_DOWN, height)
-    disk.files.set(userPrefabFile("Bridge"), PREFAB_TEXT)
-    yield* createNewMap("Big Loop", "Isaac")
-    yield* checkPrefabs
-    return s().tabId
-  })
+  startPrefabMap(indexCatalog(parsed), AIM, () => disk.files.set(userPrefabFile("Bridge"), PREFAB_TEXT))
 
 const placed = Effect.gen(function*() {
   yield* placePrefabEffect(USER)

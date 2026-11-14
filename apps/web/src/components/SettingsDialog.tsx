@@ -40,6 +40,7 @@ import { CheckAgainButton, useGameLinkSettings } from "./GameLink"
 import { KeybindWhen, useKeybindCapture } from "./KeybindControl"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
+import { siteAccountSettingsRow } from "./SiteAccountSetting"
 
 /** Each answers the row's label, "Movement keys need the look button". */
 const movementLookItems = {
@@ -153,6 +154,8 @@ export function SettingsDialog(props: {
   const foundCreator = useEditor((s) => s.foundCreator)
   const snapFactory = useEditor(snapDefaultsAreFactory)
   const usageStats = useEditor((s) => s.usageStats)
+  const site = useEditor((s) => s.capabilities.site)
+  const siteAccount = useEditor((s) => s.siteAccount)
 
   // The game or the plugin manager may have been installed, run or moved since, and Steam logged in as someone else:
   // look the folders, the plugin and the creator name up each time the dialog opens.
@@ -315,6 +318,7 @@ export function SettingsDialog(props: {
           } satisfies Row
         ]
         : []),
+      ...(site ? [siteAccountSettingsRow(siteAccount)] : []),
       {
         id: "placeDistance",
         ...setting("editor", "placeDistance"),
